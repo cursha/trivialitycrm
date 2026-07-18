@@ -103,3 +103,81 @@ export async function findPotentialDuplicates(
     })
     .filter((candidate) => candidate.matchedOn.length > 0);
 }
+
+export type RejectedMatch = {
+  id: string;
+  name: string;
+  city: string;
+  region: string;
+  rejectionReasonId: string | null;
+  matchedOn: DuplicateMatchReason[];
+};
+
+/**
+ * Checks a freshly-discovered research candidate against every previously
+ * REJECTED SearchResult (across all past searches, not just the current
+ * one) — this is what lets the research pipeline "remember" a rejected
+ * location instead of resuggesting it every time a search overlaps the same
+ * area. Callers (run-search.ts) use a match to auto-mark the new candidate
+ * REJECTED again while still writing the row, so an authorized user can
+ * still find and restore it via the existing restore_rejected permission.
+ */
+export async function findPriorRejectedMatches(
+  prisma: Pick<PrismaClient, "searchResult">,
+  input: DuplicateCandidateInput,
+): Promise<RejectedMatch[]> {
+  const { normalizedName, normalizedPhone, normalizedEmail, websiteDomain } = computeNormalizedFields(input);
+  const normalizedAddress = input.address1 ? normalizeAddressLine(input.address1) : null;
+
+  const orConditions: Record<string, unknown>[] = [{ normalizedName }];
+  if (websiteDomain) orConditions.push({ websiteDomain });
+  if (normalizedPhone) orConditions.push({ normalizedPhone });
+  if (normalizedEmail) orConditions.push({ normalizedEmail });
+
+  const candidates = await prisma.searchResult.findMany({
+    where: { disposition: "REJECTED", OR: orConditions },
+    select: {
+      id: true,
+      name: true,
+      city: true,
+      region: true,
+      rejectionReasonId: true,
+      normalizedName: true,
+      normalizedPhone: true,
+      normalizedEmail: true,
+      websiteDomain: true,
+      address1: true,
+      postalCode: true,
+      country: true,
+    },
+  });
+
+  return candidates
+    .map((candidate) => {
+      const matchedOn: DuplicateMatchReason[] = [];
+
+      if (candidate.normalizedName === normalizedName) matchedOn.push("name");
+      if (websiteDomain && candidate.websiteDomain === websiteDomain) matchedOn.push("websiteDomain");
+      if (normalizedPhone && candidate.normalizedPhone === normalizedPhone) matchedOn.push("phone");
+      if (normalizedEmail && candidate.normalizedEmail === normalizedEmail) matchedOn.push("email");
+      if (
+        normalizedAddress &&
+        candidate.address1 &&
+        normalizeAddressLine(candidate.address1) === normalizedAddress &&
+        candidate.postalCode === input.postalCode &&
+        candidate.country === input.country
+      ) {
+        matchedOn.push("address");
+      }
+
+      return {
+        id: candidate.id,
+        name: candidate.name,
+        city: candidate.city,
+        region: candidate.region,
+        rejectionReasonId: candidate.rejectionReasonId,
+        matchedOn,
+      };
+    })
+    .filter((candidate) => candidate.matchedOn.length > 0);
+}

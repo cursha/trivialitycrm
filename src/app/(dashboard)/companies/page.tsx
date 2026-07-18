@@ -55,6 +55,13 @@ export default async function CompaniesPage({
   ]);
 
   const canAdd = hasPermission(user, "add_leads");
+  const canExport = hasPermission(user, "export_leads");
+
+  const exportQuery = new URLSearchParams(
+    ["leadTypeId", "pipelineStageId", "competitorId"]
+      .map((key) => [key, toSingle(params[key])] as const)
+      .filter((entry): entry is [string, string] => !!entry[1]),
+  ).toString();
 
   const queryWithoutPage = new URLSearchParams(
     Object.entries(params).flatMap(([key, value]) =>
@@ -75,15 +82,25 @@ export default async function CompaniesPage({
           <h1 className="text-3xl font-black tracking-tight">Companies</h1>
           <p className="mt-1 text-slate-500">{total} matching companies.</p>
         </div>
-        {canAdd && (
-          <Link
-            href="/companies/new"
-            className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white shadow-lg shadow-blue-200"
-          >
-            <CirclePlus size={19} />
-            Add company
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          {canExport && (
+            <a
+              href={`/api/export/companies?format=csv${exportQuery ? `&${exportQuery}` : ""}`}
+              className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600"
+            >
+              Export CSV
+            </a>
+          )}
+          {canAdd && (
+            <Link
+              href="/companies/new"
+              className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white shadow-lg shadow-blue-200"
+            >
+              <CirclePlus size={19} />
+              Add company
+            </Link>
+          )}
+        </div>
       </div>
 
       <CompaniesFilters leadTypes={leadTypes} pipelineStages={pipelineStages} salespeople={salespeople} competitors={competitors} />
