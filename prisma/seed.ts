@@ -44,6 +44,10 @@ const permissions: { key: string; label: string }[] = [
   { key: "manage_settings", label: "Manage settings" },
   { key: "restore_rejected", label: "Restore rejected AI search results" },
   { key: "restore_archived_leads", label: "Restore archived companies" },
+  { key: "run_research", label: "Run AI lead research searches" },
+  { key: "review_research_results", label: "Review AI research results" },
+  { key: "transfer_leads", label: "Transfer AI research results to the CRM" },
+  { key: "view_evidence", label: "View AI research evidence and citations" },
 ];
 
 // Initial role -> permission grants. All grants are stored as editable

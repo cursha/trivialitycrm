@@ -22,6 +22,21 @@ enum SearchResultDisposition {
   DUPLICATE
 }
 
+enum SearchJobStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum LeadSearchMode {
+  TRIVIA_GAP
+  TRIVIA_CONFIRMED
+  COMPETITOR
+  GENERAL
+}
+
 enum ActivityType {
   PHONE
   EMAIL
@@ -31,6 +46,7 @@ enum ActivityType {
   TRIAL
   NOTE
   PIPELINE_CHANGE
+  LEAD_TRANSFERRED
 }
 
 enum TaskStatus {
@@ -121,6 +137,7 @@ model User {
   tasks                   Task[]                  @relation("TaskAssignee")
   prompts                 PromptTemplate[]
   searches                LeadSearch[]
+  importTemplates         ImportTemplate[]
   createdEvidence         EvidenceRecord[]        @relation("EvidenceCreator")
   scoredHistoricalRecords HistoricalScoreRecord[] @relation("ScoreAuthor")
   createdAt               DateTime                @default(now())
@@ -197,14 +214,15 @@ model RejectionReason {
 }
 
 model Competitor {
-  id         String       @id @default(cuid())
-  name       String       @unique
-  websiteUrl String?
-  active     Boolean      @default(true)
-  companies  Company[]
-  searches   LeadSearch[]
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
+  id            String         @id @default(cuid())
+  name          String         @unique
+  websiteUrl    String?
+  active        Boolean        @default(true)
+  companies     Company[]
+  searches      LeadSearch[]
+  searchResults SearchResult[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model Company {
@@ -418,6 +436,7 @@ model PromptTemplate {
   id                  String       @id @default(cuid())
   name                String
   qualificationPrompt String       @db.Text
+  archived            Boolean      @default(false)
   createdById         String
   createdBy           User         @relation(fields: [createdById], references: [id])
   searches            LeadSearch[]
@@ -435,14 +454,26 @@ model LeadSearch {
   region         String
   cities         Json
   minimumScore   Int             @default(80)
+  mode           LeadSearchMode  @default(GENERAL)
   promptSnapshot String          @db.Text
   prompt         PromptTemplate? @relation(fields: [promptId], references: [id], onDelete: SetNull)
   createdBy      User            @relation(fields: [createdById], references: [id])
   leadType       LeadType        @relation(fields: [leadTypeId], references: [id])
   competitor     Competitor?     @relation(fields: [competitorId], references: [id], onDelete: SetNull)
   results        SearchResult[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+
+  // Background-job tracking (single-process runner — see run-search.ts).
+  status          SearchJobStatus @default(PENDING)
+  startedAt       DateTime?
+  completedAt     DateTime?
+  heartbeatAt     DateTime?
+  errorMessage    String?         @db.Text
+  candidatesFound Int             @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, heartbeatAt])
 }
 
 model SearchResult {
@@ -450,6 +481,7 @@ model SearchResult {
   searchId          String
   companyId         String?
   rejectionReasonId String?
+  competitorId      String?
   name              String
   address1          String?
   city              String
@@ -462,15 +494,33 @@ model SearchResult {
   contactData       Json?
   score             Int
   explanation       String                  @db.Text
+  // Structured convention (no schema-level shape, defined at the app layer):
+  // evidence = { category, note, sourceUrl, verificationStatus }[]
+  // sources  = { url, title }[] flat citation list for quick display
   evidence          Json
   sources           Json
+  triviaStatus      TriviaStatus            @default(UNCERTAIN)
   disposition       SearchResultDisposition @default(NEW)
   researchedAt      DateTime                @default(now())
   search            LeadSearch              @relation(fields: [searchId], references: [id], onDelete: Cascade)
   company           Company?                @relation(fields: [companyId], references: [id], onDelete: SetNull)
   rejectionReason   RejectionReason?        @relation(fields: [rejectionReasonId], references: [id], onDelete: SetNull)
+  competitor        Competitor?             @relation(fields: [competitorId], references: [id], onDelete: SetNull)
+
+  // Mirrors Company's normalized columns — powers cross-search rejection
+  // memory (findPriorRejectedMatches) since candidates aren't Company rows
+  // yet when this matching needs to happen.
+  normalizedName  String
+  normalizedPhone String?
+  normalizedEmail String?
+  websiteDomain   String?
 
   @@index([searchId, score])
+  @@index([normalizedName])
+  @@index([websiteDomain])
+  @@index([normalizedPhone])
+  @@index([normalizedEmail])
+  @@index([disposition])
 }
 
 model ImportTemplate {
@@ -478,6 +528,8 @@ model ImportTemplate {
   name            String
   mapping         Json
   transformations Json?
+  createdById     String
+  createdBy       User     @relation(fields: [createdById], references: [id])
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }

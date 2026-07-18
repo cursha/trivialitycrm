@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ListTree, GitBranch, Users, ShieldCheck } from "lucide-react";
+import { ListTree, GitBranch, Users, ShieldCheck, XCircle, FileSpreadsheet } from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
 
@@ -21,6 +21,20 @@ export default async function SettingsPage() {
       label: "Pipeline Stages",
       description: "Manage the sales pipeline and its default stage.",
       icon: GitBranch,
+      visible: hasPermission(user, "manage_settings"),
+    },
+    {
+      href: "/settings/rejection-reasons",
+      label: "Rejection Reasons",
+      description: "Reasons available when rejecting an AI research result.",
+      icon: XCircle,
+      visible: hasPermission(user, "manage_settings"),
+    },
+    {
+      href: "/leads/import/templates",
+      label: "Import Mapping Templates",
+      description: "Saved spreadsheet column mappings for future imports.",
+      icon: FileSpreadsheet,
       visible: hasPermission(user, "manage_settings"),
     },
     {

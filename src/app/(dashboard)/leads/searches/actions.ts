@@ -1,0 +1,61 @@
+"use server";
+
+import { after } from "next/server";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/auth/current-user";
+import { requirePermission } from "@/lib/auth/permissions";
+import { SearchSetupSchema } from "@/lib/validation/search";
+import { formString } from "@/lib/form-data";
+import { runSearchJob } from "@/lib/research/run-search";
+
+export type SearchFormState = { error?: string } | undefined;
+
+export async function startSearch(_prevState: SearchFormState, formData: FormData): Promise<SearchFormState> {
+  const user = await requireUser();
+  requirePermission(user, "run_research");
+
+  const parsed = SearchSetupSchema.safeParse({
+    promptId: formString(formData, "promptId"),
+    country: formString(formData, "country"),
+    region: formString(formData, "region"),
+    cities: formData
+      .getAll("cities")
+      .map((value) => String(value).trim())
+      .filter(Boolean),
+    leadTypeId: formString(formData, "leadTypeId"),
+    minimumScore: formString(formData, "minimumScore") || "80",
+    mode: formString(formData, "mode"),
+    competitorId: formString(formData, "competitorId"),
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Please correct the highlighted fields." };
+  }
+
+  const prompt = await prisma.promptTemplate.findUnique({ where: { id: parsed.data.promptId } });
+  if (!prompt) {
+    return { error: "That prompt no longer exists." };
+  }
+
+  const search = await prisma.leadSearch.create({
+    data: {
+      promptId: prompt.id,
+      createdById: user.id,
+      leadTypeId: parsed.data.leadTypeId,
+      competitorId: parsed.data.competitorId ?? null,
+      country: parsed.data.country,
+      region: parsed.data.region,
+      cities: parsed.data.cities,
+      minimumScore: parsed.data.minimumScore,
+      mode: parsed.data.mode,
+      promptSnapshot: prompt.qualificationPrompt,
+    },
+  });
+
+  // Long-running work runs after the response is sent (see run-search.ts) —
+  // the status page below polls for progress instead of blocking here.
+  after(() => runSearchJob(search.id));
+
+  redirect(`/leads/searches/${search.id}`);
+}

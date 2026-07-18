@@ -18,6 +18,23 @@ Module One turns the original interface mockup into a working, database-backed C
 
 Not in Module One (by design): live AI research, AI score generation, web search, spreadsheet import, email integration, production hosting.
 
+## Module Two: AI-assisted lead discovery, review, and CRM transfer
+
+Module Two adds the AI-assisted research workflow on top of Module One's foundation (the underlying database tables for prompts, searches, and results already existed from Module One's schema — Module Two is almost entirely the application layer):
+
+- Reusable, AI-assisted research prompts (save, edit, duplicate, archive) — independent of any one search's location or Lead Type
+- Structured search setup (country, state/province, optional cities, one Lead Type, editable minimum quality score) with four research modes: general, "offers events but not trivia," "currently offers trivia," and competitor research — the trivia-gap and trivia-confirmed modes are mutually exclusive by construction (`src/lib/research/exclusivity.ts`)
+- Evidence-based results: every candidate stores address/contact fields, trivia status (confirmed/absent/uncertain — uncertain is never silently promoted to confirmed), evidence notes with source citations, quality score and explanation, and which search/prompt produced it
+- Ranked, filterable, paginated review with select-all-on-page and bulk selection, an evidence drawer, and reject/restore actions
+- Rejection memory: a location rejected in one search is auto-flagged if it resurfaces in a later search, while staying visible and restorable by an authorized user (`restore_rejected` permission) — never confused with archived CRM companies
+- Edit-before-transfer with duplicate-blocking reuse of Module One's duplicate-matching service, transactional bulk transfer into the CRM `Company`/`Contact` models, and an automatic `LEAD_TRANSFERRED` activity
+- CSV/Excel spreadsheet import with a user-defined column-mapping screen, saved mapping templates, and a validated preview before commit — uploaded files and parsed rows are held only in memory for the length of the upload session and are never written to disk, Postgres, or Git
+- CSV/Excel export of research results and CRM companies, respecting the caller's permissions and active filters
+- A replaceable AI/research provider layer (`src/lib/research/providers/`) with a full mock/demo provider used by every automated test, and an Anthropic Claude implementation as the live default — see `MODULE_2_REPORT.md` for the provider comparison (costs, legal/ToS considerations, and why Google Places and Yelp Fusion were not used by default)
+- A single-process background job runner for long-running searches (`after()` + status polling), appropriate for the current self-hosted single-instance deployment — see `MODULE_2_REPORT.md` for the scaling limitation this implies
+
+Not in Module Two (by design): a second real AI provider (OpenAI is documented but not built), multi-instance/horizontally-scaled job processing, structured-data providers like Google Places or Yelp Fusion.
+
 ## Installation
 
 1. Install [Node.js 20+](https://nodejs.org/), [Docker](https://www.docker.com/) (for local Postgres), and Git.
@@ -60,6 +77,13 @@ All roles and permission grants are stored in the database (`Role`, `Permission`
 - **Manager** — view/add/edit/reassign leads within their own team.
 - **Salesperson** — view/add/edit leads assigned to them.
 
-## Service adapters still requiring credentials
+Module Two adds `run_research`, `review_research_results`, `transfer_leads`, and `view_evidence`, alongside Module One's already-seeded `manage_prompts`, `import_leads`, `export_leads`, and `restore_rejected`. Only Administrator is granted these by default — assign them to Manager/Salesperson from Settings → Roles & Permissions as needed.
 
-The live AI prompt interview, business web research, and email delivery are **not implemented in Module One** and must be connected in a future module. Keep any provider credentials only in environment variables; never commit them.
+## AI research provider
+
+Set `AI_PROVIDER` in `.env`:
+
+- `"mock"` (default) — no network calls, no cost, deterministic fixture data. Used for local dev without API keys and unconditionally by every automated test (`.env.test` forces this regardless of `.env`).
+- `"anthropic"` — live AI-assisted research using Claude with its server-side web search/fetch tools. Requires `AI_API_KEY`. See `MODULE_2_REPORT.md` for cost and legal considerations, and for why this was chosen over Google Places API and Yelp Fusion for v1.
+
+Email delivery is **not implemented** and must be connected in a future module. Keep any provider credentials only in environment variables; never commit them.

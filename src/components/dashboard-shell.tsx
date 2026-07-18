@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, CalendarClock, LayoutDashboard, Menu, Settings, Trophy, X } from "lucide-react";
+import { Building2, CalendarClock, LayoutDashboard, Menu, Search, Settings, Trophy, X } from "lucide-react";
 import type { NavItem, NavIconKey } from "@/lib/nav";
 import { logout } from "@/lib/auth/actions";
 
@@ -14,6 +14,7 @@ const ICONS: Record<NavIconKey, typeof LayoutDashboard> = {
   calendar: CalendarClock,
   trophy: Trophy,
   settings: Settings,
+  search: Search,
 };
 
 export function DashboardShell({

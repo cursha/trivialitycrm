@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { testPrisma } from "./db";
 import { hashPassword } from "../../src/lib/auth/password";
 import { createSession } from "../../src/lib/auth/session";
+import { computeNormalizedFields } from "../../src/lib/duplicates/match";
 
 export async function createPermission(key: string, label = key) {
   return testPrisma.permission.upsert({
@@ -93,6 +94,110 @@ export async function createCompanyFixture(opts: {
       createdById: opts.createdById,
       competitorId: opts.competitorId ?? null,
       status: opts.status ?? "ACTIVE",
+    },
+  });
+}
+
+export async function createPromptTemplateFixture(opts: {
+  createdById: string;
+  name?: string;
+  qualificationPrompt?: string;
+  archived?: boolean;
+}) {
+  return testPrisma.promptTemplate.create({
+    data: {
+      name: opts.name ?? `Prompt ${crypto.randomUUID().slice(0, 8)}`,
+      qualificationPrompt: opts.qualificationPrompt ?? "Independently-owned bars with a weekly events calendar.",
+      archived: opts.archived ?? false,
+      createdById: opts.createdById,
+    },
+  });
+}
+
+export async function createLeadSearchFixture(opts: {
+  createdById: string;
+  leadTypeId: string;
+  promptId?: string;
+  competitorId?: string | null;
+  country?: string;
+  region?: string;
+  cities?: string[];
+  minimumScore?: number;
+  mode?: "TRIVIA_GAP" | "TRIVIA_CONFIRMED" | "COMPETITOR" | "GENERAL";
+}) {
+  return testPrisma.leadSearch.create({
+    data: {
+      createdById: opts.createdById,
+      leadTypeId: opts.leadTypeId,
+      promptId: opts.promptId ?? null,
+      competitorId: opts.competitorId ?? null,
+      country: opts.country ?? "Canada",
+      region: opts.region ?? "ON",
+      cities: opts.cities ?? [],
+      minimumScore: opts.minimumScore ?? 80,
+      mode: opts.mode ?? "GENERAL",
+      promptSnapshot: "Independently-owned bars with a weekly events calendar.",
+    },
+  });
+}
+
+export async function createSearchResultFixture(opts: {
+  searchId: string;
+  name?: string;
+  city?: string;
+  region?: string;
+  country?: string;
+  address1?: string | null;
+  postalCode?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  websiteUrl?: string | null;
+  score?: number;
+  explanation?: string;
+  disposition?: "NEW" | "REVIEWED" | "TRANSFERRED" | "REJECTED" | "BELOW_SCORE" | "DUPLICATE";
+  rejectionReasonId?: string | null;
+  triviaStatus?: "CURRENT_TRIVIA" | "NO_CURRENT_TRIVIA" | "UNCERTAIN";
+  competitorId?: string | null;
+}) {
+  const name = opts.name ?? `Result ${crypto.randomUUID().slice(0, 8)}`;
+  const normalized = computeNormalizedFields({
+    name,
+    phone: opts.phone ?? null,
+    email: opts.email ?? null,
+    websiteUrl: opts.websiteUrl ?? null,
+  });
+
+  return testPrisma.searchResult.create({
+    data: {
+      searchId: opts.searchId,
+      name,
+      ...normalized,
+      city: opts.city ?? "Milton",
+      region: opts.region ?? "ON",
+      country: opts.country ?? "Canada",
+      address1: opts.address1 ?? null,
+      postalCode: opts.postalCode ?? null,
+      phone: opts.phone ?? null,
+      email: opts.email ?? null,
+      websiteUrl: opts.websiteUrl ?? null,
+      score: opts.score ?? 80,
+      explanation: opts.explanation ?? "Fixture explanation.",
+      evidence: [],
+      sources: [],
+      disposition: opts.disposition ?? "NEW",
+      rejectionReasonId: opts.rejectionReasonId ?? null,
+      triviaStatus: opts.triviaStatus ?? "UNCERTAIN",
+      competitorId: opts.competitorId ?? null,
+    },
+  });
+}
+
+export async function createImportTemplateFixture(opts: { createdById: string; name?: string; mapping?: object }) {
+  return testPrisma.importTemplate.create({
+    data: {
+      name: opts.name ?? `Import Template ${crypto.randomUUID().slice(0, 8)}`,
+      mapping: opts.mapping ?? {},
+      createdById: opts.createdById,
     },
   });
 }
