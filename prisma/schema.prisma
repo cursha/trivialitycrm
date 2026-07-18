@@ -1,0 +1,288 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TriviaStatus {
+  CURRENT_TRIVIA
+  NO_CURRENT_TRIVIA
+  UNCERTAIN
+}
+
+enum SearchResultDisposition {
+  NEW
+  REVIEWED
+  TRANSFERRED
+  REJECTED
+  BELOW_SCORE
+  DUPLICATE
+}
+
+enum ActivityType {
+  PHONE
+  EMAIL
+  MEETING
+  MATERIAL_SENT
+  DEMO
+  TRIAL
+  NOTE
+  PIPELINE_CHANGE
+}
+
+enum TaskStatus {
+  OPEN
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id                String           @id @default(cuid())
+  name              String
+  email             String           @unique
+  roleId            String
+  teamId            String?
+  role              Role             @relation(fields: [roleId], references: [id])
+  team              Team?            @relation(fields: [teamId], references: [id])
+  assignedCompanies Company[]        @relation("AssignedSalesperson")
+  createdCompanies  Company[]        @relation("CompanyCreator")
+  activities        Activity[]
+  tasks             Task[]           @relation("TaskAssignee")
+  prompts           PromptTemplate[]
+  searches          LeadSearch[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+}
+
+model Team {
+  id    String @id @default(cuid())
+  name  String @unique
+  users User[]
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  active      Boolean          @default(true)
+  sortOrder   Int              @default(0)
+  users       User[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id    String           @id @default(cuid())
+  key   String           @unique
+  label String
+  roles RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  allowed      Boolean    @default(true)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+model LeadType {
+  id        String       @id @default(cuid())
+  name      String       @unique
+  active    Boolean      @default(true)
+  sortOrder Int          @default(0)
+  companies Company[]
+  searches  LeadSearch[]
+}
+
+model PipelineStage {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  active    Boolean   @default(true)
+  isDefault Boolean   @default(false)
+  sortOrder Int       @default(0)
+  companies Company[]
+}
+
+model RejectionReason {
+  id        String         @id @default(cuid())
+  name      String         @unique
+  active    Boolean        @default(true)
+  sortOrder Int            @default(0)
+  results   SearchResult[]
+}
+
+model Competitor {
+  id         String       @id @default(cuid())
+  name       String       @unique
+  websiteUrl String?
+  active     Boolean      @default(true)
+  companies  Company[]
+  searches   LeadSearch[]
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model Company {
+  id              String          @id @default(cuid())
+  name            String
+  normalizedName  String
+  address1        String?
+  city            String
+  region          String
+  postalCode      String?
+  country         String
+  phone           String?
+  email           String?
+  websiteUrl      String?
+  websiteDomain   String?
+  notes           String?         @db.Text
+  aiScore         Int?
+  aiExplanation   String?         @db.Text
+  triviaStatus    TriviaStatus    @default(UNCERTAIN)
+  nextFollowUpAt  DateTime?
+  leadTypeId      String
+  pipelineStageId String
+  competitorId    String?
+  assignedToId    String
+  createdById     String
+  leadType        LeadType        @relation(fields: [leadTypeId], references: [id])
+  pipelineStage   PipelineStage   @relation(fields: [pipelineStageId], references: [id])
+  competitor      Competitor?     @relation(fields: [competitorId], references: [id], onDelete: SetNull)
+  assignedTo      User            @relation("AssignedSalesperson", fields: [assignedToId], references: [id])
+  createdBy       User            @relation("CompanyCreator", fields: [createdById], references: [id])
+  contacts        Contact[]
+  activities      Activity[]
+  tasks           Task[]
+  sources         CompanySource[]
+  searchResults   SearchResult[]
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([normalizedName])
+  @@index([websiteDomain])
+  @@index([city, region, country])
+  @@index([assignedToId, pipelineStageId])
+}
+
+model Contact {
+  id        String   @id @default(cuid())
+  companyId String
+  firstName String
+  lastName  String
+  title     String?
+  phone     String?
+  email     String?
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CompanySource {
+  id         String   @id @default(cuid())
+  companyId  String
+  url        String
+  title      String?
+  evidence   String?
+  verifiedAt DateTime
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model Activity {
+  id         String       @id @default(cuid())
+  companyId  String
+  userId     String
+  type       ActivityType
+  occurredAt DateTime     @default(now())
+  notes      String?      @db.Text
+  outcome    String?
+  company    Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user       User         @relation(fields: [userId], references: [id])
+  createdAt  DateTime     @default(now())
+}
+
+model Task {
+  id           String     @id @default(cuid())
+  companyId    String
+  assignedToId String
+  title        String
+  notes        String?
+  dueAt        DateTime
+  status       TaskStatus @default(OPEN)
+  completedAt  DateTime?
+  company      Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assignedTo   User       @relation("TaskAssignee", fields: [assignedToId], references: [id])
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model PromptTemplate {
+  id                  String       @id @default(cuid())
+  name                String
+  qualificationPrompt String       @db.Text
+  createdById         String
+  createdBy           User         @relation(fields: [createdById], references: [id])
+  searches            LeadSearch[]
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+}
+
+model LeadSearch {
+  id             String          @id @default(cuid())
+  promptId       String?
+  createdById    String
+  leadTypeId     String
+  competitorId   String?
+  country        String
+  region         String
+  cities         Json
+  minimumScore   Int             @default(80)
+  promptSnapshot String          @db.Text
+  prompt         PromptTemplate? @relation(fields: [promptId], references: [id], onDelete: SetNull)
+  createdBy      User            @relation(fields: [createdById], references: [id])
+  leadType       LeadType        @relation(fields: [leadTypeId], references: [id])
+  competitor     Competitor?     @relation(fields: [competitorId], references: [id], onDelete: SetNull)
+  results        SearchResult[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model SearchResult {
+  id                String                  @id @default(cuid())
+  searchId          String
+  companyId         String?
+  rejectionReasonId String?
+  name              String
+  address1          String?
+  city              String
+  region            String
+  postalCode        String?
+  country           String
+  phone             String?
+  email             String?
+  websiteUrl        String?
+  contactData       Json?
+  score             Int
+  explanation       String                  @db.Text
+  evidence          Json
+  sources           Json
+  disposition       SearchResultDisposition @default(NEW)
+  researchedAt      DateTime                @default(now())
+  search            LeadSearch              @relation(fields: [searchId], references: [id], onDelete: Cascade)
+  company           Company?                @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  rejectionReason   RejectionReason?        @relation(fields: [rejectionReasonId], references: [id], onDelete: SetNull)
+
+  @@index([searchId, score])
+}
+
+model ImportTemplate {
+  id              String   @id @default(cuid())
+  name            String
+  mapping         Json
+  transformations Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
