@@ -39,22 +39,103 @@ enum TaskStatus {
   CANCELLED
 }
 
+enum CompanyStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum OpportunityGrade {
+  A_PLUS
+  A
+  B
+  C
+  D
+}
+
+enum ConfidenceLevel {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum PrimaryClassification {
+  ENTERTAINMENT_READY
+  GREENFIELD
+  REPLACEMENT
+  NEEDS_QUALIFICATION
+  EXISTING_CUSTOMER
+}
+
+enum SecondaryTag {
+  EASY_WIN
+  REVENUE_READY
+  NO_HOST_READY
+}
+
+enum ScoringCategory {
+  FOOD_BEVERAGE_FOCUS
+  WEEKNIGHT_REVENUE_OPPORTUNITY
+  COMMUNITY_ENGAGEMENT
+  EXISTING_EVENT_CULTURE
+  GROUP_SEATING_LAYOUT
+  CAPACITY_OPERATIONAL_SUITABILITY
+  DECISION_MAKER_ACCESSIBILITY
+  MARKETING_ACTIVITY_VISIBILITY
+  TURNKEY_IMPLEMENTATION_READINESS
+  COMPETITIVE_OPPORTUNITY
+}
+
+enum EvidenceVerificationStatus {
+  VERIFIED
+  INFERRED
+  UNVERIFIED
+  OUTDATED
+  CONTRADICTORY
+}
+
+enum EvidenceReliability {
+  HIGH
+  MEDIUM
+  LOW
+}
+
 model User {
-  id                String           @id @default(cuid())
-  name              String
-  email             String           @unique
-  roleId            String
-  teamId            String?
-  role              Role             @relation(fields: [roleId], references: [id])
-  team              Team?            @relation(fields: [teamId], references: [id])
-  assignedCompanies Company[]        @relation("AssignedSalesperson")
-  createdCompanies  Company[]        @relation("CompanyCreator")
-  activities        Activity[]
-  tasks             Task[]           @relation("TaskAssignee")
-  prompts           PromptTemplate[]
-  searches          LeadSearch[]
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  id                      String                  @id @default(cuid())
+  name                    String
+  email                   String                  @unique
+  passwordHash            String
+  mustChangePassword      Boolean                 @default(false)
+  disabled                Boolean                 @default(false)
+  failedLoginAttempts     Int                     @default(0)
+  lockedUntil             DateTime?
+  roleId                  String
+  teamId                  String?
+  role                    Role                    @relation(fields: [roleId], references: [id])
+  team                    Team?                   @relation(fields: [teamId], references: [id])
+  sessions                Session[]
+  assignedCompanies       Company[]               @relation("AssignedSalesperson")
+  createdCompanies        Company[]               @relation("CompanyCreator")
+  updatedCompanies        Company[]               @relation("CompanyUpdater")
+  archivedCompanies       Company[]               @relation("CompanyArchiver")
+  activities              Activity[]
+  tasks                   Task[]                  @relation("TaskAssignee")
+  prompts                 PromptTemplate[]
+  searches                LeadSearch[]
+  createdEvidence         EvidenceRecord[]        @relation("EvidenceCreator")
+  scoredHistoricalRecords HistoricalScoreRecord[] @relation("ScoreAuthor")
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model Team {
@@ -127,7 +208,7 @@ model Competitor {
 }
 
 model Company {
-  id              String          @id @default(cuid())
+  id              String        @id @default(cuid())
   name            String
   normalizedName  String
   address1        String?
@@ -136,36 +217,88 @@ model Company {
   postalCode      String?
   country         String
   phone           String?
+  normalizedPhone String?
   email           String?
+  normalizedEmail String?
   websiteUrl      String?
   websiteDomain   String?
-  notes           String?         @db.Text
+  notes           String?       @db.Text
   aiScore         Int?
-  aiExplanation   String?         @db.Text
-  triviaStatus    TriviaStatus    @default(UNCERTAIN)
+  aiExplanation   String?       @db.Text
+  triviaStatus    TriviaStatus  @default(UNCERTAIN)
   nextFollowUpAt  DateTime?
   leadTypeId      String
   pipelineStageId String
   competitorId    String?
   assignedToId    String
   createdById     String
-  leadType        LeadType        @relation(fields: [leadTypeId], references: [id])
-  pipelineStage   PipelineStage   @relation(fields: [pipelineStageId], references: [id])
-  competitor      Competitor?     @relation(fields: [competitorId], references: [id], onDelete: SetNull)
-  assignedTo      User            @relation("AssignedSalesperson", fields: [assignedToId], references: [id])
-  createdBy       User            @relation("CompanyCreator", fields: [createdById], references: [id])
-  contacts        Contact[]
-  activities      Activity[]
-  tasks           Task[]
-  sources         CompanySource[]
-  searchResults   SearchResult[]
-  createdAt       DateTime        @default(now())
-  updatedAt       DateTime        @updatedAt
+  updatedById     String?
+  leadType        LeadType      @relation(fields: [leadTypeId], references: [id])
+  pipelineStage   PipelineStage @relation(fields: [pipelineStageId], references: [id])
+  competitor      Competitor?   @relation(fields: [competitorId], references: [id], onDelete: SetNull)
+  assignedTo      User          @relation("AssignedSalesperson", fields: [assignedToId], references: [id])
+  createdBy       User          @relation("CompanyCreator", fields: [createdById], references: [id])
+  updatedBy       User?         @relation("CompanyUpdater", fields: [updatedById], references: [id])
+
+  // Archiving (soft delete). Companies are never hard-deleted except by an
+  // Administrator permanently removing an already-archived record.
+  status       CompanyStatus @default(ACTIVE)
+  archivedAt   DateTime?
+  archivedById String?
+  archivedBy   User?         @relation("CompanyArchiver", fields: [archivedById], references: [id])
+
+  // EOS-1.0 current/summary outputs. Category-level scores and full
+  // scoring snapshots live only in HistoricalScoreRecord (append-only audit
+  // trail); these fields are a denormalized "latest" view for fast listing.
+  eosScore                 Int?
+  opportunityGrade         OpportunityGrade?
+  confidenceLevel          ConfidenceLevel?
+  primaryClassification    PrimaryClassification?
+  secondaryTags            SecondaryTag[]         @default([])
+  salesPriorityScore       Int?
+  scoreExplanation         String?                @db.Text
+  verifiedEvidenceSummary  String?                @db.Text
+  inferredEvidenceSummary  String?                @db.Text
+  missingInformation       String?                @db.Text
+  recommendedSalesApproach String?                @db.Text
+  recommendedNextAction    String?                @db.Text
+  lastScoredAt             DateTime?
+  scoringVersion           String?
+  isExistingCustomer       Boolean                @default(false)
+  isQualified              Boolean                @default(false)
+  exclusionReason          String?
+  doNotContact             Boolean                @default(false)
+
+  // Pointer to the single HistoricalScoreRecord considered "current" for
+  // this company. @unique makes this a true one-to-one, so at most one
+  // company can ever treat a given history row as current — this is the
+  // sole source of truth for "current score", avoiding a duplicate/
+  // conflicting `isCurrent` flag on the history table itself.
+  currentHistoricalScoreId String?                 @unique
+  currentHistoricalScore   HistoricalScoreRecord?  @relation("CurrentScore", fields: [currentHistoricalScoreId], references: [id], onDelete: SetNull)
+  historicalScores         HistoricalScoreRecord[] @relation("CompanyScoreHistory")
+  evidenceRecords          EvidenceRecord[]
+
+  contacts      Contact[]
+  activities    Activity[]
+  tasks         Task[]
+  sources       CompanySource[]
+  searchResults SearchResult[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
   @@index([normalizedName])
   @@index([websiteDomain])
+  @@index([normalizedPhone])
+  @@index([normalizedEmail])
   @@index([city, region, country])
   @@index([assignedToId, pipelineStageId])
+  @@index([status])
+  @@index([eosScore])
+  @@index([opportunityGrade])
+  @@index([primaryClassification])
+  @@index([nextFollowUpAt])
+  @@index([triviaStatus])
 }
 
 model Contact {
@@ -189,6 +322,68 @@ model CompanySource {
   evidence   String?
   verifiedAt DateTime
   company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model EvidenceRecord {
+  id                 String                     @id @default(cuid())
+  companyId          String
+  company            Company                    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  category           ScoringCategory
+  sourceType         String?
+  sourceUrl          String?
+  evidenceSummary    String                     @db.Text
+  evidenceDate       DateTime?
+  verificationStatus EvidenceVerificationStatus @default(UNVERIFIED)
+  reliability        EvidenceReliability        @default(MEDIUM)
+  createdById        String
+  createdBy          User                       @relation("EvidenceCreator", fields: [createdById], references: [id])
+  createdAt          DateTime                   @default(now())
+
+  @@index([companyId, category])
+}
+
+// Append-only audit trail of EOS-1.0 scoring runs. Rows here are never
+// updated or deleted once written; Company.currentHistoricalScoreId points
+// at whichever row is presently "current" for fast listing.
+model HistoricalScoreRecord {
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation("CompanyScoreHistory", fields: [companyId], references: [id], onDelete: Cascade)
+
+  // Back-reference for the Company.currentHistoricalScoreId pointer above.
+  currentForCompany Company? @relation("CurrentScore")
+
+  eosTotal                       Int
+  foodBeverageFocus              Int
+  weeknightRevenueOpportunity    Int
+  communityEngagement            Int
+  existingEventCulture           Int
+  groupSeatingLayout             Int
+  capacityOperationalSuitability Int
+  decisionMakerAccessibility     Int
+  marketingActivityVisibility    Int
+  turnkeyImplementationReadiness Int
+  competitiveOpportunity         Int
+
+  opportunityGrade         OpportunityGrade
+  confidenceLevel          ConfidenceLevel
+  primaryClassification    PrimaryClassification
+  secondaryTags            SecondaryTag[]        @default([])
+  salesPriorityScore       Int?
+  scoreExplanation         String?               @db.Text
+  recommendedSalesApproach String?               @db.Text
+  recommendedNextAction    String?               @db.Text
+  scoringVersion           String
+  scoredAt                 DateTime              @default(now())
+
+  // Either a human reviewer (scoredBy) or a named automated source
+  // (scoringSource, e.g. a future AI engine identifier) — at least one
+  // should be set, enforced at the application layer.
+  scoredById    String?
+  scoredBy      User?   @relation("ScoreAuthor", fields: [scoredById], references: [id])
+  scoringSource String?
+
+  @@index([companyId, scoredAt])
 }
 
 model Activity {
