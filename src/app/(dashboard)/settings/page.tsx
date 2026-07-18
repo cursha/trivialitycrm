@@ -1,0 +1,70 @@
+import Link from "next/link";
+import { ListTree, GitBranch, Users, ShieldCheck } from "lucide-react";
+import { requireUser } from "@/lib/auth/current-user";
+import { hasPermission } from "@/lib/auth/permissions";
+
+export const metadata = { title: "Settings — Triviality CRM" };
+
+export default async function SettingsPage() {
+  const user = await requireUser();
+
+  const cards = [
+    {
+      href: "/settings/lead-types",
+      label: "Lead Types",
+      description: "Add, rename, reorder and deactivate the Lead Types companies use.",
+      icon: ListTree,
+      visible: hasPermission(user, "manage_settings"),
+    },
+    {
+      href: "/settings/pipeline-stages",
+      label: "Pipeline Stages",
+      description: "Manage the sales pipeline and its default stage.",
+      icon: GitBranch,
+      visible: hasPermission(user, "manage_settings"),
+    },
+    {
+      href: "/settings/users",
+      label: "Users",
+      description: "Create accounts, assign roles and teams, and disable access.",
+      icon: Users,
+      visible: hasPermission(user, "manage_users"),
+    },
+    {
+      href: "/settings/roles",
+      label: "Roles & Permissions",
+      description: "Edit the permission grants for each role.",
+      icon: ShieldCheck,
+      visible: hasPermission(user, "manage_users"),
+    },
+  ].filter((card) => card.visible);
+
+  return (
+    <div className="mx-auto max-w-5xl space-y-6">
+      <div>
+        <h1 className="text-3xl font-black tracking-tight">Settings</h1>
+        <p className="mt-1 text-slate-500">Configuration for how the CRM works for your whole team.</p>
+      </div>
+
+      {cards.length === 0 ? (
+        <p className="text-slate-500">You don&apos;t have access to any settings sections.</p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {cards.map((card) => (
+            <Link
+              key={card.href}
+              href={card.href}
+              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-blue-300 hover:shadow-md"
+            >
+              <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                <card.icon size={18} />
+              </div>
+              <b>{card.label}</b>
+              <p className="mt-1 text-sm text-slate-500">{card.description}</p>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

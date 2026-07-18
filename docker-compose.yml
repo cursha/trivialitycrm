@@ -1,0 +1,30 @@
+services:
+  postgres-dev:
+    image: postgres:16-alpine
+    container_name: trivialitycrm-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: trivialitycrm
+      POSTGRES_PASSWORD: trivialitycrm
+      POSTGRES_DB: trivialitycrm
+    ports:
+      - "5432:5432"
+    volumes:
+      - trivialitycrm-postgres-dev-data:/var/lib/postgresql/data
+
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: trivialitycrm-postgres-test
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: trivialitycrm
+      POSTGRES_PASSWORD: trivialitycrm
+      POSTGRES_DB: trivialitycrm_test
+    ports:
+      - "5433:5432"
+    volumes:
+      - trivialitycrm-postgres-test-data:/var/lib/postgresql/data
+
+volumes:
+  trivialitycrm-postgres-dev-data:
+  trivialitycrm-postgres-test-data:
