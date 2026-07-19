@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
 import { parseSpreadsheet, SpreadsheetParseError } from "@/lib/import/parse";
-import { putUpload, getUpload, clearUpload } from "@/lib/import/preview-store";
+import { putUpload, getUpload, recordMapping, markImported } from "@/lib/import/batch-store";
 import { mapAndValidateRow, type ImportMapping, type MappedRow } from "@/lib/validation/import";
 import { findPotentialDuplicates, computeNormalizedFields } from "@/lib/duplicates/match";
 
@@ -26,7 +26,7 @@ export async function uploadSpreadsheet(formData: FormData): Promise<UploadResul
     const parsed = await parseSpreadsheet(buffer, file.name);
     if (parsed.rows.length === 0) return { error: "No data rows found in the file." };
 
-    const sessionId = putUpload(user.id, parsed);
+    const sessionId = await putUpload(user.id, file.name, parsed);
     return { sessionId, headers: parsed.headers, rowCount: parsed.rows.length, sampleRows: parsed.rows.slice(0, 5) };
   } catch (error) {
     if (error instanceof SpreadsheetParseError) return { error: error.message };
@@ -34,19 +34,21 @@ export async function uploadSpreadsheet(formData: FormData): Promise<UploadResul
   }
 }
 
-export type PreviewedRow = { index: number; values: MappedRow; errors: string[]; duplicateOf: string | null };
+export type PreviewedRow = { index: number; values: MappedRow; errors: string[]; warnings: string[]; duplicateOf: string | null };
 export type PreviewResult = { error: string } | { rows: PreviewedRow[] };
 
 export async function previewImport(sessionId: string, mapping: ImportMapping): Promise<PreviewResult> {
   const user = await requireUser();
   requirePermission(user, "import_leads");
 
-  const upload = getUpload(sessionId, user.id);
+  const upload = await getUpload(sessionId, user.id);
   if (!upload) return { error: "This upload has expired — please upload the file again." };
+
+  await recordMapping(sessionId, mapping);
 
   const rows: PreviewedRow[] = [];
   for (const [index, rawRow] of upload.rows.entries()) {
-    const { values, errors } = mapAndValidateRow(rawRow, mapping);
+    const { values, errors, warnings } = mapAndValidateRow(rawRow, mapping);
 
     let duplicateOf: string | null = null;
     if (errors.length === 0) {
@@ -54,7 +56,7 @@ export async function previewImport(sessionId: string, mapping: ImportMapping): 
       if (matches.length > 0) duplicateOf = matches[0].name;
     }
 
-    rows.push({ index, values, errors, duplicateOf });
+    rows.push({ index, values, errors, warnings, duplicateOf });
   }
 
   return { rows };
@@ -73,7 +75,7 @@ export async function commitImport(
   const user = await requireUser();
   requirePermission(user, "import_leads");
 
-  const upload = getUpload(sessionId, user.id);
+  const upload = await getUpload(sessionId, user.id);
   if (!upload) return { error: "This upload has expired — please upload the file again." };
 
   let importedCount = 0;
@@ -149,9 +151,13 @@ export async function commitImport(
 
       importedCount += 1;
     }
+
+    // Wiped in the same transaction as the rows it produced — a crash
+    // between the two can't leave the staged payload lingering while its
+    // data is already live in Company/Contact.
+    await markImported(tx, sessionId);
   });
 
-  clearUpload(sessionId);
   revalidatePath("/companies");
   return { importedCount, skippedCount };
 }

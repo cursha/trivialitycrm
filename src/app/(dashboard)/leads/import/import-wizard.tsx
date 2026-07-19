@@ -3,6 +3,10 @@
 import { useRef, useState, useTransition } from "react";
 import { IMPORT_TARGET_FIELDS, type ImportTargetField } from "@/lib/validation/import";
 import { uploadSpreadsheet, previewImport, commitImport, saveImportTemplate, type PreviewedRow } from "./actions";
+import { Card } from "@/components/ui/card";
+import { Label, Input, Select } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/alert";
 
 type Option = { id: string; name: string };
 type Template = { id: string; name: string; mapping: Record<string, string> };
@@ -111,51 +115,51 @@ export function ImportWizard({
 
   if (step === "done" && result) {
     return (
-      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-6 text-emerald-800">
-        <p className="font-bold">Imported {result.importedCount} row(s). Skipped {result.skippedCount} (invalid or duplicate).</p>
-      </div>
+      <Alert tone="success" className="block p-6 text-base">
+        Imported {result.importedCount} row(s). Skipped {result.skippedCount} (invalid or duplicate).
+      </Alert>
     );
   }
 
   return (
     <div className="space-y-6">
-      {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{error}</p>}
+      {error && <Alert tone="danger">{error}</Alert>}
 
       {step === "upload" && (
-        <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" className="text-sm" />
+        <Card className="space-y-3">
+          <input ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" className="text-sm text-text" />
           <div>
-            <button type="button" disabled={isPending} onClick={handleUpload} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60">
+            <Button type="button" disabled={isPending} onClick={handleUpload} variant="primary">
               {isPending ? "Uploading..." : "Upload"}
-            </button>
+            </Button>
           </div>
-        </div>
+        </Card>
       )}
 
       {step === "map" && (
-        <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <Card className="space-y-4">
           {templates.length > 0 && (
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Load a saved mapping</label>
-              <select onChange={(e) => applyTemplate(e.target.value)} defaultValue="" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+              <Label className="mb-1 block text-xs uppercase">Load a saved mapping</Label>
+              <Select onChange={(e) => applyTemplate(e.target.value)} defaultValue="">
                 <option value="">Choose a template...</option>
                 {templates.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-3">
             {IMPORT_TARGET_FIELDS.map((field) => (
               <div key={field}>
-                <label className="mb-1 block text-xs font-semibold text-slate-500">{FIELD_LABELS[field]}</label>
-                <select
+                <Label className="mb-1 block text-xs">{FIELD_LABELS[field]}</Label>
+                <Select
                   value={mapping[field] ?? ""}
                   onChange={(e) => setMapping((prev) => ({ ...prev, [field]: e.target.value }))}
-                  className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+                  className="py-1.5"
                 >
                   <option value="">(not mapped)</option>
                   {headers.map((header) => (
@@ -163,58 +167,58 @@ export function ImportWizard({
                       {header}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             ))}
           </div>
 
           <div className="flex items-center gap-2">
-            <button type="button" disabled={isPending} onClick={handlePreview} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60">
+            <Button type="button" disabled={isPending} onClick={handlePreview} variant="primary">
               {isPending ? "Validating..." : "Preview"}
-            </button>
+            </Button>
             <SaveTemplateButton mapping={mapping} />
           </div>
-        </div>
+        </Card>
       )}
 
       {step === "preview" && (
         <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <Card className="grid grid-cols-3 gap-4">
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Lead Type</label>
-              <select value={leadTypeId} onChange={(e) => setLeadTypeId(e.target.value)} className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm">
+              <Label className="mb-1 block text-xs uppercase">Lead Type</Label>
+              <Select value={leadTypeId} onChange={(e) => setLeadTypeId(e.target.value)} className="py-1.5">
                 {leadTypes.map((lt) => (
                   <option key={lt.id} value={lt.id}>
                     {lt.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Pipeline stage</label>
-              <select value={pipelineStageId} onChange={(e) => setPipelineStageId(e.target.value)} className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm">
+              <Label className="mb-1 block text-xs uppercase">Pipeline stage</Label>
+              <Select value={pipelineStageId} onChange={(e) => setPipelineStageId(e.target.value)} className="py-1.5">
                 {pipelineStages.map((stage) => (
                   <option key={stage.id} value={stage.id}>
                     {stage.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Assign to</label>
-              <select value={assignedToId} onChange={(e) => setAssignedToId(e.target.value)} className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm">
+              <Label className="mb-1 block text-xs uppercase">Assign to</Label>
+              <Select value={assignedToId} onChange={(e) => setAssignedToId(e.target.value)} className="py-1.5">
                 {salespeople.map((sp) => (
                   <option key={sp.id} value={sp.id}>
                     {sp.name}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
-          </div>
+          </Card>
 
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <Card className="overflow-hidden p-0">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+              <thead className="bg-black/5 text-xs uppercase text-text-muted">
                 <tr>
                   <th className="px-4 py-3">Import</th>
                   <th className="px-4 py-3">Company</th>
@@ -224,7 +228,7 @@ export function ImportWizard({
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.index} className="border-t border-slate-100">
+                  <tr key={row.index} className="border-t border-border">
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
@@ -240,27 +244,32 @@ export function ImportWizard({
                         }
                       />
                     </td>
-                    <td className="px-4 py-3 font-semibold">{row.values.name || <span className="text-slate-400">—</span>}</td>
-                    <td className="px-4 py-3 text-slate-500">
+                    <td className="px-4 py-3 font-semibold text-text">{row.values.name || <span className="text-text-muted">—</span>}</td>
+                    <td className="px-4 py-3 text-text-muted">
                       {row.values.city}, {row.values.region}
                     </td>
                     <td className="px-4 py-3">
                       {row.errors.map((e, i) => (
-                        <p key={i} className="text-xs font-semibold text-red-600">
+                        <p key={i} className="text-xs font-semibold text-danger">
                           {e}
                         </p>
                       ))}
-                      {row.duplicateOf && <p className="text-xs font-semibold text-amber-600">Possible duplicate of &quot;{row.duplicateOf}&quot;</p>}
+                      {row.warnings.map((w, i) => (
+                        <p key={i} className="text-xs font-semibold text-amber-700">
+                          {w}
+                        </p>
+                      ))}
+                      {row.duplicateOf && <p className="text-xs font-semibold text-amber-700">Possible duplicate of &quot;{row.duplicateOf}&quot;</p>}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          </div>
+          </Card>
 
-          <button type="button" disabled={isPending || selected.size === 0} onClick={handleCommit} className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60">
+          <Button type="button" disabled={isPending || selected.size === 0} onClick={handleCommit} variant="primary" className="px-5 py-2.5">
             {isPending ? "Importing..." : `Import ${selected.size} row(s)`}
-          </button>
+          </Button>
         </div>
       )}
     </div>
@@ -274,12 +283,7 @@ function SaveTemplateButton({ mapping }: { mapping: Record<string, string> }) {
 
   return (
     <div className="flex items-center gap-2">
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Template name"
-        className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
-      />
+      <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Template name" className="py-1.5" />
       <button
         type="button"
         disabled={isPending || !name.trim()}
@@ -289,7 +293,7 @@ function SaveTemplateButton({ mapping }: { mapping: Record<string, string> }) {
             setSaved(true);
           })
         }
-        className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700"
+        className="rounded-lg border border-border-strong px-3 py-1.5 text-xs font-semibold text-text hover:bg-black/5 disabled:pointer-events-none disabled:opacity-50"
       >
         {saved ? "Saved" : "Save mapping as template"}
       </button>

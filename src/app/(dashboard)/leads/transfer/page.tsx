@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
 import { TransferForm } from "./transfer-form";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const metadata = { title: "Transfer Leads — Triviality CRM" };
 
@@ -58,10 +59,7 @@ export default async function TransferPage({ searchParams }: { searchParams: Pro
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-black tracking-tight">Transfer to CRM</h1>
-        <p className="mt-1 text-slate-500">Review and edit each candidate before creating it as a CRM company.</p>
-      </div>
+      <PageHeader title="Transfer to CRM" description="Review and edit each candidate before creating it as a CRM company." />
       <TransferForm
         rows={rows}
         pipelineStages={pipelineStages.map((stage) => ({ id: stage.id, name: stage.name }))}

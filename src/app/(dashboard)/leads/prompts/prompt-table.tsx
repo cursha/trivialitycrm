@@ -4,6 +4,9 @@ import { useTransition } from "react";
 import Link from "next/link";
 import { Pencil, Copy, Archive, ArchiveRestore } from "lucide-react";
 import { duplicatePrompt, archivePrompt, restorePrompt } from "./actions";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ACTIVE_TONE } from "@/lib/ui/status-tones";
 
 export type PromptRow = {
   id: string;
@@ -17,9 +20,9 @@ export function PromptTable({ prompts, canManage }: { prompts: PromptRow[]; canM
   const [isPending, startTransition] = useTransition();
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <Card className="overflow-hidden p-0">
       <table className="w-full text-left text-sm">
-        <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+        <thead className="bg-black/5 text-xs uppercase text-text-muted">
           <tr>
             <th className="px-5 py-3">Name</th>
             <th className="px-5 py-3">Prompt</th>
@@ -29,26 +32,22 @@ export function PromptTable({ prompts, canManage }: { prompts: PromptRow[]; canM
         </thead>
         <tbody>
           {prompts.map((prompt) => (
-            <tr key={prompt.id} className="border-t border-slate-100 align-top">
-              <td className="px-5 py-4 font-semibold">{prompt.name}</td>
-              <td className="max-w-xl px-5 py-4 text-slate-500">
+            <tr key={prompt.id} className="border-t border-border align-top">
+              <td className="px-5 py-4 font-semibold text-text">{prompt.name}</td>
+              <td className="max-w-xl px-5 py-4 text-text-muted">
                 <p className="line-clamp-2">{prompt.qualificationPrompt}</p>
               </td>
               <td className="px-5 py-4">
-                <span
-                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                    prompt.archived ? "bg-slate-100 text-slate-500" : "bg-emerald-50 text-emerald-700"
-                  }`}
-                >
+                <Badge tone={ACTIVE_TONE[prompt.archived ? "inactive" : "active"]}>
                   {prompt.archived ? "Archived" : "Active"}
-                </span>
+                </Badge>
               </td>
               {canManage && (
                 <td className="px-5 py-4 text-right">
                   <div className="flex justify-end gap-1">
                     <Link
                       href={`/leads/prompts/${prompt.id}/edit`}
-                      className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                      className="rounded p-1.5 text-text-muted hover:bg-black/5 hover:text-text"
                       aria-label={`Edit ${prompt.name}`}
                     >
                       <Pencil size={16} />
@@ -57,7 +56,7 @@ export function PromptTable({ prompts, canManage }: { prompts: PromptRow[]; canM
                       type="button"
                       disabled={isPending}
                       onClick={() => startTransition(() => duplicatePrompt(prompt.id))}
-                      className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                      className="rounded p-1.5 text-text-muted hover:bg-black/5 hover:text-text"
                       aria-label={`Duplicate ${prompt.name}`}
                     >
                       <Copy size={16} />
@@ -67,7 +66,7 @@ export function PromptTable({ prompts, canManage }: { prompts: PromptRow[]; canM
                         type="button"
                         disabled={isPending}
                         onClick={() => startTransition(() => restorePrompt(prompt.id))}
-                        className="rounded p-1.5 text-slate-400 hover:bg-emerald-50 hover:text-emerald-700"
+                        className="rounded p-1.5 text-text-muted hover:bg-emerald-50 hover:text-emerald-700"
                         aria-label={`Restore ${prompt.name}`}
                       >
                         <ArchiveRestore size={16} />
@@ -77,7 +76,7 @@ export function PromptTable({ prompts, canManage }: { prompts: PromptRow[]; canM
                         type="button"
                         disabled={isPending}
                         onClick={() => startTransition(() => archivePrompt(prompt.id))}
-                        className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                        className="rounded p-1.5 text-text-muted hover:bg-danger/10 hover:text-danger"
                         aria-label={`Archive ${prompt.name}`}
                       >
                         <Archive size={16} />
@@ -90,13 +89,13 @@ export function PromptTable({ prompts, canManage }: { prompts: PromptRow[]; canM
           ))}
           {prompts.length === 0 && (
             <tr>
-              <td colSpan={canManage ? 4 : 3} className="px-5 py-8 text-center text-slate-500">
+              <td colSpan={canManage ? 4 : 3} className="px-5 py-8 text-center text-text-muted">
                 No prompts yet.
               </td>
             </tr>
           )}
         </tbody>
       </table>
-    </div>
+    </Card>
   );
 }

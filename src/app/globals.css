@@ -1,7 +1,77 @@
 @import "tailwindcss";
 
-:root { --background: #f5f7fb; --foreground: #12213a; }
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--background); color: var(--foreground); font-family: Arial, Helvetica, sans-serif; }
-button, input, textarea { font: inherit; }
-button { cursor: pointer; }
+/*
+ * Triviality Mayhem brand tokens — fixed, not admin-editable. See
+ * BRAND_GUIDE.md for the full rationale (including why Silver gets two
+ * darker derivatives for text/borders specifically: the literal brand hex
+ * #A0A0A0 fails WCAG AA as text (2.37:1, needs 4.5:1) and as an
+ * interactive-element border (needs 3:1) against Warm White — verified by
+ * computing actual relative-luminance contrast ratios, not assumed. The 8
+ * brand hues themselves are untouched; only two extra lightness steps of
+ * the same neutral gray are added).
+ *
+ * Tailwind v4 auto-generates bg-, text-, and border- utilities from every
+ * --color- custom property declared here (e.g. --color-mayhem-red becomes
+ * bg-mayhem-red, text-mayhem-red, border-mayhem-red). Note for anyone
+ * editing this comment block: a literal star-slash sequence anywhere inside
+ * it closes the comment early and breaks the CSS parser — avoid it.
+ */
+@theme {
+  --color-mayhem-red: #da0301;
+  --color-mayhem-red-dark: #650000;
+  --color-deep-navy: #002a6b;
+  --color-mayhem-blue: #00368b;
+  --color-electric-blue: #0648a6;
+  --color-near-black: #050405;
+  --color-warm-white: #f7f3ed;
+  --color-silver: #a0a0a0;
+  --color-silver-strong: #8a8a8a;
+  --color-text-muted: #6b6b6b;
+
+  /* Semantic aliases — components should reach for these, not the raw
+   * brand-color names above, so a future palette adjustment only ever
+   * touches this one block. */
+  --color-surface: var(--color-warm-white);
+  --color-surface-raised: #ffffff;
+  --color-text: var(--color-near-black);
+  --color-border: var(--color-silver);
+  --color-border-strong: var(--color-silver-strong);
+  --color-primary: var(--color-mayhem-red);
+  --color-primary-hover: var(--color-mayhem-red-dark);
+  --color-secondary: var(--color-mayhem-blue);
+  --color-accent: var(--color-deep-navy);
+  --color-focus: var(--color-electric-blue);
+  --color-danger: var(--color-mayhem-red-dark);
+}
+
+:root {
+  --background: var(--color-surface);
+  --foreground: var(--color-text);
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+
+/* Global keyboard-focus visibility floor — every interactive element gets a
+ * clearly visible ring even where a component doesn't define its own
+ * focus:ring-* utility. Individual components may layer additional
+ * focus:ring-* styling on top of this; this is the guaranteed baseline. */
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}

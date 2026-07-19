@@ -4,6 +4,10 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Pencil, Trash2 } from "lucide-react";
 import { setCompetitorActive, deleteCompetitor, updateCompetitor } from "./actions";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/field";
+import { ACTIVE_TONE } from "@/lib/ui/status-tones";
 
 export type CompetitorRow = {
   id: string;
@@ -45,9 +49,9 @@ export function CompetitorTable({ competitors, canManage }: { competitors: Compe
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <Card className="overflow-hidden p-0">
       <table className="w-full text-left text-sm">
-        <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+        <thead className="bg-black/5 text-xs uppercase text-text-muted">
           <tr>
             <th className="px-5 py-3">Name</th>
             <th className="px-5 py-3">Website</th>
@@ -58,40 +62,30 @@ export function CompetitorTable({ competitors, canManage }: { competitors: Compe
         </thead>
         <tbody>
           {competitors.map((competitor) => (
-            <tr key={competitor.id} className="border-t border-slate-100 align-top">
+            <tr key={competitor.id} className="border-t border-border align-top">
               <td className="px-5 py-4">
                 {editingId === competitor.id ? (
                   <form action={(formData) => handleUpdate(competitor.id, formData)} className="space-y-2">
-                    <input
-                      name="name"
-                      defaultValue={competitor.name}
-                      autoFocus
-                      className="w-full rounded-lg border border-slate-300 px-2 py-1 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                    />
-                    <input
-                      name="websiteUrl"
-                      defaultValue={competitor.websiteUrl ?? ""}
-                      placeholder="https://example.com"
-                      className="w-full rounded-lg border border-slate-300 px-2 py-1 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                    />
+                    <Input name="name" defaultValue={competitor.name} autoFocus className="py-1" />
+                    <Input name="websiteUrl" defaultValue={competitor.websiteUrl ?? ""} placeholder="https://example.com" className="py-1" />
                     <div className="flex gap-2">
-                      <button type="submit" className="rounded bg-blue-600 px-2 py-1 text-xs font-bold text-white">
+                      <button type="submit" className="rounded bg-primary px-2 py-1 text-xs font-bold text-white hover:bg-primary-hover">
                         Save
                       </button>
                       <button
                         type="button"
                         onClick={() => setEditingId(null)}
-                        className="rounded border border-slate-200 px-2 py-1 text-xs font-semibold"
+                        className="rounded border border-border-strong px-2 py-1 text-xs font-semibold text-text hover:bg-black/5"
                       >
                         Cancel
                       </button>
                     </div>
                   </form>
                 ) : (
-                  <span className="font-semibold">{competitor.name}</span>
+                  <span className="font-semibold text-text">{competitor.name}</span>
                 )}
                 {rowErrors[competitor.id] && (
-                  <p className="mt-1 text-xs font-semibold text-red-600">{rowErrors[competitor.id]}</p>
+                  <p className="mt-1 text-xs font-semibold text-danger">{rowErrors[competitor.id]}</p>
                 )}
               </td>
               <td className="px-5 py-4">
@@ -100,16 +94,16 @@ export function CompetitorTable({ competitors, canManage }: { competitors: Compe
                     href={competitor.websiteUrl}
                     target="_blank"
                     rel="noreferrer noopener"
-                    className="text-blue-600 hover:underline"
+                    className="text-secondary hover:underline"
                   >
                     {competitor.websiteUrl}
                   </a>
                 ) : (
-                  <span className="text-slate-400">—</span>
+                  <span className="text-text-muted">—</span>
                 )}
               </td>
               <td className="px-5 py-4">
-                <Link href={`/companies?competitorId=${competitor.id}`} className="font-bold text-blue-600 hover:underline">
+                <Link href={`/companies?competitorId=${competitor.id}`} className="font-bold text-secondary hover:underline">
                   {competitor.locationCount}
                 </Link>
               </td>
@@ -119,16 +113,15 @@ export function CompetitorTable({ competitors, canManage }: { competitors: Compe
                     type="button"
                     disabled={isPending}
                     onClick={() => startTransition(() => setCompetitorActive(competitor.id, !competitor.active))}
-                    className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                      competitor.active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
-                    }`}
                   >
-                    {competitor.active ? "Active" : "Inactive"}
+                    <Badge tone={ACTIVE_TONE[competitor.active ? "active" : "inactive"]}>
+                      {competitor.active ? "Active" : "Inactive"}
+                    </Badge>
                   </button>
                 ) : (
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${competitor.active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+                  <Badge tone={ACTIVE_TONE[competitor.active ? "active" : "inactive"]}>
                     {competitor.active ? "Active" : "Inactive"}
-                  </span>
+                  </Badge>
                 )}
               </td>
               {canManage && (
@@ -137,7 +130,7 @@ export function CompetitorTable({ competitors, canManage }: { competitors: Compe
                     <button
                       type="button"
                       onClick={() => setEditingId(competitor.id)}
-                      className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                      className="rounded p-1.5 text-text-muted hover:bg-black/5 hover:text-text"
                       aria-label={`Edit ${competitor.name}`}
                     >
                       <Pencil size={16} />
@@ -146,7 +139,7 @@ export function CompetitorTable({ competitors, canManage }: { competitors: Compe
                       type="button"
                       disabled={isPending}
                       onClick={() => handleDelete(competitor.id, competitor.name)}
-                      className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                      className="rounded p-1.5 text-text-muted hover:bg-danger/10 hover:text-danger"
                       aria-label={`Delete ${competitor.name}`}
                     >
                       <Trash2 size={16} />
@@ -158,13 +151,13 @@ export function CompetitorTable({ competitors, canManage }: { competitors: Compe
           ))}
           {competitors.length === 0 && (
             <tr>
-              <td colSpan={canManage ? 5 : 4} className="px-5 py-8 text-center text-slate-500">
+              <td colSpan={canManage ? 5 : 4} className="px-5 py-8 text-center text-text-muted">
                 No competitors yet.
               </td>
             </tr>
           )}
         </tbody>
       </table>
-    </div>
+    </Card>
   );
 }

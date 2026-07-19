@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { resetDatabase, testPrisma } from "../helpers/db";
 import { createRoleWithPermissions, createTestUser, createLeadTypeFixture, createPipelineStageFixture, createCompanyFixture, loginAs } from "../helpers/fixtures";
 import { resetFakeCookies } from "../setup/mock-next";
-import { putUpload } from "../../src/lib/import/preview-store";
+import { putUpload } from "../../src/lib/import/batch-store";
 import { previewImport, commitImport, saveImportTemplate } from "../../src/app/(dashboard)/leads/import/actions";
 
 beforeEach(async () => {
@@ -26,7 +26,7 @@ describe("import preview and commit", () => {
     await loginAs(user.id);
     await createCompanyFixture({ name: "The Copper Kettle", leadTypeId: leadType.id, pipelineStageId: stage.id, assignedToId: user.id, createdById: user.id });
 
-    const sessionId = putUpload(user.id, {
+    const sessionId = await putUpload(user.id, "leads.csv", {
       headers: ["Name", "City", "Region", "Country", "First", "Last"],
       rows: [
         { Name: "The Copper Kettle", City: "Milton", Region: "ON", Country: "Canada", First: "", Last: "" },
@@ -55,7 +55,7 @@ describe("import preview and commit", () => {
       createdById: user.id,
     });
 
-    const sessionId = putUpload(user.id, {
+    const sessionId = await putUpload(user.id, "leads.csv", {
       headers: ["Name", "City", "Region", "Country", "First", "Last"],
       rows: [
         { Name: "The Copper Kettle", City: "Milton", Region: "ON", Country: "Canada", First: "Jane", Last: "Doe" },
@@ -78,7 +78,7 @@ describe("import preview and commit", () => {
     const { user, leadType, stage } = await baseFixtures();
     await loginAs(user.id);
 
-    const sessionId = putUpload(user.id, {
+    const sessionId = await putUpload(user.id, "leads.csv", {
       headers: ["Name", "City", "Region", "Country"],
       rows: [{ Name: "New Bar", City: "Ottawa", Region: "ON", Country: "Canada" }],
     });

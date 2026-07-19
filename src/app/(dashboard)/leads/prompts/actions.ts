@@ -88,7 +88,7 @@ export async function restorePrompt(id: string): Promise<void> {
 }
 
 export async function refinePrompt(_prevState: PromptRefineState, formData: FormData): Promise<PromptRefineState> {
-  await requirePromptManager();
+  const user = await requirePromptManager();
 
   const parsed = PromptRefineSchema.safeParse({
     description: formString(formData, "description"),
@@ -99,6 +99,10 @@ export async function refinePrompt(_prevState: PromptRefineState, formData: Form
   }
 
   const { promptAssistant } = getProviders();
-  const { prompt } = await promptAssistant.refine({ description: parsed.data.description, currentPrompt: parsed.data.currentPrompt });
+  const { prompt } = await promptAssistant.refine({
+    description: parsed.data.description,
+    currentPrompt: parsed.data.currentPrompt,
+    userId: user.id,
+  });
   return { prompt };
 }

@@ -54,11 +54,17 @@ export type DiscoverParams = {
   leadTypeName: string;
   mode: LeadSearchMode;
   competitorName?: string;
+  // Optional attribution for AiUsageRecord (worker-side cost tracking). Not
+  // used by mock providers; the Anthropic provider writes one row per call
+  // when present. Absent for callers with no LeadSearch context (e.g. the
+  // prompt assistant, which threads userId separately below).
+  searchId?: string;
+  userId?: string;
 };
 
 /** Turns a user's freeform description into (or improves an existing) reusable research prompt. */
 export interface PromptAssistant {
-  refine(input: { description: string; currentPrompt?: string }): Promise<{ prompt: string }>;
+  refine(input: { description: string; currentPrompt?: string; userId?: string }): Promise<{ prompt: string }>;
 }
 
 /** Finds raw business candidates matching the structured search criteria. */

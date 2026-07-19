@@ -3,6 +3,8 @@ import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
 import { CompanyForm } from "../company-form";
 import { createCompany } from "../actions";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
 
 export const metadata = { title: "New Company — Triviality CRM" };
 
@@ -21,12 +23,9 @@ export default async function NewCompanyPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-black tracking-tight">New Company</h1>
-        <p className="mt-1 text-slate-500">We&apos;ll check for likely duplicates before adding it.</p>
-      </div>
+      <PageHeader title="New Company" description="We'll check for likely duplicates before adding it." />
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <Card>
         <CompanyForm
           action={createCompany}
           defaultValues={defaultStage ? { pipelineStageId: defaultStage.id } : undefined}
@@ -37,7 +36,7 @@ export default async function NewCompanyPage() {
           isAdmin={user.role.name === "Administrator"}
           submitLabel="Create company"
         />
-      </div>
+      </Card>
     </div>
   );
 }

@@ -2,6 +2,10 @@
 
 import { useTransition } from "react";
 import { setUserRole, setUserTeam, setUserDisabled } from "./actions";
+import { ResetPasswordControl } from "./reset-password-control";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Select } from "@/components/ui/field";
 
 export type UserRow = {
   id: string;
@@ -28,49 +32,50 @@ export function UserTable({
   const [isPending, startTransition] = useTransition();
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <Card className="overflow-hidden p-0">
       <table className="w-full text-left text-sm">
-        <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+        <thead className="bg-black/5 text-xs uppercase text-text-muted">
           <tr>
             <th className="px-5 py-3">Name</th>
             <th className="px-5 py-3">Email</th>
             <th className="px-5 py-3">Role</th>
             <th className="px-5 py-3">Team</th>
             <th className="px-5 py-3">Status</th>
+            <th className="px-5 py-3">Password</th>
           </tr>
         </thead>
         <tbody>
           {users.map((user) => (
-            <tr key={user.id} className="border-t border-slate-100">
+            <tr key={user.id} className="border-t border-border">
               <td className="px-5 py-4">
-                <span className="font-semibold">{user.name}</span>
+                <span className="font-semibold text-text">{user.name}</span>
                 {user.mustChangePassword && (
-                  <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                  <Badge tone="warning" className="ml-2">
                     Must change password
-                  </span>
+                  </Badge>
                 )}
               </td>
-              <td className="px-5 py-4 text-slate-600">{user.email}</td>
+              <td className="px-5 py-4 text-text-muted">{user.email}</td>
               <td className="px-5 py-4">
-                <select
+                <Select
                   defaultValue={user.roleId}
                   disabled={isPending}
                   onChange={(event) => startTransition(() => setUserRole(user.id, event.target.value))}
-                  className="rounded-lg border border-slate-300 px-2 py-1 text-sm outline-none focus:border-blue-500"
+                  className="w-auto py-1"
                 >
                   {roles.map((role) => (
                     <option key={role.id} value={role.id}>
                       {role.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </td>
               <td className="px-5 py-4">
-                <select
+                <Select
                   defaultValue={userTeamIds[user.id] ?? ""}
                   disabled={isPending}
                   onChange={(event) => startTransition(() => setUserTeam(user.id, event.target.value || null))}
-                  className="rounded-lg border border-slate-300 px-2 py-1 text-sm outline-none focus:border-blue-500"
+                  className="w-auto py-1"
                 >
                   <option value="">No team</option>
                   {teams.map((team) => (
@@ -78,32 +83,33 @@ export function UserTable({
                       {team.name}
                     </option>
                   ))}
-                </select>
+                </Select>
               </td>
               <td className="px-5 py-4">
                 <button
                   type="button"
                   disabled={isPending || user.id === currentUserId}
                   onClick={() => startTransition(() => setUserDisabled(user.id, !user.disabled))}
-                  className={`rounded-full px-2.5 py-1 text-xs font-semibold disabled:opacity-50 ${
-                    user.disabled ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"
-                  }`}
+                  className="disabled:pointer-events-none disabled:opacity-50"
                   title={user.id === currentUserId ? "You cannot disable your own account" : undefined}
                 >
-                  {user.disabled ? "Disabled" : "Active"}
+                  <Badge tone={user.disabled ? "danger" : "success"}>{user.disabled ? "Disabled" : "Active"}</Badge>
                 </button>
+              </td>
+              <td className="px-5 py-4">
+                <ResetPasswordControl userId={user.id} userName={user.name} />
               </td>
             </tr>
           ))}
           {users.length === 0 && (
             <tr>
-              <td colSpan={5} className="px-5 py-8 text-center text-slate-500">
+              <td colSpan={6} className="px-5 py-8 text-center text-text-muted">
                 No users yet.
               </td>
             </tr>
           )}
         </tbody>
       </table>
-    </div>
+    </Card>
   );
 }

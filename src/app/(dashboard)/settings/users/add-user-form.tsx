@@ -1,8 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
-import { CirclePlus } from "lucide-react";
+import { useActionState, useState } from "react";
+import { CirclePlus, Eye, EyeOff } from "lucide-react";
 import { createUser } from "./actions";
+import { Input, Select, FieldError, HelpText } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
 
 export function AddUserForm({
   roles,
@@ -12,30 +14,15 @@ export function AddUserForm({
   teams: { id: string; name: string }[];
 }) {
   const [state, action, pending] = useActionState(createUser, undefined);
+  const [showPassword, setShowPassword] = useState(false);
 
   return (
-    <form action={action} className="space-y-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-4">
-      <h3 className="text-sm font-bold text-slate-700">Add a user</h3>
+    <form action={action} className="space-y-3 rounded-2xl border border-dashed border-border-strong bg-black/[0.02] p-4">
+      <h3 className="text-sm font-bold text-accent">Add a user</h3>
       <div className="grid gap-3 sm:grid-cols-2">
-        <input
-          name="name"
-          placeholder="Full name"
-          required
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-        />
-        <input
-          name="email"
-          type="email"
-          placeholder="Email"
-          required
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-        />
-        <select
-          name="roleId"
-          required
-          defaultValue=""
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
-        >
+        <Input name="name" placeholder="Full name" required />
+        <Input name="email" type="email" placeholder="Email" required />
+        <Select name="roleId" required defaultValue="">
           <option value="" disabled>
             Choose a role
           </option>
@@ -44,41 +31,44 @@ export function AddUserForm({
               {role.name}
             </option>
           ))}
-        </select>
-        <select
-          name="teamId"
-          defaultValue=""
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500"
-        >
+        </Select>
+        <Select name="teamId" defaultValue="">
           <option value="">No team</option>
           {teams.map((team) => (
             <option key={team.id} value={team.id}>
               {team.name}
             </option>
           ))}
-        </select>
-        <input
-          name="initialPassword"
-          type="password"
-          placeholder="Temporary password"
-          required
-          autoComplete="new-password"
-          className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 sm:col-span-2"
-        />
+        </Select>
+        <div className="relative sm:col-span-2">
+          <Input
+            name="initialPassword"
+            type={showPassword ? "text" : "password"}
+            placeholder="Temporary password"
+            required
+            autoComplete="new-password"
+            className="pr-10"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((current) => !current)}
+            aria-label={showPassword ? "Hide temporary password" : "Show temporary password"}
+            aria-pressed={showPassword}
+            className="absolute inset-y-0 right-0 flex items-center px-3 text-text-muted hover:text-text"
+          >
+            {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        </div>
       </div>
-      <p className="text-xs text-slate-500">
+      <HelpText>
         Share this temporary password with the new user directly — they&apos;ll be required to change it on first
         sign-in. At least 8 characters, with a letter, a number, and a special character.
-      </p>
-      {state?.error && <p className="text-xs font-semibold text-red-600">{state.error}</p>}
-      <button
-        type="submit"
-        disabled={pending}
-        className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
-      >
+      </HelpText>
+      {state?.error && <FieldError>{state.error}</FieldError>}
+      <Button type="submit" disabled={pending} variant="primary">
         <CirclePlus size={16} />
         {pending ? "Adding..." : "Add user"}
-      </button>
+      </Button>
     </form>
   );
 }

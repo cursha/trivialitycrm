@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { PermissionMatrix } from "./permission-matrix";
 import { AddLookupForm } from "@/components/add-lookup-form";
 import { createRole } from "./actions";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const metadata = { title: "Roles & Permissions — Triviality CRM" };
 
@@ -21,12 +22,10 @@ export default async function RolesPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-black tracking-tight">Roles &amp; Permissions</h1>
-        <p className="mt-1 text-slate-500">
-          Every permission grant is stored in the database and editable here — nothing is hardcoded.
-        </p>
-      </div>
+      <PageHeader
+        title="Roles & Permissions"
+        description="Every permission grant is stored in the database and editable here — nothing is hardcoded."
+      />
 
       <PermissionMatrix roles={roles} permissions={permissions} grants={grants} />
 

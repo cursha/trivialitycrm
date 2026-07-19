@@ -3,6 +3,12 @@ import type { NextRequest } from "next/server";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 
 const PUBLIC_ROUTES = ["/login"];
+// /api/health is Railway's health check target — confirmed by an actual
+// container run during this module's build testing that, without this
+// exemption, an unauthenticated health check gets a 307 to /login instead
+// of the route's own 200, which is exactly the wrong signal for a
+// deployment platform deciding whether to keep an instance alive.
+const PUBLIC_PREFIXES = ["/api/health"];
 
 // Optimistic check ONLY — this reads whether the session cookie is present,
 // not whether it's still valid. Proxy runs on every request (including
@@ -13,6 +19,10 @@ const PUBLIC_ROUTES = ["/login"];
 // authentication beyond this fast pre-filter.
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  if (PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+    return NextResponse.next();
+  }
+
   const hasSessionCookie = request.cookies.has(SESSION_COOKIE_NAME);
   const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
 

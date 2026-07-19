@@ -5,6 +5,8 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { getScopedCompany } from "../../queries";
 import { CompanyForm } from "../../company-form";
 import { updateCompany } from "../../actions";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
 
 export const metadata = { title: "Edit Company — Triviality CRM" };
 
@@ -25,11 +27,9 @@ export default async function EditCompanyPage({ params }: { params: Promise<{ id
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-black tracking-tight">Edit {company.name}</h1>
-      </div>
+      <PageHeader title={`Edit ${company.name}`} />
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <Card>
         <CompanyForm
           action={updateCompany.bind(null, id)}
           defaultValues={{
@@ -57,7 +57,7 @@ export default async function EditCompanyPage({ params }: { params: Promise<{ id
           isAdmin={user.role.name === "Administrator"}
           submitLabel="Save changes"
         />
-      </div>
+      </Card>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import {
   deletePipelineStage,
   setDefaultPipelineStage,
 } from "./actions";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const metadata = { title: "Pipeline Stages — Triviality CRM" };
 
@@ -22,13 +23,10 @@ export default async function PipelineStagesPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-black tracking-tight">Pipeline Stages</h1>
-        <p className="mt-1 text-slate-500">
-          Add, rename, reorder, and activate or deactivate stages. Exactly one stage is marked as the default for new
-          companies. A stage in use by existing companies can be deactivated but not deleted.
-        </p>
-      </div>
+      <PageHeader
+        title="Pipeline Stages"
+        description="Add, rename, reorder, and activate or deactivate stages. Exactly one stage is marked as the default for new companies. A stage in use by existing companies can be deactivated but not deleted."
+      />
 
       <LookupTable
         items={stages}

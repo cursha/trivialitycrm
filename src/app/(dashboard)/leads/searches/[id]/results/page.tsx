@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission, hasPermission } from "@/lib/auth/permissions";
 import { ResultsTable } from "./results-table";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const metadata = { title: "Search Results — Triviality CRM" };
 
@@ -66,14 +67,10 @@ export default async function SearchResultsPage({
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-black tracking-tight">
-          {search.region}, {search.country} — Results
-        </h1>
-        <p className="mt-1 text-slate-500">
-          Ranked highest to lowest quality score. Minimum score for this search: {search.minimumScore}.
-        </p>
-      </div>
+      <PageHeader
+        title={`${search.region}, ${search.country} — Results`}
+        description={`Ranked highest to lowest quality score. Minimum score for this search: ${search.minimumScore}.`}
+      />
 
       <ResultsTable
         results={rows}

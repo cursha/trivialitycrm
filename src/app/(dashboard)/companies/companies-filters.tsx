@@ -2,6 +2,8 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useTransition } from "react";
+import { Input, Select } from "@/components/ui/field";
+import { Card } from "@/components/ui/card";
 
 type Option = { id: string; name: string };
 
@@ -35,19 +37,18 @@ export function CompaniesFilters({
     });
   }
 
-  const selectClass = "rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500";
+  const selectClass = "w-auto";
 
   return (
-    <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <input
+    <Card className="space-y-3">
+      <Input
         type="search"
         placeholder="Search by name, city, email or phone"
         defaultValue={searchParams.get("q") ?? ""}
         onChange={(event) => updateParam("q", event.target.value)}
-        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
       />
       <div className="flex flex-wrap gap-2">
-        <select
+        <Select
           className={selectClass}
           defaultValue={searchParams.get("leadTypeId") ?? ""}
           onChange={(event) => updateParam("leadTypeId", event.target.value)}
@@ -58,8 +59,8 @@ export function CompaniesFilters({
               {option.name}
             </option>
           ))}
-        </select>
-        <select
+        </Select>
+        <Select
           className={selectClass}
           defaultValue={searchParams.get("pipelineStageId") ?? ""}
           onChange={(event) => updateParam("pipelineStageId", event.target.value)}
@@ -70,8 +71,8 @@ export function CompaniesFilters({
               {option.name}
             </option>
           ))}
-        </select>
-        <select
+        </Select>
+        <Select
           className={selectClass}
           defaultValue={searchParams.get("assignedToId") ?? ""}
           onChange={(event) => updateParam("assignedToId", event.target.value)}
@@ -82,8 +83,8 @@ export function CompaniesFilters({
               {option.name}
             </option>
           ))}
-        </select>
-        <select
+        </Select>
+        <Select
           className={selectClass}
           defaultValue={searchParams.get("competitorId") ?? ""}
           onChange={(event) => updateParam("competitorId", event.target.value)}
@@ -94,8 +95,8 @@ export function CompaniesFilters({
               {option.name}
             </option>
           ))}
-        </select>
-        <select
+        </Select>
+        <Select
           className={selectClass}
           defaultValue={searchParams.get("triviaStatus") ?? ""}
           onChange={(event) => updateParam("triviaStatus", event.target.value)}
@@ -104,8 +105,8 @@ export function CompaniesFilters({
           <option value="CURRENT_TRIVIA">Current Trivia</option>
           <option value="NO_CURRENT_TRIVIA">No Current Trivia</option>
           <option value="UNCERTAIN">Uncertain</option>
-        </select>
-        <select
+        </Select>
+        <Select
           className={selectClass}
           defaultValue={searchParams.get("followUp") ?? ""}
           onChange={(event) => updateParam("followUp", event.target.value)}
@@ -115,8 +116,8 @@ export function CompaniesFilters({
           <option value="today">Due today</option>
           <option value="upcoming">Upcoming</option>
           <option value="none">No follow-up set</option>
-        </select>
-        <select
+        </Select>
+        <Select
           className={selectClass}
           defaultValue={searchParams.get("opportunityGrade") ?? ""}
           onChange={(event) => updateParam("opportunityGrade", event.target.value)}
@@ -127,8 +128,8 @@ export function CompaniesFilters({
           <option value="B">B</option>
           <option value="C">C</option>
           <option value="D">D</option>
-        </select>
-        <select
+        </Select>
+        <Select
           className={selectClass}
           defaultValue={searchParams.get("confidenceLevel") ?? ""}
           onChange={(event) => updateParam("confidenceLevel", event.target.value)}
@@ -137,8 +138,8 @@ export function CompaniesFilters({
           <option value="HIGH">High</option>
           <option value="MEDIUM">Medium</option>
           <option value="LOW">Low</option>
-        </select>
-        <select
+        </Select>
+        <Select
           className={selectClass}
           defaultValue={searchParams.get("primaryClassification") ?? ""}
           onChange={(event) => updateParam("primaryClassification", event.target.value)}
@@ -149,8 +150,8 @@ export function CompaniesFilters({
           <option value="REPLACEMENT">Replacement</option>
           <option value="NEEDS_QUALIFICATION">Needs Qualification</option>
           <option value="EXISTING_CUSTOMER">Existing Customer</option>
-        </select>
-        <select
+        </Select>
+        <Select
           className={selectClass}
           defaultValue={searchParams.get("sortBy") ?? "name"}
           onChange={(event) => updateParam("sortBy", event.target.value)}
@@ -160,16 +161,16 @@ export function CompaniesFilters({
           <option value="nextFollowUpAt">Sort: Follow-up date</option>
           <option value="eosScore">Sort: EOS score</option>
           <option value="createdAt">Sort: Created</option>
-        </select>
-        <select
+        </Select>
+        <Select
           className={selectClass}
           defaultValue={searchParams.get("sortDir") ?? "asc"}
           onChange={(event) => updateParam("sortDir", event.target.value)}
         >
           <option value="asc">Ascending</option>
           <option value="desc">Descending</option>
-        </select>
+        </Select>
       </div>
-    </div>
+    </Card>
   );
 }

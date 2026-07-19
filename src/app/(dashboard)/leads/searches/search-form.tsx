@@ -2,6 +2,9 @@
 
 import { useActionState, useState } from "react";
 import { startSearch, type SearchFormState } from "./actions";
+import { Card } from "@/components/ui/card";
+import { Label, Input, Select, FieldError } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
 
 export type SearchFormOptions = {
   prompts: { id: string; name: string }[];
@@ -27,70 +30,65 @@ export function SearchForm({ prompts, leadTypes, competitors }: SearchFormOption
     .filter(Boolean);
 
   return (
-    <form action={formAction} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <form action={formAction}>
+    <Card className="space-y-4">
       <div>
-        <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Research prompt</label>
-        <select name="promptId" required className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+        <Label className="mb-1 block text-xs uppercase">Research prompt</Label>
+        <Select name="promptId" required>
           <option value="">Choose a prompt...</option>
           {prompts.map((prompt) => (
             <option key={prompt.id} value={prompt.id}>
               {prompt.name}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Research mode</label>
-        <select
-          name="mode"
-          value={mode}
-          onChange={(event) => setMode(event.target.value)}
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-        >
+        <Label className="mb-1 block text-xs uppercase">Research mode</Label>
+        <Select name="mode" value={mode} onChange={(event) => setMode(event.target.value)}>
           {MODES.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       {mode === "COMPETITOR" && (
         <div>
-          <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Competitor</label>
-          <select name="competitorId" required className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+          <Label className="mb-1 block text-xs uppercase">Competitor</Label>
+          <Select name="competitorId" required>
             <option value="">Choose a competitor...</option>
             {competitors.map((competitor) => (
               <option key={competitor.id} value={competitor.id}>
                 {competitor.name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
       )}
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Country</label>
-          <select name="country" required className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+          <Label className="mb-1 block text-xs uppercase">Country</Label>
+          <Select name="country" required>
             <option value="Canada">Canada</option>
             <option value="United States">United States</option>
-          </select>
+          </Select>
         </div>
         <div>
-          <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">State / Province</label>
-          <input name="region" required placeholder="e.g. ON or Colorado" className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" />
+          <Label className="mb-1 block text-xs uppercase">State / Province</Label>
+          <Input name="region" required placeholder="e.g. ON or Colorado" />
         </div>
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Cities (optional, comma-separated)</label>
-        <input
+        <Label className="mb-1 block text-xs uppercase">Cities (optional, comma-separated)</Label>
+        <Input
           value={citiesInput}
           onChange={(event) => setCitiesInput(event.target.value)}
           placeholder="Leave blank to search the whole state/province"
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
         />
         {cities.map((city) => (
           <input key={city} type="hidden" name="cities" value={city} />
@@ -98,34 +96,28 @@ export function SearchForm({ prompts, leadTypes, competitors }: SearchFormOption
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Lead Type</label>
-        <select name="leadTypeId" required className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+        <Label className="mb-1 block text-xs uppercase">Lead Type</Label>
+        <Select name="leadTypeId" required>
           <option value="">Choose a Lead Type...</option>
           {leadTypes.map((leadType) => (
             <option key={leadType.id} value={leadType.id}>
               {leadType.name}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Minimum quality score</label>
-        <input
-          name="minimumScore"
-          type="number"
-          min={0}
-          max={100}
-          defaultValue={80}
-          className="w-32 rounded-lg border border-slate-300 px-3 py-2 text-sm"
-        />
+        <Label className="mb-1 block text-xs uppercase">Minimum quality score</Label>
+        <Input name="minimumScore" type="number" min={0} max={100} defaultValue={80} className="w-32" />
       </div>
 
-      {state?.error && <p className="text-xs font-semibold text-red-600">{state.error}</p>}
+      {state?.error && <FieldError>{state.error}</FieldError>}
 
-      <button type="submit" disabled={pending} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60">
+      <Button type="submit" disabled={pending} variant="primary">
         {pending ? "Starting..." : "Start search"}
-      </button>
+      </Button>
+    </Card>
     </form>
   );
 }

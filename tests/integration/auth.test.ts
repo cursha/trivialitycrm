@@ -7,6 +7,9 @@ import { RedirectSignal } from "../setup/mock-next";
 import { hasPermission, requirePermission, ForbiddenError } from "../../src/lib/auth/permissions";
 import { isLockedOut, recordFailedLogin, recordSuccessfulLogin } from "../../src/lib/auth/rate-limit";
 import { createSession, destroySession, invalidateAllSessionsForUser } from "../../src/lib/auth/session";
+import { sweepExpiredSessions } from "../../worker/handlers/cleanup";
+import { hashPassword } from "../../src/lib/auth/password";
+import { login } from "../../src/app/login/actions";
 
 beforeEach(async () => {
   await resetDatabase();
@@ -79,6 +82,33 @@ describe("session verification", () => {
     expect(await testPrisma.session.count({ where: { userId: user.id } })).toBe(0);
   });
 
+  it("requireUser() redirects to /change-password when mustChangePassword is set, even with an otherwise-valid session", async () => {
+    const role = await createRoleWithPermissions("Administrator", ["view_all_leads"]);
+    const user = await createTestUser({ roleId: role.id });
+    await testPrisma.user.update({ where: { id: user.id }, data: { mustChangePassword: true } });
+    await loginAs(user.id);
+
+    // Previously only enforced at the login redirect — a direct requireUser()
+    // call (any of the ~119 server action/route-handler call sites, not just
+    // a page render) must reject this session just as strictly.
+    try {
+      await requireUser();
+      expect.fail("expected requireUser() to throw a redirect");
+    } catch (error) {
+      expect((error as RedirectSignal).url).toBe("/change-password");
+    }
+  });
+
+  it("requireUser({ allowMustChangePassword: true }) proceeds despite the flag, for the change-password page/action themselves", async () => {
+    const role = await createRoleWithPermissions("Administrator", ["view_all_leads"]);
+    const user = await createTestUser({ roleId: role.id });
+    await testPrisma.user.update({ where: { id: user.id }, data: { mustChangePassword: true } });
+    await loginAs(user.id);
+
+    const current = await requireUser({ allowMustChangePassword: true });
+    expect(current.id).toBe(user.id);
+  });
+
   it("disabling a user invalidates all of their sessions immediately", async () => {
     const role = await createRoleWithPermissions("Administrator", ["view_all_leads"]);
     const user = await createTestUser({ roleId: role.id });
@@ -117,6 +147,48 @@ describe("permission enforcement", () => {
   });
 });
 
+describe("login server action (real form submission, not the loginAs() test bypass)", () => {
+  function formDataFor(email: string, password: string): FormData {
+    const fd = new FormData();
+    fd.set("email", email);
+    fd.set("password", password);
+    return fd;
+  }
+
+  it("logs in with correct credentials and creates a session", async () => {
+    const role = await createRoleWithPermissions("Administrator", ["view_all_leads"]);
+    const passwordHash = await hashPassword("Correct-Horse-Battery-9");
+    const user = await testPrisma.user.create({
+      data: { name: "Diagnostic User", email: "diag@example.test", passwordHash, roleId: role.id },
+    });
+
+    let redirectUrl: string | null = null;
+    try {
+      await login(undefined, formDataFor("diag@example.test", "Correct-Horse-Battery-9"));
+      expect.fail("expected login() to redirect on success");
+    } catch (error) {
+      if (error instanceof RedirectSignal) redirectUrl = error.url;
+      else throw error;
+    }
+
+    expect(redirectUrl).toBe("/dashboard");
+    expect(await testPrisma.session.count({ where: { userId: user.id } })).toBe(1);
+  });
+
+  it("rejects an incorrect password with the generic error, no session created", async () => {
+    const role = await createRoleWithPermissions("Administrator", ["view_all_leads"]);
+    const passwordHash = await hashPassword("Correct-Horse-Battery-9");
+    const user = await testPrisma.user.create({
+      data: { name: "Diagnostic User 2", email: "diag2@example.test", passwordHash, roleId: role.id },
+    });
+
+    const result = await login(undefined, formDataFor("diag2@example.test", "wrong-password"));
+
+    expect(result?.error).toBe("Invalid email or password.");
+    expect(await testPrisma.session.count({ where: { userId: user.id } })).toBe(0);
+  });
+});
+
 describe("login rate limiting", () => {
   it("locks the account after five failed attempts and clears on success", async () => {
     const role = await createRoleWithPermissions("Administrator", ["view_all_leads"]);
@@ -145,6 +217,22 @@ describe("login rate limiting", () => {
 
     const stillOpenUser = await testPrisma.user.findUniqueOrThrow({ where: { id: user.id } });
     expect(isLockedOut(stillOpenUser)).toBe(false);
+  });
+});
+
+describe("expired session cleanup", () => {
+  it("removes expired sessions and leaves live ones — the worker's periodic sweep, not just lazy per-lookup deletion", async () => {
+    const role = await createRoleWithPermissions("Administrator", ["view_all_leads"]);
+    const user = await createTestUser({ roleId: role.id });
+    await createSession(user.id);
+    await createSession(user.id);
+
+    await testPrisma.session.updateMany({ where: { userId: user.id }, data: { expiresAt: new Date(Date.now() - 1000) } });
+    await createSession(user.id); // a third, still-live session
+
+    const removed = await sweepExpiredSessions();
+    expect(removed).toBe(2);
+    expect(await testPrisma.session.count({ where: { userId: user.id } })).toBe(1);
   });
 });
 

@@ -4,6 +4,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CirclePlus, Phone, Mail, Users, FileText, Presentation, FlaskConical, StickyNote, GitBranch } from "lucide-react";
 import { createActivity } from "./actions";
+import { Card } from "@/components/ui/card";
+import { Input, Select, Textarea } from "@/components/ui/field";
 
 export type ActivityRow = {
   id: string;
@@ -42,9 +44,6 @@ export function ActivityPanel({ companyId, activities, canLog }: { companyId: st
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  const inputClass =
-    "w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
-
   function handleCreate(formData: FormData) {
     startTransition(async () => {
       const result = await createActivity(companyId, undefined, formData);
@@ -59,14 +58,14 @@ export function ActivityPanel({ companyId, activities, canLog }: { companyId: st
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <Card>
       <div className="flex items-center justify-between">
-        <h2 className="font-bold">Activity timeline</h2>
+        <h2 className="font-bold text-accent">Activity timeline</h2>
         {canLog && !logging && (
           <button
             type="button"
             onClick={() => setLogging(true)}
-            className="flex items-center gap-1 text-sm font-bold text-blue-600 hover:underline"
+            className="flex items-center gap-1 text-sm font-bold text-secondary hover:underline"
           >
             <CirclePlus size={15} />
             Log activity
@@ -74,11 +73,11 @@ export function ActivityPanel({ companyId, activities, canLog }: { companyId: st
         )}
       </div>
 
-      {error && <p className="mt-2 text-xs font-semibold text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-xs font-semibold text-danger">{error}</p>}
 
       {logging && (
-        <form action={handleCreate} className="mt-3 space-y-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3">
-          <select name="type" required defaultValue="" className={inputClass}>
+        <form action={handleCreate} className="mt-3 space-y-2 rounded-lg border border-dashed border-border-strong bg-black/[0.02] p-3">
+          <Select name="type" required defaultValue="" className="py-1.5">
             <option value="" disabled>
               Activity type
             </option>
@@ -89,17 +88,17 @@ export function ActivityPanel({ companyId, activities, canLog }: { companyId: st
             <option value="DEMO">Demo</option>
             <option value="TRIAL">Trial</option>
             <option value="NOTE">General note</option>
-          </select>
-          <input name="outcome" placeholder="Outcome (optional)" className={inputClass} />
-          <textarea name="notes" placeholder="Notes" rows={3} className={inputClass} />
+          </Select>
+          <Input name="outcome" placeholder="Outcome (optional)" className="py-1.5" />
+          <Textarea name="notes" placeholder="Notes" rows={3} className="py-1.5" />
           <div className="flex gap-2">
-            <button type="submit" disabled={isPending} className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white">
+            <button type="submit" disabled={isPending} className="rounded bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-50">
               {isPending ? "Saving..." : "Log activity"}
             </button>
             <button
               type="button"
               onClick={() => setLogging(false)}
-              className="rounded border border-slate-300 px-3 py-1.5 text-xs font-semibold"
+              className="rounded border border-border-strong px-3 py-1.5 text-xs font-semibold text-text hover:bg-black/5"
             >
               Cancel
             </button>
@@ -108,28 +107,28 @@ export function ActivityPanel({ companyId, activities, canLog }: { companyId: st
       )}
 
       {activities.length === 0 ? (
-        <p className="mt-3 text-sm text-slate-500">No activity yet.</p>
+        <p className="mt-3 text-sm text-text-muted">No activity yet.</p>
       ) : (
-        <ol className="mt-4 space-y-4 border-l border-slate-200 pl-4">
+        <ol className="mt-4 space-y-4 border-l border-border pl-4">
           {activities.map((activity) => {
             const Icon = TYPE_ICONS[activity.type] ?? StickyNote;
             return (
               <li key={activity.id} className="relative">
-                <span className="absolute -left-[21px] flex h-6 w-6 items-center justify-center rounded-full bg-blue-50 text-blue-600 ring-4 ring-white">
+                <span className="absolute -left-[21px] flex h-6 w-6 items-center justify-center rounded-full bg-secondary/10 text-secondary ring-4 ring-surface-raised">
                   <Icon size={13} />
                 </span>
                 <div className="flex items-baseline justify-between gap-2">
-                  <p className="font-semibold">{TYPE_LABELS[activity.type] ?? activity.type}</p>
-                  <p className="text-xs text-slate-400">{new Date(activity.occurredAt).toLocaleString()}</p>
+                  <p className="font-semibold text-text">{TYPE_LABELS[activity.type] ?? activity.type}</p>
+                  <p className="text-xs text-text-muted">{new Date(activity.occurredAt).toLocaleString()}</p>
                 </div>
-                <p className="text-xs text-slate-500">{activity.user.name}</p>
-                {activity.outcome && <p className="mt-1 text-sm font-medium text-slate-700">Outcome: {activity.outcome}</p>}
-                {activity.notes && <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">{activity.notes}</p>}
+                <p className="text-xs text-text-muted">{activity.user.name}</p>
+                {activity.outcome && <p className="mt-1 text-sm font-medium text-text">Outcome: {activity.outcome}</p>}
+                {activity.notes && <p className="mt-1 whitespace-pre-wrap text-sm text-text-muted">{activity.notes}</p>}
               </li>
             );
           })}
         </ol>
       )}
-    </div>
+    </Card>
   );
 }

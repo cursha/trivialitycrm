@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
 import { hashPassword } from "@/lib/auth/password";
 import { invalidateAllSessionsForUser } from "@/lib/auth/session";
-import { CreateUserSchema } from "@/lib/validation/user";
+import { CreateUserSchema, ResetPasswordSchema } from "@/lib/validation/user";
 import { LookupNameSchema } from "@/lib/validation/lookup";
 import { formString } from "@/lib/form-data";
 
@@ -54,6 +54,40 @@ export async function createUser(_prevState: ActionResult, formData: FormData): 
   } catch {
     return { error: "A user with that email already exists." };
   }
+
+  revalidatePath(PATH);
+}
+
+/**
+ * Sets a fresh temporary password for an existing user — never a way to
+ * recover their previous one (impossible: only its bcrypt hash exists, and
+ * that must stay one-way). The administrator sees the new value because
+ * they're the one typing it, the same way "Add a user" already works. Also
+ * clears any account lockout, since "forgot/needs their password" and "got
+ * locked out trying it" tend to happen together.
+ */
+export async function resetUserPassword(_prevState: ActionResult, formData: FormData): Promise<ActionResult> {
+  await requireUserManager();
+
+  const parsed = ResetPasswordSchema.safeParse({
+    userId: formString(formData, "userId"),
+    newPassword: formString(formData, "newPassword"),
+  });
+
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0]?.message ?? "Please correct the highlighted fields." };
+  }
+
+  const passwordHash = await hashPassword(parsed.data.newPassword);
+
+  await prisma.user.update({
+    where: { id: parsed.data.userId },
+    data: { passwordHash, mustChangePassword: true, failedLoginAttempts: 0, lockedUntil: null },
+  });
+
+  // They'll sign back in with the new temporary password — don't leave a
+  // session from before the reset still valid alongside it.
+  await invalidateAllSessionsForUser(parsed.data.userId);
 
   revalidatePath(PATH);
 }

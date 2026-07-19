@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
 import { ImportWizard } from "./import-wizard";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const metadata = { title: "Import Leads — Triviality CRM" };
 
@@ -20,10 +21,10 @@ export default async function ImportPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-black tracking-tight">Import Leads</h1>
-        <p className="mt-1 text-slate-500">Upload a CSV or Excel file, map its columns, then review and confirm before importing.</p>
-      </div>
+      <PageHeader
+        title="Import Leads"
+        description="Upload a CSV or Excel file, map its columns, then review and confirm before importing."
+      />
       <ImportWizard
         leadTypes={leadTypes.map((lt) => ({ id: lt.id, name: lt.name }))}
         pipelineStages={pipelineStages.map((stage) => ({ id: stage.id, name: stage.name }))}

@@ -7,6 +7,9 @@ import {
   listCompletedTasks,
   listCompaniesWithoutFollowUp,
 } from "./queries";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
+import clsx from "clsx";
 
 export const metadata = { title: "Follow-Ups — Triviality CRM" };
 
@@ -35,19 +38,17 @@ export default async function FollowUpsPage({
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-black tracking-tight">Follow-Ups</h1>
-        <p className="mt-1 text-slate-500">Due, upcoming, completed, overdue, and companies with nothing scheduled.</p>
-      </div>
+      <PageHeader title="Follow-Ups" description="Due, upcoming, completed, overdue, and companies with nothing scheduled." />
 
-      <div className="flex flex-wrap gap-2 border-b border-slate-200">
+      <div className="flex flex-wrap gap-2 border-b border-border">
         {VIEWS.map((v) => (
           <Link
             key={v.key}
             href={`/follow-ups?view=${v.key}`}
-            className={`rounded-t-lg px-4 py-2 text-sm font-semibold ${
-              view === v.key ? "border-b-2 border-blue-600 text-blue-600" : "text-slate-500 hover:text-slate-800"
-            }`}
+            className={clsx(
+              "rounded-t-lg px-4 py-2 text-sm font-semibold",
+              view === v.key ? "border-b-2 border-accent text-accent" : "text-text-muted hover:text-text",
+            )}
           >
             {v.label}
           </Link>
@@ -70,13 +71,13 @@ async function TaskView({ user, view }: { user: Awaited<ReturnType<typeof requir
           : await listCompletedTasks(user);
 
   if (tasks.length === 0) {
-    return <p className="py-8 text-center text-slate-500">Nothing here.</p>;
+    return <p className="py-8 text-center text-text-muted">Nothing here.</p>;
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <Card className="overflow-hidden p-0">
       <table className="w-full text-left text-sm">
-        <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+        <thead className="bg-black/5 text-xs uppercase text-text-muted">
           <tr>
             <th className="px-5 py-3">Company</th>
             <th className="px-5 py-3">Follow-up</th>
@@ -86,9 +87,9 @@ async function TaskView({ user, view }: { user: Awaited<ReturnType<typeof requir
         </thead>
         <tbody>
           {tasks.map((task) => (
-            <tr key={task.id} className="border-t border-slate-100 hover:bg-blue-50/40">
+            <tr key={task.id} className="border-t border-border hover:bg-black/5">
               <td className="px-5 py-4">
-                <Link href={`/companies/${task.company.id}`} className="font-bold text-blue-600 hover:underline">
+                <Link href={`/companies/${task.company.id}`} className="font-bold text-secondary hover:underline">
                   {task.company.name}
                 </Link>
               </td>
@@ -103,7 +104,7 @@ async function TaskView({ user, view }: { user: Awaited<ReturnType<typeof requir
           ))}
         </tbody>
       </table>
-    </div>
+    </Card>
   );
 }
 
@@ -111,13 +112,13 @@ async function NoFollowUpView({ user }: { user: Awaited<ReturnType<typeof requir
   const companies = await listCompaniesWithoutFollowUp(user);
 
   if (companies.length === 0) {
-    return <p className="py-8 text-center text-slate-500">Every company has an open follow-up scheduled.</p>;
+    return <p className="py-8 text-center text-text-muted">Every company has an open follow-up scheduled.</p>;
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <Card className="overflow-hidden p-0">
       <table className="w-full text-left text-sm">
-        <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+        <thead className="bg-black/5 text-xs uppercase text-text-muted">
           <tr>
             <th className="px-5 py-3">Company</th>
             <th className="px-5 py-3">Assigned to</th>
@@ -125,12 +126,12 @@ async function NoFollowUpView({ user }: { user: Awaited<ReturnType<typeof requir
         </thead>
         <tbody>
           {companies.map((company) => (
-            <tr key={company.id} className="border-t border-slate-100 hover:bg-blue-50/40">
+            <tr key={company.id} className="border-t border-border hover:bg-black/5">
               <td className="px-5 py-4">
-                <Link href={`/companies/${company.id}`} className="font-bold text-blue-600 hover:underline">
+                <Link href={`/companies/${company.id}`} className="font-bold text-secondary hover:underline">
                   {company.name}
                 </Link>
-                <div className="text-xs text-slate-500">
+                <div className="text-xs text-text-muted">
                   {company.city}, {company.region}
                 </div>
               </td>
@@ -139,6 +140,6 @@ async function NoFollowUpView({ user }: { user: Awaited<ReturnType<typeof requir
           ))}
         </tbody>
       </table>
-    </div>
+    </Card>
   );
 }

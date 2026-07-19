@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
 import { SearchForm } from "../search-form";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const metadata = { title: "New Search — Triviality CRM" };
 
@@ -17,12 +18,10 @@ export default async function NewSearchPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-black tracking-tight">New Research Search</h1>
-        <p className="mt-1 text-slate-500">
-          The prompt describes the business criteria; country, state/province, cities, and Lead Type are the authoritative filters.
-        </p>
-      </div>
+      <PageHeader
+        title="New Research Search"
+        description="The prompt describes the business criteria; country, state/province, cities, and Lead Type are the authoritative filters."
+      />
       <SearchForm prompts={prompts} leadTypes={leadTypes} competitors={competitors} />
     </div>
   );
