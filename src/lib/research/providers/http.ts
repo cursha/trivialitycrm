@@ -1,4 +1,4 @@
-import "server-only";
+import { checkRateLimit } from "../../rate-limit/postgres-bucket";
 
 /** Thrown when a provider call is rejected by the local rate limiter (distinct from the
  * provider's own 429s, which the caller should retry with backoff instead). */
@@ -16,56 +16,31 @@ export class ProviderTimeoutError extends Error {
   }
 }
 
-/** Minimal in-process token bucket. Fine for the single-process deployment
- * this app runs on (see run-search.ts) — not a distributed limiter. */
-class TokenBucket {
-  private tokens: number;
-  private lastRefillAt = Date.now();
-
-  constructor(
-    private readonly capacity: number,
-    private readonly refillPerSecond: number,
-  ) {
-    this.tokens = capacity;
-  }
-
-  tryTake(): boolean {
-    const now = Date.now();
-    const elapsedSeconds = (now - this.lastRefillAt) / 1000;
-    this.tokens = Math.min(this.capacity, this.tokens + elapsedSeconds * this.refillPerSecond);
-    this.lastRefillAt = now;
-
-    if (this.tokens < 1) return false;
-    this.tokens -= 1;
-    return true;
-  }
-}
-
-const buckets = new Map<string, TokenBucket>();
-
-function bucketFor(providerName: string, capacity: number, refillPerSecond: number): TokenBucket {
-  let bucket = buckets.get(providerName);
-  if (!bucket) {
-    bucket = new TokenBucket(capacity, refillPerSecond);
-    buckets.set(providerName, bucket);
-  }
-  return bucket;
-}
-
 export type ProviderCallOptions = {
   providerName: string;
   timeoutMs?: number;
-  rateLimit?: { capacity: number; refillPerSecond: number };
+  /** Fixed-window limit, e.g. { windowMs: 60_000, limit: 30 } = 30 calls/minute. */
+  rateLimit?: { windowMs: number; limit: number };
 };
 
-/** Wraps a provider call with a timeout and a local rate limit. Retries are
- * intentionally left to the caller (a bare retry over a timed-out research
- * call risks doubling an expensive request). */
+/**
+ * Wraps a provider call with a timeout and a rate limit. The rate limit is
+ * Postgres-backed (see src/lib/rate-limit/postgres-bucket.ts) — shared
+ * across every process (the worker is normally the only caller, but this is
+ * correct even if it's ever scaled to multiple instances) and durable
+ * across restarts, replacing an earlier in-process token bucket that reset
+ * on every deploy and wasn't shared across instances.
+ *
+ * Retries are intentionally left to the caller (a bare retry over a
+ * timed-out research call risks doubling an expensive request) — see
+ * anthropic.ts's client(), which sets the Anthropic SDK's own maxRetries
+ * explicitly instead of hand-rolling retry logic here.
+ */
 export async function callProvider<T>(options: ProviderCallOptions, fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
-  const { providerName, timeoutMs = 30_000, rateLimit = { capacity: 20, refillPerSecond: 1 } } = options;
+  const { providerName, timeoutMs = 30_000, rateLimit = { windowMs: 60_000, limit: 30 } } = options;
 
-  const bucket = bucketFor(providerName, rateLimit.capacity, rateLimit.refillPerSecond);
-  if (!bucket.tryTake()) {
+  const result = await checkRateLimit(`ai-provider:${providerName}`, rateLimit);
+  if (!result.allowed) {
     throw new ProviderRateLimitError(providerName);
   }
 

@@ -115,6 +115,21 @@ enum EvidenceReliability {
   LOW
 }
 
+enum SearchCandidateStatus {
+  PENDING
+  VERIFIED
+  SCORED
+  COMPLETED
+}
+
+enum ImportBatchStatus {
+  PENDING
+  CONFIRMED
+  IMPORTED
+  EXPIRED
+  FAILED
+}
+
 model User {
   id                      String                  @id @default(cuid())
   name                    String
@@ -140,6 +155,8 @@ model User {
   importTemplates         ImportTemplate[]
   createdEvidence         EvidenceRecord[]        @relation("EvidenceCreator")
   scoredHistoricalRecords HistoricalScoreRecord[] @relation("ScoreAuthor")
+  importBatches           ImportBatch[]
+  aiUsageRecords          AiUsageRecord[]
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
 }
@@ -445,7 +462,7 @@ model PromptTemplate {
 }
 
 model LeadSearch {
-  id             String          @id @default(cuid())
+  id             String            @id @default(cuid())
   promptId       String?
   createdById    String
   leadTypeId     String
@@ -453,27 +470,64 @@ model LeadSearch {
   country        String
   region         String
   cities         Json
-  minimumScore   Int             @default(80)
-  mode           LeadSearchMode  @default(GENERAL)
-  promptSnapshot String          @db.Text
-  prompt         PromptTemplate? @relation(fields: [promptId], references: [id], onDelete: SetNull)
-  createdBy      User            @relation(fields: [createdById], references: [id])
-  leadType       LeadType        @relation(fields: [leadTypeId], references: [id])
-  competitor     Competitor?     @relation(fields: [competitorId], references: [id], onDelete: SetNull)
+  minimumScore   Int               @default(80)
+  mode           LeadSearchMode    @default(GENERAL)
+  promptSnapshot String            @db.Text
+  prompt         PromptTemplate?   @relation(fields: [promptId], references: [id], onDelete: SetNull)
+  createdBy      User              @relation(fields: [createdById], references: [id])
+  leadType       LeadType          @relation(fields: [leadTypeId], references: [id])
+  competitor     Competitor?       @relation(fields: [competitorId], references: [id], onDelete: SetNull)
   results        SearchResult[]
+  candidates     SearchCandidate[]
+  usageRecords   AiUsageRecord[]
 
-  // Background-job tracking (single-process runner — see run-search.ts).
+  // Durable job tracking — executed by the worker via a pg-boss job
+  // (providerJobId), not inline in the web process. See run-search.ts and
+  // worker/handlers/run-search.ts.
   status          SearchJobStatus @default(PENDING)
   startedAt       DateTime?
   completedAt     DateTime?
   heartbeatAt     DateTime?
   errorMessage    String?         @db.Text
   candidatesFound Int             @default(0)
+  providerJobId   String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([status, heartbeatAt])
+  @@index([providerJobId])
+}
+
+/**
+ * One row per candidate returned by a single discover() call for a
+ * LeadSearch, persisted immediately so the expensive/non-deterministic
+ * discovery step is never re-run once its results are checkpointed. Status
+ * advances PENDING -> VERIFIED -> SCORED -> COMPLETED as run-search.ts
+ * processes each candidate; a resumed/retried job skips everything already
+ * COMPLETED and re-enters at the first un-checkpointed stage, so a crash mid
+ * -job can cause at most one extra provider call per candidate per retry,
+ * never a duplicate SearchResult row (see SearchResult.candidateId).
+ */
+model SearchCandidate {
+  id                 String                @id @default(cuid())
+  searchId           String
+  search             LeadSearch            @relation(fields: [searchId], references: [id], onDelete: Cascade)
+  index              Int
+  normalizedIdentity String
+  rawCandidate       Json
+  status             SearchCandidateStatus @default(PENDING)
+  verifiedData       Json?
+  score              Int?
+  explanation        String?               @db.Text
+  attempts           Int                   @default(0)
+  lastError          String?               @db.Text
+  result             SearchResult?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  @@unique([searchId, normalizedIdentity])
+  @@index([searchId, status])
 }
 
 model SearchResult {
@@ -482,6 +536,12 @@ model SearchResult {
   companyId         String?
   rejectionReasonId String?
   competitorId      String?
+  // Links back to the SearchCandidate this result was created from. Nullable
+  // because rows created before this column existed have no candidate row;
+  // every new result is upserted by candidateId so a retried job can never
+  // create a duplicate (see SearchCandidate doc comment).
+  candidateId       String?                 @unique
+  candidate         SearchCandidate?        @relation(fields: [candidateId], references: [id], onDelete: SetNull)
   name              String
   address1          String?
   city              String
@@ -532,4 +592,75 @@ model ImportTemplate {
   createdBy       User     @relation(fields: [createdById], references: [id])
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+/**
+ * Durable replacement for the old in-memory upload preview store. `payload`
+ * (the parsed spreadsheet rows) is nulled the moment it's no longer needed —
+ * immediately after a successful commitImport, or by the worker's cleanup
+ * job once expiresAt passes for a batch nobody committed. The row itself
+ * (metadata only, once payload is null) is kept a further grace period for
+ * troubleshooting, then hard-deleted. Never written with app-layer
+ * encryption — see MODULE_3_REPORT.md for why plain Json was chosen.
+ */
+model ImportBatch {
+  id           String            @id @default(cuid())
+  uploadedById String
+  uploadedBy   User              @relation(fields: [uploadedById], references: [id])
+  filename     String
+  status       ImportBatchStatus @default(PENDING)
+  headers      Json
+  payload      Json?
+  rowCount     Int
+  mapping      Json?
+  errorMessage String?           @db.Text
+  expiresAt    DateTime
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  @@index([status, expiresAt])
+  @@index([uploadedById])
+}
+
+/**
+ * One row per AI provider call (discover/verify/score/promptAssist),
+ * written immediately after the call returns so cost is visible even if the
+ * enclosing job later fails. Feeds the optional AI_DAILY_BUDGET_USD /
+ * AI_MONTHLY_BUDGET_USD safeguard — see src/lib/research/providers/pricing.ts.
+ */
+model AiUsageRecord {
+  id                  String      @id @default(cuid())
+  searchId            String?
+  search              LeadSearch? @relation(fields: [searchId], references: [id], onDelete: SetNull)
+  userId              String?
+  user                User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  provider            String
+  operation           String
+  model               String
+  inputTokens         Int
+  outputTokens        Int
+  cacheReadTokens     Int         @default(0)
+  cacheCreationTokens Int         @default(0)
+  serverToolUses      Int         @default(0)
+  estimatedCostUsd    Decimal     @db.Decimal(10, 6)
+  createdAt           DateTime    @default(now())
+
+  @@index([createdAt])
+  @@index([searchId])
+}
+
+/**
+ * Fixed-window Postgres counter, shared by every process (web + every
+ * worker instance) — replaces the old in-process, restart-losing token
+ * bucket. key encodes the axis being limited, e.g. "login:ip:<ip>" or
+ * "ai-provider:anthropic". See src/lib/rate-limit/postgres-bucket.ts.
+ */
+model RateLimitBucket {
+  id          String   @id @default(cuid())
+  key         String
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@unique([key, windowStart])
+  @@index([windowStart])
 }

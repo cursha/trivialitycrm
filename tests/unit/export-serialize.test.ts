@@ -22,6 +22,21 @@ describe("buildCsv", () => {
   it("writes just the header when there are no rows", () => {
     expect(buildCsv(columns, [])).toBe("Name,City\n");
   });
+
+  it("neutralizes a formula-injection attempt in a cell value", () => {
+    const csv = buildCsv(columns, [{ name: "=cmd|'/C calc'!A1", city: "Milton" }]);
+    expect(csv).toContain("'=cmd|'/C calc'!A1");
+  });
+
+  it("leaves an ordinary hyphen-leading business name intact aside from the safety prefix", () => {
+    const csv = buildCsv(columns, [{ name: "-24 Grill", city: "Milton" }]);
+    expect(csv).toContain("'-24 Grill");
+  });
+
+  it("does not mangle values that don't start with a formula-trigger character", () => {
+    const csv = buildCsv(columns, [{ name: "The Copper Kettle", city: "Milton" }]);
+    expect(csv).toBe("Name,City\nThe Copper Kettle,Milton\n");
+  });
 });
 
 describe("buildXlsx", () => {
@@ -34,5 +49,15 @@ describe("buildXlsx", () => {
 
     expect(sheet.getRow(1).getCell(1).value).toBe("Name");
     expect(sheet.getRow(2).getCell(1).value).toBe("The Copper Kettle");
+  });
+
+  it("neutralizes a formula-injection attempt in a cell value", async () => {
+    const buffer = await buildXlsx(columns, [{ name: "=cmd|'/C calc'!A1", city: "Milton" }]);
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer as unknown as ArrayBuffer);
+    const sheet = workbook.worksheets[0];
+
+    expect(sheet.getRow(2).getCell(1).value).toBe("'=cmd|'/C calc'!A1");
   });
 });

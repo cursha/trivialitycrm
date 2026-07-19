@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
 import { TemplateList } from "./template-list";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const metadata = { title: "Import Mapping Templates — Triviality CRM" };
 
@@ -13,10 +14,7 @@ export default async function ImportTemplatesPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-black tracking-tight">Import Mapping Templates</h1>
-        <p className="mt-1 text-slate-500">Saved column mappings, reusable across future spreadsheet imports.</p>
-      </div>
+      <PageHeader title="Import Mapping Templates" description="Saved column mappings, reusable across future spreadsheet imports." />
       <TemplateList
         templates={templates.map((t) => ({ id: t.id, name: t.name, createdByName: t.createdBy.name }))}
       />

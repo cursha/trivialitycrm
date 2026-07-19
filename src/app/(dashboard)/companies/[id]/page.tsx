@@ -11,18 +11,15 @@ import { ActivityPanel } from "./activities/activity-panel";
 import { TasksPanel } from "./tasks/tasks-panel";
 import { ScorePanel } from "./eos/score-panel";
 import { EvidencePanel } from "./eos/evidence-panel";
-
-const TRIVIA_LABELS: Record<string, string> = {
-  CURRENT_TRIVIA: "Current Trivia",
-  NO_CURRENT_TRIVIA: "No Current Trivia",
-  UNCERTAIN: "Uncertain",
-};
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { TRIVIA_STATUS_LABEL } from "@/lib/ui/status-tones";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="mt-0.5 text-sm text-slate-900">{value || <span className="text-slate-400">—</span>}</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">{label}</p>
+      <p className="mt-0.5 text-sm text-text">{value || <span className="text-text-muted">—</span>}</p>
     </div>
   );
 }
@@ -48,12 +45,12 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div>
           {company.status === "ARCHIVED" && (
-            <span className="mb-2 inline-block rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600">
+            <Badge tone="neutral" className="mb-2">
               Archived
-            </span>
+            </Badge>
           )}
-          <h1 className="text-3xl font-black tracking-tight">{company.name}</h1>
-          <p className="mt-1 text-slate-500">
+          <h1 className="text-3xl font-black tracking-tight text-accent">{company.name}</h1>
+          <p className="mt-1 text-text-muted">
             {company.city}, {company.region}, {company.country}
           </p>
         </div>
@@ -61,7 +58,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
           {canEdit && company.status === "ACTIVE" && (
             <Link
               href={`/companies/${company.id}/edit`}
-              className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white"
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary-hover"
             >
               <Pencil size={15} />
               Edit
@@ -79,8 +76,8 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-6">
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="font-bold">Company details</h2>
+          <Card>
+            <h2 className="font-bold text-accent">Company details</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <Field label="Street address" value={company.address1} />
               <Field label="City" value={company.city} />
@@ -93,7 +90,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                 label="Website"
                 value={
                   company.websiteUrl ? (
-                    <a href={company.websiteUrl} target="_blank" rel="noreferrer noopener" className="text-blue-600 hover:underline">
+                    <a href={company.websiteUrl} target="_blank" rel="noreferrer noopener" className="text-secondary hover:underline">
                       {company.websiteUrl}
                     </a>
                   ) : null
@@ -103,7 +100,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               <Field label="Pipeline Stage" value={company.pipelineStage.name} />
               <Field label="Assigned salesperson" value={company.assignedTo.name} />
               <Field label="Competitor" value={company.competitor?.name} />
-              <Field label="Trivia status" value={TRIVIA_LABELS[company.triviaStatus]} />
+              <Field label="Trivia status" value={TRIVIA_STATUS_LABEL[company.triviaStatus]} />
               <Field
                 label="Next follow-up"
                 value={company.nextFollowUpAt ? new Date(company.nextFollowUpAt).toLocaleDateString() : null}
@@ -111,11 +108,11 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             </div>
             {company.notes && (
               <div className="mt-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Notes</p>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-slate-900">{company.notes}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Notes</p>
+                <p className="mt-1 whitespace-pre-wrap text-sm text-text">{company.notes}</p>
               </div>
             )}
-          </div>
+          </Card>
 
           <ScorePanel
             companyId={company.id}
@@ -134,8 +131,8 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         <div className="space-y-6">
           <EvidencePanel companyId={company.id} evidence={evidence} canEdit={canEdit} />
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="font-bold">Record history</h2>
+          <Card>
+            <h2 className="font-bold text-accent">Record history</h2>
             <div className="mt-4 space-y-4">
               <Field label="Created" value={`${company.createdAt.toLocaleDateString()} by ${company.createdBy.name}`} />
               <Field
@@ -153,7 +150,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                 />
               )}
             </div>
-          </div>
+          </Card>
         </div>
       </div>
     </div>

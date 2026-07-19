@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { looksLikeFormulaInjection } from "@/lib/security/formula-injection";
 
 export const IMPORT_TARGET_FIELDS = [
   "name",
@@ -30,6 +31,13 @@ export type MappedRow = Record<ImportTargetField, string>;
 export type RowValidationResult = {
   values: MappedRow;
   errors: string[];
+  // Non-blocking — a value starting with =, +, -, @, tab, or CR is flagged
+  // for the user to double-check (a legitimate business name can start with
+  // "-", so this must never silently block or mangle the row), but is not
+  // treated as invalid. The actual protection against formula execution
+  // happens unconditionally at export time (see src/lib/security/formula-injection.ts
+  // and src/lib/export/serialize.ts), not by rejecting the import.
+  warnings: string[];
 };
 
 const EMPTY_ROW: MappedRow = IMPORT_TARGET_FIELDS.reduce((acc, field) => {
@@ -55,5 +63,12 @@ export function mapAndValidateRow(rawRow: Record<string, string>, mapping: Impor
   if (values.contactEmail && !z.email().safeParse(values.contactEmail).success) errors.push("Invalid contact email.");
   if (values.websiteUrl && !z.url().safeParse(values.websiteUrl).success) errors.push("Invalid website URL.");
 
-  return { values, errors };
+  const warnings: string[] = [];
+  for (const field of IMPORT_TARGET_FIELDS) {
+    if (values[field] && looksLikeFormulaInjection(values[field])) {
+      warnings.push(`Field "${field}" starts with a character a spreadsheet could interpret as a formula — please verify this value.`);
+    }
+  }
+
+  return { values, errors, warnings };
 }

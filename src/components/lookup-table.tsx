@@ -2,6 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { ArrowDown, ArrowUp, Check, Pencil, Star, Trash2, X } from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/field";
+import { ACTIVE_TONE } from "@/lib/ui/status-tones";
 
 export type LookupItem = {
   id: string;
@@ -66,9 +70,9 @@ export function LookupTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <Card className="overflow-hidden p-0">
       <table className="w-full text-left text-sm">
-        <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+        <thead className="bg-black/5 text-xs uppercase text-text-muted">
           <tr>
             <th className="px-5 py-3">Order</th>
             <th className="px-5 py-3">Name</th>
@@ -79,14 +83,14 @@ export function LookupTable({
         </thead>
         <tbody>
           {items.map((item, index) => (
-            <tr key={item.id} className="border-t border-slate-100 align-top">
+            <tr key={item.id} className="border-t border-border align-top">
               <td className="px-5 py-4">
                 <div className="flex flex-col gap-1">
                   <button
                     type="button"
                     disabled={isPending || index === 0}
                     onClick={() => startTransition(() => move(item.id, "up"))}
-                    className="rounded border border-slate-200 p-1 disabled:opacity-30"
+                    className="rounded border border-border-strong p-1 text-text disabled:opacity-30"
                     aria-label={`Move ${item.name} up`}
                   >
                     <ArrowUp size={14} />
@@ -95,7 +99,7 @@ export function LookupTable({
                     type="button"
                     disabled={isPending || index === items.length - 1}
                     onClick={() => startTransition(() => move(item.id, "down"))}
-                    className="rounded border border-slate-200 p-1 disabled:opacity-30"
+                    className="rounded border border-border-strong p-1 text-text disabled:opacity-30"
                     aria-label={`Move ${item.name} down`}
                   >
                     <ArrowDown size={14} />
@@ -108,12 +112,7 @@ export function LookupTable({
                     action={(formData) => handleRename(item.id, formData)}
                     className="flex items-center gap-2"
                   >
-                    <input
-                      name="name"
-                      defaultValue={item.name}
-                      autoFocus
-                      className="rounded-lg border border-slate-300 px-2 py-1 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                    />
+                    <Input name="name" defaultValue={item.name} autoFocus className="py-1" />
                     <button type="submit" className="rounded p-1 text-emerald-600 hover:bg-emerald-50" aria-label="Save">
                       <Check size={16} />
                     </button>
@@ -123,7 +122,7 @@ export function LookupTable({
                         setEditingId(null);
                         clearError(item.id);
                       }}
-                      className="rounded p-1 text-slate-500 hover:bg-slate-100"
+                      className="rounded p-1 text-text-muted hover:bg-black/5"
                       aria-label="Cancel"
                     >
                       <X size={16} />
@@ -131,29 +130,26 @@ export function LookupTable({
                   </form>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold">{item.name}</span>
+                    <span className="font-semibold text-text">{item.name}</span>
                     <button
                       type="button"
                       onClick={() => setEditingId(item.id)}
-                      className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                      className="rounded p-1 text-text-muted hover:bg-black/5 hover:text-text"
                       aria-label={`Rename ${item.name}`}
                     >
                       <Pencil size={14} />
                     </button>
                   </div>
                 )}
-                {rowErrors[item.id] && <p className="mt-1 text-xs font-semibold text-red-600">{rowErrors[item.id]}</p>}
+                {rowErrors[item.id] && <p className="mt-1 text-xs font-semibold text-danger">{rowErrors[item.id]}</p>}
               </td>
               <td className="px-5 py-4">
                 <button
                   type="button"
                   disabled={isPending}
                   onClick={() => startTransition(() => setActive(item.id, !item.active))}
-                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                    item.active ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"
-                  }`}
                 >
-                  {item.active ? "Active" : "Inactive"}
+                  <Badge tone={ACTIVE_TONE[item.active ? "active" : "inactive"]}>{item.active ? "Active" : "Inactive"}</Badge>
                 </button>
               </td>
               {setDefault && (
@@ -162,7 +158,7 @@ export function LookupTable({
                     type="button"
                     disabled={isPending || item.isDefault}
                     onClick={() => startTransition(() => setDefault(item.id))}
-                    className={`rounded-full p-1.5 ${item.isDefault ? "text-amber-500" : "text-slate-300 hover:text-slate-500"}`}
+                    className={`rounded-full p-1.5 ${item.isDefault ? "text-amber-500" : "text-border-strong hover:text-text-muted"}`}
                     aria-label={item.isDefault ? `${item.name} is the default` : `Make ${item.name} the default`}
                   >
                     <Star size={16} fill={item.isDefault ? "currentColor" : "none"} />
@@ -174,7 +170,7 @@ export function LookupTable({
                   type="button"
                   disabled={isPending}
                   onClick={() => handleDelete(item.id, item.name)}
-                  className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                  className="rounded p-1.5 text-text-muted hover:bg-danger/10 hover:text-danger"
                   aria-label={`Delete ${item.name}`}
                 >
                   <Trash2 size={16} />
@@ -184,13 +180,13 @@ export function LookupTable({
           ))}
           {items.length === 0 && (
             <tr>
-              <td colSpan={setDefault ? 5 : 4} className="px-5 py-8 text-center text-slate-500">
+              <td colSpan={setDefault ? 5 : 4} className="px-5 py-8 text-center text-text-muted">
                 Nothing here yet — add the first one below.
               </td>
             </tr>
           )}
         </tbody>
       </table>
-    </div>
+    </Card>
   );
 }

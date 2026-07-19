@@ -1,4 +1,3 @@
-import "server-only";
 import type { ResearchProviders } from "./types";
 import { MockPromptAssistant, MockCandidateDiscoveryProvider, MockEvidenceVerificationProvider, MockScoringProvider } from "./mock";
 import {

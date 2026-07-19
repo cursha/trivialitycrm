@@ -5,15 +5,13 @@ import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
 import { listCompanies, PAGE_SIZE } from "./queries";
 import { CompaniesFilters } from "./companies-filters";
+import { PageHeader } from "@/components/ui/page-header";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Pagination } from "@/components/ui/pagination";
+import { GRADE_TONE, GRADE_LABEL, TRIVIA_STATUS_LABEL } from "@/lib/ui/status-tones";
 
 export const metadata = { title: "Companies — Triviality CRM" };
-
-const GRADE_LABELS: Record<string, string> = { A_PLUS: "A+", A: "A", B: "B", C: "C", D: "D" };
-const TRIVIA_LABELS: Record<string, string> = {
-  CURRENT_TRIVIA: "Current Trivia",
-  NO_CURRENT_TRIVIA: "No Current Trivia",
-  UNCERTAIN: "Uncertain",
-};
 
 function toSingle(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -77,38 +75,38 @@ export default async function CompaniesPage({
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <h1 className="text-3xl font-black tracking-tight">Companies</h1>
-          <p className="mt-1 text-slate-500">{total} matching companies.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {canExport && (
-            <a
-              href={`/api/export/companies?format=csv${exportQuery ? `&${exportQuery}` : ""}`}
-              className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600"
-            >
-              Export CSV
-            </a>
-          )}
-          {canAdd && (
-            <Link
-              href="/companies/new"
-              className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white shadow-lg shadow-blue-200"
-            >
-              <CirclePlus size={19} />
-              Add company
-            </Link>
-          )}
-        </div>
-      </div>
+      <PageHeader
+        title="Companies"
+        description={`${total} matching companies.`}
+        actions={
+          <>
+            {canExport && (
+              <a
+                href={`/api/export/companies?format=csv${exportQuery ? `&${exportQuery}` : ""}`}
+                className="rounded-lg border border-border-strong px-4 py-2.5 text-sm font-semibold text-text hover:bg-black/5"
+              >
+                Export CSV
+              </a>
+            )}
+            {canAdd && (
+              <Link
+                href="/companies/new"
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-white hover:bg-primary-hover"
+              >
+                <CirclePlus size={17} />
+                Add company
+              </Link>
+            )}
+          </>
+        }
+      />
 
       <CompaniesFilters leadTypes={leadTypes} pipelineStages={pipelineStages} salespeople={salespeople} competitors={competitors} />
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+            <thead className="bg-black/5 text-xs uppercase text-text-muted">
               <tr>
                 <th className="px-5 py-3">Company</th>
                 <th className="px-5 py-3">Lead Type</th>
@@ -121,42 +119,40 @@ export default async function CompaniesPage({
             </thead>
             <tbody>
               {companies.map((company) => (
-                <tr key={company.id} className="border-t border-slate-100 hover:bg-blue-50/40">
+                <tr key={company.id} className="border-t border-border hover:bg-black/5">
                   <td className="px-5 py-4">
-                    <Link href={`/companies/${company.id}`} className="font-bold text-blue-600 hover:underline">
+                    <Link href={`/companies/${company.id}`} className="font-bold text-secondary hover:underline">
                       {company.name}
                     </Link>
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs text-text-muted">
                       {company.city}, {company.region}
                     </div>
                   </td>
                   <td className="px-5 py-4">{company.leadType.name}</td>
                   <td className="px-5 py-4">
-                    <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                      {company.pipelineStage.name}
-                    </span>
+                    <Badge tone="secondary">{company.pipelineStage.name}</Badge>
                   </td>
                   <td className="px-5 py-4">{company.assignedTo.name}</td>
-                  <td className="px-5 py-4">{TRIVIA_LABELS[company.triviaStatus]}</td>
+                  <td className="px-5 py-4">{TRIVIA_STATUS_LABEL[company.triviaStatus]}</td>
                   <td className="px-5 py-4">
                     {company.opportunityGrade ? (
-                      <span className="font-black text-emerald-600">{GRADE_LABELS[company.opportunityGrade]}</span>
+                      <Badge tone={GRADE_TONE[company.opportunityGrade]}>{GRADE_LABEL[company.opportunityGrade]}</Badge>
                     ) : (
-                      <span className="text-slate-400">—</span>
+                      <span className="text-text-muted">—</span>
                     )}
                   </td>
                   <td className="px-5 py-4">
                     {company.nextFollowUpAt ? (
                       new Date(company.nextFollowUpAt).toLocaleDateString()
                     ) : (
-                      <span className="text-slate-400">—</span>
+                      <span className="text-text-muted">—</span>
                     )}
                   </td>
                 </tr>
               ))}
               {companies.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-10 text-center text-slate-500">
+                  <td colSpan={7} className="px-5 py-10 text-center text-text-muted">
                     No companies match these filters.
                   </td>
                 </tr>
@@ -164,33 +160,9 @@ export default async function CompaniesPage({
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
 
-      {pageCount > 1 && (
-        <div className="flex items-center justify-between">
-          <Link
-            href={pageHref(Math.max(1, page - 1))}
-            aria-disabled={page <= 1}
-            className={`rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold ${
-              page <= 1 ? "pointer-events-none opacity-40" : "hover:bg-slate-50"
-            }`}
-          >
-            Previous
-          </Link>
-          <p className="text-sm text-slate-500">
-            Page {page} of {pageCount} · {PAGE_SIZE} per page
-          </p>
-          <Link
-            href={pageHref(Math.min(pageCount, page + 1))}
-            aria-disabled={page >= pageCount}
-            className={`rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold ${
-              page >= pageCount ? "pointer-events-none opacity-40" : "hover:bg-slate-50"
-            }`}
-          >
-            Next
-          </Link>
-        </div>
-      )}
+      <Pagination page={page} pageCount={pageCount} pageSize={PAGE_SIZE} hrefFor={pageHref} />
     </div>
   );
 }

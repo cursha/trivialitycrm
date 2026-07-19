@@ -35,6 +35,17 @@ Module Two adds the AI-assisted research workflow on top of Module One's foundat
 
 Not in Module Two (by design): a second real AI provider (OpenAI is documented but not built), multi-instance/horizontally-scaled job processing, structured-data providers like Google Places or Yelp Fusion.
 
+## Module Three: production hardening and Railway deployment
+
+Module Three replaces every single-process/in-memory assumption from Modules One and Two with something that survives a restart or a redeploy, adds production security controls, and packages the app for Railway — see `MODULE_3_REPORT.md` for the full report, a step-by-step Railway deployment checklist, and an incident/recovery runbook.
+
+- **Durable background jobs**: the AI research runner moved out of the web process entirely, into a separate `worker` service (`worker/index.ts`) consuming a Postgres-backed job queue ([pg-boss](https://github.com/timgit/pg-boss) — no Redis). Jobs are checkpointed per-candidate (`SearchCandidate`) so a crash mid-search resumes safely with no duplicate results, and pg-boss provides bounded exponential-backoff retries, per-job timeouts, and duplicate-job prevention.
+- **Durable spreadsheet imports**: the in-memory upload preview store was replaced with a database-backed `ImportBatch` table with a configurable expiry (`IMPORT_BATCH_TTL_HOURS`, default 4h) and automatic cleanup, plus magic-byte file validation and formula-injection protection on both import (flagged) and export (neutralized).
+- **Security**: production security headers (CSP, HSTS, etc.), a documented trusted-proxy IP design for rate limiting (Railway-specific — see the report), Postgres-backed rate limiting that survives restarts, a fix for a bug where a user with `mustChangePassword` set could bypass the forced password change via a direct action call, and AI provider cost tracking with an optional daily/monthly budget cap.
+- **Deployment**: a `Dockerfile` with `web` and `worker` targets, both built and run end-to-end against a real database during this module (not just theoretically — see the report for several real bugs this caught, including a proxy misconfiguration that would have broken Railway's health check and an `npm`/`npx`-as-PID-1 issue that silently broke graceful shutdown).
+
+Not in Module Three (by design, or not yet done): actually creating any Railway resources, changing DNS, or making a live Anthropic API call — all documented as manual next steps in `MODULE_3_REPORT.md`. A nonce-based CSP (stronger than the current static one) and horizontally-scaling the web service to multiple instances are both possible follow-ups, not required for this module's scope.
+
 ## Installation
 
 1. Install [Node.js 20+](https://nodejs.org/), [Docker](https://www.docker.com/) (for local Postgres), and Git.
@@ -46,7 +57,8 @@ Not in Module Two (by design): a second real AI provider (OpenAI is documented b
 7. Set `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` in your `.env` to create your own bootstrap Administrator account (choose your own password — nothing here generates one for you).
 8. Run `npx prisma db seed`. This creates Pipeline Stages, Rejection Reasons, Roles, Permissions, the default Role→Permission grants, and your bootstrap Administrator. It's safe to re-run — it skips anything that already exists.
 9. Run `npm run dev` for local use, or `npm run build && npm start` for production.
-10. Sign in with the email/password you set in step 7. No Lead Types or Competitors are seeded — create them from Settings once you're in.
+10. In a second terminal, run `npm run worker` to start the background job processor (Module Three) — AI research searches and scheduled cleanup only run if this is running. Not required just to browse the CRM.
+11. Sign in with the email/password you set in step 7. No Lead Types or Competitors are seeded — create them from Settings once you're in.
 
 ## Running tests
 

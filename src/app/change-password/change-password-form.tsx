@@ -2,6 +2,8 @@
 
 import { useActionState } from "react";
 import { changePassword } from "./actions";
+import { Label, Input, HelpText, FieldError } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
 
 export function ChangePasswordForm() {
   const [state, action, pending] = useActionState(changePassword, undefined);
@@ -9,55 +11,22 @@ export function ChangePasswordForm() {
   return (
     <form action={action} className="mt-6 space-y-4">
       <div>
-        <label htmlFor="currentPassword" className="text-sm font-semibold text-slate-700">
-          Current password
-        </label>
-        <input
-          id="currentPassword"
-          name="currentPassword"
-          type="password"
-          required
-          autoComplete="current-password"
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-        />
+        <Label htmlFor="currentPassword">Current password</Label>
+        <Input id="currentPassword" name="currentPassword" type="password" required autoComplete="current-password" className="mt-1" />
       </div>
       <div>
-        <label htmlFor="newPassword" className="text-sm font-semibold text-slate-700">
-          New password
-        </label>
-        <input
-          id="newPassword"
-          name="newPassword"
-          type="password"
-          required
-          autoComplete="new-password"
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-        />
-        <p className="mt-1 text-xs text-slate-500">
-          At least 8 characters, with a letter, a number, and a special character.
-        </p>
+        <Label htmlFor="newPassword">New password</Label>
+        <Input id="newPassword" name="newPassword" type="password" required autoComplete="new-password" className="mt-1" />
+        <HelpText className="mt-1">At least 8 characters, with a letter, a number, and a special character.</HelpText>
       </div>
       <div>
-        <label htmlFor="confirmPassword" className="text-sm font-semibold text-slate-700">
-          Confirm new password
-        </label>
-        <input
-          id="confirmPassword"
-          name="confirmPassword"
-          type="password"
-          required
-          autoComplete="new-password"
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-        />
+        <Label htmlFor="confirmPassword">Confirm new password</Label>
+        <Input id="confirmPassword" name="confirmPassword" type="password" required autoComplete="new-password" className="mt-1" />
       </div>
-      {state?.error && <p className="text-sm font-semibold text-red-600">{state.error}</p>}
-      <button
-        type="submit"
-        disabled={pending}
-        className="w-full rounded-xl bg-blue-600 px-5 py-3 font-bold text-white shadow-lg shadow-blue-200 disabled:opacity-60"
-      >
+      {state?.error && <FieldError>{state.error}</FieldError>}
+      <Button type="submit" disabled={pending} variant="primary" className="w-full py-3">
         {pending ? "Saving..." : "Save new password"}
-      </button>
+      </Button>
     </form>
   );
 }

@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
 import { CompetitorTable } from "./competitor-table";
 import { AddCompetitorForm } from "./add-competitor-form";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const metadata = { title: "Competitors — Triviality CRM" };
 
@@ -25,12 +26,10 @@ export default async function CompetitorsPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-black tracking-tight">Competitors</h1>
-        <p className="mt-1 text-slate-500">
-          Location counts are calculated live from linked companies — click a count to see those companies.
-        </p>
-      </div>
+      <PageHeader
+        title="Competitors"
+        description="Location counts are calculated live from linked companies — click a count to see those companies."
+      />
 
       <CompetitorTable competitors={rows} canManage={canManage} />
 

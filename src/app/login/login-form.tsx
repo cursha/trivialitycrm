@@ -2,6 +2,8 @@
 
 import { useActionState } from "react";
 import { login } from "./actions";
+import { Label, Input, FieldError } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
 
 export function LoginForm() {
   const [state, action, pending] = useActionState(login, undefined);
@@ -9,39 +11,17 @@ export function LoginForm() {
   return (
     <form action={action} className="mt-6 space-y-4">
       <div>
-        <label htmlFor="email" className="text-sm font-semibold text-slate-700">
-          Email
-        </label>
-        <input
-          id="email"
-          name="email"
-          type="email"
-          required
-          autoComplete="username"
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-        />
+        <Label htmlFor="email">Email</Label>
+        <Input id="email" name="email" type="email" required autoComplete="username" className="mt-1" />
       </div>
       <div>
-        <label htmlFor="password" className="text-sm font-semibold text-slate-700">
-          Password
-        </label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          required
-          autoComplete="current-password"
-          className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-        />
+        <Label htmlFor="password">Password</Label>
+        <Input id="password" name="password" type="password" required autoComplete="current-password" className="mt-1" />
       </div>
-      {state?.error && <p className="text-sm font-semibold text-red-600">{state.error}</p>}
-      <button
-        type="submit"
-        disabled={pending}
-        className="w-full rounded-xl bg-blue-600 px-5 py-3 font-bold text-white shadow-lg shadow-blue-200 disabled:opacity-60"
-      >
+      {state?.error && <FieldError>{state.error}</FieldError>}
+      <Button type="submit" disabled={pending} variant="primary" className="w-full py-3">
         {pending ? "Signing in..." : "Sign in"}
-      </button>
+      </Button>
     </form>
   );
 }

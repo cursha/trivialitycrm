@@ -3,6 +3,9 @@
 import { useActionState, useRef } from "react";
 import Link from "next/link";
 import type { CompanyFormState } from "./actions";
+import { Label, Input, Select, Textarea, FieldError } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
+import { Alert } from "@/components/ui/alert";
 
 type Option = { id: string; name: string };
 
@@ -45,63 +48,59 @@ export function CompanyForm({
   const [state, formAction, pending] = useActionState(action, undefined);
   const overrideRef = useRef<HTMLInputElement>(null);
 
-  const inputClass =
-    "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
-  const labelClass = "text-sm font-semibold text-slate-700";
-
   return (
     <form action={formAction} className="space-y-6">
       <input ref={overrideRef} type="hidden" name="overrideDuplicates" defaultValue="false" />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
-          <label className={labelClass}>Company name</label>
-          <input name="name" defaultValue={defaultValues?.name} required className={`mt-1 ${inputClass}`} />
+          <Label>Company name</Label>
+          <Input name="name" defaultValue={defaultValues?.name} required className="mt-1" />
         </div>
 
         <div className="sm:col-span-2">
-          <label className={labelClass}>Street address</label>
-          <input name="address1" defaultValue={defaultValues?.address1} className={`mt-1 ${inputClass}`} />
+          <Label>Street address</Label>
+          <Input name="address1" defaultValue={defaultValues?.address1} className="mt-1" />
         </div>
 
         <div>
-          <label className={labelClass}>City</label>
-          <input name="city" defaultValue={defaultValues?.city} required className={`mt-1 ${inputClass}`} />
+          <Label>City</Label>
+          <Input name="city" defaultValue={defaultValues?.city} required className="mt-1" />
         </div>
         <div>
-          <label className={labelClass}>State / Province</label>
-          <input name="region" defaultValue={defaultValues?.region} required className={`mt-1 ${inputClass}`} />
+          <Label>State / Province</Label>
+          <Input name="region" defaultValue={defaultValues?.region} required className="mt-1" />
         </div>
         <div>
-          <label className={labelClass}>ZIP / Postal code</label>
-          <input name="postalCode" defaultValue={defaultValues?.postalCode} className={`mt-1 ${inputClass}`} />
+          <Label>ZIP / Postal code</Label>
+          <Input name="postalCode" defaultValue={defaultValues?.postalCode} className="mt-1" />
         </div>
         <div>
-          <label className={labelClass}>Country</label>
-          <input name="country" defaultValue={defaultValues?.country} required className={`mt-1 ${inputClass}`} />
+          <Label>Country</Label>
+          <Input name="country" defaultValue={defaultValues?.country} required className="mt-1" />
         </div>
 
         <div>
-          <label className={labelClass}>Company phone</label>
-          <input name="phone" defaultValue={defaultValues?.phone} className={`mt-1 ${inputClass}`} />
+          <Label>Company phone</Label>
+          <Input name="phone" defaultValue={defaultValues?.phone} className="mt-1" />
         </div>
         <div>
-          <label className={labelClass}>Company email</label>
-          <input name="email" type="email" defaultValue={defaultValues?.email} className={`mt-1 ${inputClass}`} />
+          <Label>Company email</Label>
+          <Input name="email" type="email" defaultValue={defaultValues?.email} className="mt-1" />
         </div>
         <div className="sm:col-span-2">
-          <label className={labelClass}>Website URL</label>
-          <input
+          <Label>Website URL</Label>
+          <Input
             name="websiteUrl"
             defaultValue={defaultValues?.websiteUrl}
             placeholder="https://example.com"
-            className={`mt-1 ${inputClass}`}
+            className="mt-1"
           />
         </div>
 
         <div>
-          <label className={labelClass}>Lead Type</label>
-          <select name="leadTypeId" defaultValue={defaultValues?.leadTypeId ?? ""} required className={`mt-1 ${inputClass}`}>
+          <Label>Lead Type</Label>
+          <Select name="leadTypeId" defaultValue={defaultValues?.leadTypeId ?? ""} required className="mt-1">
             <option value="" disabled>
               Choose a lead type
             </option>
@@ -110,15 +109,15 @@ export function CompanyForm({
                 {option.name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <div>
-          <label className={labelClass}>Pipeline Stage</label>
-          <select
+          <Label>Pipeline Stage</Label>
+          <Select
             name="pipelineStageId"
             defaultValue={defaultValues?.pipelineStageId ?? ""}
             required
-            className={`mt-1 ${inputClass}`}
+            className="mt-1"
           >
             <option value="" disabled>
               Choose a stage
@@ -128,15 +127,15 @@ export function CompanyForm({
                 {option.name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <div>
-          <label className={labelClass}>Assigned salesperson</label>
-          <select
+          <Label>Assigned salesperson</Label>
+          <Select
             name="assignedToId"
             defaultValue={defaultValues?.assignedToId ?? ""}
             required
-            className={`mt-1 ${inputClass}`}
+            className="mt-1"
           >
             <option value="" disabled>
               Choose a salesperson
@@ -146,75 +145,75 @@ export function CompanyForm({
                 {option.name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <div>
-          <label className={labelClass}>Competitor</label>
-          <select name="competitorId" defaultValue={defaultValues?.competitorId ?? ""} className={`mt-1 ${inputClass}`}>
+          <Label>Competitor</Label>
+          <Select name="competitorId" defaultValue={defaultValues?.competitorId ?? ""} className="mt-1">
             <option value="">None</option>
             {competitors.map((option) => (
               <option key={option.id} value={option.id}>
                 {option.name}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
         <div>
-          <label className={labelClass}>Trivia status</label>
-          <select
+          <Label>Trivia status</Label>
+          <Select
             name="triviaStatus"
             defaultValue={defaultValues?.triviaStatus ?? "UNCERTAIN"}
             required
-            className={`mt-1 ${inputClass}`}
+            className="mt-1"
           >
             <option value="CURRENT_TRIVIA">Current Trivia</option>
             <option value="NO_CURRENT_TRIVIA">No Current Trivia</option>
             <option value="UNCERTAIN">Uncertain</option>
-          </select>
+          </Select>
         </div>
         <div>
-          <label className={labelClass}>Next follow-up date</label>
-          <input
+          <Label>Next follow-up date</Label>
+          <Input
             name="nextFollowUpAt"
             type="date"
             defaultValue={defaultValues?.nextFollowUpAt}
-            className={`mt-1 ${inputClass}`}
+            className="mt-1"
           />
         </div>
 
         <div className="sm:col-span-2">
-          <label className={labelClass}>Notes</label>
-          <textarea name="notes" defaultValue={defaultValues?.notes} rows={4} className={`mt-1 ${inputClass}`} />
+          <Label>Notes</Label>
+          <Textarea name="notes" defaultValue={defaultValues?.notes} rows={4} className="mt-1" />
         </div>
       </div>
 
-      {state?.error && <p className="text-sm font-semibold text-red-600">{state.error}</p>}
+      {state?.error && <FieldError>{state.error}</FieldError>}
 
       {state?.duplicates && state.duplicates.length > 0 && (
-        <div className="rounded-2xl border border-amber-300 bg-amber-50 p-5">
-          <h3 className="font-bold text-amber-900">This looks like it might already exist</h3>
-          <p className="mt-1 text-sm text-amber-800">
+        <Alert tone="warning" className="block space-y-3">
+          <h3 className="font-bold">This looks like it might already exist</h3>
+          <p className="font-normal">
             The following {state.duplicates.length === 1 ? "company matches" : "companies match"} on name, address,
             website, phone, or email:
           </p>
-          <ul className="mt-3 space-y-2">
+          <ul className="space-y-2">
             {state.duplicates.map((duplicate) => (
-              <li key={duplicate.id} className="rounded-lg border border-amber-200 bg-white p-3 text-sm">
-                <Link href={`/companies/${duplicate.id}`} className="font-bold text-blue-600 hover:underline" target="_blank">
+              <li key={duplicate.id} className="rounded-lg border border-amber-200 bg-white p-3 font-normal text-text">
+                <Link href={`/companies/${duplicate.id}`} className="font-bold text-secondary hover:underline" target="_blank">
                   {duplicate.name}
                 </Link>
-                <span className="text-slate-500">
+                <span className="text-text-muted">
                   {" "}
                   — {duplicate.city}, {duplicate.region}
                 </span>
-                <div className="mt-1 text-xs text-slate-500">Matched on: {duplicate.matchedOn.join(", ")}</div>
+                <div className="mt-1 text-xs text-text-muted">Matched on: {duplicate.matchedOn.join(", ")}</div>
               </li>
             ))}
           </ul>
-          <div className="mt-4 flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3">
             <Link
               href="/companies"
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50"
+              className="rounded-lg border border-border-strong bg-surface-raised px-4 py-2 text-sm font-semibold text-text hover:bg-black/5"
             >
               Cancel
             </Link>
@@ -230,17 +229,13 @@ export function CompanyForm({
               </button>
             )}
           </div>
-        </div>
+        </Alert>
       )}
 
       {!(state?.duplicates && state.duplicates.length > 0) && (
-        <button
-          type="submit"
-          disabled={pending}
-          className="rounded-xl bg-blue-600 px-6 py-3 font-bold text-white shadow-lg shadow-blue-200 disabled:opacity-60"
-        >
+        <Button type="submit" disabled={pending} variant="primary" className="px-6 py-3">
           {pending ? "Saving..." : submitLabel}
-        </button>
+        </Button>
       )}
     </form>
   );

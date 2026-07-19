@@ -11,7 +11,7 @@ export default async function NewPromptPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="text-3xl font-black tracking-tight">New Research Prompt</h1>
+      <h1 className="text-3xl font-black tracking-tight text-accent">New Research Prompt</h1>
       <PromptForm action={createPrompt} submitLabel="Create prompt" />
     </div>
   );

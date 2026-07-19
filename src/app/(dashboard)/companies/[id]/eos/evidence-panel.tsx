@@ -4,6 +4,10 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CirclePlus } from "lucide-react";
 import { addEvidence } from "./actions";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Input, Select, Textarea } from "@/components/ui/field";
+import { VERIFICATION_TONE as VERIFICATION_TONE_MAP } from "@/lib/ui/status-tones";
 
 export type EvidenceRow = {
   id: string;
@@ -31,22 +35,11 @@ const CATEGORY_LABELS: Record<string, string> = {
   COMPETITIVE_OPPORTUNITY: "Competitive opportunity",
 };
 
-const VERIFICATION_TONE: Record<string, string> = {
-  VERIFIED: "bg-emerald-50 text-emerald-700",
-  INFERRED: "bg-blue-50 text-blue-700",
-  UNVERIFIED: "bg-slate-100 text-slate-600",
-  OUTDATED: "bg-amber-50 text-amber-700",
-  CONTRADICTORY: "bg-red-50 text-red-700",
-};
-
 export function EvidencePanel({ companyId, evidence, canEdit }: { companyId: string; evidence: EvidenceRow[]; canEdit: boolean }) {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-
-  const inputClass =
-    "w-full rounded-lg border border-slate-300 px-2 py-1.5 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
 
   function handleCreate(formData: FormData) {
     startTransition(async () => {
@@ -62,22 +55,22 @@ export function EvidencePanel({ companyId, evidence, canEdit }: { companyId: str
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <Card>
       <div className="flex items-center justify-between">
-        <h2 className="font-bold">Evidence</h2>
+        <h2 className="font-bold text-accent">Evidence</h2>
         {canEdit && !adding && (
-          <button type="button" onClick={() => setAdding(true)} className="flex items-center gap-1 text-sm font-bold text-blue-600 hover:underline">
+          <button type="button" onClick={() => setAdding(true)} className="flex items-center gap-1 text-sm font-bold text-secondary hover:underline">
             <CirclePlus size={15} />
             Add evidence
           </button>
         )}
       </div>
 
-      {error && <p className="mt-2 text-xs font-semibold text-red-600">{error}</p>}
+      {error && <p className="mt-2 text-xs font-semibold text-danger">{error}</p>}
 
       {adding && (
-        <form action={handleCreate} className="mt-3 space-y-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3">
-          <select name="category" required defaultValue="" className={inputClass}>
+        <form action={handleCreate} className="mt-3 space-y-2 rounded-lg border border-dashed border-border-strong bg-black/[0.02] p-3">
+          <Select name="category" required defaultValue="" className="py-1.5">
             <option value="" disabled>
               Scoring category
             </option>
@@ -86,32 +79,32 @@ export function EvidencePanel({ companyId, evidence, canEdit }: { companyId: str
                 {label}
               </option>
             ))}
-          </select>
-          <textarea name="evidenceSummary" placeholder="Evidence summary" required rows={2} className={inputClass} />
+          </Select>
+          <Textarea name="evidenceSummary" placeholder="Evidence summary" required rows={2} className="py-1.5" />
           <div className="grid gap-2 sm:grid-cols-2">
-            <input name="sourceType" placeholder="Source type (e.g. website, review)" className={inputClass} />
-            <input name="sourceUrl" placeholder="Source URL" className={inputClass} />
+            <Input name="sourceType" placeholder="Source type (e.g. website, review)" className="py-1.5" />
+            <Input name="sourceUrl" placeholder="Source URL" className="py-1.5" />
           </div>
           <div className="grid gap-2 sm:grid-cols-3">
-            <input name="evidenceDate" type="date" className={inputClass} />
-            <select name="verificationStatus" required defaultValue="UNVERIFIED" className={inputClass}>
+            <Input name="evidenceDate" type="date" className="py-1.5" />
+            <Select name="verificationStatus" required defaultValue="UNVERIFIED" className="py-1.5">
               <option value="VERIFIED">Verified</option>
               <option value="INFERRED">Inferred</option>
               <option value="UNVERIFIED">Unverified</option>
               <option value="OUTDATED">Outdated</option>
               <option value="CONTRADICTORY">Contradictory</option>
-            </select>
-            <select name="reliability" required defaultValue="MEDIUM" className={inputClass}>
+            </Select>
+            <Select name="reliability" required defaultValue="MEDIUM" className="py-1.5">
               <option value="HIGH">High reliability</option>
               <option value="MEDIUM">Medium reliability</option>
               <option value="LOW">Low reliability</option>
-            </select>
+            </Select>
           </div>
           <div className="flex gap-2">
-            <button type="submit" disabled={isPending} className="rounded bg-blue-600 px-3 py-1.5 text-xs font-bold text-white">
+            <button type="submit" disabled={isPending} className="rounded bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-50">
               {isPending ? "Saving..." : "Add evidence"}
             </button>
-            <button type="button" onClick={() => setAdding(false)} className="rounded border border-slate-300 px-3 py-1.5 text-xs font-semibold">
+            <button type="button" onClick={() => setAdding(false)} className="rounded border border-border-strong px-3 py-1.5 text-xs font-semibold text-text hover:bg-black/5">
               Cancel
             </button>
           </div>
@@ -119,20 +112,18 @@ export function EvidencePanel({ companyId, evidence, canEdit }: { companyId: str
       )}
 
       {evidence.length === 0 ? (
-        <p className="mt-3 text-sm text-slate-500">No evidence recorded yet.</p>
+        <p className="mt-3 text-sm text-text-muted">No evidence recorded yet.</p>
       ) : (
         <ul className="mt-3 space-y-2">
           {evidence.map((item) => (
-            <li key={item.id} className="rounded-lg border border-slate-100 p-3 text-sm">
+            <li key={item.id} className="rounded-lg border border-border p-3 text-sm">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-semibold">{CATEGORY_LABELS[item.category] ?? item.category}</span>
-                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${VERIFICATION_TONE[item.verificationStatus] ?? "bg-slate-100 text-slate-600"}`}>
-                  {item.verificationStatus}
-                </span>
-                <span className="text-xs text-slate-400">{item.reliability} reliability</span>
+                <span className="font-semibold text-text">{CATEGORY_LABELS[item.category] ?? item.category}</span>
+                <Badge tone={VERIFICATION_TONE_MAP[item.verificationStatus] ?? "neutral"}>{item.verificationStatus}</Badge>
+                <span className="text-xs text-text-muted">{item.reliability} reliability</span>
               </div>
-              <p className="mt-1 text-slate-700">{item.evidenceSummary}</p>
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-text">{item.evidenceSummary}</p>
+              <p className="mt-1 text-xs text-text-muted">
                 {[item.sourceType, item.sourceUrl].filter(Boolean).join(" · ")}
                 {item.evidenceDate && ` · ${new Date(item.evidenceDate).toLocaleDateString()}`}
                 {` · added by ${item.createdBy.name}`}
@@ -141,6 +132,6 @@ export function EvidencePanel({ companyId, evidence, canEdit }: { companyId: str
           ))}
         </ul>
       )}
-    </div>
+    </Card>
   );
 }

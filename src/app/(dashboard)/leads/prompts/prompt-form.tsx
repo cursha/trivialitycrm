@@ -4,6 +4,9 @@ import { useState, useTransition } from "react";
 import { useActionState } from "react";
 import { Sparkles } from "lucide-react";
 import { refinePrompt, type PromptFormState } from "./actions";
+import { Card } from "@/components/ui/card";
+import { Label, Input, Textarea, FieldError } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
 
 export function PromptForm({
   action,
@@ -42,61 +45,50 @@ export function PromptForm({
   }
 
   return (
-    <form action={formAction} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <form action={formAction}>
+    <Card className="space-y-4">
       <div>
-        <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Name</label>
-        <input
-          name="name"
-          defaultValue={initialName}
-          required
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-        />
+        <Label className="mb-1 block text-xs uppercase">Name</Label>
+        <Input name="name" defaultValue={initialName} required />
       </div>
 
-      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
-        <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">
-          Describe what you want (AI assist)
-        </label>
+      <div className="rounded-xl border border-dashed border-border-strong bg-black/[0.02] p-3">
+        <Label className="mb-1 block text-xs uppercase">Describe what you want (AI assist)</Label>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <input
+          <Input
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             placeholder="e.g. Bars that host live music but haven't added trivia yet"
-            className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+            className="flex-1"
           />
-          <button
-            type="button"
-            onClick={handleAssist}
-            disabled={isAssisting}
-            className="flex items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-violet-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
-          >
+          <Button type="button" variant="secondary" onClick={handleAssist} disabled={isAssisting} className="whitespace-nowrap">
             <Sparkles size={16} />
             {isAssisting ? "Thinking..." : prompt ? "Improve prompt" : "Draft prompt"}
-          </button>
+          </Button>
         </div>
-        {assistError && <p className="mt-2 text-xs font-semibold text-red-600">{assistError}</p>}
+        {assistError && <FieldError className="mt-2">{assistError}</FieldError>}
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-semibold uppercase text-slate-500">Research prompt</label>
-        <textarea
+        <Label className="mb-1 block text-xs uppercase">Research prompt</Label>
+        <Textarea
           name="qualificationPrompt"
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
           required
           rows={8}
-          className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
         />
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="mt-1 text-xs text-text-muted">
           This prompt is saved independently of location and Lead Type — reuse it across different searches.
         </p>
       </div>
 
-      {state?.error && <p className="text-xs font-semibold text-red-600">{state.error}</p>}
+      {state?.error && <FieldError>{state.error}</FieldError>}
 
-      <button type="submit" disabled={pending} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-60">
+      <Button type="submit" disabled={pending} variant="primary">
         {pending ? "Saving..." : submitLabel}
-      </button>
+      </Button>
+    </Card>
     </form>
   );
 }

@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Building2, CalendarClock, LayoutDashboard, Menu, Search, Settings, Trophy, X } from "lucide-react";
 import type { NavItem, NavIconKey } from "@/lib/nav";
 import { logout } from "@/lib/auth/actions";
+import { Logo } from "@/components/ui/logo";
+import { Button } from "@/components/ui/button";
 
 const ICONS: Record<NavIconKey, typeof LayoutDashboard> = {
   dashboard: LayoutDashboard,
@@ -34,27 +35,29 @@ export function DashboardShell({
   const pathname = usePathname();
 
   return (
-    <div className="min-h-screen bg-[#f5f7fb] text-slate-900">
+    <div className="min-h-screen bg-surface text-text">
+      {/* Mobile backdrop — dims the page and closes the sidebar on tap
+          outside it. Previously absent entirely. */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-near-black/40 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64 border-r border-slate-200 bg-[#10233f] text-white transition-transform lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-30 w-72 border-r border-border-strong bg-surface transition-transform lg:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex h-24 items-center justify-between border-b border-white/10 px-5">
-          <div className="flex items-center gap-3">
-            <Image
-              src="/triviality-mayhem-logo.png"
-              alt="Triviality Mayhem"
-              width={142}
-              height={80}
-              className="h-[72px] w-auto object-contain"
-              priority
-            />
-            <span className="rounded-md bg-white/10 px-2 py-1 text-[10px] font-black tracking-[.18em] text-blue-200">
-              CRM
-            </span>
-          </div>
-          <button className="lg:hidden" onClick={() => setMobileOpen(false)} aria-label="Close menu">
+        <div className="flex h-40 items-center justify-between border-b border-border px-6">
+          <Logo size="full" className="h-32" priority />
+          <button
+            className="rounded-lg p-2 text-text hover:bg-black/5 lg:hidden"
+            onClick={() => setMobileOpen(false)}
+            aria-label="Close menu"
+          >
             <X size={20} />
           </button>
         </div>
@@ -67,10 +70,8 @@ export function DashboardShell({
                 key={item.href}
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
-                className={`flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium ${
-                  active
-                    ? "bg-blue-500 text-white shadow-lg shadow-blue-950/20"
-                    : "text-slate-300 hover:bg-white/10 hover:text-white"
+                className={`flex items-center gap-3 rounded-lg border-l-4 px-4 py-3 text-sm font-medium transition-colors ${
+                  active ? "border-accent bg-accent/10 font-semibold text-accent" : "border-transparent text-text hover:bg-black/5"
                 }`}
               >
                 <Icon size={18} />
@@ -81,26 +82,32 @@ export function DashboardShell({
         </nav>
       </aside>
 
-      <section className="lg:pl-64">
-        <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-slate-200 bg-white/95 px-5 backdrop-blur lg:px-8">
-          <button className="rounded-lg border p-2 lg:hidden" onClick={() => setMobileOpen(true)} aria-label="Open menu">
-            <Menu size={20} />
-          </button>
+      <section className="lg:pl-72">
+        <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-border bg-surface-raised/95 px-5 backdrop-blur lg:px-8">
+          <div className="flex items-center gap-3">
+            <button
+              className="rounded-lg border border-border-strong p-2 text-text hover:bg-black/5 lg:hidden"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu size={20} />
+            </button>
+            {/* Compact mark, mobile only — keeps the brand visible in the
+                header once the full sidebar is off-screen. */}
+            <Logo size="compact" className="h-12 lg:hidden" />
+          </div>
           <div className="flex items-center gap-4">
-            <div className="text-right">
+            <div className="hidden text-right sm:block">
               <p className="text-sm font-bold leading-tight">{userName}</p>
-              <p className="text-xs text-slate-500">{roleName}</p>
+              <p className="text-xs text-text-muted">{roleName}</p>
             </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 font-bold text-white">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary font-bold text-white">
               {userInitials}
             </div>
             <form action={logout}>
-              <button
-                type="submit"
-                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold hover:bg-slate-50"
-              >
+              <Button type="submit" variant="ghost" className="px-3 py-2">
                 Sign out
-              </button>
+              </Button>
             </form>
           </div>
         </header>

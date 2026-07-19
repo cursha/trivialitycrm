@@ -2,6 +2,9 @@ import Link from "next/link";
 import { BarChart3, Building2, CalendarClock, ListTree, Trophy, Users } from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
 import { getDashboardStats } from "./queries";
+import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
+import clsx from "clsx";
 
 export const metadata = { title: "Dashboard — Triviality CRM" };
 
@@ -28,29 +31,29 @@ function BreakdownList({
   const total = items.reduce((sum, item) => sum + item.count, 0) || 1;
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <Card>
       <div className="flex items-center gap-2">
-        <Icon size={16} className="text-blue-500" />
-        <h3 className="font-bold">{title}</h3>
+        <Icon size={16} className="text-secondary" />
+        <h3 className="font-bold text-accent">{title}</h3>
       </div>
       {items.length === 0 ? (
-        <p className="mt-3 text-sm text-slate-500">{emptyLabel}</p>
+        <p className="mt-3 text-sm text-text-muted">{emptyLabel}</p>
       ) : (
         <div className="mt-4 space-y-3">
           {items.map((item) => (
             <div key={item.label}>
               <div className="mb-1 flex justify-between text-sm">
-                <span className="font-medium">{item.label}</span>
-                <b>{item.count}</b>
+                <span className="font-medium text-text">{item.label}</span>
+                <b className="text-text">{item.count}</b>
               </div>
-              <div className="h-1.5 rounded-full bg-slate-100">
-                <div className="h-1.5 rounded-full bg-blue-500" style={{ width: `${(item.count / total) * 100}%` }} />
+              <div className="h-1.5 rounded-full bg-border/40">
+                <div className="h-1.5 rounded-full bg-secondary" style={{ width: `${(item.count / total) * 100}%` }} />
               </div>
             </div>
           ))}
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -61,8 +64,8 @@ export default async function DashboardPage() {
   if (!stats) {
     return (
       <div className="mx-auto max-w-3xl">
-        <h1 className="text-3xl font-black tracking-tight">Welcome, {user.name}</h1>
-        <p className="mt-2 text-slate-500">
+        <h1 className="text-3xl font-black tracking-tight text-accent">Welcome, {user.name}</h1>
+        <p className="mt-2 text-text-muted">
           Your account doesn&apos;t have a lead-viewing permission yet — ask an Administrator to grant one.
         </p>
       </div>
@@ -81,28 +84,28 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-7xl space-y-7">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <h2 className="text-3xl font-black tracking-tight">Welcome, {user.name}</h2>
-          <p className="mt-1 text-slate-500">Here&apos;s what&apos;s happening across your leads.</p>
-        </div>
-        <Link
-          href="/companies"
-          className="flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-bold text-white shadow-lg shadow-blue-200"
-        >
-          View companies
-        </Link>
-      </div>
+      <PageHeader
+        title={`Welcome, ${user.name}`}
+        description="Here's what's happening across your leads."
+        actions={
+          <Link
+            href="/companies"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-bold text-white transition-colors hover:bg-primary-hover"
+          >
+            View companies
+          </Link>
+        }
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {statTiles.map((tile) => (
-          <div key={tile.label} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <p className="text-sm font-semibold text-slate-500">{tile.label}</p>
+          <Card key={tile.label}>
+            <p className="text-sm font-semibold text-text-muted">{tile.label}</p>
             <div className="mt-2 flex items-end justify-between">
-              <strong className="text-3xl">{tile.value}</strong>
-              <BarChart3 className={tile.alert && tile.value > 0 ? "text-red-400" : "text-blue-400"} />
+              <strong className="text-3xl text-text">{tile.value}</strong>
+              <BarChart3 className={clsx(tile.alert && tile.value > 0 ? "text-primary" : "text-secondary")} />
             </div>
-          </div>
+          </Card>
         ))}
       </div>
 

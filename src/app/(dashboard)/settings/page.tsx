@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ListTree, GitBranch, Users, ShieldCheck, XCircle, FileSpreadsheet } from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
+import { PageHeader } from "@/components/ui/page-header";
 
 export const metadata = { title: "Settings — Triviality CRM" };
 
@@ -55,26 +56,23 @@ export default async function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-black tracking-tight">Settings</h1>
-        <p className="mt-1 text-slate-500">Configuration for how the CRM works for your whole team.</p>
-      </div>
+      <PageHeader title="Settings" description="Configuration for how the CRM works for your whole team." />
 
       {cards.length === 0 ? (
-        <p className="text-slate-500">You don&apos;t have access to any settings sections.</p>
+        <p className="text-text-muted">You don&apos;t have access to any settings sections.</p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {cards.map((card) => (
             <Link
               key={card.href}
               href={card.href}
-              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-blue-300 hover:shadow-md"
+              className="rounded-2xl border border-border-strong bg-surface-raised p-5 shadow-sm hover:border-focus hover:shadow-md"
             >
-              <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+              <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-secondary/10 text-secondary">
                 <card.icon size={18} />
               </div>
-              <b>{card.label}</b>
-              <p className="mt-1 text-sm text-slate-500">{card.description}</p>
+              <b className="text-text">{card.label}</b>
+              <p className="mt-1 text-sm text-text-muted">{card.description}</p>
             </Link>
           ))}
         </div>
