@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef } from "react";
+import { useActionState, useRef, useState } from "react";
 import Link from "next/link";
 import type { CompanyFormState } from "./actions";
 import { Label, Input, Select, Textarea, FieldError } from "@/components/ui/field";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 
 type Option = { id: string; name: string };
+type PipelineStageOption = Option & { outcomeType: string | null };
 
 export function CompanyForm({
   action,
@@ -16,6 +17,7 @@ export function CompanyForm({
   pipelineStages,
   competitors,
   salespeople,
+  lossReasons,
   isAdmin,
   submitLabel,
 }: {
@@ -35,18 +37,22 @@ export function CompanyForm({
     competitorId?: string;
     assignedToId?: string;
     triviaStatus?: string;
+    lossReasonId?: string;
     notes?: string;
     nextFollowUpAt?: string;
   };
   leadTypes: Option[];
-  pipelineStages: Option[];
+  pipelineStages: PipelineStageOption[];
   competitors: Option[];
   salespeople: Option[];
+  lossReasons: Option[];
   isAdmin: boolean;
   submitLabel: string;
 }) {
   const [state, formAction, pending] = useActionState(action, undefined);
   const overrideRef = useRef<HTMLInputElement>(null);
+  const [pipelineStageId, setPipelineStageId] = useState(defaultValues?.pipelineStageId ?? "");
+  const selectedStageIsLost = pipelineStages.find((stage) => stage.id === pipelineStageId)?.outcomeType === "LOST";
 
   return (
     <form action={formAction} className="space-y-6">
@@ -115,7 +121,8 @@ export function CompanyForm({
           <Label>Pipeline Stage</Label>
           <Select
             name="pipelineStageId"
-            defaultValue={defaultValues?.pipelineStageId ?? ""}
+            value={pipelineStageId}
+            onChange={(event) => setPipelineStageId(event.target.value)}
             required
             className="mt-1"
           >
@@ -129,6 +136,19 @@ export function CompanyForm({
             ))}
           </Select>
         </div>
+        {selectedStageIsLost && (
+          <div>
+            <Label>Loss reason</Label>
+            <Select name="lossReasonId" defaultValue={defaultValues?.lossReasonId ?? ""} className="mt-1">
+              <option value="">Not recorded</option>
+              {lossReasons.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
         <div>
           <Label>Assigned salesperson</Label>
           <Select

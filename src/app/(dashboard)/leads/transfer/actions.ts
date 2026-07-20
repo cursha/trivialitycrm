@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { TransferPayloadSchema, type TransferPayload } from "@/lib/validation/transfer";
 import { findPotentialDuplicates, computeNormalizedFields } from "@/lib/duplicates/match";
 import type { DuplicateMatch } from "@/lib/duplicates/match";
+import { logInitialPipelineStage } from "@/lib/companies/activity-log";
 
 export type TransferResult =
   | { error: string }
@@ -78,9 +79,12 @@ export async function transferSearchResults(rawPayload: TransferPayload): Promis
           assignedToId: payload.assignedToId,
           triviaStatus: source.triviaStatus,
           createdById: user.id,
+          source: "AI_RESEARCH",
           ...normalized,
         },
       });
+
+      await logInitialPipelineStage(tx, { companyId: company.id, userId: user.id, toStageId: company.pipelineStageId });
 
       if (row.contactFirstName && row.contactLastName) {
         await tx.contact.create({

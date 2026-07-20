@@ -8,7 +8,7 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { companyScope, canAssignTo } from "@/lib/companies/scope";
 import { CompanySchema } from "@/lib/validation/company";
 import { findPotentialDuplicates, computeNormalizedFields, type DuplicateMatch } from "@/lib/duplicates/match";
-import { logAssignmentChange, logPipelineChange } from "@/lib/companies/activity-log";
+import { logAssignmentChange, logPipelineChange, logInitialPipelineStage } from "@/lib/companies/activity-log";
 import { formString } from "@/lib/form-data";
 
 export type CompanyFormState = { error?: string; duplicates?: DuplicateMatch[] } | undefined;
@@ -30,6 +30,7 @@ function parseCompanyForm(formData: FormData) {
     competitorId: formString(formData, "competitorId"),
     assignedToId: formString(formData, "assignedToId"),
     triviaStatus: formString(formData, "triviaStatus"),
+    lossReasonId: formString(formData, "lossReasonId"),
     notes: formString(formData, "notes"),
     nextFollowUpAt: formString(formData, "nextFollowUpAt"),
   });
@@ -57,27 +58,34 @@ export async function createCompany(_prevState: CompanyFormState, formData: Form
 
   const normalized = computeNormalizedFields(parsed.data);
 
-  const company = await prisma.company.create({
-    data: {
-      name: parsed.data.name,
-      address1: parsed.data.address1 ?? null,
-      city: parsed.data.city,
-      region: parsed.data.region,
-      postalCode: parsed.data.postalCode ?? null,
-      country: parsed.data.country,
-      phone: parsed.data.phone ?? null,
-      email: parsed.data.email ?? null,
-      websiteUrl: parsed.data.websiteUrl ?? null,
-      leadTypeId: parsed.data.leadTypeId,
-      pipelineStageId: parsed.data.pipelineStageId,
-      competitorId: parsed.data.competitorId ?? null,
-      assignedToId: parsed.data.assignedToId,
-      triviaStatus: parsed.data.triviaStatus,
-      notes: parsed.data.notes ?? null,
-      nextFollowUpAt: parsed.data.nextFollowUpAt ? new Date(parsed.data.nextFollowUpAt) : null,
-      createdById: user.id,
-      ...normalized,
-    },
+  const company = await prisma.$transaction(async (tx) => {
+    const created = await tx.company.create({
+      data: {
+        name: parsed.data.name,
+        address1: parsed.data.address1 ?? null,
+        city: parsed.data.city,
+        region: parsed.data.region,
+        postalCode: parsed.data.postalCode ?? null,
+        country: parsed.data.country,
+        phone: parsed.data.phone ?? null,
+        email: parsed.data.email ?? null,
+        websiteUrl: parsed.data.websiteUrl ?? null,
+        leadTypeId: parsed.data.leadTypeId,
+        pipelineStageId: parsed.data.pipelineStageId,
+        competitorId: parsed.data.competitorId ?? null,
+        assignedToId: parsed.data.assignedToId,
+        triviaStatus: parsed.data.triviaStatus,
+        notes: parsed.data.notes ?? null,
+        nextFollowUpAt: parsed.data.nextFollowUpAt ? new Date(parsed.data.nextFollowUpAt) : null,
+        createdById: user.id,
+        source: "MANUAL",
+        ...normalized,
+      },
+    });
+
+    await logInitialPipelineStage(tx, { companyId: created.id, userId: user.id, toStageId: created.pipelineStageId });
+
+    return created;
   });
 
   redirect(`/companies/${company.id}`);
@@ -162,6 +170,7 @@ export async function updateCompany(
         userId: user.id,
         fromStageId: existing.pipelineStageId,
         toStageId: parsed.data.pipelineStageId,
+        lossReasonId: parsed.data.lossReasonId ?? null,
       });
     }
 

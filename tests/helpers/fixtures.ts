@@ -59,11 +59,21 @@ export async function createLeadTypeFixture(name = `Lead Type ${crypto.randomUUI
 
 export async function createPipelineStageFixture(
   name = `Stage ${crypto.randomUUID().slice(0, 8)}`,
-  opts: { isDefault?: boolean; sortOrder?: number } = {},
+  opts: { isDefault?: boolean; sortOrder?: number; outcomeType?: "WON" | "LOST" | null; active?: boolean } = {},
 ) {
   return testPrisma.pipelineStage.create({
-    data: { name, isDefault: opts.isDefault ?? false, sortOrder: opts.sortOrder ?? 0 },
+    data: {
+      name,
+      isDefault: opts.isDefault ?? false,
+      sortOrder: opts.sortOrder ?? 0,
+      outcomeType: opts.outcomeType ?? null,
+      active: opts.active ?? true,
+    },
   });
+}
+
+export async function createRejectionReasonFixture(name = `Reason ${crypto.randomUUID().slice(0, 8)}`) {
+  return testPrisma.rejectionReason.create({ data: { name } });
 }
 
 export async function createCompetitorFixture(name = `Competitor ${crypto.randomUUID().slice(0, 8)}`) {
@@ -74,26 +84,66 @@ export async function createCompanyFixture(opts: {
   name?: string;
   leadTypeId: string;
   pipelineStageId: string;
-  assignedToId: string;
+  assignedToId: string | null;
   createdById: string;
   competitorId?: string | null;
   status?: "ACTIVE" | "ARCHIVED";
+  source?: "MANUAL" | "AI_RESEARCH" | "IMPORT" | null;
+  importBatchId?: string | null;
+  city?: string;
+  region?: string;
+  country?: string;
+  eosScore?: number | null;
+  triviaStatus?: "CURRENT_TRIVIA" | "NO_CURRENT_TRIVIA" | "UNCERTAIN";
+  createdAt?: Date;
 }) {
   const name = opts.name ?? `Company ${crypto.randomUUID().slice(0, 8)}`;
 
-  return testPrisma.company.create({
+  const company = await testPrisma.company.create({
     data: {
       name,
       normalizedName: name.toLowerCase(),
-      city: "Testville",
-      region: "ON",
-      country: "Canada",
+      city: opts.city ?? "Testville",
+      region: opts.region ?? "ON",
+      country: opts.country ?? "Canada",
       leadTypeId: opts.leadTypeId,
       pipelineStageId: opts.pipelineStageId,
       assignedToId: opts.assignedToId,
       createdById: opts.createdById,
       competitorId: opts.competitorId ?? null,
       status: opts.status ?? "ACTIVE",
+      source: opts.source ?? null,
+      importBatchId: opts.importBatchId ?? null,
+      eosScore: opts.eosScore ?? null,
+      triviaStatus: opts.triviaStatus ?? "UNCERTAIN",
+    },
+  });
+
+  // createdAt has a DB default of now() with no updatable column exposed on
+  // create — a direct update is the only way fixtures can backdate a
+  // company for date-range tests.
+  if (opts.createdAt) {
+    return testPrisma.company.update({ where: { id: company.id }, data: { createdAt: opts.createdAt } });
+  }
+  return company;
+}
+
+export async function createPipelineStageHistoryFixture(opts: {
+  companyId: string;
+  changedById: string;
+  fromStageId?: string | null;
+  toStageId: string;
+  changedAt?: Date;
+  lossReasonId?: string | null;
+}) {
+  return testPrisma.pipelineStageHistory.create({
+    data: {
+      companyId: opts.companyId,
+      changedById: opts.changedById,
+      fromStageId: opts.fromStageId ?? null,
+      toStageId: opts.toStageId,
+      changedAt: opts.changedAt ?? new Date(),
+      lossReasonId: opts.lossReasonId ?? null,
     },
   });
 }
@@ -199,6 +249,17 @@ export async function createImportTemplateFixture(opts: { createdById: string; n
       mapping: opts.mapping ?? {},
       createdById: opts.createdById,
     },
+  });
+}
+
+/** Re-fetches a user with the role/permissions include shape
+ * AuthenticatedUser requires — for tests that call a report-query function
+ * directly (bypassing requireUser()'s own fetch), so the fixture user has
+ * the same nested shape hasPermission()/reportScope() expect. */
+export async function fetchAuthenticatedUser(userId: string) {
+  return testPrisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    include: { role: { include: { permissions: { include: { permission: true } } } }, team: true },
   });
 }
 
