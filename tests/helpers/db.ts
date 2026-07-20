@@ -34,6 +34,9 @@ const TABLES_TO_RESET = [
   "ImportTemplate",
   "ImportBatch",
   "RateLimitBucket",
+  "SavedView",
+  "Territory",
+  "WorkspaceSettings",
   "Company",
   "User",
   "Team",
@@ -46,7 +49,7 @@ const TABLES_TO_RESET = [
   "Competitor",
 ];
 
-/** Truncates every Module One table. Re-asserts the DB-safety guard
+/** Truncates every application table. Re-asserts the DB-safety guard
  * immediately before the destructive call, not just at module load. */
 export async function resetDatabase() {
   assertTestDatabaseUrl(process.env.DATABASE_URL);

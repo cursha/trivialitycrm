@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { BarChart3, Building2, CalendarClock, ListTree, Trophy, Users } from "lucide-react";
+import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
 import { getDashboardStats } from "./queries";
-import { Card } from "@/components/ui/card";
+import { getMyPriorityList, getMyPipelineCounts } from "./priority-data";
+import { PriorityList } from "./priority-list";
+import { Card, SectionHeading } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import clsx from "clsx";
 
@@ -72,6 +75,16 @@ export default async function DashboardPage() {
     );
   }
 
+  const workspaceSettings = await prisma.workspaceSettings.findUnique({ where: { id: 1 } });
+  const thresholds = {
+    noActivityThresholdDays: workspaceSettings?.noActivityThresholdDays ?? 14,
+    newlyAssignedThresholdDays: workspaceSettings?.newlyAssignedThresholdDays ?? 3,
+  };
+  const [priorityItems, myPipelineCounts] = await Promise.all([
+    getMyPriorityList(user, thresholds),
+    getMyPipelineCounts(user),
+  ]);
+
   const statTiles = [
     { label: "Active leads", value: stats.activeLeads },
     { label: "Follow-ups due today", value: stats.followUpsDueToday },
@@ -96,6 +109,33 @@ export default async function DashboardPage() {
           </Link>
         }
       />
+
+      <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
+        <Card>
+          <SectionHeading>What should I do next?</SectionHeading>
+          <div className="mt-3">
+            <PriorityList items={priorityItems} />
+          </div>
+        </Card>
+        <Card>
+          <SectionHeading>My pipeline</SectionHeading>
+          {myPipelineCounts.length === 0 ? (
+            <p className="mt-3 text-sm text-text-muted">No leads assigned to you yet.</p>
+          ) : (
+            <div className="mt-3 space-y-2">
+              {myPipelineCounts.map((row) => (
+                <div key={row.stageName} className="flex items-center justify-between text-sm">
+                  <span className="text-text">{row.stageName}</span>
+                  <span className="font-semibold text-text">{row.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          <Link href="/pipeline?view=saved" className="mt-4 inline-block text-sm font-semibold text-secondary hover:underline">
+            Quick links to saved views →
+          </Link>
+        </Card>
+      </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {statTiles.map((tile) => (

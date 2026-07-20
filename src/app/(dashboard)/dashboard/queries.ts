@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { AuthenticatedUser } from "@/lib/auth/current-user";
 import { companyScope, taskScope } from "@/lib/companies/scope";
+import { dayBounds } from "@/lib/dates";
 
 export async function getDashboardStats(user: AuthenticatedUser) {
   const scope = companyScope(user);
@@ -39,9 +40,7 @@ export async function getDashboardStats(user: AuthenticatedUser) {
     prisma.competitor.findMany(),
   ]);
 
-  const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const startOfTomorrow = new Date(startOfToday.getTime() + 24 * 60 * 60 * 1000);
+  const { startOfToday, startOfTomorrow } = dayBounds();
 
   const [followUpsDueToday, followUpsOverdue] = await Promise.all([
     prisma.task.count({
@@ -84,7 +83,7 @@ export async function getDashboardStats(user: AuthenticatedUser) {
     })),
     salespeopleBreakdown: salespeopleGroups.map((g) => ({
       userId: g.assignedToId,
-      userName: userNameById.get(g.assignedToId) ?? "Unknown",
+      userName: g.assignedToId ? (userNameById.get(g.assignedToId) ?? "Unknown") : "Unassigned",
       count: g._count,
     })),
     competitorsBreakdown: competitorGroups

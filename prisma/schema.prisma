@@ -47,6 +47,7 @@ enum ActivityType {
   NOTE
   PIPELINE_CHANGE
   LEAD_TRANSFERRED
+  ASSIGNMENT_CHANGE
 }
 
 enum TaskStatus {
@@ -58,6 +59,20 @@ enum TaskStatus {
 enum CompanyStatus {
   ACTIVE
   ARCHIVED
+}
+
+// Optional flag on PipelineStage identifying the Won/Lost stage(s) without
+// hardcoding a stage name anywhere in query logic — stage names are
+// admin-editable free text (see PipelineStage.name), so any Won/Lost view
+// or aggregate must key off this instead of a string match.
+enum PipelineStageOutcome {
+  WON
+  LOST
+}
+
+enum SavedViewVisibility {
+  PRIVATE
+  SHARED
 }
 
 enum OpportunityGrade {
@@ -157,6 +172,8 @@ model User {
   scoredHistoricalRecords HistoricalScoreRecord[] @relation("ScoreAuthor")
   importBatches           ImportBatch[]
   aiUsageRecords          AiUsageRecord[]
+  territories             Territory[]             @relation("TerritoryAssignee")
+  savedViews              SavedView[]
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
 }
@@ -214,12 +231,13 @@ model LeadType {
 }
 
 model PipelineStage {
-  id        String    @id @default(cuid())
-  name      String    @unique
-  active    Boolean   @default(true)
-  isDefault Boolean   @default(false)
-  sortOrder Int       @default(0)
-  companies Company[]
+  id          String                @id @default(cuid())
+  name        String                @unique
+  active      Boolean               @default(true)
+  isDefault   Boolean               @default(false)
+  sortOrder   Int                   @default(0)
+  outcomeType PipelineStageOutcome?
+  companies   Company[]
 }
 
 model RejectionReason {
@@ -265,13 +283,18 @@ model Company {
   leadTypeId      String
   pipelineStageId String
   competitorId    String?
-  assignedToId    String
+  // Nullable: a company can be unassigned (created without an owner, or
+  // explicitly unassigned) — Module Four's "Unassigned Leads" view relies on
+  // this. Never auto-cleared by any automated process; only an explicit
+  // assign/reassign/unassign action changes it, always logging an
+  // ASSIGNMENT_CHANGE Activity.
+  assignedToId    String?
   createdById     String
   updatedById     String?
   leadType        LeadType      @relation(fields: [leadTypeId], references: [id])
   pipelineStage   PipelineStage @relation(fields: [pipelineStageId], references: [id])
   competitor      Competitor?   @relation(fields: [competitorId], references: [id], onDelete: SetNull)
-  assignedTo      User          @relation("AssignedSalesperson", fields: [assignedToId], references: [id])
+  assignedTo      User?         @relation("AssignedSalesperson", fields: [assignedToId], references: [id])
   createdBy       User          @relation("CompanyCreator", fields: [createdById], references: [id])
   updatedBy       User?         @relation("CompanyUpdater", fields: [updatedById], references: [id])
 
@@ -334,6 +357,60 @@ model Company {
   @@index([primaryClassification])
   @@index([nextFollowUpAt])
   @@index([triviaStatus])
+}
+
+// Territory matching against a Company is computed at query time from
+// (country, region, city) — there is deliberately no territoryId on
+// Company. A stored FK would go stale whenever a territory's scope is
+// edited; computing the match on read keeps it always consistent with the
+// current territory definitions. See src/lib/workspace/territory-match.ts.
+model Territory {
+  id           String   @id @default(cuid())
+  name         String? // optional label, e.g. "Greater Toronto Area"
+  country      String
+  region       String? // null = whole country
+  city         String? // null = whole region
+  active       Boolean  @default(true)
+  assignedToId String?
+  assignedTo   User?    @relation("TerritoryAssignee", fields: [assignedToId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Prevents two territories from ever covering the identical scope.
+  // Hierarchical overlap (e.g. a country-level territory plus a city-level
+  // territory within it) is allowed and resolved by specificity at match
+  // time, not by this constraint.
+  @@unique([country, region, city])
+  @@index([assignedToId])
+}
+
+// A saved, reusable set of company-list filters. `filters` is a plain JSON
+// object validated against SavedViewFiltersSchema (src/lib/workspace/
+// saved-view-filters.ts) on every save AND every load-and-apply — never
+// raw query text or anything executable.
+model SavedView {
+  id         String              @id @default(cuid())
+  name       String
+  ownerId    String
+  owner      User                @relation(fields: [ownerId], references: [id])
+  visibility SavedViewVisibility @default(PRIVATE)
+  isDefault  Boolean             @default(false)
+  filters    Json
+  archivedAt DateTime?
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@index([ownerId])
+}
+
+// Single-row table (id fixed at 1) for the two configurable Sales Workspace
+// thresholds. Edited from Settings, gated by the existing manage_settings
+// permission — no new permission needed for this.
+model WorkspaceSettings {
+  id                         Int      @id @default(1)
+  noActivityThresholdDays    Int      @default(14)
+  newlyAssignedThresholdDays Int      @default(3)
+  updatedAt                  DateTime @updatedAt
 }
 
 model Contact {

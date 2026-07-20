@@ -135,7 +135,7 @@ async function NoFollowUpView({ user }: { user: Awaited<ReturnType<typeof requir
                   {company.city}, {company.region}
                 </div>
               </td>
-              <td className="px-5 py-4">{company.assignedTo.name}</td>
+              <td className="px-5 py-4">{company.assignedTo?.name ?? <span className="text-text-muted">Unassigned</span>}</td>
             </tr>
           ))}
         </tbody>

@@ -134,12 +134,9 @@ export function CompanyForm({
           <Select
             name="assignedToId"
             defaultValue={defaultValues?.assignedToId ?? ""}
-            required
             className="mt-1"
           >
-            <option value="" disabled>
-              Choose a salesperson
-            </option>
+            <option value="">Leave unassigned</option>
             {salespeople.map((option) => (
               <option key={option.id} value={option.id}>
                 {option.name}

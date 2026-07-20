@@ -1,8 +1,10 @@
 import Link from "next/link";
-import { ListTree, GitBranch, Users, ShieldCheck, XCircle, FileSpreadsheet } from "lucide-react";
+import { ListTree, GitBranch, Users, ShieldCheck, XCircle, FileSpreadsheet, MapPin } from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
 import { PageHeader } from "@/components/ui/page-header";
+import { prisma } from "@/lib/prisma";
+import { WorkspaceSettingsForm } from "./workspace-settings-form";
 
 export const metadata = { title: "Settings — Triviality CRM" };
 
@@ -39,6 +41,13 @@ export default async function SettingsPage() {
       visible: hasPermission(user, "manage_settings"),
     },
     {
+      href: "/settings/territories",
+      label: "Territories",
+      description: "Organize companies into country/state/city territories with an owning salesperson.",
+      icon: MapPin,
+      visible: hasPermission(user, "manage_territories"),
+    },
+    {
       href: "/settings/users",
       label: "Users",
       description: "Create accounts, assign roles and teams, and disable access.",
@@ -53,6 +62,14 @@ export default async function SettingsPage() {
       visible: hasPermission(user, "manage_users"),
     },
   ].filter((card) => card.visible);
+
+  const canManageSettings = hasPermission(user, "manage_settings");
+  const workspaceSettings = canManageSettings
+    ? ((await prisma.workspaceSettings.findUnique({ where: { id: 1 } })) ?? {
+        noActivityThresholdDays: 14,
+        newlyAssignedThresholdDays: 3,
+      })
+    : null;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -77,6 +94,8 @@ export default async function SettingsPage() {
           ))}
         </div>
       )}
+
+      {workspaceSettings && <WorkspaceSettingsForm defaultValues={workspaceSettings} />}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/prisma";
 import { getScopedCompany, listCompanyActivities, listCompanyTasks, listCompanyEvidence, listCompanyScoreHistory } from "../queries";
 import { CompanyActions } from "./company-actions";
+import { QuickActionsBar } from "./quick-actions-bar";
 import { ContactsPanel } from "./contacts/contacts-panel";
 import { ActivityPanel } from "./activities/activity-panel";
 import { TasksPanel } from "./tasks/tasks-panel";
@@ -31,12 +32,13 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const company = await getScopedCompany(user, id);
   if (!company) notFound();
 
-  const [activities, tasks, salespeople, evidence, scoreHistory] = await Promise.all([
+  const [activities, tasks, salespeople, evidence, scoreHistory, pipelineStages] = await Promise.all([
     listCompanyActivities(user, id),
     listCompanyTasks(user, id),
     prisma.user.findMany({ where: { disabled: false }, orderBy: { name: "asc" } }),
     listCompanyEvidence(user, id),
     listCompanyScoreHistory(user, id),
+    prisma.pipelineStage.findMany({ orderBy: { sortOrder: "asc" } }),
   ]);
   const canEdit = hasPermission(user, "edit_leads");
 
@@ -74,6 +76,13 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         </div>
       </div>
 
+      <QuickActionsBar
+        companyId={company.id}
+        currentStageId={company.pipelineStageId}
+        stages={pipelineStages.map((s) => ({ id: s.id, name: s.name, active: s.active }))}
+        canEdit={canEdit}
+      />
+
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-6">
           <Card>
@@ -98,7 +107,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               />
               <Field label="Lead Type" value={company.leadType.name} />
               <Field label="Pipeline Stage" value={company.pipelineStage.name} />
-              <Field label="Assigned salesperson" value={company.assignedTo.name} />
+              <Field label="Assigned salesperson" value={company.assignedTo?.name} />
               <Field label="Competitor" value={company.competitor?.name} />
               <Field label="Trivia status" value={TRIVIA_STATUS_LABEL[company.triviaStatus]} />
               <Field
@@ -123,9 +132,13 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
 
           <ContactsPanel companyId={company.id} contacts={company.contacts} canEdit={canEdit} />
 
-          <TasksPanel companyId={company.id} tasks={tasks} salespeople={salespeople} canManage={canEdit} />
+          <div id="tasks-panel">
+            <TasksPanel companyId={company.id} tasks={tasks} salespeople={salespeople} canManage={canEdit} />
+          </div>
 
-          <ActivityPanel companyId={company.id} activities={activities} canLog={canEdit} />
+          <div id="activity-panel">
+            <ActivityPanel companyId={company.id} activities={activities} canLog={canEdit} />
+          </div>
         </div>
 
         <div className="space-y-6">

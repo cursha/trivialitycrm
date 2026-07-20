@@ -1,5 +1,6 @@
 import { prisma } from "../src/lib/prisma";
 import bcrypt from "bcryptjs";
+import type { PipelineStageOutcome } from "../src/generated/prisma/enums";
 
 // Duplicated from src/lib/auth/password.ts rather than imported: that module
 // is guarded with `import "server-only"`, which throws under plain Node/tsx
@@ -7,14 +8,14 @@ import bcrypt from "bcryptjs";
 // condition). Keep this cost factor in sync with password.ts's.
 const BCRYPT_COST_FACTOR = 12;
 
-const pipelineStages = [
-  { name: "New", isDefault: true },
-  { name: "Material Sent", isDefault: false },
-  { name: "Demo Given", isDefault: false },
-  { name: "Trial", isDefault: false },
-  { name: "Booked", isDefault: false },
-  { name: "Won", isDefault: false },
-  { name: "Lost", isDefault: false },
+const pipelineStages: { name: string; isDefault: boolean; outcomeType: PipelineStageOutcome | null }[] = [
+  { name: "New", isDefault: true, outcomeType: null },
+  { name: "Material Sent", isDefault: false, outcomeType: null },
+  { name: "Demo Given", isDefault: false, outcomeType: null },
+  { name: "Trial", isDefault: false, outcomeType: null },
+  { name: "Booked", isDefault: false, outcomeType: null },
+  { name: "Won", isDefault: false, outcomeType: "WON" },
+  { name: "Lost", isDefault: false, outcomeType: "LOST" },
 ];
 
 const rejectionReasons = [
@@ -48,6 +49,11 @@ const permissions: { key: string; label: string }[] = [
   { key: "review_research_results", label: "Review AI research results" },
   { key: "transfer_leads", label: "Transfer AI research results to the CRM" },
   { key: "view_evidence", label: "View AI research evidence and citations" },
+  // Module Four: Sales Workspace
+  { key: "bulk_update_leads", label: "Use bulk actions on leads" },
+  { key: "manage_territories", label: "Manage territories" },
+  { key: "create_shared_views", label: "Create shared saved views" },
+  { key: "view_manager_workspace", label: "View manager workspace" },
 ];
 
 // Initial role -> permission grants. All grants are stored as editable
@@ -56,7 +62,15 @@ const permissions: { key: string; label: string }[] = [
 // the Roles admin screen.
 const roleGrants: Record<(typeof roles)[number], string[]> = {
   Administrator: permissions.map((p) => p.key),
-  Manager: ["view_team_leads", "add_leads", "edit_leads", "reassign_leads"],
+  Manager: [
+    "view_team_leads",
+    "add_leads",
+    "edit_leads",
+    "reassign_leads",
+    "bulk_update_leads",
+    "create_shared_views",
+    "view_manager_workspace",
+  ],
   Salesperson: ["view_assigned_leads", "add_leads", "edit_leads"],
 };
 
@@ -64,8 +78,12 @@ async function seedPipelineStages() {
   for (const [index, stage] of pipelineStages.entries()) {
     await prisma.pipelineStage.upsert({
       where: { name: stage.name },
-      update: {},
-      create: { name: stage.name, isDefault: stage.isDefault, sortOrder: index },
+      // outcomeType is a classification of the seed-defined stage itself
+      // (like a permission's label), kept in sync on reseed — unlike
+      // sortOrder/active, which are operational settings an Administrator
+      // may have already changed and must not be silently overwritten.
+      update: { outcomeType: stage.outcomeType },
+      create: { name: stage.name, isDefault: stage.isDefault, sortOrder: index, outcomeType: stage.outcomeType },
     });
   }
   console.log(`Seeded ${pipelineStages.length} pipeline stages.`);

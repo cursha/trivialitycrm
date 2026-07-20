@@ -170,6 +170,14 @@ export function CompaniesFilters({
           <option value="asc">Ascending</option>
           <option value="desc">Descending</option>
         </Select>
+        <Select
+          className={selectClass}
+          defaultValue={searchParams.get("status") ?? "ACTIVE"}
+          onChange={(event) => updateParam("status", event.target.value)}
+        >
+          <option value="ACTIVE">Active</option>
+          <option value="ARCHIVED">Archived</option>
+        </Select>
       </div>
     </Card>
   );
