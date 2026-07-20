@@ -33,7 +33,12 @@ export const CompanySchema = z.object({
     .string()
     .optional()
     .transform((value) => (value ? value : undefined)),
-  assignedToId: z.string().min(1, { error: "Choose an assigned salesperson." }),
+  // Optional — a company can be created or left unassigned; Module Four's
+  // "Unassigned Leads" view relies on this.
+  assignedToId: z
+    .string()
+    .optional()
+    .transform((value) => (value ? value : undefined)),
   triviaStatus: z.enum(TriviaStatusValues),
   notes: optionalText(5000),
   nextFollowUpAt: z

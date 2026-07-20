@@ -46,6 +46,22 @@ Module Three replaces every single-process/in-memory assumption from Modules One
 
 Not in Module Three (by design, or not yet done): actually creating any Railway resources, changing DNS, or making a live Anthropic API call — all documented as manual next steps in `MODULE_3_REPORT.md`. A nonce-based CSP (stronger than the current static one) and horizontally-scaling the web service to multiple instances are both possible follow-ups, not required for this module's scope.
 
+## Module Four: Sales Workspace
+
+Module Four turns the CRM into a daily-use sales workspace on top of Modules One–Three — see `MODULE_4_REPORT.md` for the full report, schema changes, and permission matrix.
+
+- **Pipeline board**: a drag-and-drop board (`/pipeline`) with one column per active Pipeline Stage (order and names fully admin-editable, never hardcoded), an accessible non-drag `<select>` alternative on every card, and an automatic Pipeline Change activity on every move — the same reused, permission-checked code path for drag, dropdown, and bulk stage changes alike.
+- **Named work views**: My Leads, Team Leads, Unassigned Leads, Today's/Overdue/Upcoming Follow-ups, Recently Added, No Recent Activity, Won, Lost, and Archived — all tabs on `/pipeline`, all reusing the existing company-scope visibility rules (no parallel authorization system).
+- **Lead assignment**: single and bulk assign/reassign/unassign, with every change recorded as an `ASSIGNMENT_CHANGE` activity (who, when, from, to) and the same team-boundary check reassignment already enforced.
+- **Territories**: table-driven country/state-province/city territories (`Settings → Territories`) with an optional owning salesperson. A company's territory is computed from its location at read time, not stored — see `MODULE_4_REPORT.md` for the overlap-resolution rule (most-specific-match-wins).
+- **Saved views**: reusable, named filter sets — private by default, shared with permission — validated against a strict schema on every save and load (never raw query text).
+- **Bulk actions**: assign, change stage, set territory, create a follow-up, add a note, archive, restore, and export, each transactional and reporting per-row success/failure.
+- **Quick sales actions**: a shortcut bar on the company detail page and on every pipeline card for logging a note/call/email/demo/trial or follow-up — reuses the existing Activity/Task models, no parallel note system.
+- **Salesperson Home Page**: the Dashboard now leads with a deterministic "What should I do next?" priority list (overdue → due today → active trials → newly assigned → stale → upcoming) and personal pipeline counts.
+- **Manager Workspace** (`/manager`, permission-gated): team workload, unassigned leads, overdue-by-salesperson, pipeline-stage counts, recently won/lost, and territory coverage.
+
+Not in Module Four (by design): mapping/route-planning services, real email or calendar integration (activity is recorded only), and advanced conversion/analytics reporting — that's Module Five.
+
 ## Installation
 
 1. Install [Node.js 20+](https://nodejs.org/), [Docker](https://www.docker.com/) (for local Postgres), and Git.
@@ -73,7 +89,9 @@ A safety guard (`tests/setup/test-db-guard.ts`) refuses to run any destructive t
 
 ## Core data rules
 
-- A company has one Lead Type, one Pipeline Stage, one assigned salesperson, and zero or one competitor.
+- A company has one Lead Type, one Pipeline Stage, zero or one assigned salesperson (Module Four: a company may be unassigned), and zero or one competitor.
+- A Pipeline Stage may optionally be flagged Won or Lost (`outcomeType`) — this is how "Won"/"Lost" views and reports identify outcome stages without ever hardcoding a stage name.
+- A company's territory is computed from its location (country/state-province/city) against the table-driven `Territory` list, not stored — see `MODULE_4_REPORT.md`.
 - Competitor location counts are calculated live from linked companies — never stored.
 - Contacts are separate records, allowing multiple contacts per company.
 - Deleting a company archives it by default, preserving its contacts, activities, follow-ups, and scoring history. Only an Administrator can permanently delete an already-archived company.
@@ -90,6 +108,8 @@ All roles and permission grants are stored in the database (`Role`, `Permission`
 - **Salesperson** — view/add/edit leads assigned to them.
 
 Module Two adds `run_research`, `review_research_results`, `transfer_leads`, and `view_evidence`, alongside Module One's already-seeded `manage_prompts`, `import_leads`, `export_leads`, and `restore_rejected`. Only Administrator is granted these by default — assign them to Manager/Salesperson from Settings → Roles & Permissions as needed.
+
+Module Four adds `bulk_update_leads`, `manage_territories`, `create_shared_views`, and `view_manager_workspace`. Administrator gets all four; Manager gets `bulk_update_leads`, `create_shared_views`, and `view_manager_workspace` by default (not `manage_territories`, matching the existing pattern where other `manage_*` lookup-table permissions are Administrator-only by default); Salesperson gets none of the four (private saved views and personal pipeline access need no new grant). Assigning/reassigning a lead — including a previously-unassigned one — continues to use the existing `reassign_leads` permission; no separate `assign_leads` key was added.
 
 ## AI research provider
 

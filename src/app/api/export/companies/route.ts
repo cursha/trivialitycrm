@@ -36,13 +36,21 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const format = searchParams.get("format") === "xlsx" ? "xlsx" : "csv";
 
-  const filters: Prisma.CompanyWhereInput[] = [scope, { status: "ACTIVE" }];
+  // Explicit status param (used by the Archived view and bulk export of a
+  // specific selection) overrides the default ACTIVE-only export.
+  const status = searchParams.get("status") === "ARCHIVED" ? "ARCHIVED" : "ACTIVE";
+  const filters: Prisma.CompanyWhereInput[] = [scope, { status }];
   const leadTypeId = searchParams.get("leadTypeId");
   const pipelineStageId = searchParams.get("pipelineStageId");
   const competitorId = searchParams.get("competitorId");
+  // Bulk "Export selected" passes an explicit id list — still ANDed with
+  // scope above, so a selection can never export a record the requester
+  // isn't otherwise permitted to see.
+  const ids = searchParams.get("ids");
   if (leadTypeId) filters.push({ leadTypeId });
   if (pipelineStageId) filters.push({ pipelineStageId });
   if (competitorId) filters.push({ competitorId });
+  if (ids) filters.push({ id: { in: ids.split(",").filter(Boolean) } });
 
   const companies = await prisma.company.findMany({
     where: { AND: filters },
@@ -62,7 +70,7 @@ export async function GET(request: Request) {
     websiteUrl: company.websiteUrl ?? "",
     leadType: company.leadType.name,
     pipelineStage: company.pipelineStage.name,
-    assignedTo: company.assignedTo.name,
+    assignedTo: company.assignedTo?.name ?? "",
     competitor: company.competitor?.name ?? "",
     triviaStatus: company.triviaStatus,
     status: company.status,

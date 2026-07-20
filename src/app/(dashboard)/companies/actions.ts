@@ -4,10 +4,11 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
-import { requirePermission, hasPermission } from "@/lib/auth/permissions";
-import { companyScope } from "@/lib/companies/scope";
+import { requirePermission } from "@/lib/auth/permissions";
+import { companyScope, canAssignTo } from "@/lib/companies/scope";
 import { CompanySchema } from "@/lib/validation/company";
 import { findPotentialDuplicates, computeNormalizedFields, type DuplicateMatch } from "@/lib/duplicates/match";
+import { logAssignmentChange, logPipelineChange } from "@/lib/companies/activity-log";
 import { formString } from "@/lib/form-data";
 
 export type CompanyFormState = { error?: string; duplicates?: DuplicateMatch[] } | undefined;
@@ -105,14 +106,13 @@ export async function updateCompany(
     return { error: parsed.error.issues[0]?.message ?? "Please correct the highlighted fields." };
   }
 
-  if (parsed.data.assignedToId !== existing.assignedToId) {
-    requirePermission(user, "reassign_leads");
+  const newAssignedToId = parsed.data.assignedToId ?? null;
+  const assignmentChanged = newAssignedToId !== existing.assignedToId;
 
-    if (!hasPermission(user, "view_all_leads")) {
-      const newAssignee = await prisma.user.findUnique({ where: { id: parsed.data.assignedToId } });
-      if (!newAssignee || newAssignee.teamId !== user.teamId) {
-        return { error: "You can only reassign within your own team." };
-      }
+  if (assignmentChanged) {
+    requirePermission(user, "reassign_leads");
+    if (!(await canAssignTo(prisma, user, newAssignedToId))) {
+      return { error: "You can only reassign within your own team." };
     }
   }
 
@@ -145,7 +145,7 @@ export async function updateCompany(
         leadTypeId: parsed.data.leadTypeId,
         pipelineStageId: parsed.data.pipelineStageId,
         competitorId: parsed.data.competitorId ?? null,
-        assignedToId: parsed.data.assignedToId,
+        assignedToId: newAssignedToId,
         triviaStatus: parsed.data.triviaStatus,
         notes: parsed.data.notes ?? null,
         nextFollowUpAt: parsed.data.nextFollowUpAt ? new Date(parsed.data.nextFollowUpAt) : null,
@@ -157,23 +157,113 @@ export async function updateCompany(
     // Automatic Pipeline Change activity — never left to the user to log
     // manually.
     if (pipelineStageChanged) {
-      const [fromStage, toStage] = await Promise.all([
-        tx.pipelineStage.findUnique({ where: { id: existing.pipelineStageId } }),
-        tx.pipelineStage.findUnique({ where: { id: parsed.data.pipelineStageId } }),
-      ]);
+      await logPipelineChange(tx, {
+        companyId: id,
+        userId: user.id,
+        fromStageId: existing.pipelineStageId,
+        toStageId: parsed.data.pipelineStageId,
+      });
+    }
 
-      await tx.activity.create({
-        data: {
-          companyId: id,
-          userId: user.id,
-          type: "PIPELINE_CHANGE",
-          notes: `Pipeline stage changed from "${fromStage?.name ?? "Unknown"}" to "${toStage?.name ?? "Unknown"}".`,
-        },
+    if (assignmentChanged) {
+      await logAssignmentChange(tx, {
+        companyId: id,
+        userId: user.id,
+        fromUserId: existing.assignedToId,
+        toUserId: newAssignedToId,
       });
     }
   });
 
   redirect(`/companies/${id}`);
+}
+
+export type MutationResult = { error?: string } | { success: true };
+
+/**
+ * Lightweight stage-change action for the pipeline board's drag-and-drop
+ * and its accessible <Select> alternative — both call this exact same
+ * function, so they always produce identical resulting state and Activity.
+ * Deliberately does not take a full CompanySchema payload and does not
+ * redirect(), unlike updateCompany, since this is called from an
+ * AJAX-style client interaction that needs to stay on the page.
+ */
+export async function changeCompanyStage(companyId: string, newStageId: string): Promise<MutationResult> {
+  const user = await requireUser();
+  requirePermission(user, "edit_leads");
+
+  const scope = companyScope(user);
+  if (!scope) return { error: "You do not have access to this company." };
+
+  const existing = await prisma.company.findFirst({ where: { id: companyId, ...scope } });
+  if (!existing) return { error: "You do not have access to this company." };
+
+  const targetStage = await prisma.pipelineStage.findUnique({ where: { id: newStageId } });
+  if (!targetStage || !targetStage.active) {
+    return { error: "That pipeline stage is not available." };
+  }
+
+  if (newStageId === existing.pipelineStageId) {
+    return { success: true };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.company.update({ where: { id: companyId }, data: { pipelineStageId: newStageId, updatedById: user.id } });
+    await logPipelineChange(tx, {
+      companyId,
+      userId: user.id,
+      fromStageId: existing.pipelineStageId,
+      toStageId: newStageId,
+    });
+  });
+
+  revalidatePath("/pipeline");
+  revalidatePath(`/companies/${companyId}`);
+  revalidatePath("/companies");
+  return { success: true };
+}
+
+/**
+ * Lightweight assign/reassign/unassign action, shared by the pipeline
+ * board, the company detail quick-actions bar, and (per-row, inside its
+ * own transaction) bulk reassignment. Assigning a previously-unassigned
+ * company and reassigning an already-assigned one are the same operation —
+ * both require reassign_leads, exactly like updateCompany's inline check
+ * used to, now shared via canAssignTo.
+ */
+export async function assignCompany(companyId: string, newAssigneeId: string | null): Promise<MutationResult> {
+  const user = await requireUser();
+  requirePermission(user, "edit_leads");
+
+  const scope = companyScope(user);
+  if (!scope) return { error: "You do not have access to this company." };
+
+  const existing = await prisma.company.findFirst({ where: { id: companyId, ...scope } });
+  if (!existing) return { error: "You do not have access to this company." };
+
+  if (newAssigneeId === existing.assignedToId) {
+    return { success: true };
+  }
+
+  requirePermission(user, "reassign_leads");
+  if (!(await canAssignTo(prisma, user, newAssigneeId))) {
+    return { error: "You can only assign within your own team." };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.company.update({ where: { id: companyId }, data: { assignedToId: newAssigneeId, updatedById: user.id } });
+    await logAssignmentChange(tx, {
+      companyId,
+      userId: user.id,
+      fromUserId: existing.assignedToId,
+      toUserId: newAssigneeId,
+    });
+  });
+
+  revalidatePath("/pipeline");
+  revalidatePath(`/companies/${companyId}`);
+  revalidatePath("/companies");
+  return { success: true };
 }
 
 export async function archiveCompany(id: string): Promise<SimpleActionResult> {

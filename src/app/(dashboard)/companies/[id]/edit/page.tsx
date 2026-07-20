@@ -45,7 +45,7 @@ export default async function EditCompanyPage({ params }: { params: Promise<{ id
             leadTypeId: company.leadTypeId,
             pipelineStageId: company.pipelineStageId,
             competitorId: company.competitorId ?? undefined,
-            assignedToId: company.assignedToId,
+            assignedToId: company.assignedToId ?? undefined,
             triviaStatus: company.triviaStatus,
             notes: company.notes ?? undefined,
             nextFollowUpAt: company.nextFollowUpAt ? company.nextFollowUpAt.toISOString().slice(0, 10) : undefined,

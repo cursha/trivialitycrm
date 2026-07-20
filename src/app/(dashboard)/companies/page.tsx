@@ -5,11 +5,9 @@ import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
 import { listCompanies, PAGE_SIZE } from "./queries";
 import { CompaniesFilters } from "./companies-filters";
+import { CompaniesTable } from "./companies-table";
 import { PageHeader } from "@/components/ui/page-header";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Pagination } from "@/components/ui/pagination";
-import { GRADE_TONE, GRADE_LABEL, TRIVIA_STATUS_LABEL } from "@/lib/ui/status-tones";
 
 export const metadata = { title: "Companies — Triviality CRM" };
 
@@ -27,33 +25,40 @@ export default async function CompaniesPage({
 
   const page = Number(toSingle(params.page)) || 1;
 
-  const [{ companies, total, pageCount }, leadTypes, pipelineStages, competitors, salespeople] = await Promise.all([
-    listCompanies(user, {
-      q: toSingle(params.q),
-      leadTypeId: toSingle(params.leadTypeId),
-      pipelineStageId: toSingle(params.pipelineStageId),
-      assignedToId: toSingle(params.assignedToId),
-      competitorId: toSingle(params.competitorId),
-      triviaStatus: toSingle(params.triviaStatus),
-      country: toSingle(params.country),
-      region: toSingle(params.region),
-      city: toSingle(params.city),
-      opportunityGrade: toSingle(params.opportunityGrade),
-      confidenceLevel: toSingle(params.confidenceLevel),
-      primaryClassification: toSingle(params.primaryClassification),
-      followUp: toSingle(params.followUp),
-      sortBy: toSingle(params.sortBy),
-      sortDir: toSingle(params.sortDir),
-      page,
-    }),
-    prisma.leadType.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
-    prisma.pipelineStage.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
-    prisma.competitor.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
-    prisma.user.findMany({ where: { disabled: false }, orderBy: { name: "asc" } }),
-  ]);
+  const statusParam = toSingle(params.status) === "ARCHIVED" ? "ARCHIVED" : "ACTIVE";
+
+  const [{ companies, total, pageCount }, leadTypes, pipelineStages, allPipelineStages, competitors, salespeople, territories] =
+    await Promise.all([
+      listCompanies(user, {
+        q: toSingle(params.q),
+        leadTypeId: toSingle(params.leadTypeId),
+        pipelineStageId: toSingle(params.pipelineStageId),
+        assignedToId: toSingle(params.assignedToId),
+        competitorId: toSingle(params.competitorId),
+        triviaStatus: toSingle(params.triviaStatus),
+        country: toSingle(params.country),
+        region: toSingle(params.region),
+        city: toSingle(params.city),
+        opportunityGrade: toSingle(params.opportunityGrade),
+        confidenceLevel: toSingle(params.confidenceLevel),
+        primaryClassification: toSingle(params.primaryClassification),
+        followUp: toSingle(params.followUp),
+        status: statusParam,
+        sortBy: toSingle(params.sortBy),
+        sortDir: toSingle(params.sortDir),
+        page,
+      }),
+      prisma.leadType.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
+      prisma.pipelineStage.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
+      prisma.pipelineStage.findMany({ orderBy: { sortOrder: "asc" } }),
+      prisma.competitor.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+      prisma.user.findMany({ where: { disabled: false }, orderBy: { name: "asc" } }),
+      prisma.territory.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+    ]);
 
   const canAdd = hasPermission(user, "add_leads");
   const canExport = hasPermission(user, "export_leads");
+  const canBulk = hasPermission(user, "bulk_update_leads");
 
   const exportQuery = new URLSearchParams(
     ["leadTypeId", "pipelineStageId", "competitorId"]
@@ -103,64 +108,13 @@ export default async function CompaniesPage({
 
       <CompaniesFilters leadTypes={leadTypes} pipelineStages={pipelineStages} salespeople={salespeople} competitors={competitors} />
 
-      <Card className="overflow-hidden p-0">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-black/5 text-xs uppercase text-text-muted">
-              <tr>
-                <th className="px-5 py-3">Company</th>
-                <th className="px-5 py-3">Lead Type</th>
-                <th className="px-5 py-3">Stage</th>
-                <th className="px-5 py-3">Salesperson</th>
-                <th className="px-5 py-3">Trivia Status</th>
-                <th className="px-5 py-3">EOS Grade</th>
-                <th className="px-5 py-3">Follow-up</th>
-              </tr>
-            </thead>
-            <tbody>
-              {companies.map((company) => (
-                <tr key={company.id} className="border-t border-border hover:bg-black/5">
-                  <td className="px-5 py-4">
-                    <Link href={`/companies/${company.id}`} className="font-bold text-secondary hover:underline">
-                      {company.name}
-                    </Link>
-                    <div className="text-xs text-text-muted">
-                      {company.city}, {company.region}
-                    </div>
-                  </td>
-                  <td className="px-5 py-4">{company.leadType.name}</td>
-                  <td className="px-5 py-4">
-                    <Badge tone="secondary">{company.pipelineStage.name}</Badge>
-                  </td>
-                  <td className="px-5 py-4">{company.assignedTo.name}</td>
-                  <td className="px-5 py-4">{TRIVIA_STATUS_LABEL[company.triviaStatus]}</td>
-                  <td className="px-5 py-4">
-                    {company.opportunityGrade ? (
-                      <Badge tone={GRADE_TONE[company.opportunityGrade]}>{GRADE_LABEL[company.opportunityGrade]}</Badge>
-                    ) : (
-                      <span className="text-text-muted">—</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-4">
-                    {company.nextFollowUpAt ? (
-                      new Date(company.nextFollowUpAt).toLocaleDateString()
-                    ) : (
-                      <span className="text-text-muted">—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {companies.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="px-5 py-10 text-center text-text-muted">
-                    No companies match these filters.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      <CompaniesTable
+        companies={companies}
+        stages={allPipelineStages.map((s) => ({ id: s.id, name: s.name, active: s.active }))}
+        salespeople={salespeople}
+        territories={territories.map((t) => ({ id: t.id, name: t.name ?? [t.city, t.region, t.country].filter(Boolean).join(", ") }))}
+        canBulk={canBulk}
+      />
 
       <Pagination page={page} pageCount={pageCount} pageSize={PAGE_SIZE} hrefFor={pageHref} />
     </div>
