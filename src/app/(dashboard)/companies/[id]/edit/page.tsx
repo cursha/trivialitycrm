@@ -15,12 +15,13 @@ export default async function EditCompanyPage({ params }: { params: Promise<{ id
   requirePermission(user, "edit_leads");
   const { id } = await params;
 
-  const [company, leadTypes, pipelineStages, competitors, salespeople] = await Promise.all([
+  const [company, leadTypes, pipelineStages, competitors, salespeople, lossReasons] = await Promise.all([
     getScopedCompany(user, id),
     prisma.leadType.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
     prisma.pipelineStage.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
     prisma.competitor.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
     prisma.user.findMany({ where: { disabled: false }, orderBy: { name: "asc" } }),
+    prisma.rejectionReason.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
   ]);
 
   if (!company) notFound();
@@ -54,6 +55,7 @@ export default async function EditCompanyPage({ params }: { params: Promise<{ id
           pipelineStages={pipelineStages}
           competitors={competitors}
           salespeople={salespeople}
+          lossReasons={lossReasons}
           isAdmin={user.role.name === "Administrator"}
           submitLabel="Save changes"
         />

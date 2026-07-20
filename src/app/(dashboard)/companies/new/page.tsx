@@ -12,11 +12,12 @@ export default async function NewCompanyPage() {
   const user = await requireUser();
   requirePermission(user, "add_leads");
 
-  const [leadTypes, pipelineStages, competitors, salespeople] = await Promise.all([
+  const [leadTypes, pipelineStages, competitors, salespeople, lossReasons] = await Promise.all([
     prisma.leadType.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
     prisma.pipelineStage.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
     prisma.competitor.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
     prisma.user.findMany({ where: { disabled: false }, orderBy: { name: "asc" } }),
+    prisma.rejectionReason.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
   ]);
 
   const defaultStage = pipelineStages.find((stage) => stage.isDefault);
@@ -33,6 +34,7 @@ export default async function NewCompanyPage() {
           pipelineStages={pipelineStages}
           competitors={competitors}
           salespeople={salespeople}
+          lossReasons={lossReasons}
           isAdmin={user.role.name === "Administrator"}
           submitLabel="Create company"
         />

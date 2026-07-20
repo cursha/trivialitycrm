@@ -1,7 +1,16 @@
 // Plain data only (no React/icon imports) so it can be safely imported from
 // both the server layout (for permission filtering) and the client shell
 // (for rendering) without crossing a function-serialization boundary.
-export type NavIconKey = "dashboard" | "building" | "calendar" | "trophy" | "settings" | "search" | "pipeline" | "team";
+export type NavIconKey =
+  | "dashboard"
+  | "building"
+  | "calendar"
+  | "trophy"
+  | "settings"
+  | "search"
+  | "pipeline"
+  | "team"
+  | "reports";
 
 export type NavItem = {
   label: string;
@@ -25,6 +34,12 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Follow-Ups", href: "/follow-ups", icon: "calendar", requiresAnyPermission: LEAD_VIEW_PERMISSIONS },
   { label: "Competitors", href: "/competitors", icon: "trophy" },
   { label: "Manager Workspace", href: "/manager", icon: "team", requiresAnyPermission: ["view_manager_workspace"] },
+  {
+    label: "Reports",
+    href: "/reports",
+    icon: "reports",
+    requiresAnyPermission: ["view_own_reports", "view_team_reports", "view_all_reports"],
+  },
   {
     label: "Settings",
     href: "/settings",

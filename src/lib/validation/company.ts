@@ -40,6 +40,13 @@ export const CompanySchema = z.object({
     .optional()
     .transform((value) => (value ? value : undefined)),
   triviaStatus: z.enum(TriviaStatusValues),
+  // Only meaningful when pipelineStageId resolves to a Lost-outcome stage —
+  // enforced server-side in the caller, not here, since this schema has no
+  // access to PipelineStage.outcomeType.
+  lossReasonId: z
+    .string()
+    .optional()
+    .transform((value) => (value ? value : undefined)),
   notes: optionalText(5000),
   nextFollowUpAt: z
     .string()

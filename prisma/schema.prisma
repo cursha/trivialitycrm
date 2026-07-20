@@ -75,6 +75,29 @@ enum SavedViewVisibility {
   SHARED
 }
 
+// Closed, rarely-changing set — unlike Lead Types/Pipeline Stages, which
+// are genuinely admin-editable, a company's origin is one of a small fixed
+// list. Nullable on Company: pre-Module-Five rows have no reliable source
+// to backfill, so they stay null ("unknown/legacy") rather than guessed.
+enum LeadSource {
+  MANUAL
+  AI_RESEARCH
+  IMPORT
+}
+
+enum ReportCadence {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum ReportRunStatus {
+  PENDING
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
 enum OpportunityGrade {
   A_PLUS
   A
@@ -174,6 +197,8 @@ model User {
   aiUsageRecords          AiUsageRecord[]
   territories             Territory[]             @relation("TerritoryAssignee")
   savedViews              SavedView[]
+  stageHistoryChanges     PipelineStageHistory[]
+  scheduledReports        ScheduledReport[]
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
 }
@@ -238,6 +263,9 @@ model PipelineStage {
   sortOrder   Int                   @default(0)
   outcomeType PipelineStageOutcome?
   companies   Company[]
+
+  historyFrom PipelineStageHistory[] @relation("StageHistoryFrom")
+  historyTo   PipelineStageHistory[] @relation("StageHistoryTo")
 }
 
 model RejectionReason {
@@ -246,6 +274,8 @@ model RejectionReason {
   active    Boolean        @default(true)
   sortOrder Int            @default(0)
   results   SearchResult[]
+
+  lossHistoryEntries PipelineStageHistory[]
 }
 
 model Competitor {
@@ -298,6 +328,14 @@ model Company {
   createdBy       User          @relation("CompanyCreator", fields: [createdById], references: [id])
   updatedBy       User?         @relation("CompanyUpdater", fields: [updatedById], references: [id])
 
+  // Module Five: origin attribution. Nullable — set once at creation by
+  // each of the three creation paths (manual add, AI transfer, import
+  // commit); pre-existing rows stay null ("unknown/legacy") rather than
+  // guessed. importBatchId is only ever set alongside source: IMPORT.
+  source        LeadSource?
+  importBatchId String?
+  importBatch   ImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+
   // Archiving (soft delete). Companies are never hard-deleted except by an
   // Administrator permanently removing an already-archived record.
   status       CompanyStatus @default(ACTIVE)
@@ -342,8 +380,9 @@ model Company {
   tasks         Task[]
   sources       CompanySource[]
   searchResults SearchResult[]
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  stageHistory  PipelineStageHistory[]
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
 
   @@index([normalizedName])
   @@index([websiteDomain])
@@ -357,6 +396,38 @@ model Company {
   @@index([primaryClassification])
   @@index([nextFollowUpAt])
   @@index([triviaStatus])
+  @@index([source])
+}
+
+// Append-only, populated going forward only (no backfill — see
+// MODULE_5_REPORT.md). Written inside the same transaction as the
+// Activity.PIPELINE_CHANGE row it accompanies (src/lib/companies/
+// activity-log.ts), plus once at company creation (fromStageId: null),
+// so "time in stage" is computable from day one for every new company.
+// This is the structured twin of the human-readable Activity log, purpose
+// -built for reporting — the Activity log itself is untouched.
+model PipelineStageHistory {
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  fromStageId String? // null = company was just created
+  fromStage   PipelineStage? @relation("StageHistoryFrom", fields: [fromStageId], references: [id])
+  toStageId   String
+  toStage     PipelineStage  @relation("StageHistoryTo", fields: [toStageId], references: [id])
+
+  changedById String
+  changedBy   User     @relation(fields: [changedById], references: [id])
+  changedAt   DateTime @default(now())
+
+  // Set only when moving into a Lost-outcome stage — reuses the existing
+  // RejectionReason lookup table rather than a second "why did we lose
+  // this" list.
+  lossReasonId String?
+  lossReason   RejectionReason? @relation(fields: [lossReasonId], references: [id])
+
+  @@index([companyId, changedAt])
+  @@index([toStageId])
 }
 
 // Territory matching against a Company is computed at query time from
@@ -400,6 +471,8 @@ model SavedView {
   createdAt  DateTime            @default(now())
   updatedAt  DateTime            @updatedAt
 
+  scheduledReports ScheduledReport[]
+
   @@index([ownerId])
 }
 
@@ -411,6 +484,55 @@ model WorkspaceSettings {
   noActivityThresholdDays    Int      @default(14)
   newlyAssignedThresholdDays Int      @default(3)
   updatedAt                  DateTime @updatedAt
+}
+
+// A report's filter configuration lives entirely in the existing SavedView
+// (reused as-is, no changes to its schema or validated .strict() filter
+// shape) — this table only carries what SavedView has no reason to hold:
+// cadence, recipients, run status. See MODULE_5_REPORT.md for the
+// scheduling design (one fixed hourly pg-boss tick + per-row dedup via
+// singletonKey, not per-report native cron registration).
+model ScheduledReport {
+  id            String           @id @default(cuid())
+  name          String
+  reportKey     String // matches a /reports/[section] route, e.g. "pipeline" — never a stage/leadtype name
+  savedViewId   String?
+  savedView     SavedView?       @relation(fields: [savedViewId], references: [id])
+  cadence       ReportCadence
+  recipientIds  String[] // User ids, validated server-side against real users at save time
+  active        Boolean          @default(true)
+  createdById   String
+  createdBy     User             @relation(fields: [createdById], references: [id])
+  lastRunAt     DateTime?
+  lastRunStatus ReportRunStatus?
+  nextRunAt     DateTime
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  generatedReports GeneratedReport[]
+
+  @@index([active, nextRunAt])
+  @@index([createdById])
+}
+
+// One row per actual report run — deliberately serves both roles Module
+// Five needs ("store an in-app notification or downloadable report
+// record"): seenByIds drives the notification-bell unread state, and the
+// row (plus reportKey/scheduledReportId) is what a "download again" link
+// re-runs against. Avoids a second, parallel Notification model.
+model GeneratedReport {
+  id                String           @id @default(cuid())
+  scheduledReportId String? // null = ad-hoc/manual export, not from a schedule
+  scheduledReport   ScheduledReport? @relation(fields: [scheduledReportId], references: [id])
+  reportKey         String
+  status            ReportRunStatus
+  recipientIds      String[]
+  seenByIds         String[]         @default([])
+  errorMessage      String?
+  createdAt         DateTime         @default(now())
+
+  @@index([scheduledReportId])
+  @@index([createdAt])
 }
 
 model Contact {
@@ -694,6 +816,7 @@ model ImportBatch {
   expiresAt    DateTime
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
+  companies    Company[]
 
   @@index([status, expiresAt])
   @@index([uploadedById])

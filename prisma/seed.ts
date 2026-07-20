@@ -54,6 +54,14 @@ const permissions: { key: string; label: string }[] = [
   { key: "manage_territories", label: "Manage territories" },
   { key: "create_shared_views", label: "Create shared saved views" },
   { key: "view_manager_workspace", label: "View manager workspace" },
+  // Module Five: Reporting and Analytics
+  { key: "view_own_reports", label: "View own reports" },
+  { key: "view_team_reports", label: "View team reports" },
+  { key: "view_all_reports", label: "View all reports" },
+  { key: "export_reports", label: "Export reports" },
+  { key: "manage_scheduled_reports", label: "Manage scheduled reports" },
+  { key: "view_ai_costs", label: "View AI research cost estimates" },
+  { key: "view_competitor_reports", label: "View competitor reports" },
 ];
 
 // Initial role -> permission grants. All grants are stored as editable
@@ -70,8 +78,12 @@ const roleGrants: Record<(typeof roles)[number], string[]> = {
     "bulk_update_leads",
     "create_shared_views",
     "view_manager_workspace",
+    "view_own_reports",
+    "view_team_reports",
+    "export_reports",
+    "view_competitor_reports",
   ],
-  Salesperson: ["view_assigned_leads", "add_leads", "edit_leads"],
+  Salesperson: ["view_assigned_leads", "add_leads", "edit_leads", "view_own_reports"],
 };
 
 async function seedPipelineStages() {

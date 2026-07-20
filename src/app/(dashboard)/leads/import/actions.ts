@@ -8,6 +8,7 @@ import { parseSpreadsheet, SpreadsheetParseError } from "@/lib/import/parse";
 import { putUpload, getUpload, recordMapping, markImported } from "@/lib/import/batch-store";
 import { mapAndValidateRow, type ImportMapping, type MappedRow } from "@/lib/validation/import";
 import { findPotentialDuplicates, computeNormalizedFields } from "@/lib/duplicates/match";
+import { logInitialPipelineStage } from "@/lib/companies/activity-log";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
@@ -132,9 +133,13 @@ export async function commitImport(
           pipelineStageId,
           assignedToId,
           createdById: user.id,
+          source: "IMPORT",
+          importBatchId: sessionId,
           ...normalized,
         },
       });
+
+      await logInitialPipelineStage(tx, { companyId: company.id, userId: user.id, toStageId: company.pipelineStageId });
 
       if (values.contactFirstName && values.contactLastName) {
         await tx.contact.create({

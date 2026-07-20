@@ -62,6 +62,20 @@ Module Four turns the CRM into a daily-use sales workspace on top of Modules One
 
 Not in Module Four (by design): mapping/route-planning services, real email or calendar integration (activity is recorded only), and advanced conversion/analytics reporting — that's Module Five.
 
+## Module Five: Reporting and Analytics
+
+Module Five turns the CRM's data into management reporting — see `MODULE_5_REPORT.md` for the full report and `REPORT_DEFINITIONS.md` for every metric's numerator/denominator/date-field/permission-scope, and known limitations.
+
+- **A new `/reports` section** (permission-gated) with a dashboard plus dedicated Pipeline, Salespeople, Lead Sources, AI Research, Competitors, Territories, Lead Types, and Trends reports — all built on real Postgres aggregation, never estimated or invented numbers.
+- **`PipelineStageHistory`**: a new append-only table (populated going forward only, no backfill — see `REPORT_DEFINITIONS.md`'s Global Rules for why) makes time-in-stage, stalled-lead detection, stage-to-stage conversion, and win/loss-by-dimension reporting possible without ever parsing the old free-text activity log.
+- **Lead source attribution**: a new `Company.source` field (Manual/AI Research/Import), set once at creation by each of the three existing creation paths — pre-Module-Five companies stay `null` ("unknown"), never guessed.
+- **Report scope is a separate permission tier from lead-edit visibility** (`view_own_reports`/`view_team_reports`/`view_all_reports`) — a user's report access is independent of what leads they can edit.
+- **Full filtering**: date range (Today/Week/Month/Quarter/Year/Custom, resolved against a documented `BUSINESS_TIMEZONE`), territory, lead type, pipeline stage, salesperson, source, competitor, score range, trivia status, active/archived, and won/lost — validated server-side and carried through to exports.
+- **CSV/Excel export** of every report, reusing the existing formula-injection-safe export utility, with the report name, date range, active filters, and generation timestamp always included.
+- **Small-sample honesty**: any rate (win rate, conversion rate) is suppressed in favor of "not enough data" below a documented minimum sample size, and the underlying count is always shown — never a bare, misleading percentage.
+
+Not in Module Five (by design, deferred to Module Six): scheduled/recurring report delivery (a `ScheduledReport`/`GeneratedReport` schema exists and is migrated, but the worker job and CRUD UI were explicitly descoped to ship core reporting sooner — see `MODULE_5_REPORT.md`'s Known Limitations), and query-performance testing at large data volumes (hundreds-of-thousands of rows) beyond what's exercised by the automated test suite.
+
 ## Installation
 
 1. Install [Node.js 20+](https://nodejs.org/), [Docker](https://www.docker.com/) (for local Postgres), and Git.
@@ -98,6 +112,8 @@ A safety guard (`tests/setup/test-db-guard.ts`) refuses to run any destructive t
 - Duplicate candidates are blocked before creation or edit; only an Administrator can override, with explicit confirmation.
 - EOS-1.0 historical score records are append-only — a new score never overwrites a prior one. `Company.currentHistoricalScoreId` is the single source of truth for which record is "current."
 - Existing customers and do-not-contact companies are excluded from active-prospect ranking queries.
+- `PipelineStageHistory` is append-only and populated going forward only (from Module Five's ship date) — there is no backfill for stage changes that happened before then; see `REPORT_DEFINITIONS.md`.
+- `Company.source` (Manual/AI Research/Import) is set once at creation and never changed afterward; pre-Module-Five companies are `null`, never guessed.
 
 ## Permissions
 
@@ -110,6 +126,8 @@ All roles and permission grants are stored in the database (`Role`, `Permission`
 Module Two adds `run_research`, `review_research_results`, `transfer_leads`, and `view_evidence`, alongside Module One's already-seeded `manage_prompts`, `import_leads`, `export_leads`, and `restore_rejected`. Only Administrator is granted these by default — assign them to Manager/Salesperson from Settings → Roles & Permissions as needed.
 
 Module Four adds `bulk_update_leads`, `manage_territories`, `create_shared_views`, and `view_manager_workspace`. Administrator gets all four; Manager gets `bulk_update_leads`, `create_shared_views`, and `view_manager_workspace` by default (not `manage_territories`, matching the existing pattern where other `manage_*` lookup-table permissions are Administrator-only by default); Salesperson gets none of the four (private saved views and personal pipeline access need no new grant). Assigning/reassigning a lead — including a previously-unassigned one — continues to use the existing `reassign_leads` permission; no separate `assign_leads` key was added.
+
+Module Five adds `view_own_reports`, `view_team_reports`, `view_all_reports`, `export_reports`, `manage_scheduled_reports`, `view_ai_costs`, and `view_competitor_reports` — a permission tier independent of lead-edit visibility (see `MODULE_5_REPORT.md`). Administrator gets all seven; Manager gets `view_own_reports`, `view_team_reports`, `export_reports`, and `view_competitor_reports`; Salesperson gets `view_own_reports` only. `manage_scheduled_reports` is seeded and assignable but has no UI yet (scheduled reports are deferred to Module Six).
 
 ## AI research provider
 
