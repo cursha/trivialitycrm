@@ -6,6 +6,8 @@ import { getEnv } from "../env";
 
 export const QUEUE_RUN_SEARCH = "run-search";
 export const QUEUE_GENERATE_REPORT = "generate-report";
+export const QUEUE_SEND_SCHEDULED_EMAIL = "send-scheduled-email";
+export const QUEUE_RUN_SEQUENCE_STEP = "run-sequence-step";
 
 /**
  * Retry/expiry defaults for the run-search queue. expireInSeconds is
@@ -45,6 +47,35 @@ const GENERATE_REPORT_QUEUE_OPTIONS = {
   retentionSeconds: 30 * 24 * 60 * 60,
 };
 
+/**
+ * Same singleton+singletonKey dedup idiom, keyed per EmailMessage id — a
+ * scheduled email offered by two overlapping ticks (worker restart, slow
+ * processing) can only ever have one active job, so it's sent exactly once.
+ */
+const SEND_SCHEDULED_EMAIL_QUEUE_OPTIONS = {
+  policy: "singleton" as const,
+  retryLimit: 2,
+  retryBackoff: true,
+  retryDelayMax: 60,
+  expireInSeconds: 120,
+  retentionSeconds: 30 * 24 * 60 * 60,
+};
+
+/**
+ * Keyed per (enrollmentId, stepId) — the same pair SequenceStepRun's
+ * `@@unique([enrollmentId, stepId])` constraint dedups at the database
+ * level, so a step can be offered by multiple ticks without ever running
+ * twice even under a race between two overlapping job attempts.
+ */
+const RUN_SEQUENCE_STEP_QUEUE_OPTIONS = {
+  policy: "singleton" as const,
+  retryLimit: 2,
+  retryBackoff: true,
+  retryDelayMax: 60,
+  expireInSeconds: 120,
+  retentionSeconds: 30 * 24 * 60 * 60,
+};
+
 let instance: PgBoss | null = null;
 
 /**
@@ -77,6 +108,8 @@ export async function startBoss(options: { supervise?: boolean } = {}): Promise<
   await boss.start();
   await boss.createQueue(QUEUE_RUN_SEARCH, RUN_SEARCH_QUEUE_OPTIONS);
   await boss.createQueue(QUEUE_GENERATE_REPORT, GENERATE_REPORT_QUEUE_OPTIONS);
+  await boss.createQueue(QUEUE_SEND_SCHEDULED_EMAIL, SEND_SCHEDULED_EMAIL_QUEUE_OPTIONS);
+  await boss.createQueue(QUEUE_RUN_SEQUENCE_STEP, RUN_SEQUENCE_STEP_QUEUE_OPTIONS);
   return boss;
 }
 

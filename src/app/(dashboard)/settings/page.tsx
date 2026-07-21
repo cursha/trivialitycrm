@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ListTree, GitBranch, Users, ShieldCheck, XCircle, FileSpreadsheet, MapPin, Mail, FileText, ShieldAlert } from "lucide-react";
+import { ListTree, GitBranch, Users, ShieldCheck, XCircle, FileSpreadsheet, MapPin, Mail, FileText, ShieldAlert, Workflow } from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
 import { PageHeader } from "@/components/ui/page-header";
@@ -53,6 +53,13 @@ export default async function SettingsPage() {
       description: "Reusable email content with placeholders, personal or shared with the team.",
       icon: FileText,
       visible: hasPermission(user, "manage_personal_templates"),
+    },
+    {
+      href: "/settings/sequences",
+      label: "Follow-up Sequences",
+      description: "Multi-step, explicitly-enrolled follow-up campaigns (wait, email, task reminders).",
+      icon: Workflow,
+      visible: hasPermission(user, "manage_sequences"),
     },
     {
       href: "/settings/communication-compliance",

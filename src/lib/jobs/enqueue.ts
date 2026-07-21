@@ -4,10 +4,12 @@
 // execution. Every consumer of this module is itself a server-only context
 // (Server Actions in the web process, or the worker process), same reasoning
 // as src/lib/prisma.ts's identical omission.
-import { startBoss, QUEUE_RUN_SEARCH, QUEUE_GENERATE_REPORT } from "./boss-client";
+import { startBoss, QUEUE_RUN_SEARCH, QUEUE_GENERATE_REPORT, QUEUE_SEND_SCHEDULED_EMAIL, QUEUE_RUN_SEQUENCE_STEP } from "./boss-client";
 
 export type RunSearchJobData = { searchId: string };
 export type GenerateReportJobData = { scheduledReportId: string; periodKey: string };
+export type SendScheduledEmailJobData = { emailMessageId: string };
+export type RunSequenceStepJobData = { enrollmentId: string; stepId: string };
 
 /** Enqueues a durable run-search job and returns pg-boss's job id (stored on
  * LeadSearch.providerJobId for cancellation lookup / log correlation). The
@@ -44,5 +46,29 @@ export async function enqueueGenerateReportJob(scheduledReportId: string, period
     QUEUE_GENERATE_REPORT,
     { scheduledReportId, periodKey } satisfies GenerateReportJobData,
     { singletonKey: `${scheduledReportId}:${periodKey}` },
+  );
+}
+
+/** Enqueues the actual send for one due scheduled EmailMessage.
+ * singletonKey = the message id, so an overlapping tick's duplicate send
+ * for the same still-unprocessed row is a no-op. */
+export async function enqueueSendScheduledEmailJob(emailMessageId: string): Promise<string | null> {
+  const boss = await startBoss({ supervise: false });
+  return boss.send(
+    QUEUE_SEND_SCHEDULED_EMAIL,
+    { emailMessageId } satisfies SendScheduledEmailJobData,
+    { singletonKey: emailMessageId },
+  );
+}
+
+/** Enqueues one sequence step's execution. singletonKey = enrollmentId:stepId
+ * — the same pair SequenceStepRun's own unique constraint dedups at the DB
+ * level, so this is defense in depth, not the only guard. */
+export async function enqueueRunSequenceStepJob(enrollmentId: string, stepId: string): Promise<string | null> {
+  const boss = await startBoss({ supervise: false });
+  return boss.send(
+    QUEUE_RUN_SEQUENCE_STEP,
+    { enrollmentId, stepId } satisfies RunSequenceStepJobData,
+    { singletonKey: `${enrollmentId}:${stepId}` },
   );
 }
