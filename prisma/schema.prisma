@@ -205,6 +205,7 @@ model User {
   emailTemplatesUpdated   EmailTemplate[]         @relation("EmailTemplateUpdater")
   emailMessagesCreated    EmailMessage[]          @relation("EmailMessageCreator")
   notifications           Notification[]
+  consentRecordsRecorded  ConsentRecord[]
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
 }
@@ -493,6 +494,11 @@ model WorkspaceSettings {
   noActivityThresholdDays    Int      @default(14)
   newlyAssignedThresholdDays Int      @default(3)
   updatedAt                  DateTime @updatedAt
+
+  // Module Six Phase B: CAN-SPAM requires a valid physical mailing address
+  // in every commercial email — resolved via the {{sender.mailingAddress}}
+  // template placeholder rather than hardcoded per-template.
+  mailingAddress String?
 }
 
 // A report's filter configuration lives entirely in the existing SavedView
@@ -569,6 +575,19 @@ model Contact {
   emailMessages EmailMessage[]
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+
+  // Module Six Phase B: CASL-safe default-deny — a contact cannot receive
+  // automated/composer email until a ConsentRecord establishes permission.
+  // These two fields are a denormalized "current state" read alongside the
+  // append-only ConsentRecord history, mirroring the exact
+  // Company.currentHistoricalScoreId "current pointer" pattern from Module
+  // One (full history in one table, fast current-state check on the row
+  // itself).
+  emailPermitted    Boolean         @default(false)
+  doNotContact      Boolean         @default(false)
+  unsubscribedAt    DateTime?
+  unsubscribeSource String?
+  consentRecords    ConsentRecord[]
 }
 
 model CompanySource {
@@ -888,7 +907,7 @@ model RateLimitBucket {
   @@index([windowStart])
 }
 
-// ===== Module Six: Communications and Follow-up Automation (Phase A) =====
+// ===== Module Six: Communications and Follow-up Automation (Phases A-B) =====
 
 enum ProviderKind {
   MICROSOFT
@@ -1032,6 +1051,38 @@ model EmailMessage {
   @@index([companyId])
   @@index([contactId])
   @@index([status, scheduledFor])
+}
+
+enum ConsentType {
+  EXPRESS
+  IMPLIED
+  WITHDRAWN
+}
+
+/**
+ * Append-only — mirrors the exact HistoricalScoreRecord pattern from Module
+ * One (full history here; Contact.emailPermitted/doNotContact are the
+ * denormalized "current state" fields computed at write time, same split
+ * as Company.currentHistoricalScoreId). A new record is never deleted or
+ * edited, including a WITHDRAWN one from a self-service unsubscribe click
+ * (recordedById is null in that case — no user performed the action).
+ * This is compliance evidence, not just a status field: source/note/
+ * occurredAt document *why* consent is believed to exist, for CASL/
+ * CAN-SPAM record-keeping.
+ */
+model ConsentRecord {
+  id           String      @id @default(cuid())
+  contactId    String
+  contact      Contact     @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  type         ConsentType
+  source       String
+  note         String?
+  occurredAt   DateTime    @default(now())
+  recordedById String?
+  recordedBy   User?       @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime    @default(now())
+
+  @@index([contactId, occurredAt])
 }
 
 enum NotificationType {

@@ -141,7 +141,12 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             canEdit={canEdit}
           />
 
-          <ContactsPanel companyId={company.id} contacts={company.contacts} canEdit={canEdit} />
+          <ContactsPanel
+            companyId={company.id}
+            contacts={company.contacts}
+            canEdit={canEdit}
+            canManageCompliance={hasPermission(user, "manage_communication_compliance")}
+          />
 
           <div id="tasks-panel">
             <TasksPanel companyId={company.id} tasks={tasks} salespeople={salespeople} canManage={canEdit} />

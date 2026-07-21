@@ -15,6 +15,7 @@ const REQUIRED_KEYS = [
   "SEED_ADMIN_EMAIL",
   "SEED_ADMIN_PASSWORD",
   "TOKEN_ENCRYPTION_KEY",
+  "UNSUBSCRIBE_TOKEN_SECRET",
   "MICROSOFT_CLIENT_ID",
   "MICROSOFT_CLIENT_SECRET",
   "GOOGLE_CLIENT_ID",
@@ -206,6 +207,17 @@ describe("getEnv", () => {
     expect(() => getEnv()).toThrow(/TOKEN_ENCRYPTION_KEY/);
   });
 
+  it("requires UNSUBSCRIBE_TOKEN_SECRET when NODE_ENV is production", () => {
+    for (const key of REQUIRED_KEYS) delete process.env[key];
+    setNodeEnv("production");
+    process.env.DATABASE_URL = "postgresql://user:pass@localhost:5432/db";
+    process.env.APP_URL = "https://crm.example.com";
+    process.env.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY = "a-stable-key";
+    process.env.TOKEN_ENCRYPTION_KEY = "a-stable-key";
+
+    expect(() => getEnv()).toThrow(/UNSUBSCRIBE_TOKEN_SECRET/);
+  });
+
   it("requires MICROSOFT_CLIENT_ID and MICROSOFT_CLIENT_SECRET to be set together", () => {
     for (const key of REQUIRED_KEYS) delete process.env[key];
     setNodeEnv("test");
@@ -231,6 +243,7 @@ describe("getEnv", () => {
     process.env.APP_URL = "https://crm.example.com";
     process.env.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY = "a-stable-key";
     process.env.TOKEN_ENCRYPTION_KEY = "a-stable-key";
+    process.env.UNSUBSCRIBE_TOKEN_SECRET = "a-stable-key";
 
     expect(() => getEnv()).not.toThrow();
   });

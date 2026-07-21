@@ -24,6 +24,7 @@ const TABLES_TO_RESET = [
   "Activity",
   "EvidenceRecord",
   "HistoricalScoreRecord",
+  "ConsentRecord",
   "Contact",
   "CompanySource",
   "AiUsageRecord",

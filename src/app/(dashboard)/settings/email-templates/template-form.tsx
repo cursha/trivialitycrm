@@ -89,10 +89,16 @@ export function TemplateForm({
       </div>
       <div className="sm:col-span-2">
         <Label>Body</Label>
-        <Textarea name="body" required rows={8} className="mt-1" defaultValue={defaultValues?.body} />
+        <Textarea
+          name="body"
+          required
+          rows={8}
+          className="mt-1"
+          defaultValue={defaultValues?.body ?? "\n\nUnsubscribe: {{unsubscribeLink}}"}
+        />
         <HelpText className="mt-1">
           Placeholders: {KNOWN_PLACEHOLDERS.map((token) => `{{${token}}}`).join(", ")}. An unresolved placeholder blocks sending
-          rather than going out blank.
+          rather than going out blank. {"{{unsubscribeLink}}"} is required in every template.
         </HelpText>
       </div>
 

@@ -2,10 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Pencil, Trash2, CirclePlus } from "lucide-react";
 import { createContact, updateContact, deleteContact } from "./actions";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/field";
+import { Badge } from "@/components/ui/badge";
 
 export type ContactRow = {
   id: string;
@@ -14,9 +16,27 @@ export type ContactRow = {
   title: string | null;
   phone: string | null;
   email: string | null;
+  emailPermitted: boolean;
+  doNotContact: boolean;
 };
 
-export function ContactsPanel({ companyId, contacts, canEdit }: { companyId: string; contacts: ContactRow[]; canEdit: boolean }) {
+function consentBadge(contact: ContactRow) {
+  if (contact.doNotContact) return <Badge tone="danger">Do Not Contact</Badge>;
+  if (contact.emailPermitted) return <Badge tone="success">Email Permitted</Badge>;
+  return <Badge tone="neutral">Email Not Permitted</Badge>;
+}
+
+export function ContactsPanel({
+  companyId,
+  contacts,
+  canEdit,
+  canManageCompliance,
+}: {
+  companyId: string;
+  contacts: ContactRow[];
+  canEdit: boolean;
+  canManageCompliance: boolean;
+}) {
   const router = useRouter();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -113,6 +133,17 @@ export function ContactsPanel({ companyId, contacts, canEdit }: { companyId: str
                   {contact.title && <span className="ml-2 font-normal text-text-muted">{contact.title}</span>}
                 </p>
                 <p className="text-text-muted">{[contact.phone, contact.email].filter(Boolean).join(" · ")}</p>
+                <div className="mt-1 flex items-center gap-2">
+                  {consentBadge(contact)}
+                  {canManageCompliance && (
+                    <Link
+                      href={`/settings/communication-compliance?q=${encodeURIComponent(contact.email ?? `${contact.firstName} ${contact.lastName}`)}`}
+                      className="text-xs text-secondary hover:underline"
+                    >
+                      Manage consent
+                    </Link>
+                  )}
+                </div>
               </div>
               {canEdit && (
                 <div className="flex gap-1">

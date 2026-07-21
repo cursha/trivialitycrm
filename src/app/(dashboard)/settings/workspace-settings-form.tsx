@@ -3,13 +3,13 @@
 import { useActionState } from "react";
 import { updateWorkspaceSettings } from "./actions";
 import { Card, SectionHeading } from "@/components/ui/card";
-import { Label, Input, HelpText, FieldError } from "@/components/ui/field";
+import { Label, Input, Textarea, HelpText, FieldError } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 
 export function WorkspaceSettingsForm({
   defaultValues,
 }: {
-  defaultValues: { noActivityThresholdDays: number; newlyAssignedThresholdDays: number };
+  defaultValues: { noActivityThresholdDays: number; newlyAssignedThresholdDays: number; mailingAddress: string | null };
 }) {
   const [state, action, pending] = useActionState(updateWorkspaceSettings, undefined);
 
@@ -45,6 +45,20 @@ export function WorkspaceSettingsForm({
             className="mt-1"
           />
           <HelpText className="mt-1">A lead assigned within this many days counts as &quot;newly assigned.&quot;</HelpText>
+        </div>
+        <div className="sm:col-span-2">
+          <Label>Mailing address</Label>
+          <Textarea
+            name="mailingAddress"
+            rows={2}
+            defaultValue={defaultValues.mailingAddress ?? ""}
+            placeholder="123 Main St, Springfield, ON, Canada"
+            className="mt-1"
+          />
+          <HelpText className="mt-1">
+            CAN-SPAM requires a valid physical mailing address in every commercial email — resolved via the{" "}
+            <code>{"{{sender.mailingAddress}}"}</code> template placeholder.
+          </HelpText>
         </div>
         {state?.error && (
           <div className="sm:col-span-2">

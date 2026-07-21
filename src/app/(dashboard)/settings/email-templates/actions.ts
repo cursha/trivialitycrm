@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission, hasPermission } from "@/lib/auth/permissions";
 import type { AuthenticatedUser } from "@/lib/auth/current-user";
 import { formString } from "@/lib/form-data";
-import { unknownPlaceholderTokens } from "@/lib/comms/templates";
+import { unknownPlaceholderTokens, hasUnsubscribePlaceholder } from "@/lib/comms/templates";
 
 export type ActionResult = { error?: string } | undefined;
 
@@ -42,6 +42,13 @@ function validateFields(formData: FormData): { error: string } | {
   const unknownTokens = [...unknownPlaceholderTokens(subject), ...unknownPlaceholderTokens(body)];
   if (unknownTokens.length > 0) {
     return { error: `Unknown placeholder(s): ${[...new Set(unknownTokens)].map((t) => `{{${t}}}`).join(", ")}` };
+  }
+
+  // CAN-SPAM requires a working unsubscribe mechanism in every commercial
+  // email — a template cannot be saved without this placeholder, so it can
+  // never be silently omitted from a send that uses it.
+  if (!hasUnsubscribePlaceholder(body)) {
+    return { error: "The body must include the {{unsubscribeLink}} placeholder." };
   }
 
   return {
