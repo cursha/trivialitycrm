@@ -169,45 +169,47 @@ enum ImportBatchStatus {
 }
 
 model User {
-  id                      String                  @id @default(cuid())
-  name                    String
-  email                   String                  @unique
-  passwordHash            String
-  mustChangePassword      Boolean                 @default(false)
-  disabled                Boolean                 @default(false)
-  failedLoginAttempts     Int                     @default(0)
-  lockedUntil             DateTime?
-  roleId                  String
-  teamId                  String?
-  role                    Role                    @relation(fields: [roleId], references: [id])
-  team                    Team?                   @relation(fields: [teamId], references: [id])
-  sessions                Session[]
-  assignedCompanies       Company[]               @relation("AssignedSalesperson")
-  createdCompanies        Company[]               @relation("CompanyCreator")
-  updatedCompanies        Company[]               @relation("CompanyUpdater")
-  archivedCompanies       Company[]               @relation("CompanyArchiver")
-  activities              Activity[]
-  tasks                   Task[]                  @relation("TaskAssignee")
-  prompts                 PromptTemplate[]
-  searches                LeadSearch[]
-  importTemplates         ImportTemplate[]
-  createdEvidence         EvidenceRecord[]        @relation("EvidenceCreator")
-  scoredHistoricalRecords HistoricalScoreRecord[] @relation("ScoreAuthor")
-  importBatches           ImportBatch[]
-  aiUsageRecords          AiUsageRecord[]
-  territories             Territory[]             @relation("TerritoryAssignee")
-  savedViews              SavedView[]
-  stageHistoryChanges     PipelineStageHistory[]
-  scheduledReports        ScheduledReport[]
-  providerConnection      ProviderConnection?
-  emailTemplatesOwned     EmailTemplate[]         @relation("EmailTemplateOwner")
-  emailTemplatesCreated   EmailTemplate[]         @relation("EmailTemplateCreator")
-  emailTemplatesUpdated   EmailTemplate[]         @relation("EmailTemplateUpdater")
-  emailMessagesCreated    EmailMessage[]          @relation("EmailMessageCreator")
-  notifications           Notification[]
-  consentRecordsRecorded  ConsentRecord[]
-  createdAt               DateTime                @default(now())
-  updatedAt               DateTime                @updatedAt
+  id                       String                  @id @default(cuid())
+  name                     String
+  email                    String                  @unique
+  passwordHash             String
+  mustChangePassword       Boolean                 @default(false)
+  disabled                 Boolean                 @default(false)
+  failedLoginAttempts      Int                     @default(0)
+  lockedUntil              DateTime?
+  roleId                   String
+  teamId                   String?
+  role                     Role                    @relation(fields: [roleId], references: [id])
+  team                     Team?                   @relation(fields: [teamId], references: [id])
+  sessions                 Session[]
+  assignedCompanies        Company[]               @relation("AssignedSalesperson")
+  createdCompanies         Company[]               @relation("CompanyCreator")
+  updatedCompanies         Company[]               @relation("CompanyUpdater")
+  archivedCompanies        Company[]               @relation("CompanyArchiver")
+  activities               Activity[]
+  tasks                    Task[]                  @relation("TaskAssignee")
+  prompts                  PromptTemplate[]
+  searches                 LeadSearch[]
+  importTemplates          ImportTemplate[]
+  createdEvidence          EvidenceRecord[]        @relation("EvidenceCreator")
+  scoredHistoricalRecords  HistoricalScoreRecord[] @relation("ScoreAuthor")
+  importBatches            ImportBatch[]
+  aiUsageRecords           AiUsageRecord[]
+  territories              Territory[]             @relation("TerritoryAssignee")
+  savedViews               SavedView[]
+  stageHistoryChanges      PipelineStageHistory[]
+  scheduledReports         ScheduledReport[]
+  providerConnection       ProviderConnection?
+  emailTemplatesOwned      EmailTemplate[]         @relation("EmailTemplateOwner")
+  emailTemplatesCreated    EmailTemplate[]         @relation("EmailTemplateCreator")
+  emailTemplatesUpdated    EmailTemplate[]         @relation("EmailTemplateUpdater")
+  emailMessagesCreated     EmailMessage[]          @relation("EmailMessageCreator")
+  notifications            Notification[]
+  consentRecordsRecorded   ConsentRecord[]
+  followUpSequencesCreated FollowUpSequence[]
+  sequenceEnrollmentsMade  SequenceEnrollment[]
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime                @updatedAt
 }
 
 model Session {
@@ -272,9 +274,10 @@ model PipelineStage {
   outcomeType PipelineStageOutcome?
   companies   Company[]
 
-  historyFrom    PipelineStageHistory[] @relation("StageHistoryFrom")
-  historyTo      PipelineStageHistory[] @relation("StageHistoryTo")
-  emailTemplates EmailTemplate[]
+  historyFrom       PipelineStageHistory[] @relation("StageHistoryFrom")
+  historyTo         PipelineStageHistory[] @relation("StageHistoryTo")
+  emailTemplates    EmailTemplate[]
+  followUpSequences FollowUpSequence[]
 }
 
 model RejectionReason {
@@ -384,15 +387,16 @@ model Company {
   historicalScores         HistoricalScoreRecord[] @relation("CompanyScoreHistory")
   evidenceRecords          EvidenceRecord[]
 
-  contacts      Contact[]
-  activities    Activity[]
-  tasks         Task[]
-  sources       CompanySource[]
-  searchResults SearchResult[]
-  stageHistory  PipelineStageHistory[]
-  emailMessages EmailMessage[]
-  createdAt     DateTime               @default(now())
-  updatedAt     DateTime               @updatedAt
+  contacts            Contact[]
+  activities          Activity[]
+  tasks               Task[]
+  sources             CompanySource[]
+  searchResults       SearchResult[]
+  stageHistory        PipelineStageHistory[]
+  emailMessages       EmailMessage[]
+  sequenceEnrollments SequenceEnrollment[]
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
 
   @@index([normalizedName])
   @@index([websiteDomain])
@@ -588,6 +592,8 @@ model Contact {
   unsubscribedAt    DateTime?
   unsubscribeSource String?
   consentRecords    ConsentRecord[]
+
+  sequenceEnrollments SequenceEnrollment[]
 }
 
 model CompanySource {
@@ -988,6 +994,7 @@ model EmailTemplate {
   updatedAt       DateTime                @updatedAt
 
   emailMessages EmailMessage[]
+  sequenceSteps SequenceStep[]
 
   @@index([visibility, active])
   @@index([ownerId])
@@ -1048,6 +1055,8 @@ model EmailMessage {
   createdBy            User?               @relation("EmailMessageCreator", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt            DateTime            @default(now())
 
+  sequenceStepRun SequenceStepRun?
+
   @@index([companyId])
   @@index([contactId])
   @@index([status, scheduledFor])
@@ -1083,6 +1092,144 @@ model ConsentRecord {
   createdAt    DateTime    @default(now())
 
   @@index([contactId, occurredAt])
+}
+
+// ===== Module Six Phase C: scheduling and follow-up sequences =====
+
+enum SequenceStepType {
+  WAIT
+  EMAIL
+  TASK
+  CALL_REMINDER
+  DEMO_REMINDER
+  TRIAL_FOLLOWUP
+}
+
+/**
+ * A table-driven, admin-authored step list — never generated or recursive
+ * — so a sequence terminates in at most `steps.length` ticks-worth of
+ * processing (see the approved plan's "no uncontrolled loops" requirement).
+ * WAIT has no side effect of its own; it only delays how long after the
+ * previous step the next actionable (EMAIL/TASK-like) step becomes due —
+ * see src/lib/comms/sequences.ts for the due-date computation. The other
+ * five types are "actionable": EMAIL sends via the same sendEmail() gate
+ * every other send path shares; the four TASK-like types create a real
+ * Task row (src/app/(dashboard)/companies/[id]/tasks), reusing the
+ * existing follow-up infrastructure rather than a parallel one.
+ */
+model SequenceStep {
+  id         String           @id @default(cuid())
+  sequenceId String
+  sequence   FollowUpSequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  stepOrder  Int
+  type       SequenceStepType
+
+  waitDays        Int?
+  emailTemplateId String?
+  emailTemplate   EmailTemplate? @relation(fields: [emailTemplateId], references: [id], onDelete: SetNull)
+  taskTitle       String?
+  taskNotes       String?        @db.Text
+
+  stepRuns SequenceStepRun[]
+
+  @@unique([sequenceId, stepOrder])
+}
+
+/**
+ * A sequence-level (not per-step) stop condition: reaching this pipeline
+ * stage ends every active enrollment in this sequence, checked by the tick
+ * before running any step (src/lib/comms/sequences.ts). Kept at the
+ * sequence level rather than duplicated per step — the plan's schema
+ * sketch put this on SequenceStep, but "which stage ends the sequence" is
+ * one decision per sequence, not one the author should have to repeat on
+ * every step.
+ */
+model FollowUpSequence {
+  id                    String         @id @default(cuid())
+  name                  String
+  active                Boolean        @default(true)
+  stopOnPipelineStageId String?
+  stopOnPipelineStage   PipelineStage? @relation(fields: [stopOnPipelineStageId], references: [id], onDelete: SetNull)
+  createdById           String
+  createdBy             User           @relation(fields: [createdById], references: [id])
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  steps       SequenceStep[]
+  enrollments SequenceEnrollment[]
+}
+
+enum SequenceEnrollmentStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+  STOPPED_OPT_OUT
+  STOPPED_STAGE
+  STOPPED_REPLY
+}
+
+/**
+ * Explicit enrollment only — created by a user action after previewing
+ * every step (no automatic/batch enrollment path anywhere in this schema).
+ * `currentStepOrder` always points at the next actionable step to run;
+ * `nextStepDueAt` is when the tick should run it. `STOPPED_REPLY` exists
+ * on the enum for schema completeness across the whole plan but is
+ * unreachable until Phase D adds inbound reply detection — this phase can
+ * only ever produce STOPPED_OPT_OUT/STOPPED_STAGE, never STOPPED_REPLY.
+ */
+model SequenceEnrollment {
+  id         String                   @id @default(cuid())
+  sequenceId String
+  sequence   FollowUpSequence         @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  companyId  String
+  company    Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contactId  String?
+  contact    Contact?                 @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  status     SequenceEnrollmentStatus @default(ACTIVE)
+
+  currentStepOrder Int
+  nextStepDueAt    DateTime?
+
+  enrolledById String
+  enrolledBy   User      @relation(fields: [enrolledById], references: [id])
+  enrolledAt   DateTime  @default(now())
+  stoppedAt    DateTime?
+  stopReason   String?
+
+  stepRuns SequenceStepRun[]
+
+  @@index([status, nextStepDueAt])
+}
+
+enum SequenceStepRunStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  SKIPPED
+}
+
+/**
+ * One row per attempted step, `@@unique([enrollmentId, stepId])` — the
+ * duplicate-send-prevention mechanism, playing the exact role Module
+ * Five's pg-boss `singletonKey` dedup plays for scheduled reports: a step
+ * can be offered by multiple ticks (worker restart, slow processing)
+ * without ever executing twice, without new locking code.
+ */
+model SequenceStepRun {
+  id           String                @id @default(cuid())
+  enrollmentId String
+  enrollment   SequenceEnrollment    @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  stepId       String
+  step         SequenceStep          @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  status       SequenceStepRunStatus @default(PENDING)
+  runAt        DateTime              @default(now())
+
+  emailMessageId String?       @unique
+  emailMessage   EmailMessage? @relation(fields: [emailMessageId], references: [id], onDelete: SetNull)
+  errorMessage   String?
+
+  @@unique([enrollmentId, stepId])
 }
 
 enum NotificationType {

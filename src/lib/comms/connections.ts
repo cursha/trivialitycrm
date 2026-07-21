@@ -1,4 +1,3 @@
-import "server-only";
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import { encryptToken, decryptToken } from "@/lib/comms/token-crypto";
@@ -6,11 +5,17 @@ import { getEmailProvider } from "@/lib/comms/providers/factory";
 import { providerSlugFromKind } from "@/lib/comms/provider-kind";
 import type { ConnectedAccount } from "@/lib/comms/providers/types";
 
-// This file (unlike token-crypto.ts/the provider files) IS server-only —
-// it's only ever called from web Server Actions/pages, never from the
-// worker (the worker resolves a usable access token itself, inline in its
-// send-job handler, since it needs the refresh-and-persist behavior below
-// applied per-job rather than through this settings-page-oriented module).
+// No `import "server-only"` — Phase A's doc comment here assumed the
+// worker would resolve tokens through its own inline logic, but Phase C's
+// scheduled-send and sequence-step worker handlers call sendEmail()
+// (src/lib/comms/send-email.ts) directly, which calls getUsableAccessToken()
+// below — confirmed by an actual worker crash during this phase's build
+// testing ("This module cannot be imported from a Client Component
+// module"), the same class of bug the Module Five server-only lesson
+// documents. disconnectMailbox()/getConnectionStatus() remain web-only in
+// practice (only ever called from the settings page), but there's no
+// benefit to splitting them into a separate file just to keep a guard
+// that costs nothing to drop.
 
 /**
  * Revokes the connection with the provider on a best-effort basis (Google

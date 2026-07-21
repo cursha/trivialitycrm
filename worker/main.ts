@@ -3,11 +3,22 @@ import { promisify } from "node:util";
 import http from "node:http";
 import { getEnv } from "../src/lib/env";
 import { logger } from "../src/lib/logger";
-import { getBoss, startBoss, QUEUE_RUN_SEARCH, QUEUE_GENERATE_REPORT } from "../src/lib/jobs/boss-client";
+import {
+  getBoss,
+  startBoss,
+  QUEUE_RUN_SEARCH,
+  QUEUE_GENERATE_REPORT,
+  QUEUE_SEND_SCHEDULED_EMAIL,
+  QUEUE_RUN_SEQUENCE_STEP,
+} from "../src/lib/jobs/boss-client";
 import { handleRunSearchJob } from "./handlers/run-search";
 import { sweepExpiredSessions, sweepExpiredImportBatches, sweepExpiredRateLimitBuckets } from "./handlers/cleanup";
 import { runReportsTick } from "./handlers/reports-tick";
 import { handleGenerateReportJob } from "./handlers/generate-report";
+import { runSendScheduledEmailTick } from "./handlers/send-scheduled-email-tick";
+import { handleSendScheduledEmailJob } from "./handlers/send-scheduled-email";
+import { runSequenceTick } from "./handlers/sequence-tick";
+import { handleRunSequenceStepJob } from "./handlers/run-sequence-step";
 import { shutdownBoss } from "./shutdown";
 
 const execAsync = promisify(exec);
@@ -16,6 +27,8 @@ const QUEUE_CLEANUP_SESSIONS = "cleanup-sessions";
 const QUEUE_CLEANUP_IMPORT_BATCHES = "cleanup-import-batches";
 const QUEUE_CLEANUP_RATE_LIMIT_BUCKETS = "cleanup-rate-limit-buckets";
 const QUEUE_REPORTS_TICK = "reports-tick";
+const QUEUE_SEND_SCHEDULED_EMAIL_TICK = "send-scheduled-email-tick";
+const QUEUE_SEQUENCE_TICK = "sequence-tick";
 const MIGRATION_GATE_POLL_MS = 5_000;
 const MIGRATION_GATE_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -99,8 +112,18 @@ async function main(): Promise<void> {
   await boss.createQueue(QUEUE_REPORTS_TICK, { retryLimit: 1 });
   await boss.schedule(QUEUE_REPORTS_TICK, "0 * * * *");
 
+  // Every 5 minutes, not hourly like reports-tick — a "send at 2pm" user
+  // expectation of timeliness that report generation doesn't have.
+  await boss.createQueue(QUEUE_SEND_SCHEDULED_EMAIL_TICK, { retryLimit: 1 });
+  await boss.schedule(QUEUE_SEND_SCHEDULED_EMAIL_TICK, "*/5 * * * *");
+
+  await boss.createQueue(QUEUE_SEQUENCE_TICK, { retryLimit: 1 });
+  await boss.schedule(QUEUE_SEQUENCE_TICK, "*/5 * * * *");
+
   await boss.work(QUEUE_RUN_SEARCH, { localConcurrency: 1 }, handleRunSearchJob);
   await boss.work(QUEUE_GENERATE_REPORT, { localConcurrency: 1 }, handleGenerateReportJob);
+  await boss.work(QUEUE_SEND_SCHEDULED_EMAIL, { localConcurrency: 1 }, handleSendScheduledEmailJob);
+  await boss.work(QUEUE_RUN_SEQUENCE_STEP, { localConcurrency: 1 }, handleRunSequenceStepJob);
   await boss.work(QUEUE_CLEANUP_SESSIONS, async () => {
     await sweepExpiredSessions();
   });
@@ -112,6 +135,12 @@ async function main(): Promise<void> {
   });
   await boss.work(QUEUE_REPORTS_TICK, async () => {
     await runReportsTick();
+  });
+  await boss.work(QUEUE_SEND_SCHEDULED_EMAIL_TICK, async () => {
+    await runSendScheduledEmailTick();
+  });
+  await boss.work(QUEUE_SEQUENCE_TICK, async () => {
+    await runSequenceTick();
   });
 
   boss.on("error", (error) => logger.error({ err: error }, "pg-boss error"));

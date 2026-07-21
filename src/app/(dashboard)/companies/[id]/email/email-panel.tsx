@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CirclePlus, Mail } from "lucide-react";
-import { sendComposedEmail } from "./actions";
+import { sendComposedEmail, cancelComposedScheduledEmail } from "./actions";
 import { Card } from "@/components/ui/card";
 import { Label, Input, Select, Textarea, FieldError } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +28,7 @@ export type EmailMessageRow = {
   toAddresses: string[];
   status: string;
   sentAt: string | null;
+  scheduledFor: string | null;
   errorMessage: string | null;
   createdAt: string;
 };
@@ -35,18 +36,47 @@ export type EmailMessageRow = {
 export type TemplateOption = { id: string; name: string; subject: string; body: string };
 export type ContactOption = { id: string; name: string; email: string };
 
+function ScheduledMessageActions({ companyId, messageId }: { companyId: string; messageId: string }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  function handleCancel() {
+    if (!window.confirm("Cancel this scheduled email?")) return;
+    startTransition(async () => {
+      const result = await cancelComposedScheduledEmail(companyId, messageId);
+      if (result?.error) {
+        setError(result.error);
+      } else {
+        router.refresh();
+      }
+    });
+  }
+
+  return (
+    <>
+      <button type="button" disabled={isPending} onClick={handleCancel} className="mt-1 text-xs font-semibold text-danger hover:underline">
+        Cancel send
+      </button>
+      {error && <p className="mt-1 text-xs font-semibold text-danger">{error}</p>}
+    </>
+  );
+}
+
 export function EmailPanel({
   companyId,
   messages,
   templates,
   contacts,
   canSend,
+  canSchedule,
 }: {
   companyId: string;
   messages: EmailMessageRow[];
   templates: TemplateOption[];
   contacts: ContactOption[];
   canSend: boolean;
+  canSchedule: boolean;
 }) {
   const router = useRouter();
   const [composing, setComposing] = useState(false);
@@ -56,6 +86,7 @@ export function EmailPanel({
   const [templateId, setTemplateId] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [sendAt, setSendAt] = useState("");
 
   const selectedContact = contacts.find((c) => c.id === contactId);
 
@@ -80,6 +111,7 @@ export function EmailPanel({
         setBody("");
         setContactId("");
         setTemplateId("");
+        setSendAt("");
         router.refresh();
       }
     });
@@ -160,6 +192,19 @@ export function EmailPanel({
             <Textarea name="body" required rows={6} value={body} onChange={(e) => setBody(e.target.value)} className="mt-1 py-1.5" />
           </div>
 
+          {canSchedule && (
+            <div>
+              <Label className="text-xs">Send at (optional — leave blank to send now)</Label>
+              <Input
+                type="datetime-local"
+                name="sendAt"
+                value={sendAt}
+                onChange={(e) => setSendAt(e.target.value)}
+                className="mt-1 py-1.5"
+              />
+            </div>
+          )}
+
           {error && <FieldError>{error}</FieldError>}
 
           <div className="flex gap-2">
@@ -168,7 +213,7 @@ export function EmailPanel({
               disabled={isPending}
               className="rounded bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-50"
             >
-              {isPending ? "Sending..." : "Send email"}
+              {isPending ? "Sending..." : sendAt ? "Schedule email" : "Send email"}
             </button>
             <button
               type="button"
@@ -195,9 +240,13 @@ export function EmailPanel({
                 <Badge tone={toneFor(STATUS_TONE, message.status)}>{message.status}</Badge>
               </div>
               <p className="text-xs text-text-muted">
-                To {message.toAddresses.join(", ")} · {new Date(message.sentAt ?? message.createdAt).toLocaleString()}
+                To {message.toAddresses.join(", ")} ·{" "}
+                {message.status === "SCHEDULED" && message.scheduledFor
+                  ? `scheduled for ${new Date(message.scheduledFor).toLocaleString()}`
+                  : new Date(message.sentAt ?? message.createdAt).toLocaleString()}
               </p>
               {message.errorMessage && <p className="mt-1 text-xs font-semibold text-danger">{message.errorMessage}</p>}
+              {message.status === "SCHEDULED" && canSchedule && <ScheduledMessageActions companyId={companyId} messageId={message.id} />}
             </li>
           ))}
         </ol>

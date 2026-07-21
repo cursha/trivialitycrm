@@ -13,6 +13,8 @@ import { TasksPanel } from "./tasks/tasks-panel";
 import { ScorePanel } from "./eos/score-panel";
 import { EvidencePanel } from "./eos/evidence-panel";
 import { EmailPanel } from "./email/email-panel";
+import { SequenceEnrollmentPanel } from "./sequences/sequence-enrollment-panel";
+import { previewSteps } from "@/lib/comms/sequences";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TRIVIA_STATUS_LABEL } from "@/lib/ui/status-tones";
@@ -33,24 +35,34 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const company = await getScopedCompany(user, id);
   if (!company) notFound();
 
-  const [activities, tasks, salespeople, evidence, scoreHistory, pipelineStages, emailMessages, emailTemplates] = await Promise.all([
-    listCompanyActivities(user, id),
-    listCompanyTasks(user, id),
-    prisma.user.findMany({ where: { disabled: false }, orderBy: { name: "asc" } }),
-    listCompanyEvidence(user, id),
-    listCompanyScoreHistory(user, id),
-    prisma.pipelineStage.findMany({ orderBy: { sortOrder: "asc" } }),
-    prisma.emailMessage.findMany({
-      where: { companyId: id },
-      orderBy: { createdAt: "desc" },
-      select: { id: true, subject: true, toAddresses: true, status: true, sentAt: true, errorMessage: true, createdAt: true },
-    }),
-    prisma.emailTemplate.findMany({
-      where: { active: true, OR: [{ visibility: "SHARED" }, { ownerId: user.id }] },
-      orderBy: { name: "asc" },
-      select: { id: true, name: true, subject: true, body: true },
-    }),
-  ]);
+  const [activities, tasks, salespeople, evidence, scoreHistory, pipelineStages, emailMessages, emailTemplates, activeSequences, enrollments] =
+    await Promise.all([
+      listCompanyActivities(user, id),
+      listCompanyTasks(user, id),
+      prisma.user.findMany({ where: { disabled: false }, orderBy: { name: "asc" } }),
+      listCompanyEvidence(user, id),
+      listCompanyScoreHistory(user, id),
+      prisma.pipelineStage.findMany({ orderBy: { sortOrder: "asc" } }),
+      prisma.emailMessage.findMany({
+        where: { companyId: id },
+        orderBy: { createdAt: "desc" },
+        select: { id: true, subject: true, toAddresses: true, status: true, sentAt: true, scheduledFor: true, errorMessage: true, createdAt: true },
+      }),
+      prisma.emailTemplate.findMany({
+        where: { active: true, OR: [{ visibility: "SHARED" }, { ownerId: user.id }] },
+        orderBy: { name: "asc" },
+        select: { id: true, name: true, subject: true, body: true },
+      }),
+      prisma.followUpSequence.findMany({
+        where: { active: true },
+        include: { steps: { orderBy: { stepOrder: "asc" }, include: { emailTemplate: { select: { name: true } } } } },
+      }),
+      prisma.sequenceEnrollment.findMany({
+        where: { companyId: id },
+        orderBy: { enrolledAt: "desc" },
+        include: { sequence: { select: { name: true, steps: { select: { id: true } } } } },
+      }),
+    ]);
   const canEdit = hasPermission(user, "edit_leads");
 
   return (
@@ -164,6 +176,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               toAddresses: m.toAddresses,
               status: m.status,
               sentAt: m.sentAt?.toISOString() ?? null,
+              scheduledFor: m.scheduledFor?.toISOString() ?? null,
               errorMessage: m.errorMessage,
               createdAt: m.createdAt.toISOString(),
             }))}
@@ -172,6 +185,31 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               .filter((c) => c.email)
               .map((c) => ({ id: c.id, name: `${c.firstName} ${c.lastName}`, email: c.email as string }))}
             canSend={hasPermission(user, "send_email")}
+            canSchedule={hasPermission(user, "schedule_email")}
+          />
+
+          <SequenceEnrollmentPanel
+            companyId={company.id}
+            sequences={activeSequences.map((sequence) => ({
+              id: sequence.id,
+              name: sequence.name,
+              hasEmailStep: sequence.steps.some((s) => s.type === "EMAIL"),
+              preview: previewSteps(
+                sequence.steps,
+                Object.fromEntries(sequence.steps.filter((s) => s.emailTemplate).map((s) => [s.id, s.emailTemplate!.name])),
+              ).map((entry) => `Day ${entry.cumulativeDays}: ${entry.label}`),
+            }))}
+            contacts={company.contacts.map((c) => ({ id: c.id, name: `${c.firstName} ${c.lastName}` }))}
+            enrollments={enrollments.map((enrollment) => ({
+              id: enrollment.id,
+              sequenceName: enrollment.sequence.name,
+              status: enrollment.status,
+              currentStepOrder: enrollment.currentStepOrder,
+              totalSteps: enrollment.sequence.steps.length,
+              nextStepDueAt: enrollment.nextStepDueAt?.toISOString() ?? null,
+              stopReason: enrollment.stopReason,
+            }))}
+            canEnroll={hasPermission(user, "enroll_in_sequences")}
           />
         </div>
 
