@@ -14,6 +14,11 @@ const REQUIRED_KEYS = [
   "SENTRY_DSN",
   "SEED_ADMIN_EMAIL",
   "SEED_ADMIN_PASSWORD",
+  "TOKEN_ENCRYPTION_KEY",
+  "MICROSOFT_CLIENT_ID",
+  "MICROSOFT_CLIENT_SECRET",
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
 ] as const;
 
 function snapshotEnv(): Record<string, string | undefined> {
@@ -186,8 +191,37 @@ describe("getEnv", () => {
     setNodeEnv("production");
     process.env.DATABASE_URL = "postgresql://user:pass@localhost:5432/db";
     process.env.APP_URL = "https://crm.example.com";
+    process.env.TOKEN_ENCRYPTION_KEY = "a-stable-key";
 
     expect(() => getEnv()).toThrow(/NEXT_SERVER_ACTIONS_ENCRYPTION_KEY/);
+  });
+
+  it("requires TOKEN_ENCRYPTION_KEY when NODE_ENV is production", () => {
+    for (const key of REQUIRED_KEYS) delete process.env[key];
+    setNodeEnv("production");
+    process.env.DATABASE_URL = "postgresql://user:pass@localhost:5432/db";
+    process.env.APP_URL = "https://crm.example.com";
+    process.env.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY = "a-stable-key";
+
+    expect(() => getEnv()).toThrow(/TOKEN_ENCRYPTION_KEY/);
+  });
+
+  it("requires MICROSOFT_CLIENT_ID and MICROSOFT_CLIENT_SECRET to be set together", () => {
+    for (const key of REQUIRED_KEYS) delete process.env[key];
+    setNodeEnv("test");
+    process.env.DATABASE_URL = "postgresql://user:pass@localhost:5432/db";
+    process.env.MICROSOFT_CLIENT_ID = "client-id-only";
+
+    expect(() => getEnv()).toThrow(/MICROSOFT_CLIENT_ID/);
+  });
+
+  it("requires GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to be set together", () => {
+    for (const key of REQUIRED_KEYS) delete process.env[key];
+    setNodeEnv("test");
+    process.env.DATABASE_URL = "postgresql://user:pass@localhost:5432/db";
+    process.env.GOOGLE_CLIENT_SECRET = "secret-only";
+
+    expect(() => getEnv()).toThrow(/GOOGLE_CLIENT_ID/);
   });
 
   it("passes a full production-shaped environment", () => {
@@ -196,6 +230,7 @@ describe("getEnv", () => {
     process.env.DATABASE_URL = "postgresql://user:pass@localhost:5432/db";
     process.env.APP_URL = "https://crm.example.com";
     process.env.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY = "a-stable-key";
+    process.env.TOKEN_ENCRYPTION_KEY = "a-stable-key";
 
     expect(() => getEnv()).not.toThrow();
   });

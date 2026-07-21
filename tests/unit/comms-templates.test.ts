@@ -1,0 +1,64 @@
+import { describe, it, expect } from "vitest";
+import { resolveTemplatePlaceholders, extractPlaceholderTokens, unknownPlaceholderTokens } from "../../src/lib/comms/templates";
+
+describe("resolveTemplatePlaceholders", () => {
+  it("replaces every known placeholder with the matching data", () => {
+    const { resolved, unresolved } = resolveTemplatePlaceholders(
+      "Hi {{contact.firstName}}, thanks for your interest in {{company.name}}. — {{sender.name}}",
+      { contact: { firstName: "Jamie" }, company: { name: "Acme Trivia" }, sender: { name: "Sam Salesperson" } },
+    );
+    expect(resolved).toBe("Hi Jamie, thanks for your interest in Acme Trivia. — Sam Salesperson");
+    expect(unresolved).toEqual([]);
+  });
+
+  it("leaves a placeholder untouched and reports it when its data is missing", () => {
+    const { resolved, unresolved } = resolveTemplatePlaceholders("Hi {{contact.firstName}}", { contact: {} });
+    expect(resolved).toBe("Hi {{contact.firstName}}");
+    expect(unresolved).toEqual(["contact.firstName"]);
+  });
+
+  it("leaves a placeholder untouched and reports it when its data is a blank string", () => {
+    const { resolved, unresolved } = resolveTemplatePlaceholders("Hi {{contact.firstName}}", { contact: { firstName: "" } });
+    expect(resolved).toBe("Hi {{contact.firstName}}");
+    expect(unresolved).toEqual(["contact.firstName"]);
+  });
+
+  it("reports an unknown token as unresolved rather than silently dropping it", () => {
+    const { resolved, unresolved } = resolveTemplatePlaceholders("Hi {{contact.nickname}}", {});
+    expect(resolved).toBe("Hi {{contact.nickname}}");
+    expect(unresolved).toEqual(["contact.nickname"]);
+  });
+
+  it("reports each distinct unresolved token only once even if it appears multiple times", () => {
+    const { unresolved } = resolveTemplatePlaceholders("{{contact.firstName}} ... {{contact.firstName}}", {});
+    expect(unresolved).toEqual(["contact.firstName"]);
+  });
+
+  it("tolerates whitespace inside the braces", () => {
+    const { resolved } = resolveTemplatePlaceholders("Hi {{ contact.firstName }}", { contact: { firstName: "Jamie" } });
+    expect(resolved).toBe("Hi Jamie");
+  });
+
+  it("returns text unchanged when it has no placeholders", () => {
+    const { resolved, unresolved } = resolveTemplatePlaceholders("Plain text, no tokens.", {});
+    expect(resolved).toBe("Plain text, no tokens.");
+    expect(unresolved).toEqual([]);
+  });
+});
+
+describe("extractPlaceholderTokens / unknownPlaceholderTokens", () => {
+  it("extracts every distinct token referenced in the text", () => {
+    expect(extractPlaceholderTokens("{{contact.firstName}} {{company.name}} {{contact.firstName}}")).toEqual([
+      "contact.firstName",
+      "company.name",
+    ]);
+  });
+
+  it("flags a token this codebase cannot resolve", () => {
+    expect(unknownPlaceholderTokens("Hi {{contact.firstName}}, {{contact.nickname}}")).toEqual(["contact.nickname"]);
+  });
+
+  it("returns an empty array when every token is known", () => {
+    expect(unknownPlaceholderTokens("{{contact.firstName}} {{company.name}} {{sender.name}}")).toEqual([]);
+  });
+});

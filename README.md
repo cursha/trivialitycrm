@@ -77,6 +77,16 @@ Module Five turns the CRM's data into management reporting — see `MODULE_5_REP
 
 Not in Module Five (by design): query-performance testing at large data volumes (hundreds-of-thousands of rows) beyond what's exercised by the automated test suite, and in-place editing of a scheduled report's cadence/recipients (delete and recreate covers it for now).
 
+## Module Six: Communications and Follow-up Automation (Phase A)
+
+Module Six lets the sales team email leads from inside the CRM using their own connected mailbox — see `MODULE_6_REPORT.md` for the full phased plan, provider comparison, permission matrix, and what's still ahead in Phases B–E. **This is Phase A only** (connections, templates, composer) — consent/compliance records, scheduled sends, follow-up sequences, calendar/appointments, inbound sync, and delivery-status webhooks are designed but not yet built.
+
+- **Connect your own mailbox** (`/settings/email-connections`, `connect_mailbox`): OAuth 2.0 to Microsoft Graph or Google (Gmail), one connection per user. Access/refresh tokens are encrypted at rest (AES-256-GCM, `TOKEN_ENCRYPTION_KEY`) and never exposed to the browser — only connection status (connected/expired/error, account email) renders in the UI. A replaceable `EmailProvider` interface (`src/lib/comms/providers/`) mirrors the AI research provider pattern; `MockEmailProvider` is the only provider active under `NODE_ENV=test` and sends no real email during tests.
+- **Email templates** (`/settings/email-templates`, `manage_personal_templates`/`manage_shared_templates`): personal (owner-only) or shared (team-wide) templates with `{{contact.firstName}}`-style placeholders. A template or send referencing an unresolved or unknown placeholder is blocked rather than delivered with a literal `{{token}}`.
+- **Composer**: a Send Email panel on the company detail page — pick a contact and/or template, edit, and send. Every send is gated on `Company.doNotContact` (the one suppression flag today; contact-level consent lands in Phase B), validated against email-header injection, and recorded as a structured `EmailMessage` row plus the existing free-text `EMAIL` activity. A failed send creates an in-app `Notification` (the codebase's first general-purpose notification model, separate from Module Five's report-specific bell for now) rather than failing silently.
+
+Not yet in Module Six (Phases B–E, see `MODULE_6_REPORT.md`): consent/compliance tracking and unsubscribe handling, scheduled sends and follow-up sequences, calendar/appointment sync, inbound email matching, delivery-status webhooks, and a bulk-send UI.
+
 ## Installation
 
 1. Install [Node.js 20+](https://nodejs.org/), [Docker](https://www.docker.com/) (for local Postgres), and Git.
@@ -130,6 +140,8 @@ Module Four adds `bulk_update_leads`, `manage_territories`, `create_shared_views
 
 Module Five adds `view_own_reports`, `view_team_reports`, `view_all_reports`, `export_reports`, `manage_scheduled_reports`, `view_ai_costs`, and `view_competitor_reports` — a permission tier independent of lead-edit visibility (see `MODULE_5_REPORT.md`). Administrator gets all seven; Manager gets `view_own_reports`, `view_team_reports`, `export_reports`, and `view_competitor_reports`; Salesperson gets `view_own_reports` only. `manage_scheduled_reports` gates the `/reports/scheduled` CRUD UI.
 
+Module Six adds `connect_mailbox`, `send_email`, `schedule_email`, `manage_personal_templates`, `manage_shared_templates`, `manage_sequences`, `enroll_in_sequences`, `view_team_communications`, `manage_calendar_connections`, `manage_communication_compliance`, and `send_bulk_email` — see `MODULE_6_REPORT.md` for the full matrix. Administrator gets all eleven; Manager and Salesperson each get the self-service ones (`connect_mailbox`, `send_email`, `schedule_email`, `manage_personal_templates`, `enroll_in_sequences`, `manage_calendar_connections`), plus `view_team_communications` for Manager only. The admin-shaped ones (`manage_shared_templates`, `manage_sequences`, `manage_communication_compliance`, `send_bulk_email`) default to Administrator only.
+
 ## AI research provider
 
 Set `AI_PROVIDER` in `.env`:
@@ -137,4 +149,6 @@ Set `AI_PROVIDER` in `.env`:
 - `"mock"` (default) — no network calls, no cost, deterministic fixture data. Used for local dev without API keys and unconditionally by every automated test (`.env.test` forces this regardless of `.env`).
 - `"anthropic"` — live AI-assisted research using Claude with its server-side web search/fetch tools. Requires `AI_API_KEY`. See `MODULE_2_REPORT.md` for cost and legal considerations, and for why this was chosen over Google Places API and Yelp Fusion for v1.
 
-Email delivery is **not implemented** and must be connected in a future module. Keep any provider credentials only in environment variables; never commit them.
+## Email provider (Module Six)
+
+Each user connects their own mailbox from `/settings/email-connections` (OAuth) — there is no global email-provider env var, since a user connects to whichever of Microsoft or Google their employer's tenant uses. Optional env vars (`.env.example`): `TOKEN_ENCRYPTION_KEY` (required in production once any mailbox is connected), `MICROSOFT_CLIENT_ID`/`MICROSOFT_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`. Under `NODE_ENV=test`, `MockEmailProvider` is used unconditionally regardless of which provider a connection specifies — no automated test ever sends real email or reaches a real OAuth endpoint. Keep any provider credentials only in environment variables; never commit them.

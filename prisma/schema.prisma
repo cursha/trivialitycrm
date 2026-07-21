@@ -199,6 +199,12 @@ model User {
   savedViews              SavedView[]
   stageHistoryChanges     PipelineStageHistory[]
   scheduledReports        ScheduledReport[]
+  providerConnection      ProviderConnection?
+  emailTemplatesOwned     EmailTemplate[]         @relation("EmailTemplateOwner")
+  emailTemplatesCreated   EmailTemplate[]         @relation("EmailTemplateCreator")
+  emailTemplatesUpdated   EmailTemplate[]         @relation("EmailTemplateUpdater")
+  emailMessagesCreated    EmailMessage[]          @relation("EmailMessageCreator")
+  notifications           Notification[]
   createdAt               DateTime                @default(now())
   updatedAt               DateTime                @updatedAt
 }
@@ -247,12 +253,13 @@ model RolePermission {
 }
 
 model LeadType {
-  id        String       @id @default(cuid())
-  name      String       @unique
-  active    Boolean      @default(true)
-  sortOrder Int          @default(0)
-  companies Company[]
-  searches  LeadSearch[]
+  id             String          @id @default(cuid())
+  name           String          @unique
+  active         Boolean         @default(true)
+  sortOrder      Int             @default(0)
+  companies      Company[]
+  searches       LeadSearch[]
+  emailTemplates EmailTemplate[]
 }
 
 model PipelineStage {
@@ -264,8 +271,9 @@ model PipelineStage {
   outcomeType PipelineStageOutcome?
   companies   Company[]
 
-  historyFrom PipelineStageHistory[] @relation("StageHistoryFrom")
-  historyTo   PipelineStageHistory[] @relation("StageHistoryTo")
+  historyFrom    PipelineStageHistory[] @relation("StageHistoryFrom")
+  historyTo      PipelineStageHistory[] @relation("StageHistoryTo")
+  emailTemplates EmailTemplate[]
 }
 
 model RejectionReason {
@@ -381,6 +389,7 @@ model Company {
   sources       CompanySource[]
   searchResults SearchResult[]
   stageHistory  PipelineStageHistory[]
+  emailMessages EmailMessage[]
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt
 
@@ -549,16 +558,17 @@ model GeneratedReport {
 }
 
 model Contact {
-  id        String   @id @default(cuid())
-  companyId String
-  firstName String
-  lastName  String
-  title     String?
-  phone     String?
-  email     String?
-  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String         @id @default(cuid())
+  companyId     String
+  firstName     String
+  lastName      String
+  title         String?
+  phone         String?
+  email         String?
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  emailMessages EmailMessage[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }
 
 model CompanySource {
@@ -876,4 +886,182 @@ model RateLimitBucket {
 
   @@unique([key, windowStart])
   @@index([windowStart])
+}
+
+// ===== Module Six: Communications and Follow-up Automation (Phase A) =====
+
+enum ProviderKind {
+  MICROSOFT
+  GOOGLE
+}
+
+enum ProviderConnectionStatus {
+  CONNECTED
+  EXPIRED
+  REVOKED
+  ERROR
+}
+
+/**
+ * One connected mailbox per user (unique on userId) — the brief's "connect
+ * their own business mailbox," never a shared company mailbox. Microsoft
+ * and Google both grant mail + calendar scopes in a single OAuth consent,
+ * so this one row covers calendar access too (Phase D) rather than a
+ * second connection model. Tokens are encrypted at rest
+ * (src/lib/comms/token-crypto.ts, AES-256-GCM) — this table never stores a
+ * plaintext token. tokenEncryptionKeyVersion supports rotating
+ * TOKEN_ENCRYPTION_KEY later without a flag day.
+ */
+model ProviderConnection {
+  id                        String                   @id @default(cuid())
+  userId                    String                   @unique
+  user                      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider                  ProviderKind
+  providerAccountEmail      String
+  encryptedAccessToken      String                   @db.Text
+  encryptedRefreshToken     String                   @db.Text
+  tokenEncryptionKeyVersion Int                      @default(1)
+  scopes                    String[]
+  tokenExpiresAt            DateTime
+  status                    ProviderConnectionStatus @default(CONNECTED)
+  lastError                 String?
+  lastSyncAt                DateTime?
+  connectedAt               DateTime                 @default(now())
+  disconnectedAt            DateTime?
+
+  emailMessages EmailMessage[]
+
+  @@index([status])
+}
+
+enum EmailTemplateVisibility {
+  PERSONAL
+  SHARED
+}
+
+/**
+ * Table-driven, editable templates — never hardcoded copy. Placeholder
+ * syntax and unresolved-placeholder detection live in
+ * src/lib/comms/templates.ts (a pure function, unit-tested standalone,
+ * same spirit as src/lib/reports/metrics.ts). ownerId is null for a shared
+ * template (visibility SHARED); set for a personal one.
+ */
+model EmailTemplate {
+  id              String                  @id @default(cuid())
+  name            String
+  category        String?
+  subject         String
+  body            String                  @db.Text
+  active          Boolean                 @default(true)
+  visibility      EmailTemplateVisibility @default(PERSONAL)
+  ownerId         String?
+  owner           User?                   @relation("EmailTemplateOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  leadTypeId      String?
+  leadType        LeadType?               @relation(fields: [leadTypeId], references: [id], onDelete: SetNull)
+  pipelineStageId String?
+  pipelineStage   PipelineStage?          @relation(fields: [pipelineStageId], references: [id], onDelete: SetNull)
+  language        String                  @default("en")
+  createdById     String
+  createdBy       User                    @relation("EmailTemplateCreator", fields: [createdById], references: [id])
+  updatedById     String?
+  updatedBy       User?                   @relation("EmailTemplateUpdater", fields: [updatedById], references: [id])
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  emailMessages EmailMessage[]
+
+  @@index([visibility, active])
+  @@index([ownerId])
+}
+
+enum EmailDirection {
+  OUTBOUND
+  INBOUND
+}
+
+enum EmailMessageStatus {
+  DRAFT
+  SCHEDULED
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  BOUNCED
+  CANCELLED
+  REPLIED
+}
+
+/**
+ * One row per email in either direction — this is what the company/contact
+ * Inbox tab renders, and (from Phase E) what delivery-status webhooks
+ * update in place. Deliberately separate from Activity (the human-readable
+ * audit trail already logs a plain-language "email sent" note via
+ * logEmailSent — see src/lib/companies/activity-log.ts's existing
+ * convention) — same split Module Five established for
+ * PipelineStageHistory vs. the PIPELINE_CHANGE activity. Phase A is
+ * outbound-only; direction/status values for inbound and
+ * sequence/appointment linkage are added by later phases' migrations, not
+ * forward-referenced here.
+ */
+model EmailMessage {
+  id                   String              @id @default(cuid())
+  companyId            String
+  company              Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contactId            String?
+  contact              Contact?            @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  direction            EmailDirection      @default(OUTBOUND)
+  providerConnectionId String?
+  providerConnection   ProviderConnection? @relation(fields: [providerConnectionId], references: [id], onDelete: SetNull)
+  toAddresses          String[]
+  ccAddresses          String[]            @default([])
+  bccAddresses         String[]            @default([])
+  subject              String
+  body                 String              @db.Text
+  templateId           String?
+  template             EmailTemplate?      @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  status               EmailMessageStatus  @default(DRAFT)
+  scheduledFor         DateTime?
+  sentAt               DateTime?
+  providerMessageId    String?
+  providerThreadId     String?
+  errorMessage         String?
+  createdById          String?
+  createdBy            User?               @relation("EmailMessageCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt            DateTime            @default(now())
+
+  @@index([companyId])
+  @@index([contactId])
+  @@index([status, scheduledFor])
+}
+
+enum NotificationType {
+  NEW_REPLY
+  DELIVERY_FAILURE
+  APPOINTMENT_ACCEPTED
+  APPOINTMENT_DECLINED
+  SEQUENCE_COMPLETED
+  SEQUENCE_PAUSED
+  PROVIDER_DISCONNECTED
+  FOLLOW_UP_DUE
+  SCHEDULED_EMAIL_FAILED
+}
+
+/**
+ * The general-purpose notification model this codebase didn't have before
+ * (Module Five's GeneratedReport.seenByIds is deliberately report-specific
+ * — see its own doc comment). payload carries type-specific display data
+ * (e.g. { companyId, companyName } for NEW_REPLY) so the bell can render
+ * and link without a second query per notification.
+ */
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        NotificationType
+  payload     Json
+  readAt      DateTime?
+  dismissedAt DateTime?
+  createdAt   DateTime         @default(now())
+
+  @@index([userId, readAt])
 }

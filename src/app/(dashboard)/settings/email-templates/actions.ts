@@ -1,0 +1,142 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/auth/current-user";
+import { requirePermission, hasPermission } from "@/lib/auth/permissions";
+import type { AuthenticatedUser } from "@/lib/auth/current-user";
+import { formString } from "@/lib/form-data";
+import { unknownPlaceholderTokens } from "@/lib/comms/templates";
+
+export type ActionResult = { error?: string } | undefined;
+
+const PATH = "/settings/email-templates";
+const VISIBILITY_VALUES = ["PERSONAL", "SHARED"] as const;
+type Visibility = (typeof VISIBILITY_VALUES)[number];
+
+function validateFields(formData: FormData): { error: string } | {
+  name: string;
+  category: string | null;
+  subject: string;
+  body: string;
+  visibility: Visibility;
+  leadTypeId: string | null;
+  pipelineStageId: string | null;
+  language: string;
+  active: boolean;
+} {
+  const name = formString(formData, "name").trim();
+  const category = formString(formData, "category").trim();
+  const subject = formString(formData, "subject").trim();
+  const body = formString(formData, "body").trim();
+  const visibility = formString(formData, "visibility");
+  const leadTypeId = formString(formData, "leadTypeId").trim();
+  const pipelineStageId = formString(formData, "pipelineStageId").trim();
+  const language = formString(formData, "language").trim() || "en";
+
+  if (!name) return { error: "Enter a template name." };
+  if (!subject) return { error: "Enter a subject." };
+  if (!body) return { error: "Enter a body." };
+  if (!VISIBILITY_VALUES.includes(visibility as Visibility)) return { error: "Choose a visibility." };
+
+  const unknownTokens = [...unknownPlaceholderTokens(subject), ...unknownPlaceholderTokens(body)];
+  if (unknownTokens.length > 0) {
+    return { error: `Unknown placeholder(s): ${[...new Set(unknownTokens)].map((t) => `{{${t}}}`).join(", ")}` };
+  }
+
+  return {
+    name,
+    category: category || null,
+    subject,
+    body,
+    visibility: visibility as Visibility,
+    leadTypeId: leadTypeId || null,
+    pipelineStageId: pipelineStageId || null,
+    language,
+    active: formString(formData, "active") === "on",
+  };
+}
+
+export async function requireEditAccess(templateId: string): Promise<{ user: AuthenticatedUser; ownerId: string | null; visibility: Visibility }> {
+  const user = await requireUser();
+  const template = await prisma.emailTemplate.findUniqueOrThrow({
+    where: { id: templateId },
+    select: { ownerId: true, visibility: true },
+  });
+
+  if (template.visibility === "SHARED") {
+    requirePermission(user, "manage_shared_templates");
+  } else {
+    requirePermission(user, "manage_personal_templates");
+    if (template.ownerId !== user.id && !hasPermission(user, "manage_shared_templates")) {
+      throw new Error("You can only manage your own personal templates.");
+    }
+  }
+
+  return { user, ownerId: template.ownerId, visibility: template.visibility };
+}
+
+export async function createEmailTemplate(_prevState: ActionResult, formData: FormData): Promise<ActionResult> {
+  const user = await requireUser();
+  const parsed = validateFields(formData);
+  if ("error" in parsed) return parsed;
+
+  if (parsed.visibility === "SHARED") {
+    requirePermission(user, "manage_shared_templates");
+  } else {
+    requirePermission(user, "manage_personal_templates");
+  }
+
+  await prisma.emailTemplate.create({
+    data: {
+      name: parsed.name,
+      category: parsed.category,
+      subject: parsed.subject,
+      body: parsed.body,
+      visibility: parsed.visibility,
+      ownerId: parsed.visibility === "PERSONAL" ? user.id : null,
+      leadTypeId: parsed.leadTypeId,
+      pipelineStageId: parsed.pipelineStageId,
+      language: parsed.language,
+      active: parsed.active,
+      createdById: user.id,
+    },
+  });
+
+  revalidatePath(PATH);
+}
+
+export async function updateEmailTemplate(id: string, _prevState: ActionResult, formData: FormData): Promise<ActionResult> {
+  const { user } = await requireEditAccess(id);
+  const parsed = validateFields(formData);
+  if ("error" in parsed) return parsed;
+
+  await prisma.emailTemplate.update({
+    where: { id },
+    data: {
+      name: parsed.name,
+      category: parsed.category,
+      subject: parsed.subject,
+      body: parsed.body,
+      leadTypeId: parsed.leadTypeId,
+      pipelineStageId: parsed.pipelineStageId,
+      language: parsed.language,
+      active: parsed.active,
+      updatedById: user.id,
+    },
+  });
+
+  revalidatePath(PATH);
+}
+
+export async function setEmailTemplateActive(id: string, active: boolean): Promise<void> {
+  const { user } = await requireEditAccess(id);
+  await prisma.emailTemplate.update({ where: { id }, data: { active, updatedById: user.id } });
+  revalidatePath(PATH);
+}
+
+export async function deleteEmailTemplate(id: string): Promise<void> {
+  await requireEditAccess(id);
+  await prisma.emailTemplate.delete({ where: { id } });
+  revalidatePath(PATH);
+}

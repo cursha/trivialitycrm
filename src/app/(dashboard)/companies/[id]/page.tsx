@@ -12,6 +12,7 @@ import { ActivityPanel } from "./activities/activity-panel";
 import { TasksPanel } from "./tasks/tasks-panel";
 import { ScorePanel } from "./eos/score-panel";
 import { EvidencePanel } from "./eos/evidence-panel";
+import { EmailPanel } from "./email/email-panel";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TRIVIA_STATUS_LABEL } from "@/lib/ui/status-tones";
@@ -32,13 +33,23 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const company = await getScopedCompany(user, id);
   if (!company) notFound();
 
-  const [activities, tasks, salespeople, evidence, scoreHistory, pipelineStages] = await Promise.all([
+  const [activities, tasks, salespeople, evidence, scoreHistory, pipelineStages, emailMessages, emailTemplates] = await Promise.all([
     listCompanyActivities(user, id),
     listCompanyTasks(user, id),
     prisma.user.findMany({ where: { disabled: false }, orderBy: { name: "asc" } }),
     listCompanyEvidence(user, id),
     listCompanyScoreHistory(user, id),
     prisma.pipelineStage.findMany({ orderBy: { sortOrder: "asc" } }),
+    prisma.emailMessage.findMany({
+      where: { companyId: id },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, subject: true, toAddresses: true, status: true, sentAt: true, errorMessage: true, createdAt: true },
+    }),
+    prisma.emailTemplate.findMany({
+      where: { active: true, OR: [{ visibility: "SHARED" }, { ownerId: user.id }] },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, subject: true, body: true },
+    }),
   ]);
   const canEdit = hasPermission(user, "edit_leads");
 
@@ -139,6 +150,24 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
           <div id="activity-panel">
             <ActivityPanel companyId={company.id} activities={activities} canLog={canEdit} />
           </div>
+
+          <EmailPanel
+            companyId={company.id}
+            messages={emailMessages.map((m) => ({
+              id: m.id,
+              subject: m.subject,
+              toAddresses: m.toAddresses,
+              status: m.status,
+              sentAt: m.sentAt?.toISOString() ?? null,
+              errorMessage: m.errorMessage,
+              createdAt: m.createdAt.toISOString(),
+            }))}
+            templates={emailTemplates}
+            contacts={company.contacts
+              .filter((c) => c.email)
+              .map((c) => ({ id: c.id, name: `${c.firstName} ${c.lastName}`, email: c.email as string }))}
+            canSend={hasPermission(user, "send_email")}
+          />
         </div>
 
         <div className="space-y-6">
