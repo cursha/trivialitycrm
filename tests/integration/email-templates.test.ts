@@ -19,7 +19,7 @@ function baseFormData(overrides: Record<string, string> = {}) {
   formData.set("name", overrides.name ?? "Intro follow-up");
   formData.set("category", overrides.category ?? "");
   formData.set("subject", overrides.subject ?? "Hi {{contact.firstName}}");
-  formData.set("body", overrides.body ?? "Thanks for your interest, {{contact.firstName}}.");
+  formData.set("body", overrides.body ?? "Thanks for your interest, {{contact.firstName}}. Unsubscribe: {{unsubscribeLink}}");
   formData.set("visibility", overrides.visibility ?? "PERSONAL");
   formData.set("leadTypeId", overrides.leadTypeId ?? "");
   formData.set("pipelineStageId", overrides.pipelineStageId ?? "");
@@ -78,6 +78,16 @@ describe("createEmailTemplate", () => {
 
     const result = await createEmailTemplate(undefined, baseFormData({ body: "Hi {{contact.nickname}}" }));
     expect(result?.error).toMatch(/contact\.nickname/);
+    expect(await testPrisma.emailTemplate.count()).toBe(0);
+  });
+
+  it("rejects a template whose body is missing the mandatory unsubscribe placeholder", async () => {
+    const role = await createRoleWithPermissions("Personal", ["manage_personal_templates"]);
+    const user = await createTestUser({ roleId: role.id });
+    await loginAs(user.id);
+
+    const result = await createEmailTemplate(undefined, baseFormData({ body: "Thanks for your interest, {{contact.firstName}}." }));
+    expect(result?.error).toMatch(/unsubscribeLink/);
     expect(await testPrisma.emailTemplate.count()).toBe(0);
   });
 

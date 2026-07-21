@@ -19,15 +19,18 @@ export async function sendComposedEmail(companyId: string, _prevState: ActionRes
   const user = await requireUser();
   requirePermission(user, "send_email");
 
-  const contactId = formString(formData, "contactId").trim() || null;
+  const contactId = formString(formData, "contactId").trim();
+  if (!contactId) {
+    return { error: "Choose a contact before sending — add one to this company first if none exists yet." };
+  }
+
   const templateId = formString(formData, "templateId").trim() || null;
-  const to = parseAddressList(formString(formData, "to"));
   const cc = parseAddressList(formString(formData, "cc"));
   const bcc = parseAddressList(formString(formData, "bcc"));
   const subject = formString(formData, "subject");
   const body = formString(formData, "body");
 
-  const result = await sendEmail({ userId: user.id, companyId, contactId, templateId, to, cc, bcc, subject, body });
+  const result = await sendEmail({ userId: user.id, companyId, contactId, templateId, cc, bcc, subject, body });
   if (!result.ok) return { error: result.error };
 
   revalidatePath(`/companies/${companyId}`);

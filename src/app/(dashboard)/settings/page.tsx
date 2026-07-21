@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ListTree, GitBranch, Users, ShieldCheck, XCircle, FileSpreadsheet, MapPin, Mail, FileText } from "lucide-react";
+import { ListTree, GitBranch, Users, ShieldCheck, XCircle, FileSpreadsheet, MapPin, Mail, FileText, ShieldAlert } from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
 import { PageHeader } from "@/components/ui/page-header";
@@ -55,6 +55,13 @@ export default async function SettingsPage() {
       visible: hasPermission(user, "manage_personal_templates"),
     },
     {
+      href: "/settings/communication-compliance",
+      label: "Communication Compliance",
+      description: "View and record each contact's email consent (CASL/CAN-SPAM compliance support).",
+      icon: ShieldAlert,
+      visible: hasPermission(user, "manage_communication_compliance"),
+    },
+    {
       href: "/settings/territories",
       label: "Territories",
       description: "Organize companies into country/state/city territories with an owning salesperson.",
@@ -82,6 +89,7 @@ export default async function SettingsPage() {
     ? ((await prisma.workspaceSettings.findUnique({ where: { id: 1 } })) ?? {
         noActivityThresholdDays: 14,
         newlyAssignedThresholdDays: 3,
+        mailingAddress: null,
       })
     : null;
 

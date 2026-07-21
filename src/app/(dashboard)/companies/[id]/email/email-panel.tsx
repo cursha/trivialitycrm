@@ -54,15 +54,10 @@ export function EmailPanel({
   const [isPending, startTransition] = useTransition();
   const [contactId, setContactId] = useState("");
   const [templateId, setTemplateId] = useState("");
-  const [to, setTo] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
 
-  function handleContactChange(id: string) {
-    setContactId(id);
-    const contact = contacts.find((c) => c.id === id);
-    if (contact) setTo(contact.email);
-  }
+  const selectedContact = contacts.find((c) => c.id === contactId);
 
   function handleTemplateChange(id: string) {
     setTemplateId(id);
@@ -81,7 +76,6 @@ export function EmailPanel({
       } else {
         setError(null);
         setComposing(false);
-        setTo("");
         setSubject("");
         setBody("");
         setContactId("");
@@ -95,7 +89,7 @@ export function EmailPanel({
     <Card>
       <div className="flex items-center justify-between">
         <h2 className="font-bold text-accent">Email</h2>
-        {canSend && !composing && (
+        {canSend && !composing && contacts.length > 0 && (
           <button
             type="button"
             onClick={() => setComposing(true)}
@@ -107,22 +101,30 @@ export function EmailPanel({
         )}
       </div>
 
+      {canSend && contacts.length === 0 && (
+        <p className="mt-2 text-sm text-text-muted">
+          Add a contact with an email address to this company before you can send email — every send must be tied to a tracked contact so
+          consent can be checked.
+        </p>
+      )}
+
       {composing && (
         <form action={handleSend} className="mt-3 space-y-2 rounded-lg border border-dashed border-border-strong bg-black/[0.02] p-3">
-          {contacts.length > 0 && (
-            <div>
-              <Label className="text-xs">Contact</Label>
-              <input type="hidden" name="contactId" value={contactId} />
-              <Select value={contactId} onChange={(e) => handleContactChange(e.target.value)} className="mt-1 py-1.5">
-                <option value="">Choose a contact (optional)</option>
-                {contacts.map((contact) => (
-                  <option key={contact.id} value={contact.id}>
-                    {contact.name} ({contact.email})
-                  </option>
-                ))}
-              </Select>
-            </div>
-          )}
+          <div>
+            <Label className="text-xs">Contact</Label>
+            <input type="hidden" name="contactId" value={contactId} />
+            <Select required value={contactId} onChange={(e) => setContactId(e.target.value)} className="mt-1 py-1.5">
+              <option value="" disabled>
+                Choose a contact
+              </option>
+              {contacts.map((contact) => (
+                <option key={contact.id} value={contact.id}>
+                  {contact.name} ({contact.email})
+                </option>
+              ))}
+            </Select>
+            {selectedContact && <p className="mt-1 text-xs text-text-muted">Sending to {selectedContact.email}.</p>}
+          </div>
 
           {templates.length > 0 && (
             <div>
@@ -139,17 +141,6 @@ export function EmailPanel({
             </div>
           )}
 
-          <div>
-            <Label className="text-xs">To</Label>
-            <Input
-              name="to"
-              required
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              placeholder="lead@example.com, another@example.com"
-              className="mt-1 py-1.5"
-            />
-          </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label className="text-xs">Cc</Label>

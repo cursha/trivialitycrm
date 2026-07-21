@@ -1,10 +1,10 @@
-# Module Six Delivery Report — Phase A
+# Module Six Delivery Report — Phases A–B
 
 ## Starting point
 
-Modules One through Five (CRM foundation, AI-assisted lead discovery, production hardening, Sales Workspace, Reporting and Analytics — including the scheduled-report worker) were complete, tested, and merged into `main` before this module started. Module Six was built on branch `module-six-communications`, following a 12-section plan approved before any code was written (provider comparison, database design, permission matrix, consent design, phased implementation order, and test plan — see the plan's phasing in "Deviations" below for how it maps to this report).
+Modules One through Five (CRM foundation, AI-assisted lead discovery, production hardening, Sales Workspace, Reporting and Analytics — including the scheduled-report worker) were complete, tested, and merged into `main` before this module started. Module Six Phase A was built on branch `module-six-communications`, following a 12-section plan approved before any code was written (provider comparison, database design, permission matrix, consent design, phased implementation order, and test plan — see the plan's phasing in "Deviations" below for how it maps to this report). Phase A was merged to `main` as its own checkpoint; **Phase B was then built on a fresh branch, `module-six-consent-compliance`**, off the updated `main` — mirroring how Module Five itself shipped core reporting, then scheduled reports, as two separate merges rather than one long-lived branch.
 
-**This report covers Phase A only**: mailbox connections, email templates, and the composer/send action. Phases B–E (consent/compliance, scheduled sends and follow-up sequences, calendar/appointments and inbound sync, delivery-status webhooks and unified notifications) are designed in the approved plan but not built — see "Module Seven / remaining-phase recommendations" below. Nothing in this report should be read as "Module Six is done"; it is a checkpoint at the end of the first of five planned phases.
+**This report covers Phases A and B**: mailbox connections, email templates, the composer/send action, and consent/compliance (CASL-safe default-deny, append-only consent records, a self-service unsubscribe link, and a compliance-review page). Phases C–E (scheduled sends and follow-up sequences, calendar/appointments and inbound sync, delivery-status webhooks and unified notifications) are designed in the approved plan but not built — see "Remaining-phase recommendations" below. Nothing in this report should be read as "Module Six is done"; it is a checkpoint at the end of the second of five planned phases.
 
 ## Provider architecture
 
@@ -26,20 +26,36 @@ Provider selection is **per-connection**, not a global env var — unlike AI res
 - **Notification model**: `Notification` (`userId`, `type`, `payload` JSON, `readAt`/`dismissedAt`) is the codebase's first general-purpose notification model — Module Five's `GeneratedReport.seenByIds` was deliberately report-specific by its own design note. It is not yet wired into the dashboard bell UI (that's a Phase E item, alongside unifying it with the report bell) — today it is written to but not yet displayed.
 - **HTML body handling without a new dependency**: templates/composer store and edit plain text (no rich-text/WYSIWYG editor exists in this phase), so `src/lib/comms/sanitize-html.ts` escapes HTML-significant characters and converts newlines to `<br>` rather than pulling in an HTML-parsing sanitizer library. This was flagged in the approved plan as a dependency decision needing sign-off (`sanitize-html`); resolved by not needing rich-text authoring at all in Phase A, so the decision is deferred rather than made — revisit only if a future phase adds a real HTML editor.
 
+## Features shipped (Phase B)
+
+- **CASL-safe default-deny consent**: `Contact.emailPermitted` defaults `false` and `Contact.doNotContact` defaults `false` — a contact cannot receive a contact-linked send until a `ConsentRecord` establishes permission. `ConsentRecord` (`src/lib/comms/consent.ts`) is append-only, mirroring Module One's `HistoricalScoreRecord`/`Company.currentHistoricalScoreId` "full history + denormalized current state" pattern exactly. `recordConsent()` is the one place that pattern is written to, called by both the authenticated compliance UI (with `recordedById` set) and the public unsubscribe link (with `recordedById` left `null` — no user performed that action, the contact did).
+- **`sendEmail()` gains a second, mandatory consent gate**: alongside Phase A's `Company.doNotContact` check, every send now also requires a linked contact with `Contact.emailPermitted && !Contact.doNotContact`, and the body must contain a resolved `{{unsubscribeLink}}` — enforced inside `sendEmail()` itself (`src/lib/comms/send-email.ts`), the one function every future send path shares, not left to the composer alone. `contactId` is a required field, not optional; there is no ad hoc/untracked-address send path.
+- **Mandatory unsubscribe placeholder**: `{{unsubscribeLink}}` joins the known-placeholder list (`src/lib/comms/templates.ts`) and a template cannot be saved without referencing it (`src/app/(dashboard)/settings/email-templates/actions.ts`) — CAN-SPAM requires a working unsubscribe mechanism in every commercial email. The template editor's default body scaffold already includes it.
+- **Self-verifying unsubscribe tokens** (`src/lib/comms/unsubscribe-token.ts`): HMAC-SHA256-signed, base64url-encoded `contactId + expiry` (400-day expiry — CAN-SPAM only requires 30 days of continued function, this is generous headroom), verified with a constant-time comparison and no database lookup needed to confirm authenticity. `UNSUBSCRIBE_TOKEN_SECRET` follows the exact optional-in-dev/required-in-production pattern as `TOKEN_ENCRYPTION_KEY`.
+- **Public, no-login `/unsubscribe` page**: one click, no account needed (CAN-SPAM: "no fees or extra steps"), idempotent (following the same link twice never double-records a `WITHDRAWN` consent entry), rate-limited per IP (`checkRateLimit`, reusing the existing Postgres-backed limiter). `src/proxy.ts` gained a `PUBLIC_ALWAYS_ROUTES` category, distinct from `/login`'s `PUBLIC_ROUTES` — an *authenticated* visitor must still see this page rather than being bounced to `/dashboard`.
+- **Communication Compliance page** (`/settings/communication-compliance`, `manage_communication_compliance`): search contacts by name/email/company, view each one's current status and full consent history, and record a new `EXPRESS`/`IMPLIED`/`WITHDRAWN` entry. Also reachable directly from a contact on its company page (a status badge plus a "Manage consent" link pre-filtered to that contact), per the plan's "also reachable from the contact itself" requirement.
+- **Sender mailing address**: `WorkspaceSettings.mailingAddress` (a new field on the existing Module Four singleton-row settings table, not a new table) resolves the `{{sender.mailingAddress}}` placeholder — CAN-SPAM requires a valid physical mailing address in every commercial email.
+
 ## Database additions
 
-Migration `20260721140732_module_six_communications_phase_a` — purely additive, no drops:
+**Phase A** — migration `20260721140732_module_six_communications_phase_a` — purely additive, no drops:
 
 - **`ProviderConnection`** — one per user (`@unique` on `userId`), encrypted tokens, `status` (CONNECTED/EXPIRED/REVOKED/ERROR), `scopes`, `tokenExpiresAt`, `lastError`.
 - **`EmailTemplate`** — `visibility` (PERSONAL/SHARED), optional `ownerId`/`leadTypeId`/`pipelineStageId`, `language`, `active`.
-- **`EmailMessage`** — `direction` (OUTBOUND/INBOUND, only OUTBOUND used this phase), `toAddresses`/`ccAddresses`/`bccAddresses` (`String[]`), `status` (DRAFT/SCHEDULED/QUEUED/SENT/DELIVERED/FAILED/BOUNCED/CANCELLED/REPLIED — only DRAFT-adjacent/QUEUED/SENT/FAILED are reachable in Phase A; the rest await later phases), `providerMessageId`/`providerThreadId`, optional `templateId`/`contactId`.
+- **`EmailMessage`** — `direction` (OUTBOUND/INBOUND, only OUTBOUND used so far), `toAddresses`/`ccAddresses`/`bccAddresses` (`String[]`), `status` (DRAFT/SCHEDULED/QUEUED/SENT/DELIVERED/FAILED/BOUNCED/CANCELLED/REPLIED — only DRAFT-adjacent/QUEUED/SENT/FAILED are reachable so far; the rest await later phases), `providerMessageId`/`providerThreadId`, optional `templateId`/`contactId`.
 - **`Notification`** — `type` (9-value enum covering every event type across all phases, not just Phase A's `DELIVERY_FAILURE`), `payload` JSON, `readAt`/`dismissedAt`.
 
 New indexes: `EmailMessage(companyId)`, `EmailMessage(contactId)`, `EmailMessage(status, scheduledFor)` (ready for Phase C's scheduled-send tick), `EmailTemplate(visibility, active)`, `EmailTemplate(ownerId)`, `ProviderConnection(status)`, `Notification(userId, readAt)`.
 
-Deliberately **not** in this migration (would forward-reference tables that don't exist yet): `ConsentRecord`, `Contact.emailPermitted`/`doNotContact`/`unsubscribedAt` (Phase B); `FollowUpSequence`/`SequenceStep`/`SequenceEnrollment`/`SequenceStepRun` (Phase C); `Appointment` (Phase D); `EmailMessage.sequenceEnrollmentId`/`sequenceStepId`/`bulkSendBatchId` (Phases C/F).
+**Phase B** — migration `20260721151823_module_six_consent_compliance` — purely additive, no drops:
 
-Applied to both dev and test databases; `npx prisma generate` re-run; `prisma/seed.ts` re-run against dev — **41 permissions seeded (up from 30)**.
+- **`Contact`** gains `emailPermitted Boolean @default(false)`, `doNotContact Boolean @default(false)`, `unsubscribedAt DateTime?`, `unsubscribeSource String?` — the denormalized "current state" half of the History/current-pointer split.
+- **`ConsentRecord`** (new) — `contactId`, `type` (EXPRESS/IMPLIED/WITHDRAWN), `source`, `note?`, `occurredAt`, `recordedById?` (nullable — null for a self-service unsubscribe). Append-only; `@@index([contactId, occurredAt])`.
+- **`WorkspaceSettings`** gains `mailingAddress String?`.
+
+Deliberately **not** in this migration (would forward-reference tables that don't exist yet): `FollowUpSequence`/`SequenceStep`/`SequenceEnrollment`/`SequenceStepRun` (Phase C); `Appointment` (Phase D); `EmailMessage.sequenceEnrollmentId`/`sequenceStepId`/`bulkSendBatchId` (Phases C/F).
+
+Both migrations applied to dev and test databases; `npx prisma generate` re-run after each. `prisma/seed.ts` re-run against dev after Phase A — **41 permissions seeded (up from 30)**; Phase B added no new permission keys (it uses `manage_communication_compliance`, already seeded in Phase A).
 
 ## Packages added
 
@@ -65,9 +81,11 @@ None. Token encryption uses Node's built-in `crypto` (AES-256-GCM). HTML handlin
 
 `manage_personal_templates`/`manage_shared_templates` enforcement is ownership-aware, not just key-based: a Manager/Salesperson with `manage_personal_templates` can only edit/delete *their own* personal templates (verified by a rejected-edit test where a second user with the same permission is blocked from another user's template), while a user with `manage_shared_templates` (Administrator, by default) can also administratively edit/delete any personal template — covered in `tests/integration/email-templates.test.ts`.
 
-## Consent/compliance controls (Phase A scope)
+## Consent/compliance controls (now live, Phase B)
 
-Full consent tracking (`ConsentRecord`, CASL/CAN-SPAM-aware default-deny, unsubscribe links) is Phase B. The only suppression check active today is the pre-existing `Company.doNotContact` flag, enforced as a hard server-side gate inside `sendEmail()` itself — not a UI nicety, and not something a caller could accidentally skip, since every current and future send path (composer today; scheduled sends and sequence steps in Phase C) calls this one function. This is explicitly a partial control: a `doNotContact` company blocks a send, but there is no contact-level consent requirement yet, and no unsubscribe link exists in any template. Do not treat Phase A as CASL/CAN-SPAM-compliant on its own — that compliance posture is Phase B's deliverable.
+Two consent checks apply to **every** send, with no exceptions: `Company.doNotContact` (Phase A) and `Contact.emailPermitted`/`doNotContact` plus a mandatory resolved unsubscribe link (Phase B) — both enforced inside `sendEmail()` itself, so no caller can accidentally skip either. The default is CASL-safe (opt-in): a contact cannot receive email until someone records `EXPRESS` or `IMPLIED` consent for them, which is also compliant under CAN-SPAM's opt-out model (a superset requirement satisfies both regimes without the app needing to guess which one applies to a given address). **This is a compliance-support system, not legal advice** — stated on the compliance page itself.
+
+**A linked contact is now mandatory for every send** — `SendEmailParams.contactId` is a required field, not optional. There is no ad hoc/untracked-address send path: the composer requires picking an existing contact (the "To" field was removed entirely — the recipient address is always the contact's own recorded email, resolved server-side, never taken from client input), and `sendEmail()` rejects a missing contact, a contact with no email on file, and of course a not-yet-permitted or opted-out contact. This closes the gap an earlier draft of this report flagged (an ad hoc address bypassing consent entirely) by removing the bypassable path rather than trying to extend consent-tracking to untracked addresses — a company with no contacts yet must have one added (the existing Contacts panel already supports this inline) before anyone can email it from the CRM.
 
 ## Pages and routes added
 
@@ -76,56 +94,63 @@ Full consent tracking (`ConsentRecord`, CASL/CAN-SPAM-aware default-deny, unsubs
 | `/settings/email-connections` | Connect/disconnect a mailbox, view connection status |
 | `/settings/email-templates` | Template list (shared + your personal), create form |
 | `/settings/email-templates/[id]/edit` | Edit a template you're authorized to edit |
+| `/settings/communication-compliance` | Search contacts, view consent history, record new consent |
+| `/unsubscribe` | Public, no-login one-click unsubscribe |
 | `/api/comms/oauth/[provider]/authorize` | Redirects to the provider's OAuth consent screen |
 | `/api/comms/oauth/[provider]/callback` | Verifies CSRF state, exchanges code for tokens, stores the connection |
-| Company detail page | New "Email" panel — compose/send, and the company's email history |
-| Settings hub (`/settings`) | Two new cards: Email Connections, Email Templates |
+| Company detail page | "Email" panel (compose/send + history); Contacts panel now shows a consent badge + "Manage consent" link per contact |
+| Settings hub (`/settings`) | Three new cards: Email Connections, Email Templates, Communication Compliance |
 
 ## Tests
 
-**433 tests passing (404 pre-existing, unmodified, + 29 new across 5 new test files)**:
-- `tests/unit/token-crypto.test.ts` (7 tests) — round-trip, distinct ciphertext per call (random IV), GCM tamper detection, wrong-key/malformed/missing-key failure modes
-- `tests/unit/comms-validate.test.ts` — email-header-injection rejection on to/cc/bcc/subject, valid-address acceptance
-- `tests/unit/comms-providers.test.ts` — `MockEmailProvider` requires no network access; `MicrosoftGraphProvider`/`GoogleProvider` authorization-URL construction (scopes, `access_type=offline&prompt=consent`) and their "throws without configured credentials" path; `getEmailProvider` always returns mock under `NODE_ENV=test` regardless of requested kind
-- `tests/unit/comms-templates.test.ts` (10 tests) — placeholder resolution (known/unknown/blank/whitespace-tolerant/repeated tokens), `unknownPlaceholderTokens` validation
-- `tests/integration/email-templates.test.ts` (8 tests) — permission enforcement for personal vs. shared template creation, unknown-placeholder rejection at save time, ownership-scoped edit/delete (including the administrative-override case), active toggle and delete
-- `tests/integration/send-email.test.ts` (8 tests) — `Company.doNotContact` blocking, unresolved-placeholder blocking, invalid-recipient blocking, no-connected-mailbox blocking, a full successful send (placeholder resolution + `SENT` status + `EMAIL` activity logged), and a simulated provider failure producing a `FAILED` `EmailMessage` plus a `DELIVERY_FAILURE` `Notification`; the composer server action's own permission gate and recipient-list parsing (comma/newline-separated)
+**462 tests passing (433 from the Phase A checkpoint, unmodified in substance, + 29 new/extended across 7 test files)**:
+- `tests/unit/token-crypto.test.ts`, `tests/unit/comms-validate.test.ts`, `tests/unit/comms-providers.test.ts` — unchanged from Phase A
+- `tests/unit/comms-templates.test.ts` — extended with `hasUnsubscribePlaceholder` coverage and resolution of the new `unsubscribeLink`/`sender.mailingAddress` placeholders
+- `tests/unit/unsubscribe-token.test.ts` (6 tests, new) — round-trip, wrong-secret rejection, tampered-payload rejection, malformed-token rejection, expiry (via `vi.useFakeTimers`), missing-secret error
+- `tests/integration/email-templates.test.ts` — extended with a test rejecting a template body missing `{{unsubscribeLink}}`; the base fixture body now includes it so every other test still exercises the full validation path
+- `tests/integration/send-email.test.ts` (14 tests) — rewritten around the now-mandatory `contactId`: every test uses a real linked contact; covers a not-yet-permitted contact, a `doNotContact` contact (even with permission granted), a missing/nonexistent contact, a contact with no email on file, a contact-linked send missing the unsubscribe placeholder, and a full successful send asserting the resolved unsubscribe link is a real, independently-verifiable token; the composer server action's own tests confirm it rejects a submission with no contact selected and that the recipient is always the selected contact's own email, never client-supplied text
+- `tests/integration/consent.test.ts` (11 tests, new) — `recordConsent()`'s EXPRESS/WITHDRAWN state transitions and append-only history; `unsubscribeByToken()`'s self-service path (null `recordedById`), invalid-token rejection, and double-click idempotency; `recordContactConsentAction`'s permission enforcement and required-`source` validation
+- `tests/unit/proxy.test.ts` — extended with two tests confirming `/unsubscribe` is reachable both unauthenticated and authenticated (unlike `/login`, which bounces an authenticated visitor away)
+- `tests/unit/env.test.ts` — extended for `UNSUBSCRIBE_TOKEN_SECRET`'s required-in-production check
 
-Every pre-existing test (404) stays green, unmodified. No automated test ever sends real email or reaches a real OAuth endpoint — `MockEmailProvider` is structurally the only provider active under `NODE_ENV=test`. A `SIMULATED_SEND_FAILURE_ADDRESS` constant in the mock provider is the only way tests deterministically exercise the failure path, since the mock otherwise always "succeeds."
+Every Phase A test stays green. No automated test ever sends real email or reaches a real OAuth endpoint — `MockEmailProvider` is structurally the only provider active under `NODE_ENV=test`.
+
+**A note on test-suite stability**: three separate full-suite runs during this phase each saw one or two *different*, unrelated pre-existing test files (never the same file twice, never a Phase B file) fail with a generic hook/test timeout rather than an assertion failure. Every one of those files passed cleanly (100%) when re-run in isolation immediately after. This is consistent with transient Postgres connection contention across Vitest's parallel test-file workers in this sandbox, not a regression — but it's noted here rather than silently ignored, since a flaky suite is worth knowing about regardless of cause.
 
 ## Build result
 
 - `npx prisma format` / `npx prisma validate` — clean
 - `npx tsc --noEmit` — clean, re-checked after every batch of changes
-- `npx eslint .` — clean (three unused-parameter warnings found and fixed during development, by removing the unused parameters rather than underscore-prefixing them, since this project's flat ESLint config has no `argsIgnorePattern` override)
-- `npm test` — 433/433 passing
-- `npx next build` — succeeds; `/settings/email-connections`, `/settings/email-templates`, and `/settings/email-templates/[id]/edit` all registered as dynamic server-rendered routes alongside every pre-existing route
-- `npm run worker` — every new `src/lib/comms/*` module omits `import "server-only"` where the future worker will need it (mirroring the exact Module Five lesson: Vitest mocks that guard out, so only actually starting the worker catches a real crash). Confirmed by starting the worker process directly — it passed every module import and reached its normal startup sequence (logged "database schema is up to date") before hitting an unrelated port conflict from an already-running worker instance from earlier in the session, which happens only after all imports succeed.
+- `npx eslint .` — clean
+- `npm test` — 462/462 passing (see the stability note above; all 462 passed cleanly on the final full-suite run with no contention flakes)
+- `npx next build` — succeeds; `/settings/communication-compliance` and `/unsubscribe` both registered (the latter as a dynamic server-rendered route, since it reads a query-string token and performs the unsubscribe on render) alongside every Phase A and pre-existing route
+- `npm run worker` — every new Phase B `src/lib/comms/*` module (`consent.ts`, `unsubscribe-token.ts`) omits `import "server-only"`, same reasoning as every other comms module. Confirmed by starting the worker process directly — it passed every module import and reached its normal startup sequence before hitting an unrelated port conflict from an already-running worker instance from earlier in the session (which only happens after all imports succeed).
 
 ## Browser walkthrough
 
-**Not performed as an interactive click-through** — no browser automation tool was available this session (same limitation noted in the Module Five report). In its place: `tsc`/lint/the full test suite/a production build all passed, and the worker process was started for real and confirmed importing every new module without error. A manual interactive pass — the OAuth connect/disconnect flow against a real Microsoft or Google test tenant, the template editor's placeholder picker, the composer's contact/template prefill behavior, and mobile layout — is still recommended before considering Phase A fully verified, and is explicitly **not** attempted here per the plan's "never connect real accounts without approval" instruction.
+**Not performed as an interactive click-through** — no browser automation tool was available this session, same limitation as Phase A and the Module Five report. In its place: `tsc`/lint/the full test suite/a production build all passed, and the worker process was started for real and confirmed importing every new module without error. A manual interactive pass — the compliance page's search/record-consent flow, the unsubscribe page's real click-through with a real generated link, and the contact panel's new consent badge/link — is still recommended before considering Phase B fully verified.
 
-## Remaining limitations / known gaps (Phase A)
+## Remaining limitations / known gaps
 
-- **No consent enforcement beyond `Company.doNotContact`.** Contact-level consent, unsubscribe links, and CASL/CAN-SPAM-aware defaults are Phase B, not yet built. Do not send real bulk or automated communications relying on this phase's compliance posture.
-- **No scheduling or sequences.** `EmailMessage.scheduledFor`/`status: SCHEDULED` are schema-ready but nothing sets or processes them yet — every Phase A send is immediate. Follow-up sequences don't exist at all yet (no `FollowUpSequence`/`SequenceEnrollment` tables).
-- **No calendar or inbound email.** Connecting a mailbox only grants send access in this phase; calendar create/update/cancel and inbound sync/reply-detection are Phase D.
+- **A company with no email-addressed contacts cannot be emailed from the CRM yet** — this is the intended consequence of requiring a linked contact for every send (see "Consent/compliance controls" above), not a bug, but it does mean the Email panel shows a "add a contact first" message instead of a compose button until at least one contact with an email exists.
+- **No scheduling or sequences.** `EmailMessage.scheduledFor`/`status: SCHEDULED` are schema-ready but nothing sets or processes them yet — every send today is immediate. Follow-up sequences don't exist at all yet (no `FollowUpSequence`/`SequenceEnrollment` tables).
+- **No calendar or inbound email.** Connecting a mailbox only grants send access; calendar create/update/cancel and inbound sync/reply-detection are Phase D.
 - **No delivery-status tracking beyond QUEUED→SENT/FAILED.** Delivered/bounced/replied statuses exist on the enum but nothing updates a message to them — that requires the provider webhooks Phase E adds.
 - **`Notification` rows are written but not yet displayed** — the dashboard bell still only reads `GeneratedReport`. Phase E's plan is to read both, not replace one with the other.
-- **No bulk-send UI.** `send_bulk_email` is seeded and `EmailMessage` has no batch-grouping column yet (`bulkSendBatchId` was proposed in the plan but not added this phase, since nothing consumes it) — a salesperson sends one company/contact at a time today.
-- **Recipient email addresses are entered as free text in the composer** (comma/newline-separated), with an optional contact picker that fills the "To" field for convenience. There's no multi-recipient contact picker across several contacts at once yet.
+- **No bulk-send UI.** `send_bulk_email` is seeded and `EmailMessage` has no batch-grouping column yet — a salesperson sends one company/contact at a time today.
+- **The composer sends to exactly one contact per email** (cc/bcc remain free text for internal recipients) — there's no multi-contact "To" picker for emailing several tracked contacts on the same company at once yet.
+- **The Communication Compliance page has no pagination** — it caps results at 50 with a "refine your search" note rather than paging through more. Fine at this team's likely scale; would need real pagination at a much larger contact volume.
 
-## Module Seven / remaining-phase recommendations
+## Remaining-phase recommendations
 
-The approved plan's phases (B–E) remain the direct next steps for Module Six itself, not deferred to a Module Seven:
+The approved plan's phases (C–E) remain the direct next steps for Module Six itself:
 
-1. **Phase B — Consent and compliance**: `ConsentRecord` (append-only, mirroring Module One's `HistoricalScoreRecord` pattern), `Contact.emailPermitted`/`doNotContact`/`unsubscribedAt`, `/settings/communication-compliance`, and a mandatory unsubscribe-link placeholder that templates cannot be saved without.
-2. **Phase C — Scheduling and sequences**: a `send-scheduled-email` worker tick (same idiom as Module Five's `reports-tick`), then `FollowUpSequence`/`SequenceStep`/`SequenceEnrollment`/`SequenceStepRun` with the `@@unique([enrollmentId, stepId])` + `singletonKey` dedup pattern already proven for scheduled reports.
-3. **Phase D — Calendar and inbound**: `Appointment` schema plus calendar create/update/cancel (same `ProviderConnection`, calendar scopes already requested in Phase A's OAuth grant but unused until now); inbound sync via provider webhooks, contact-matching by normalized email, and `/settings/communications-review` for unmatched senders.
-4. **Phase E — Delivery status and unified notifications**: provider delivery-status webhooks (idempotent, signature-verified); generalize the dashboard bell to read `Notification` alongside `GeneratedReport` rather than two separate unread-badge systems.
-5. **Once real OAuth app registrations exist** (Microsoft Entra / Google Cloud Console, not created this session per the plan's "never connect real accounts without approval"): a real manual connect/disconnect cycle, one real send to a controlled test mailbox, before trusting Phase A against a live account.
+1. **Phase C — Scheduling and sequences**: a `send-scheduled-email` worker tick (same idiom as Module Five's `reports-tick`), then `FollowUpSequence`/`SequenceStep`/`SequenceEnrollment`/`SequenceStepRun` with the `@@unique([enrollmentId, stepId])` + `singletonKey` dedup pattern already proven for scheduled reports. The sequence-step stop-condition check should also re-check `Contact.doNotContact` at run time, not just at enrollment.
+2. **Phase D — Calendar and inbound**: `Appointment` schema plus calendar create/update/cancel (same `ProviderConnection`, calendar scopes already requested in Phase A's OAuth grant but unused until now); inbound sync via provider webhooks, contact-matching by normalized email, and `/settings/communications-review` for unmatched senders.
+3. **Phase E — Delivery status and unified notifications**: provider delivery-status webhooks (idempotent, signature-verified); generalize the dashboard bell to read `Notification` alongside `GeneratedReport` rather than two separate unread-badge systems.
+4. **A multi-contact "To" picker** for the composer, if real use shows a need to email more than one tracked contact on the same send (currently: one contact per send, cc/bcc for everyone else).
+5. **Once real OAuth app registrations exist** (Microsoft Entra / Google Cloud Console, not created this session per the plan's "never connect real accounts without approval"): a real manual connect/disconnect cycle, one real send to a controlled test mailbox, and one real unsubscribe click-through, before trusting Phases A–B against a live account.
 
 ## Deviations from the approved plan
 
-None in substance. The approved plan (§10) explicitly proposed Phase A as "connections, composer, templates" with Phase boundaries as "proposed stopping points for check-ins, not a rigid commitment" — this report stops exactly at that boundary. The one implementation-level decision made during Phase A that the plan had flagged as open (§12, the `sanitize-html` dependency question) was resolved by not needing it this phase rather than by picking a side — see "HTML body handling" above; revisit if a future phase adds real HTML authoring.
+None in substance for Phase A (see the prior checkpoint's notes on the `sanitize-html` dependency decision). For Phase B, one judgment call the plan didn't fully specify: the plan described the consent gate in terms of `Contact.emailPermitted`, which has no meaning for a send with no `Contact` row at all. An initial implementation scoped the gate to contact-linked sends only (skipping the check for an ad hoc address) — reviewed immediately after the Phase B checkpoint and revised to close that gap by making a linked contact **mandatory** for every send instead, rather than leaving an untracked-address path unchecked. `SendEmailParams.contactId` is now required, the composer's free-text "To" field was removed, and the recipient is always resolved server-side from the contact's own record. This is a stricter posture than the plan explicitly called for, but a defensible one: a CRM whose purpose is tracking leads shouldn't have a send path that bypasses its own lead-tracking.

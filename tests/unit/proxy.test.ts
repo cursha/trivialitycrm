@@ -36,4 +36,17 @@ describe("proxy", () => {
     const response = proxy(request);
     expect(response.headers.get("location")).toBe("http://localhost/dashboard");
   });
+
+  it("lets an unauthenticated request through to /unsubscribe without redirecting", () => {
+    const request = new NextRequest("http://localhost/unsubscribe?token=abc");
+    const response = proxy(request);
+    expect(response.headers.get("location")).toBeNull();
+  });
+
+  it("does NOT bounce an authenticated request away from /unsubscribe (unlike /login)", () => {
+    const request = new NextRequest("http://localhost/unsubscribe?token=abc");
+    request.cookies.set(SESSION_COOKIE_NAME, "some-token-value");
+    const response = proxy(request);
+    expect(response.headers.get("location")).toBeNull();
+  });
 });

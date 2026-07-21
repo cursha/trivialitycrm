@@ -9,6 +9,11 @@ const PUBLIC_ROUTES = ["/login"];
 // of the route's own 200, which is exactly the wrong signal for a
 // deployment platform deciding whether to keep an instance alive.
 const PUBLIC_PREFIXES = ["/api/health"];
+// /unsubscribe (Module Six Phase B) must stay reachable with NO redirect in
+// either direction: unlike /login, an *authenticated* visitor (e.g. a
+// salesperson previewing their own unsubscribe link) must still see the
+// page, not get bounced to /dashboard the way PUBLIC_ROUTES would.
+const PUBLIC_ALWAYS_ROUTES = ["/unsubscribe"];
 
 // Optimistic check ONLY — this reads whether the session cookie is present,
 // not whether it's still valid. Proxy runs on every request (including
@@ -19,7 +24,7 @@ const PUBLIC_PREFIXES = ["/api/health"];
 // authentication beyond this fast pre-filter.
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+  if (PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix)) || PUBLIC_ALWAYS_ROUTES.includes(pathname)) {
     return NextResponse.next();
   }
 

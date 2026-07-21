@@ -9,7 +9,12 @@
 export type TemplatePlaceholderData = {
   contact?: { firstName?: string | null; lastName?: string | null; email?: string | null };
   company?: { name?: string | null };
-  sender?: { name?: string | null };
+  sender?: { name?: string | null; mailingAddress?: string | null };
+  /** The signed, one-click unsubscribe URL for this send's contact — built
+   * by send-email.ts at send time (src/lib/comms/unsubscribe-token.ts),
+   * since it depends on which contact is receiving the email, not on
+   * static template data. */
+  unsubscribeLink?: string | null;
 };
 
 const PLACEHOLDER_PATTERN = /\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}/g;
@@ -26,6 +31,10 @@ function lookupPlaceholder(token: string, data: TemplatePlaceholderData): string
       return data.company?.name ?? undefined;
     case "sender.name":
       return data.sender?.name ?? undefined;
+    case "sender.mailingAddress":
+      return data.sender?.mailingAddress ?? undefined;
+    case "unsubscribeLink":
+      return data.unsubscribeLink ?? undefined;
     default:
       return undefined;
   }
@@ -35,7 +44,25 @@ function lookupPlaceholder(token: string, data: TemplatePlaceholderData): string
  * validate a template at save time (an unknown token is always unresolved,
  * so it's flagged there too) and to render a placeholder picker in the
  * template editor. */
-export const KNOWN_PLACEHOLDERS = ["contact.firstName", "contact.lastName", "contact.email", "company.name", "sender.name"] as const;
+export const KNOWN_PLACEHOLDERS = [
+  "contact.firstName",
+  "contact.lastName",
+  "contact.email",
+  "company.name",
+  "sender.name",
+  "sender.mailingAddress",
+  "unsubscribeLink",
+] as const;
+
+/** Every outbound template must include this placeholder (CAN-SPAM requires
+ * a working unsubscribe mechanism in every commercial email) — checked at
+ * template save time and, as a second gate, at send time itself, since a
+ * composer send may not go through a saved template at all. */
+export const UNSUBSCRIBE_PLACEHOLDER_TOKEN = "unsubscribeLink";
+
+export function hasUnsubscribePlaceholder(text: string): boolean {
+  return extractPlaceholderTokens(text).includes(UNSUBSCRIBE_PLACEHOLDER_TOKEN);
+}
 
 /**
  * Replaces every `{{token}}` in `text` using `data`. A token with no value

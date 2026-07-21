@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { resolveTemplatePlaceholders, extractPlaceholderTokens, unknownPlaceholderTokens } from "../../src/lib/comms/templates";
+import {
+  resolveTemplatePlaceholders,
+  extractPlaceholderTokens,
+  unknownPlaceholderTokens,
+  hasUnsubscribePlaceholder,
+} from "../../src/lib/comms/templates";
 
 describe("resolveTemplatePlaceholders", () => {
   it("replaces every known placeholder with the matching data", () => {
@@ -59,6 +64,34 @@ describe("extractPlaceholderTokens / unknownPlaceholderTokens", () => {
   });
 
   it("returns an empty array when every token is known", () => {
-    expect(unknownPlaceholderTokens("{{contact.firstName}} {{company.name}} {{sender.name}}")).toEqual([]);
+    expect(unknownPlaceholderTokens("{{contact.firstName}} {{company.name}} {{sender.name}} {{sender.mailingAddress}} {{unsubscribeLink}}")).toEqual(
+      [],
+    );
+  });
+});
+
+describe("hasUnsubscribePlaceholder", () => {
+  it("returns true when the body includes {{unsubscribeLink}}", () => {
+    expect(hasUnsubscribePlaceholder("Thanks! Unsubscribe: {{unsubscribeLink}}")).toBe(true);
+  });
+
+  it("returns false when the body is missing it", () => {
+    expect(hasUnsubscribePlaceholder("Thanks for your interest, {{contact.firstName}}.")).toBe(false);
+  });
+});
+
+describe("unsubscribeLink and sender.mailingAddress resolution", () => {
+  it("resolves the unsubscribe link and mailing address placeholders", () => {
+    const { resolved, unresolved } = resolveTemplatePlaceholders("{{sender.mailingAddress}} — {{unsubscribeLink}}", {
+      sender: { mailingAddress: "123 Main St, Springfield" },
+      unsubscribeLink: "https://app.example.test/unsubscribe?token=abc",
+    });
+    expect(resolved).toBe("123 Main St, Springfield — https://app.example.test/unsubscribe?token=abc");
+    expect(unresolved).toEqual([]);
+  });
+
+  it("reports unsubscribeLink as unresolved when it isn't provided (no contact to link to)", () => {
+    const { unresolved } = resolveTemplatePlaceholders("{{unsubscribeLink}}", {});
+    expect(unresolved).toEqual(["unsubscribeLink"]);
   });
 });

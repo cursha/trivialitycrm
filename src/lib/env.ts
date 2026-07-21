@@ -41,6 +41,12 @@ const envSchema = z
     // is: optional in dev/test so the app boots without it, but a stable
     // value is mandatory once real tokens might actually be stored.
     TOKEN_ENCRYPTION_KEY: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
+    // Signs the {{unsubscribeLink}} token (src/lib/comms/unsubscribe-token.ts)
+    // — an HMAC secret, not an encryption key (the link's payload,
+    // contactId + expiry, isn't secret; it just needs tamper-evidence so an
+    // unauthenticated visitor can't forge or extend one). Same
+    // optional-in-dev/required-in-production shape as TOKEN_ENCRYPTION_KEY.
+    UNSUBSCRIBE_TOKEN_SECRET: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
     MICROSOFT_CLIENT_ID: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
     MICROSOFT_CLIENT_SECRET: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
     GOOGLE_CLIENT_ID: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
@@ -74,6 +80,13 @@ const envSchema = z
         code: "custom",
         path: ["TOKEN_ENCRYPTION_KEY"],
         message: "is required when NODE_ENV=production (encrypts stored OAuth tokens)",
+      });
+    }
+    if (value.NODE_ENV === "production" && !value.UNSUBSCRIBE_TOKEN_SECRET) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["UNSUBSCRIBE_TOKEN_SECRET"],
+        message: "is required when NODE_ENV=production (signs unsubscribe links)",
       });
     }
     if (Boolean(value.MICROSOFT_CLIENT_ID) !== Boolean(value.MICROSOFT_CLIENT_SECRET)) {

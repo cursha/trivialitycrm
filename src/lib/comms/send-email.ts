@@ -2,20 +2,25 @@
 // handlers call this exact function to actually perform a send; same
 // reasoning as every other Module Six file the worker will eventually need.
 import { prisma } from "@/lib/prisma";
+import { getEnv } from "@/lib/env";
 import { getUsableAccessToken } from "@/lib/comms/connections";
 import { getEmailProvider } from "@/lib/comms/providers/factory";
 import { providerSlugFromKind } from "@/lib/comms/provider-kind";
 import { validateOutgoingEmail } from "@/lib/comms/validate";
-import { resolveTemplatePlaceholders } from "@/lib/comms/templates";
+import { resolveTemplatePlaceholders, hasUnsubscribePlaceholder } from "@/lib/comms/templates";
+import { createUnsubscribeToken } from "@/lib/comms/unsubscribe-token";
 import { textToSafeHtml } from "@/lib/comms/sanitize-html";
 import { logEmailSent } from "@/lib/comms/activity-log";
 
 export type SendEmailParams = {
   userId: string;
   companyId: string;
-  contactId?: string | null;
+  /** Required — every send must be tied to a tracked Contact so consent can
+   * actually be checked. There is no "ad hoc address" path: a recipient the
+   * CRM doesn't track as a contact has no ConsentRecord to check permission
+   * against, so it can never be sent to (add them as a contact first). */
+  contactId: string;
   templateId?: string | null;
-  to: string[];
   cc?: string[];
   bcc?: string[];
   subject: string;
@@ -31,25 +36,57 @@ export type SendEmailOutcome = { ok: true; emailMessageId: string } | { ok: fals
  * consent gate, placeholder-resolution block, and recipient validation
  * rather than three independent copies that could drift apart.
  *
- * The consent check here is `Company.doNotContact` — the one suppression
- * flag that exists today. Contact-level consent (`ConsentRecord`,
- * `Contact.emailPermitted`/`doNotContact`) is Phase B; once it lands this
- * function gains that check too, in addition to (not instead of) this one.
+ * Two consent checks apply: `Company.doNotContact` (Phase A) and
+ * `Contact.emailPermitted`/`doNotContact` (Phase B's CASL-safe
+ * default-deny — a contact cannot receive email until a ConsentRecord has
+ * established permission). The "To" address is never taken from caller
+ * input — it's always the contact's own recorded email, resolved
+ * server-side from the authoritative Contact row, so a send can never be
+ * pointed at some other address than the one consent was actually recorded
+ * for.
  */
 export async function sendEmail(params: SendEmailParams): Promise<SendEmailOutcome> {
-  const [company, contact, sender] = await Promise.all([
+  const [company, contact, sender, workspaceSettings] = await Promise.all([
     prisma.company.findUniqueOrThrow({ where: { id: params.companyId }, select: { name: true, doNotContact: true } }),
-    params.contactId
-      ? prisma.contact.findUnique({ where: { id: params.contactId }, select: { firstName: true, lastName: true, email: true } })
-      : Promise.resolve(null),
+    prisma.contact.findUnique({
+      where: { id: params.contactId },
+      select: { id: true, firstName: true, lastName: true, email: true, emailPermitted: true, doNotContact: true },
+    }),
     prisma.user.findUniqueOrThrow({ where: { id: params.userId }, select: { name: true } }),
+    prisma.workspaceSettings.findUnique({ where: { id: 1 }, select: { mailingAddress: true } }),
   ]);
 
   if (company.doNotContact) {
     return { ok: false, error: "This company is marked Do Not Contact." };
   }
 
-  const placeholderData = { contact: contact ?? undefined, company, sender };
+  if (!contact) {
+    return { ok: false, error: "Contact not found." };
+  }
+  if (!contact.email) {
+    return { ok: false, error: "This contact has no email address on file." };
+  }
+  if (contact.doNotContact) {
+    return { ok: false, error: "This contact has opted out of email." };
+  }
+  if (!contact.emailPermitted) {
+    return {
+      ok: false,
+      error: "This contact has not granted email permission — record consent from Settings → Communication Compliance before sending.",
+    };
+  }
+  if (!hasUnsubscribePlaceholder(params.body)) {
+    return { ok: false, error: "This email must include an unsubscribe link — use a template or add {{unsubscribeLink}} to the body." };
+  }
+
+  const to = [contact.email];
+  const unsubscribeLink = `${getEnv().APP_URL ?? "http://localhost:3000"}/unsubscribe?token=${createUnsubscribeToken(contact.id)}`;
+  const placeholderData = {
+    contact,
+    company,
+    sender: { name: sender.name, mailingAddress: workspaceSettings?.mailingAddress ?? null },
+    unsubscribeLink,
+  };
   const subjectResolution = resolveTemplatePlaceholders(params.subject, placeholderData);
   const bodyResolution = resolveTemplatePlaceholders(params.body, placeholderData);
   const unresolved = [...new Set([...subjectResolution.unresolved, ...bodyResolution.unresolved])];
@@ -57,7 +94,7 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailOutco
     return { ok: false, error: `Unresolved placeholder(s): ${unresolved.map((t) => `{{${t}}}`).join(", ")}` };
   }
 
-  const recipientValidation = validateOutgoingEmail({ to: params.to, cc: params.cc, bcc: params.bcc, subject: subjectResolution.resolved });
+  const recipientValidation = validateOutgoingEmail({ to, cc: params.cc, bcc: params.bcc, subject: subjectResolution.resolved });
   if (!recipientValidation.valid) {
     return { ok: false, error: recipientValidation.errors.join(" ") };
   }
@@ -70,9 +107,9 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailOutco
   const emailMessage = await prisma.emailMessage.create({
     data: {
       companyId: params.companyId,
-      contactId: params.contactId ?? null,
+      contactId: params.contactId,
       providerConnectionId: connection.id,
-      toAddresses: params.to,
+      toAddresses: to,
       ccAddresses: params.cc ?? [],
       bccAddresses: params.bcc ?? [],
       subject: subjectResolution.resolved,
@@ -87,7 +124,7 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailOutco
     const account = await getUsableAccessToken(params.userId);
     const provider = getEmailProvider(providerSlugFromKind(connection.provider));
     const result = await provider.sendEmail(account, {
-      to: params.to,
+      to,
       cc: params.cc,
       bcc: params.bcc,
       subject: subjectResolution.resolved,
@@ -99,7 +136,7 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailOutco
         where: { id: emailMessage.id },
         data: { status: "SENT", sentAt: new Date(), providerMessageId: result.providerMessageId, providerThreadId: result.providerThreadId },
       });
-      await logEmailSent(tx, { companyId: params.companyId, userId: params.userId, subject: subjectResolution.resolved, toAddresses: params.to });
+      await logEmailSent(tx, { companyId: params.companyId, userId: params.userId, subject: subjectResolution.resolved, toAddresses: to });
     });
 
     return { ok: true, emailMessageId: emailMessage.id };
