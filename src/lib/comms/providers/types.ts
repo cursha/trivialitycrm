@@ -16,6 +16,11 @@ export type OAuthTokens = {
 export type ConnectedAccount = {
   accessToken: string;
   refreshToken: string;
+  /** ProviderConnection.id — present whenever the account came from a real
+   * stored connection (getUsableAccessToken()), so sendEmail() can scope
+   * its provider-call rate limit to this one mailbox rather than sharing a
+   * single bucket across every user connected to the same provider. */
+  connectionId?: string;
 };
 
 export type SendEmailInput = {

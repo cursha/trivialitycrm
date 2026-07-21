@@ -168,7 +168,7 @@ export class GoogleProvider implements EmailProvider {
   async sendEmail(account: ConnectedAccount, input: SendEmailInput): Promise<SendEmailResult> {
     const raw = base64UrlEncode(buildMimeMessage(input));
 
-    const sent = await callEmailProvider({ providerName: "google" }, async (signal) => {
+    const sent = await callEmailProvider({ providerName: "google", connectionId: account.connectionId }, async (signal) => {
       const response = await fetch(GMAIL_SEND_URL, {
         method: "POST",
         headers: { Authorization: `Bearer ${account.accessToken}`, "Content-Type": "application/json" },

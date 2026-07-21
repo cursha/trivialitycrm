@@ -173,6 +173,28 @@ describe("processDueSequenceStep", () => {
     expect(enrollment.status).toBe("ACTIVE");
   });
 
+  it("fails an EMAIL step whose template has been deactivated since the sequence was authored", async () => {
+    const { user, company } = await baseFixtures();
+    await connectMailbox(user.id);
+    const contact = await testPrisma.contact.create({
+      data: { companyId: company.id, firstName: "Jamie", lastName: "Lead", email: "jamie@example.com", emailPermitted: true },
+    });
+    const template = await sharedTemplateFixture(user.id);
+    const sequence = await testPrisma.followUpSequence.create({ data: { name: "Nurture", createdById: user.id } });
+    const step1 = await testPrisma.sequenceStep.create({ data: { sequenceId: sequence.id, stepOrder: 1, type: "EMAIL", emailTemplateId: template.id } });
+
+    const enrolled = await enrollInSequence({ sequenceId: sequence.id, companyId: company.id, contactId: contact.id, enrolledById: user.id });
+    if (!enrolled.ok) throw new Error("enroll failed");
+
+    await testPrisma.emailTemplate.update({ where: { id: template.id }, data: { active: false } });
+    await processDueSequenceStep(enrolled.enrollmentId, step1.id);
+
+    const run = await testPrisma.sequenceStepRun.findUniqueOrThrow({ where: { enrollmentId_stepId: { enrollmentId: enrolled.enrollmentId, stepId: step1.id } } });
+    expect(run.status).toBe("FAILED");
+    expect(run.errorMessage).toMatch(/deactivated/);
+    expect(await testPrisma.emailMessage.count()).toBe(0);
+  });
+
   it("creates a real Task for a TASK-like step", async () => {
     const { user, company } = await baseFixtures();
     const sequence = await testPrisma.followUpSequence.create({ data: { name: "Nurture", createdById: user.id } });

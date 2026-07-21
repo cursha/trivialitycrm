@@ -35,6 +35,10 @@ export type EnrollmentRow = {
   totalSteps: number;
   nextStepDueAt: string | null;
   stopReason: string | null;
+  /** The error from this enrollment's most recent failed step, if any — a
+   * failed step never stops the sequence (see src/lib/comms/sequences.ts),
+   * so this is the only place in the UI that surfaces it after the fact. */
+  lastFailedStepError: string | null;
 };
 
 export function SequenceEnrollmentPanel({
@@ -179,6 +183,9 @@ export function SequenceEnrollmentPanel({
                 )}
                 {enrollment.stopReason && <> · {enrollment.stopReason}</>}
               </p>
+              {enrollment.lastFailedStepError && (
+                <p className="mt-1 text-xs font-semibold text-danger">Last step failed: {enrollment.lastFailedStepError}</p>
+              )}
               {canEnroll && (enrollment.status === "ACTIVE" || enrollment.status === "PAUSED") && (
                 <div className="mt-2 flex gap-2">
                   {enrollment.status === "ACTIVE" ? (

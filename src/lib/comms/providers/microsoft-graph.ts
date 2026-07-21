@@ -137,7 +137,7 @@ export class MicrosoftGraphProvider implements EmailProvider {
    * (its id is in the response), then POST its /send action.
    */
   async sendEmail(account: ConnectedAccount, input: SendEmailInput): Promise<SendEmailResult> {
-    const draft = await callEmailProvider({ providerName: "microsoft" }, async (signal) => {
+    const draft = await callEmailProvider({ providerName: "microsoft", connectionId: account.connectionId }, async (signal) => {
       const response = await fetch(`${GRAPH_BASE}/me/messages`, {
         method: "POST",
         headers: { Authorization: `Bearer ${account.accessToken}`, "Content-Type": "application/json" },
@@ -156,7 +156,7 @@ export class MicrosoftGraphProvider implements EmailProvider {
       return (await response.json()) as { id: string; conversationId: string };
     });
 
-    await callEmailProvider({ providerName: "microsoft" }, async (signal) => {
+    await callEmailProvider({ providerName: "microsoft", connectionId: account.connectionId }, async (signal) => {
       const response = await fetch(`${GRAPH_BASE}/me/messages/${draft.id}/send`, {
         method: "POST",
         headers: { Authorization: `Bearer ${account.accessToken}` },

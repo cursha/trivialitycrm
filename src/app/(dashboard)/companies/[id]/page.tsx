@@ -60,7 +60,13 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
       prisma.sequenceEnrollment.findMany({
         where: { companyId: id },
         orderBy: { enrolledAt: "desc" },
-        include: { sequence: { select: { name: true, steps: { select: { id: true } } } } },
+        include: {
+          sequence: { select: { name: true, steps: { select: { id: true } } } },
+          // Per-enrollment "take 1" — Prisma applies a nested take/orderBy
+          // per parent row, not globally, so this is each enrollment's own
+          // most recent failed step, not the single most recent across all.
+          stepRuns: { where: { status: "FAILED" }, orderBy: { runAt: "desc" }, take: 1 },
+        },
       }),
     ]);
   const canEdit = hasPermission(user, "edit_leads");
@@ -208,6 +214,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               totalSteps: enrollment.sequence.steps.length,
               nextStepDueAt: enrollment.nextStepDueAt?.toISOString() ?? null,
               stopReason: enrollment.stopReason,
+              lastFailedStepError: enrollment.stepRuns[0]?.errorMessage ?? null,
             }))}
             canEnroll={hasPermission(user, "enroll_in_sequences")}
           />

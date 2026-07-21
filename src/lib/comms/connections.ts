@@ -82,7 +82,11 @@ export async function getUsableAccessToken(userId: string): Promise<ConnectedAcc
   const REFRESH_MARGIN_MS = 5 * 60 * 1000;
 
   if (connection.tokenExpiresAt.getTime() - Date.now() > REFRESH_MARGIN_MS && connection.status === "CONNECTED") {
-    return { accessToken: decryptToken(connection.encryptedAccessToken), refreshToken: decryptToken(connection.encryptedRefreshToken) };
+    return {
+      accessToken: decryptToken(connection.encryptedAccessToken),
+      refreshToken: decryptToken(connection.encryptedRefreshToken),
+      connectionId: connection.id,
+    };
   }
 
   const provider = getEmailProvider(providerSlugFromKind(connection.provider));
@@ -98,7 +102,7 @@ export async function getUsableAccessToken(userId: string): Promise<ConnectedAcc
         lastError: null,
       },
     });
-    return { accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken };
+    return { accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken, connectionId: connection.id };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Token refresh failed.";
     await prisma.providerConnection.update({ where: { userId }, data: { status: "ERROR", lastError: message } });

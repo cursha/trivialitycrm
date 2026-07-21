@@ -183,6 +183,9 @@ export async function processDueSequenceStep(enrollmentId: string, stepId: strin
       if (!template) {
         runStatus = "FAILED";
         errorMessage = "The template for this step no longer exists.";
+      } else if (!template.active) {
+        runStatus = "FAILED";
+        errorMessage = "The template for this step has been deactivated.";
       } else {
         const result = await sendEmail({
           userId: enrollment.enrolledById,
