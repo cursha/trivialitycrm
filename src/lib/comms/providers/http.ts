@@ -25,14 +25,25 @@ export class EmailProviderTimeoutError extends Error {
 
 export type EmailProviderCallOptions = {
   providerName: string;
+  /** Scopes the rate-limit bucket to one connected mailbox rather than
+   * every user of this provider. Pass this for actual send operations —
+   * omit it for infrequent, non-send calls (OAuth token exchange/refresh)
+   * where a single shared per-provider bucket is fine. Without this, a
+   * bucket keyed on providerName alone is shared by every user connected
+   * to the same provider, so one user's high-volume sequence/scheduled
+   * sends could throttle everyone else's — confirmed as a real gap during
+   * a post-Phase-C review and fixed here rather than left as a known
+   * limitation. */
+  connectionId?: string;
   timeoutMs?: number;
   rateLimit?: { windowMs: number; limit: number };
 };
 
 export async function callEmailProvider<T>(options: EmailProviderCallOptions, fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
-  const { providerName, timeoutMs = 30_000, rateLimit = { windowMs: 60_000, limit: 20 } } = options;
+  const { providerName, connectionId, timeoutMs = 30_000, rateLimit = { windowMs: 60_000, limit: 20 } } = options;
 
-  const result = await checkRateLimit(`email-send:${providerName}`, rateLimit);
+  const rateLimitKey = connectionId ? `email-send:${providerName}:${connectionId}` : `email-send:${providerName}`;
+  const result = await checkRateLimit(rateLimitKey, rateLimit);
   if (!result.allowed) {
     throw new EmailProviderRateLimitError(providerName);
   }

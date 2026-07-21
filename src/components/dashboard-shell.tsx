@@ -8,7 +8,7 @@ import type { NavItem, NavIconKey } from "@/lib/nav";
 import { logout } from "@/lib/auth/actions";
 import { Logo } from "@/components/ui/logo";
 import { Button } from "@/components/ui/button";
-import { NotificationBell, type UnseenReportNotification } from "@/components/notification-bell";
+import { NotificationBell, type UnseenReportNotification, type GeneralNotification } from "@/components/notification-bell";
 
 const ICONS: Record<NavIconKey, typeof LayoutDashboard> = {
   dashboard: LayoutDashboard,
@@ -28,6 +28,7 @@ export function DashboardShell({
   userInitials,
   roleName,
   notifications,
+  generalNotifications,
   children,
 }: {
   navItems: NavItem[];
@@ -35,6 +36,7 @@ export function DashboardShell({
   userInitials: string;
   roleName: string;
   notifications: UnseenReportNotification[];
+  generalNotifications: GeneralNotification[];
   children: React.ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -103,7 +105,7 @@ export function DashboardShell({
             <Logo size="compact" className="h-12 lg:hidden" />
           </div>
           <div className="flex items-center gap-4">
-            <NotificationBell notifications={notifications} />
+            <NotificationBell notifications={notifications} generalNotifications={generalNotifications} />
             <div className="hidden text-right sm:block">
               <p className="text-sm font-bold leading-tight">{userName}</p>
               <p className="text-xs text-text-muted">{roleName}</p>
