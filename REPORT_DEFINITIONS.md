@@ -149,3 +149,12 @@ Source: `src/app/(dashboard)/reports/queries.ts` (`getDashboardMetrics`). All me
 | Current pipeline (breakdown) | Active companies grouped by current pipeline stage, in scope | snapshot | Grouped by `pipelineStageId`, never by stage name |
 
 **Missing-data handling**: every count is a real Postgres aggregate; an empty scope/period renders as `0`, never blank or omitted.
+
+## Scheduled reports
+
+Source: `worker/handlers/generate-report.ts`, `worker/handlers/reports-tick.ts`, `src/lib/reports/schedule.ts`.
+
+- **Which period a run covers**: determined by the schedule's cadence, not whatever date range happens to be saved in its linked `SavedView` — `DAILY` → Today, `WEEKLY` → This week, `MONTHLY` → This month, each resolved in `BUSINESS_TIMEZONE` at generation time. A schedule's other dimensional filters (territory, lead type, etc.) still come from its linked `SavedView`, if any.
+- **Which scope a run uses**: the schedule creator's own `reportScope()` at the moment the run executes — not the scope of whoever eventually downloads it. If the creator's access has narrowed since the schedule was created (permission revoked, disabled account), the run fails permanently (recorded, not retried) rather than running with a different, unintended scope.
+- **Frozen, not live**: `GeneratedReport.payload` is computed once and stored — downloading a run next month reproduces exactly what was generated then, never a live re-query against today's data. This is the one place in the reporting system where a number shown to a user is *not* a live Postgres aggregate at view time; it is still a real, accurately-computed aggregate, just computed once and preserved rather than recomputed on every view.
+- **Failure handling**: a permanent failure (invalid report key, disabled/deleted creator, lost permission) is recorded as a `FAILED` `GeneratedReport` row with a human-readable `errorMessage`, and the schedule still advances to its next period. A transient failure (e.g. a database hiccup) is not recorded as a run at all — it is retried by the worker's own bounded backoff against the same still-due period.

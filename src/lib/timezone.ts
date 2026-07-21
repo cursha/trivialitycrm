@@ -1,4 +1,5 @@
-import "server-only";
+// No `import "server-only"` — the worker (via src/lib/reports/schedule.ts)
+// needs this module too; see src/lib/prisma.ts for the same reasoning.
 import { REPORT_DATE_RANGE_KEYS, type ReportDateRangeKey } from "@/lib/reports/date-range-keys";
 
 export { REPORT_DATE_RANGE_KEYS, type ReportDateRangeKey };

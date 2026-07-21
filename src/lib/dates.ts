@@ -1,4 +1,5 @@
-import "server-only";
+// No `import "server-only"` — the worker (via src/app/(dashboard)/reports/queries.ts)
+// needs this module too; see src/lib/prisma.ts for the same reasoning.
 
 /**
  * Local-time day boundaries, computed from calendar components (not UTC

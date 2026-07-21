@@ -73,8 +73,9 @@ Module Five turns the CRM's data into management reporting — see `MODULE_5_REP
 - **Full filtering**: date range (Today/Week/Month/Quarter/Year/Custom, resolved against a documented `BUSINESS_TIMEZONE`), territory, lead type, pipeline stage, salesperson, source, competitor, score range, trivia status, active/archived, and won/lost — validated server-side and carried through to exports.
 - **CSV/Excel export** of every report, reusing the existing formula-injection-safe export utility, with the report name, date range, active filters, and generation timestamp always included.
 - **Small-sample honesty**: any rate (win rate, conversion rate) is suppressed in favor of "not enough data" below a documented minimum sample size, and the underlying count is always shown — never a bare, misleading percentage.
+- **Scheduled reports** (`/reports/scheduled`, permission-gated): daily/weekly/monthly report generation on the durable worker (Module Three) — an hourly pg-boss tick finds due schedules, generates the report as its creator would see it, and freezes the result so a later download always reproduces exactly what was generated. No email yet (that needs a future communications module) — recipients see a new run via an in-app notification bell.
 
-Not in Module Five (by design, deferred to Module Six): scheduled/recurring report delivery (a `ScheduledReport`/`GeneratedReport` schema exists and is migrated, but the worker job and CRUD UI were explicitly descoped to ship core reporting sooner — see `MODULE_5_REPORT.md`'s Known Limitations), and query-performance testing at large data volumes (hundreds-of-thousands of rows) beyond what's exercised by the automated test suite.
+Not in Module Five (by design): query-performance testing at large data volumes (hundreds-of-thousands of rows) beyond what's exercised by the automated test suite, and in-place editing of a scheduled report's cadence/recipients (delete and recreate covers it for now).
 
 ## Installation
 
@@ -127,7 +128,7 @@ Module Two adds `run_research`, `review_research_results`, `transfer_leads`, and
 
 Module Four adds `bulk_update_leads`, `manage_territories`, `create_shared_views`, and `view_manager_workspace`. Administrator gets all four; Manager gets `bulk_update_leads`, `create_shared_views`, and `view_manager_workspace` by default (not `manage_territories`, matching the existing pattern where other `manage_*` lookup-table permissions are Administrator-only by default); Salesperson gets none of the four (private saved views and personal pipeline access need no new grant). Assigning/reassigning a lead — including a previously-unassigned one — continues to use the existing `reassign_leads` permission; no separate `assign_leads` key was added.
 
-Module Five adds `view_own_reports`, `view_team_reports`, `view_all_reports`, `export_reports`, `manage_scheduled_reports`, `view_ai_costs`, and `view_competitor_reports` — a permission tier independent of lead-edit visibility (see `MODULE_5_REPORT.md`). Administrator gets all seven; Manager gets `view_own_reports`, `view_team_reports`, `export_reports`, and `view_competitor_reports`; Salesperson gets `view_own_reports` only. `manage_scheduled_reports` is seeded and assignable but has no UI yet (scheduled reports are deferred to Module Six).
+Module Five adds `view_own_reports`, `view_team_reports`, `view_all_reports`, `export_reports`, `manage_scheduled_reports`, `view_ai_costs`, and `view_competitor_reports` — a permission tier independent of lead-edit visibility (see `MODULE_5_REPORT.md`). Administrator gets all seven; Manager gets `view_own_reports`, `view_team_reports`, `export_reports`, and `view_competitor_reports`; Salesperson gets `view_own_reports` only. `manage_scheduled_reports` gates the `/reports/scheduled` CRUD UI.
 
 ## AI research provider
 

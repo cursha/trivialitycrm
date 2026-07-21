@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
+import { prisma } from "@/lib/prisma";
 import { NAV_ITEMS } from "@/lib/nav";
 import { DashboardShell } from "@/components/dashboard-shell";
 
@@ -13,6 +14,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
     (item) => !item.requiresAnyPermission || item.requiresAnyPermission.some((key) => hasPermission(user, key)),
   );
 
+  const unseenReports = await prisma.generatedReport.findMany({
+    where: { recipientIds: { has: user.id }, NOT: { seenByIds: { has: user.id } } },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+    include: { scheduledReport: { select: { name: true } } },
+  });
+  const notifications = unseenReports.map((r) => ({
+    id: r.id,
+    name: r.scheduledReport?.name ?? r.reportKey,
+    status: r.status,
+    createdAt: r.createdAt.toISOString(),
+  }));
+
   const initials =
     user.name
       .split(" ")
@@ -23,7 +37,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
       .toUpperCase() || "?";
 
   return (
-    <DashboardShell navItems={visibleNavItems} userName={user.name} userInitials={initials} roleName={user.role.name}>
+    <DashboardShell
+      navItems={visibleNavItems}
+      userName={user.name}
+      userInitials={initials}
+      roleName={user.role.name}
+      notifications={notifications}
+    >
       {children}
     </DashboardShell>
   );

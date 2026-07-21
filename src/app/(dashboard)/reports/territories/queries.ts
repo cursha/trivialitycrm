@@ -1,4 +1,5 @@
-import "server-only";
+// No `import "server-only"` — the worker (via src/lib/reports/build-rows.ts)
+// needs this module too; see src/lib/prisma.ts for the same reasoning.
 import { prisma } from "@/lib/prisma";
 import type { AuthenticatedUser } from "@/lib/auth/current-user";
 import { reportScope } from "@/lib/reports/scope";

@@ -3,9 +3,11 @@ import { promisify } from "node:util";
 import http from "node:http";
 import { getEnv } from "../src/lib/env";
 import { logger } from "../src/lib/logger";
-import { getBoss, startBoss, QUEUE_RUN_SEARCH } from "../src/lib/jobs/boss-client";
+import { getBoss, startBoss, QUEUE_RUN_SEARCH, QUEUE_GENERATE_REPORT } from "../src/lib/jobs/boss-client";
 import { handleRunSearchJob } from "./handlers/run-search";
 import { sweepExpiredSessions, sweepExpiredImportBatches, sweepExpiredRateLimitBuckets } from "./handlers/cleanup";
+import { runReportsTick } from "./handlers/reports-tick";
+import { handleGenerateReportJob } from "./handlers/generate-report";
 import { shutdownBoss } from "./shutdown";
 
 const execAsync = promisify(exec);
@@ -13,6 +15,7 @@ const execAsync = promisify(exec);
 const QUEUE_CLEANUP_SESSIONS = "cleanup-sessions";
 const QUEUE_CLEANUP_IMPORT_BATCHES = "cleanup-import-batches";
 const QUEUE_CLEANUP_RATE_LIMIT_BUCKETS = "cleanup-rate-limit-buckets";
+const QUEUE_REPORTS_TICK = "reports-tick";
 const MIGRATION_GATE_POLL_MS = 5_000;
 const MIGRATION_GATE_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -93,7 +96,11 @@ async function main(): Promise<void> {
   await boss.createQueue(QUEUE_CLEANUP_RATE_LIMIT_BUCKETS, { retryLimit: 1 });
   await boss.schedule(QUEUE_CLEANUP_RATE_LIMIT_BUCKETS, "0 * * * *");
 
+  await boss.createQueue(QUEUE_REPORTS_TICK, { retryLimit: 1 });
+  await boss.schedule(QUEUE_REPORTS_TICK, "0 * * * *");
+
   await boss.work(QUEUE_RUN_SEARCH, { localConcurrency: 1 }, handleRunSearchJob);
+  await boss.work(QUEUE_GENERATE_REPORT, { localConcurrency: 1 }, handleGenerateReportJob);
   await boss.work(QUEUE_CLEANUP_SESSIONS, async () => {
     await sweepExpiredSessions();
   });
@@ -102,6 +109,9 @@ async function main(): Promise<void> {
   });
   await boss.work(QUEUE_CLEANUP_RATE_LIMIT_BUCKETS, async () => {
     await sweepExpiredRateLimitBuckets();
+  });
+  await boss.work(QUEUE_REPORTS_TICK, async () => {
+    await runReportsTick();
   });
 
   boss.on("error", (error) => logger.error({ err: error }, "pg-boss error"));
