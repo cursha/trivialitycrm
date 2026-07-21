@@ -36,6 +36,7 @@ const TABLES_TO_RESET = [
   "ImportBatch",
   "RateLimitBucket",
   "Notification",
+  "Appointment",
   "SequenceStepRun",
   "SequenceEnrollment",
   "SequenceStep",

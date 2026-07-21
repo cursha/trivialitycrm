@@ -14,6 +14,7 @@ import { ScorePanel } from "./eos/score-panel";
 import { EvidencePanel } from "./eos/evidence-panel";
 import { EmailPanel } from "./email/email-panel";
 import { SequenceEnrollmentPanel } from "./sequences/sequence-enrollment-panel";
+import { AppointmentPanel } from "./appointments/appointment-panel";
 import { previewSteps } from "@/lib/comms/sequences";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,8 +36,19 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const company = await getScopedCompany(user, id);
   if (!company) notFound();
 
-  const [activities, tasks, salespeople, evidence, scoreHistory, pipelineStages, emailMessages, emailTemplates, activeSequences, enrollments] =
-    await Promise.all([
+  const [
+    activities,
+    tasks,
+    salespeople,
+    evidence,
+    scoreHistory,
+    pipelineStages,
+    emailMessages,
+    emailTemplates,
+    activeSequences,
+    enrollments,
+    appointments,
+  ] = await Promise.all([
       listCompanyActivities(user, id),
       listCompanyTasks(user, id),
       prisma.user.findMany({ where: { disabled: false }, orderBy: { name: "asc" } }),
@@ -67,6 +79,10 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
           // most recent failed step, not the single most recent across all.
           stepRuns: { where: { status: "FAILED" }, orderBy: { runAt: "desc" }, take: 1 },
         },
+      }),
+      prisma.appointment.findMany({
+        where: { companyId: id },
+        orderBy: { startAt: "asc" },
       }),
     ]);
   const canEdit = hasPermission(user, "edit_leads");
@@ -217,6 +233,24 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               lastFailedStepError: enrollment.stepRuns[0]?.errorMessage ?? null,
             }))}
             canEnroll={hasPermission(user, "enroll_in_sequences")}
+          />
+
+          <AppointmentPanel
+            companyId={company.id}
+            appointments={appointments.map((appointment) => ({
+              id: appointment.id,
+              type: appointment.type,
+              title: appointment.title,
+              startAt: appointment.startAt.toISOString(),
+              endAt: appointment.endAt.toISOString(),
+              timezone: appointment.timezone,
+              status: appointment.status,
+              lastError: appointment.lastError,
+            }))}
+            contacts={company.contacts
+              .filter((c) => c.email)
+              .map((c) => ({ id: c.id, name: `${c.firstName} ${c.lastName}`, email: c.email as string }))}
+            canManage={hasPermission(user, "manage_calendar_connections")}
           />
         </div>
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { MockEmailProvider } from "../../src/lib/comms/providers/mock";
+import { MockEmailProvider, SIMULATED_CALENDAR_FAILURE_TITLE } from "../../src/lib/comms/providers/mock";
 import { MicrosoftGraphProvider } from "../../src/lib/comms/providers/microsoft-graph";
 import { GoogleProvider } from "../../src/lib/comms/providers/google";
 import { getEmailProvider } from "../../src/lib/comms/providers/factory";
@@ -32,6 +32,32 @@ describe("MockEmailProvider", () => {
     expect(first).not.toBe(second);
     expect(first).toContain("state-a");
   });
+
+  it("creates, updates, and cancels a calendar event with no network access", async () => {
+    const provider: EmailProvider = new MockEmailProvider();
+    const account = { accessToken: "token", refreshToken: "refresh" };
+    const input = { title: "Demo", startAt: new Date(), endAt: new Date(), timezone: "America/Toronto", attendeeEmails: ["lead@example.com"] };
+
+    const created = await provider.createCalendarEvent(account, input);
+    expect(created.providerEventId).toContain("mock-event-");
+
+    await expect(provider.updateCalendarEvent(account, created.providerEventId, input)).resolves.toBeUndefined();
+    await expect(provider.cancelCalendarEvent(account, created.providerEventId)).resolves.toBeUndefined();
+  });
+
+  it("simulates a calendar provider failure for a specific title, the only way tests exercise Appointment's ERROR path", async () => {
+    const provider: EmailProvider = new MockEmailProvider();
+    const account = { accessToken: "token", refreshToken: "refresh" };
+    const input = {
+      title: SIMULATED_CALENDAR_FAILURE_TITLE,
+      startAt: new Date(),
+      endAt: new Date(),
+      timezone: "America/Toronto",
+      attendeeEmails: [],
+    };
+
+    await expect(provider.createCalendarEvent(account, input)).rejects.toThrow(/Simulated calendar provider failure/);
+  });
 });
 
 describe("MicrosoftGraphProvider.getAuthorizationUrl", () => {
@@ -63,6 +89,7 @@ describe("MicrosoftGraphProvider.getAuthorizationUrl", () => {
     expect(url.searchParams.get("redirect_uri")).toBe("https://app.example.com/callback/microsoft");
     expect(url.searchParams.get("scope")).toContain("Mail.Send");
     expect(url.searchParams.get("scope")).toContain("offline_access");
+    expect(url.searchParams.get("scope")).toContain("Calendars.ReadWrite");
   });
 
   it("throws a clear error when Microsoft credentials are not configured", () => {
@@ -103,6 +130,7 @@ describe("GoogleProvider.getAuthorizationUrl", () => {
     expect(url.searchParams.get("access_type")).toBe("offline");
     expect(url.searchParams.get("prompt")).toBe("consent");
     expect(url.searchParams.get("scope")).toContain("gmail.send");
+    expect(url.searchParams.get("scope")).toContain("calendar");
   });
 });
 

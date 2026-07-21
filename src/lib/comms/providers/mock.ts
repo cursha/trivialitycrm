@@ -1,10 +1,15 @@
 import crypto from "node:crypto";
-import type { EmailProvider, OAuthTokens, SendEmailInput, SendEmailResult } from "./types";
+import type { EmailProvider, OAuthTokens, SendEmailInput, SendEmailResult, CalendarEventInput, CalendarEventResult } from "./types";
 
 /** Sending to this address deterministically simulates a provider-side
  * failure — the only way tests can exercise the FAILED/Notification path in
  * src/lib/comms/send-email.ts without a real provider ever failing. */
 export const SIMULATED_SEND_FAILURE_ADDRESS = "trigger-send-failure@example.test";
+
+/** Same idea as SIMULATED_SEND_FAILURE_ADDRESS, for calendar operations —
+ * an event with this exact title deterministically fails create/update/
+ * cancel, the only way tests exercise Appointment's ERROR path. */
+export const SIMULATED_CALENDAR_FAILURE_TITLE = "Trigger Calendar Failure";
 
 /**
  * No network calls, no cost, deterministic-enough fixture data — the only
@@ -47,4 +52,19 @@ export class MockEmailProvider implements EmailProvider {
       providerThreadId: `mock-thread-${crypto.randomUUID()}`,
     };
   }
+
+  async createCalendarEvent(_account: unknown, input: CalendarEventInput): Promise<CalendarEventResult> {
+    if (input.title === SIMULATED_CALENDAR_FAILURE_TITLE) {
+      throw new Error("Simulated calendar provider failure for testing.");
+    }
+    return { providerEventId: `mock-event-${crypto.randomUUID()}` };
+  }
+
+  async updateCalendarEvent(_account: unknown, _providerEventId: string, input: CalendarEventInput): Promise<void> {
+    if (input.title === SIMULATED_CALENDAR_FAILURE_TITLE) {
+      throw new Error("Simulated calendar provider failure for testing.");
+    }
+  }
+
+  async cancelCalendarEvent(): Promise<void> {}
 }
