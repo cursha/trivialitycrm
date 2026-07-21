@@ -34,10 +34,9 @@ export default async function ReportsLayout({ children }: { children: React.Reac
     { href: "/reports/lead-types", label: "Lead Types" },
     { href: "/reports/trends", label: "Trends" },
   );
-  // Scheduled reports (worker + CRUD UI) deferred to Module Six per explicit
-  // scope decision — see MODULE_5_REPORT.md's "Known limitations" section.
-  // The manage_scheduled_reports permission still exists (seeded, assignable)
-  // so it's ready to gate that future UI without another migration.
+  if (hasPermission(user, "manage_scheduled_reports")) {
+    tabs.push({ href: "/reports/scheduled", label: "Scheduled Reports" });
+  }
 
   return (
     <div className="mx-auto max-w-7xl space-y-6">

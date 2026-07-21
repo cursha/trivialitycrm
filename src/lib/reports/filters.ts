@@ -1,4 +1,5 @@
-import "server-only";
+// No `import "server-only"` — the worker (generate-report.ts) needs this
+// module too; see src/lib/prisma.ts for the same reasoning.
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { TriviaStatusValues } from "@/lib/validation/company";

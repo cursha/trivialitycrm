@@ -1,4 +1,8 @@
-import "server-only";
+// No `import "server-only"` — src/lib/auth/current-user.ts (needed by the
+// worker's generate-report.ts) imports this module at load time even though
+// the worker never calls its cookie-touching functions; the guard throws on
+// that mere import under plain Node/tsx. Same reasoning as
+// src/lib/prisma.ts's identical omission.
 import { cookies } from "next/headers";
 import crypto from "node:crypto";
 import { prisma } from "@/lib/prisma";

@@ -1,7 +1,13 @@
-import "server-only";
-import { startBoss, QUEUE_RUN_SEARCH } from "./boss-client";
+// Deliberately no `import "server-only"` here — worker/handlers/reports-tick.ts
+// (running under plain tsx, not Next's "react-server" bundler condition) needs
+// enqueueGenerateReportJob too, and that guard throws under plain Node/tsx
+// execution. Every consumer of this module is itself a server-only context
+// (Server Actions in the web process, or the worker process), same reasoning
+// as src/lib/prisma.ts's identical omission.
+import { startBoss, QUEUE_RUN_SEARCH, QUEUE_GENERATE_REPORT } from "./boss-client";
 
 export type RunSearchJobData = { searchId: string };
+export type GenerateReportJobData = { scheduledReportId: string; periodKey: string };
 
 /** Enqueues a durable run-search job and returns pg-boss's job id (stored on
  * LeadSearch.providerJobId for cancellation lookup / log correlation). The
@@ -22,4 +28,21 @@ export async function enqueueSearchJob(searchId: string): Promise<string> {
 export async function cancelSearchJob(providerJobId: string): Promise<void> {
   const boss = await startBoss({ supervise: false });
   await boss.cancel(QUEUE_RUN_SEARCH, providerJobId);
+}
+
+/**
+ * Enqueues a durable report-generation job. `periodKey` is the schedule's
+ * `nextRunAt` at enqueue time (an ISO string), combined with the schedule
+ * id into the singletonKey — see GENERATE_REPORT_QUEUE_OPTIONS in
+ * boss-client.ts for why. Returns null (rather than throwing) when pg-boss
+ * declines the send because an identical-key job is already active — that
+ * is the dedup working as intended, not a failure the caller should retry.
+ */
+export async function enqueueGenerateReportJob(scheduledReportId: string, periodKey: string): Promise<string | null> {
+  const boss = await startBoss({ supervise: false });
+  return boss.send(
+    QUEUE_GENERATE_REPORT,
+    { scheduledReportId, periodKey } satisfies GenerateReportJobData,
+    { singletonKey: `${scheduledReportId}:${periodKey}` },
+  );
 }

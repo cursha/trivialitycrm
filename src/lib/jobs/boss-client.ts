@@ -5,6 +5,7 @@ import { PgBoss } from "pg-boss";
 import { getEnv } from "../env";
 
 export const QUEUE_RUN_SEARCH = "run-search";
+export const QUEUE_GENERATE_REPORT = "generate-report";
 
 /**
  * Retry/expiry defaults for the run-search queue. expireInSeconds is
@@ -22,6 +23,25 @@ const RUN_SEARCH_QUEUE_OPTIONS = {
   retryBackoff: true,
   retryDelayMax: 300,
   expireInSeconds: 3600,
+  retentionSeconds: 30 * 24 * 60 * 60,
+};
+
+/**
+ * Same singleton+singletonKey dedup idiom as run-search, applied per
+ * (scheduledReportId, nextRunAt) instead of per search — the reports-tick
+ * handler sends with singletonKey = `${scheduledReportId}:${nextRunAt.toISOString()}`,
+ * so if a tick's own job for that exact period is still active when the
+ * next hourly tick runs (slow query, worker restart, etc.), the duplicate
+ * send is a no-op rather than a second generation of the same period. Once
+ * the handler advances nextRunAt to the next period, the key changes and a
+ * new job is free to be sent.
+ */
+const GENERATE_REPORT_QUEUE_OPTIONS = {
+  policy: "singleton" as const,
+  retryLimit: 2,
+  retryBackoff: true,
+  retryDelayMax: 60,
+  expireInSeconds: 300,
   retentionSeconds: 30 * 24 * 60 * 60,
 };
 
@@ -56,6 +76,7 @@ export async function startBoss(options: { supervise?: boolean } = {}): Promise<
   const boss = getBoss(options);
   await boss.start();
   await boss.createQueue(QUEUE_RUN_SEARCH, RUN_SEARCH_QUEUE_OPTIONS);
+  await boss.createQueue(QUEUE_GENERATE_REPORT, GENERATE_REPORT_QUEUE_OPTIONS);
   return boss;
 }
 

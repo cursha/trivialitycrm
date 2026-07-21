@@ -526,6 +526,19 @@ model GeneratedReport {
   scheduledReport   ScheduledReport? @relation(fields: [scheduledReportId], references: [id])
   reportKey         String
   status            ReportRunStatus
+  // The exact business-timezone period this run covers, resolved once at
+  // generation time — a "download again" next month must reproduce what was
+  // actually generated, not silently re-resolve "this month" to a different
+  // month. Required on every row (this table has never received a row
+  // before this field was added, so there is no backfill to reconcile).
+  periodStart       DateTime
+  periodEnd         DateTime
+  // Frozen at generation time: { columns: {key,label}[], rows: Record<string,string>[] }
+  // (the exact shape src/lib/export/serialize.ts's builders take) — makes
+  // "download" a pure serialization of already-computed data, never a live
+  // re-query that could drift from what was actually generated or leak data
+  // the original scope no longer permits.
+  payload           Json
   recipientIds      String[]
   seenByIds         String[]         @default([])
   errorMessage      String?

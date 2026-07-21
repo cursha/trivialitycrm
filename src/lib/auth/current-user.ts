@@ -1,4 +1,8 @@
-import "server-only";
+// No `import "server-only"` — worker/handlers/generate-report.ts needs
+// getUserById() too, and that guard throws under plain Node/tsx execution.
+// Every consumer is itself a server-only context (web Server
+// Components/Actions, or the worker process). Same reasoning as
+// src/lib/prisma.ts's identical omission.
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -31,6 +35,23 @@ export type AuthenticatedUser = NonNullable<CurrentUser>;
 
 export async function getCurrentUser(): Promise<CurrentUser> {
   return loadCurrentUser();
+}
+
+/**
+ * Same include shape as the session-based lookup above, for callers with no
+ * request/session context at all — the worker process, which runs a
+ * scheduled report as its creator's own report scope. Not cached (no
+ * per-request lifetime to memoize against) and does not check `disabled`
+ * itself; callers that need that guarantee should check it explicitly.
+ */
+export async function getUserById(userId: string): Promise<AuthenticatedUser | null> {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      role: { include: { permissions: { include: { permission: true } } } },
+      team: true,
+    },
+  });
 }
 
 /**

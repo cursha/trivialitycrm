@@ -1,4 +1,8 @@
-import "server-only";
+// No `import "server-only"` — the worker (worker/handlers/generate-report.ts,
+// via the report-scope chain) needs hasPermission()/requirePermission() too,
+// and that guard throws under plain Node/tsx execution. Every consumer is
+// itself a server-only context (web Server Actions/pages, or the worker
+// process). Same reasoning as src/lib/prisma.ts's identical omission.
 import type { CurrentUser } from "./current-user";
 
 export class ForbiddenError extends Error {
