@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ListTree, GitBranch, Users, ShieldCheck, XCircle, FileSpreadsheet, MapPin } from "lucide-react";
+import { ListTree, GitBranch, Users, ShieldCheck, XCircle, FileSpreadsheet, MapPin, Mail, FileText } from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
 import { PageHeader } from "@/components/ui/page-header";
@@ -39,6 +39,20 @@ export default async function SettingsPage() {
       description: "Saved spreadsheet column mappings for future imports.",
       icon: FileSpreadsheet,
       visible: hasPermission(user, "manage_settings"),
+    },
+    {
+      href: "/settings/email-connections",
+      label: "Email Connections",
+      description: "Connect your own business mailbox to send email from the CRM.",
+      icon: Mail,
+      visible: hasPermission(user, "connect_mailbox"),
+    },
+    {
+      href: "/settings/email-templates",
+      label: "Email Templates",
+      description: "Reusable email content with placeholders, personal or shared with the team.",
+      icon: FileText,
+      visible: hasPermission(user, "manage_personal_templates"),
     },
     {
       href: "/settings/territories",

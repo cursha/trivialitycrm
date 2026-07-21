@@ -93,6 +93,13 @@ export const DISPOSITION_LABEL: Record<string, string> = {
   DUPLICATE: "Duplicate",
 };
 
+export const PROVIDER_CONNECTION_STATUS_TONE: Record<string, BadgeTone> = {
+  CONNECTED: "success",
+  EXPIRED: "warning",
+  REVOKED: "neutral",
+  ERROR: "danger",
+};
+
 export const SEARCH_STATUS_TONE: Record<string, BadgeTone> = {
   PENDING: "neutral",
   RUNNING: "focus",

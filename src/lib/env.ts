@@ -35,6 +35,16 @@ const envSchema = z
       z.coerce.number().positive("must be a positive number").max(24, "must be 24 or less").default(4),
     ),
     SENTRY_DSN: z.preprocess(blankToUndefined, z.string().url("must be a valid URL").optional()),
+    // Encrypts ProviderConnection OAuth tokens at rest (AES-256-GCM, see
+    // src/lib/comms/token-crypto.ts) — a 32-byte key, base64-encoded.
+    // Required in production the same way NEXT_SERVER_ACTIONS_ENCRYPTION_KEY
+    // is: optional in dev/test so the app boots without it, but a stable
+    // value is mandatory once real tokens might actually be stored.
+    TOKEN_ENCRYPTION_KEY: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
+    MICROSOFT_CLIENT_ID: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
+    MICROSOFT_CLIENT_SECRET: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
+    GOOGLE_CLIENT_ID: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
+    GOOGLE_CLIENT_SECRET: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
     SEED_ADMIN_EMAIL: z.preprocess(blankToUndefined, z.string().email("must be a valid email").optional()),
     SEED_ADMIN_PASSWORD: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
   })
@@ -57,6 +67,27 @@ const envSchema = z
         code: "custom",
         path: ["NEXT_SERVER_ACTIONS_ENCRYPTION_KEY"],
         message: "is required when NODE_ENV=production (a stable value across web instances/restarts)",
+      });
+    }
+    if (value.NODE_ENV === "production" && !value.TOKEN_ENCRYPTION_KEY) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["TOKEN_ENCRYPTION_KEY"],
+        message: "is required when NODE_ENV=production (encrypts stored OAuth tokens)",
+      });
+    }
+    if (Boolean(value.MICROSOFT_CLIENT_ID) !== Boolean(value.MICROSOFT_CLIENT_SECRET)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["MICROSOFT_CLIENT_ID"],
+        message: "MICROSOFT_CLIENT_ID and MICROSOFT_CLIENT_SECRET must both be set or both be unset",
+      });
+    }
+    if (Boolean(value.GOOGLE_CLIENT_ID) !== Boolean(value.GOOGLE_CLIENT_SECRET)) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["GOOGLE_CLIENT_ID"],
+        message: "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must both be set or both be unset",
       });
     }
   });

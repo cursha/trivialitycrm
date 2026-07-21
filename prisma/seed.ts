@@ -62,6 +62,18 @@ const permissions: { key: string; label: string }[] = [
   { key: "manage_scheduled_reports", label: "Manage scheduled reports" },
   { key: "view_ai_costs", label: "View AI research cost estimates" },
   { key: "view_competitor_reports", label: "View competitor reports" },
+  // Module Six: Communications and Follow-up Automation
+  { key: "connect_mailbox", label: "Connect a mailbox for sending email" },
+  { key: "send_email", label: "Send email" },
+  { key: "schedule_email", label: "Schedule email" },
+  { key: "manage_personal_templates", label: "Manage personal email templates" },
+  { key: "manage_shared_templates", label: "Manage shared email templates" },
+  { key: "manage_sequences", label: "Manage follow-up sequences" },
+  { key: "enroll_in_sequences", label: "Enroll leads in follow-up sequences" },
+  { key: "view_team_communications", label: "View team communications" },
+  { key: "manage_calendar_connections", label: "Manage calendar connections" },
+  { key: "manage_communication_compliance", label: "Manage communication consent and compliance" },
+  { key: "send_bulk_email", label: "Send bulk email" },
 ];
 
 // Initial role -> permission grants. All grants are stored as editable
@@ -82,8 +94,26 @@ const roleGrants: Record<(typeof roles)[number], string[]> = {
     "view_team_reports",
     "export_reports",
     "view_competitor_reports",
+    "connect_mailbox",
+    "send_email",
+    "schedule_email",
+    "manage_personal_templates",
+    "enroll_in_sequences",
+    "view_team_communications",
+    "manage_calendar_connections",
   ],
-  Salesperson: ["view_assigned_leads", "add_leads", "edit_leads", "view_own_reports"],
+  Salesperson: [
+    "view_assigned_leads",
+    "add_leads",
+    "edit_leads",
+    "view_own_reports",
+    "connect_mailbox",
+    "send_email",
+    "schedule_email",
+    "manage_personal_templates",
+    "enroll_in_sequences",
+    "manage_calendar_connections",
+  ],
 };
 
 async function seedPipelineStages() {
