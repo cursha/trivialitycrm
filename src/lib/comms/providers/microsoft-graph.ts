@@ -1,6 +1,15 @@
 import { getEnv } from "@/lib/env";
 import { callEmailProvider } from "./http";
-import type { EmailProvider, OAuthTokens, ConnectedAccount, SendEmailInput, SendEmailResult } from "./types";
+import { formatWallClock } from "@/lib/comms/calendar-time";
+import type {
+  EmailProvider,
+  OAuthTokens,
+  ConnectedAccount,
+  SendEmailInput,
+  SendEmailResult,
+  CalendarEventInput,
+  CalendarEventResult,
+} from "./types";
 
 // Deliberately no `import "server-only"` — the worker's send-job handler
 // needs this; see token-crypto.ts for the same reasoning.
@@ -168,5 +177,70 @@ export class MicrosoftGraphProvider implements EmailProvider {
     });
 
     return { providerMessageId: draft.id, providerThreadId: draft.conversationId };
+  }
+
+  private eventBody(input: CalendarEventInput) {
+    return {
+      subject: input.title,
+      start: { dateTime: formatWallClock(input.startAt, input.timezone), timeZone: input.timezone },
+      end: { dateTime: formatWallClock(input.endAt, input.timezone), timeZone: input.timezone },
+      attendees: input.attendeeEmails.map((address) => ({ emailAddress: { address }, type: "required" })),
+    };
+  }
+
+  async createCalendarEvent(account: ConnectedAccount, input: CalendarEventInput): Promise<CalendarEventResult> {
+    const event = await callEmailProvider(
+      { providerName: "microsoft", connectionId: account.connectionId, bucketPrefix: "calendar" },
+      async (signal) => {
+        const response = await fetch(`${GRAPH_BASE}/me/events`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${account.accessToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify(this.eventBody(input)),
+          signal,
+        });
+        if (!response.ok) {
+          throw new Error(`Creating the Microsoft calendar event failed (${response.status}).`);
+        }
+        return (await response.json()) as { id: string };
+      },
+    );
+    return { providerEventId: event.id };
+  }
+
+  async updateCalendarEvent(account: ConnectedAccount, providerEventId: string, input: CalendarEventInput): Promise<void> {
+    await callEmailProvider(
+      { providerName: "microsoft", connectionId: account.connectionId, bucketPrefix: "calendar" },
+      async (signal) => {
+        const response = await fetch(`${GRAPH_BASE}/me/events/${providerEventId}`, {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${account.accessToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify(this.eventBody(input)),
+          signal,
+        });
+        if (!response.ok) {
+          throw new Error(`Updating the Microsoft calendar event failed (${response.status}).`);
+        }
+      },
+    );
+  }
+
+  /** Graph's documented way to cancel a meeting you organize while
+   * notifying attendees — a bare DELETE removes the event but doesn't
+   * reliably send attendees a cancellation notice. */
+  async cancelCalendarEvent(account: ConnectedAccount, providerEventId: string): Promise<void> {
+    await callEmailProvider(
+      { providerName: "microsoft", connectionId: account.connectionId, bucketPrefix: "calendar" },
+      async (signal) => {
+        const response = await fetch(`${GRAPH_BASE}/me/events/${providerEventId}/cancel`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${account.accessToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ comment: "" }),
+          signal,
+        });
+        if (!response.ok) {
+          throw new Error(`Cancelling the Microsoft calendar event failed (${response.status}).`);
+        }
+      },
+    );
   }
 }

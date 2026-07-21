@@ -208,6 +208,7 @@ model User {
   consentRecordsRecorded   ConsentRecord[]
   followUpSequencesCreated FollowUpSequence[]
   sequenceEnrollmentsMade  SequenceEnrollment[]
+  appointmentsCreated      Appointment[]
   createdAt                DateTime                @default(now())
   updatedAt                DateTime                @updatedAt
 }
@@ -395,6 +396,7 @@ model Company {
   stageHistory        PipelineStageHistory[]
   emailMessages       EmailMessage[]
   sequenceEnrollments SequenceEnrollment[]
+  appointments        Appointment[]
   createdAt           DateTime               @default(now())
   updatedAt           DateTime               @updatedAt
 
@@ -594,6 +596,7 @@ model Contact {
   consentRecords    ConsentRecord[]
 
   sequenceEnrollments SequenceEnrollment[]
+  appointments        Appointment[]
 }
 
 model CompanySource {
@@ -955,6 +958,7 @@ model ProviderConnection {
   disconnectedAt            DateTime?
 
   emailMessages EmailMessage[]
+  appointments  Appointment[]
 
   @@index([status])
 }
@@ -1230,6 +1234,61 @@ model SequenceStepRun {
   errorMessage   String?
 
   @@unique([enrollmentId, stepId])
+}
+
+// ===== Module Six Phase D1: calendar and appointments =====
+
+enum AppointmentType {
+  DEMO
+  TRIAL_REVIEW
+  FOLLOW_UP
+}
+
+enum AppointmentStatus {
+  SCHEDULED
+  UPDATED
+  CANCELLED
+  ERROR
+}
+
+/**
+ * One appointment on a connected calendar (Microsoft/Google — same
+ * ProviderConnection Phase A already established, since both providers
+ * grant calendar scope in the same OAuth consent as mail). `startAt`/
+ * `endAt` are real UTC instants; `timezone` (an IANA name) is what the
+ * provider is told to display them in — Microsoft Graph specifically
+ * requires wall-clock-in-that-zone strings, not UTC, for its event body
+ * (see src/lib/comms/calendar-time.ts). `providerEventId` is null only
+ * when creation itself failed (`status: ERROR`) — never claim a real
+ * provider-side event exists when it doesn't.
+ */
+model Appointment {
+  id        String          @id @default(cuid())
+  companyId String
+  company   Company         @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contactId String?
+  contact   Contact?        @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  type      AppointmentType
+  title     String
+  startAt   DateTime
+  endAt     DateTime
+  timezone  String
+
+  attendeeEmails String[]
+
+  providerConnectionId String?
+  providerConnection   ProviderConnection? @relation(fields: [providerConnectionId], references: [id], onDelete: SetNull)
+  providerEventId      String?
+  status               AppointmentStatus   @default(SCHEDULED)
+  lastError            String?
+
+  createdById String
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([providerConnectionId])
 }
 
 enum NotificationType {

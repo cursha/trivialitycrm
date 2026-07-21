@@ -1,6 +1,14 @@
 import { getEnv } from "@/lib/env";
 import { callEmailProvider } from "./http";
-import type { EmailProvider, OAuthTokens, ConnectedAccount, SendEmailInput, SendEmailResult } from "./types";
+import type {
+  EmailProvider,
+  OAuthTokens,
+  ConnectedAccount,
+  SendEmailInput,
+  SendEmailResult,
+  CalendarEventInput,
+  CalendarEventResult,
+} from "./types";
 
 // Deliberately no `import "server-only"` — the worker's send-job handler
 // needs this; see token-crypto.ts for the same reasoning.
@@ -9,6 +17,7 @@ const AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
 const GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
+const CALENDAR_EVENTS_URL = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
 
 // gmail.send + gmail.readonly cover Phase A (send) and a later inbound-sync
 // phase; calendar is requested now for the same one-consent reason as the
@@ -182,5 +191,72 @@ export class GoogleProvider implements EmailProvider {
     });
 
     return { providerMessageId: sent.id, providerThreadId: sent.threadId };
+  }
+
+  private eventBody(input: CalendarEventInput) {
+    return {
+      summary: input.title,
+      // Google's Calendar API accepts a full RFC3339 instant directly
+      // (unlike Graph, which wants a bare wall-clock string) — `timeZone`
+      // here is for the attendees' display, not reinterpretation of the
+      // instant itself.
+      start: { dateTime: input.startAt.toISOString(), timeZone: input.timezone },
+      end: { dateTime: input.endAt.toISOString(), timeZone: input.timezone },
+      attendees: input.attendeeEmails.map((email) => ({ email })),
+    };
+  }
+
+  async createCalendarEvent(account: ConnectedAccount, input: CalendarEventInput): Promise<CalendarEventResult> {
+    const event = await callEmailProvider(
+      { providerName: "google", connectionId: account.connectionId, bucketPrefix: "calendar" },
+      async (signal) => {
+        const response = await fetch(`${CALENDAR_EVENTS_URL}?sendUpdates=all`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${account.accessToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify(this.eventBody(input)),
+          signal,
+        });
+        if (!response.ok) {
+          throw new Error(`Creating the Google calendar event failed (${response.status}).`);
+        }
+        return (await response.json()) as { id: string };
+      },
+    );
+    return { providerEventId: event.id };
+  }
+
+  async updateCalendarEvent(account: ConnectedAccount, providerEventId: string, input: CalendarEventInput): Promise<void> {
+    await callEmailProvider(
+      { providerName: "google", connectionId: account.connectionId, bucketPrefix: "calendar" },
+      async (signal) => {
+        const response = await fetch(`${CALENDAR_EVENTS_URL}/${providerEventId}?sendUpdates=all`, {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${account.accessToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify(this.eventBody(input)),
+          signal,
+        });
+        if (!response.ok) {
+          throw new Error(`Updating the Google calendar event failed (${response.status}).`);
+        }
+      },
+    );
+  }
+
+  async cancelCalendarEvent(account: ConnectedAccount, providerEventId: string): Promise<void> {
+    await callEmailProvider(
+      { providerName: "google", connectionId: account.connectionId, bucketPrefix: "calendar" },
+      async (signal) => {
+        const response = await fetch(`${CALENDAR_EVENTS_URL}/${providerEventId}?sendUpdates=all`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${account.accessToken}` },
+          signal,
+        });
+        // Google returns 410 Gone if the event was already deleted/cancelled
+        // — treat that as success (idempotent cancel), not a failure.
+        if (!response.ok && response.status !== 410) {
+          throw new Error(`Cancelling the Google calendar event failed (${response.status}).`);
+        }
+      },
+    );
   }
 }

@@ -1,10 +1,11 @@
-// Provider interfaces for connected-mailbox email sending. Every real
+// Provider interfaces for a connected mailbox+calendar account. Every real
 // integration (Microsoft Graph, Google) and the mock provider implement
-// this same shape, so the composer/send action and OAuth routes never
-// depend on a specific vendor — mirrors src/lib/research/providers/types.ts's
-// role for the AI research pipeline. Calendar and inbound-sync methods are
-// added to this interface in later phases (see the approved Module Six
-// plan's §10 phasing), not speculatively included now.
+// this same shape, so the composer/send action, OAuth routes, and
+// appointment actions never depend on a specific vendor — mirrors
+// src/lib/research/providers/types.ts's role for the AI research pipeline.
+// Inbound-sync methods are added to this interface in a later phase (see
+// the approved Module Six plan's §10 phasing), not speculatively included
+// now.
 
 export type OAuthTokens = {
   accessToken: string;
@@ -17,9 +18,9 @@ export type ConnectedAccount = {
   accessToken: string;
   refreshToken: string;
   /** ProviderConnection.id — present whenever the account came from a real
-   * stored connection (getUsableAccessToken()), so sendEmail() can scope
-   * its provider-call rate limit to this one mailbox rather than sharing a
-   * single bucket across every user connected to the same provider. */
+   * stored connection (getUsableAccessToken()), so a provider call can
+   * scope its rate limit to this one mailbox rather than sharing a single
+   * bucket across every user connected to the same provider. */
   connectionId?: string;
 };
 
@@ -36,6 +37,20 @@ export type SendEmailInput = {
 export type SendEmailResult = {
   providerMessageId: string;
   providerThreadId?: string;
+};
+
+export type CalendarEventInput = {
+  title: string;
+  startAt: Date;
+  endAt: Date;
+  /** IANA zone name (e.g. "America/Toronto") — how the provider should
+   * display these times, not merely metadata; see calendar-time.ts. */
+  timezone: string;
+  attendeeEmails: string[];
+};
+
+export type CalendarEventResult = {
+  providerEventId: string;
 };
 
 export type ProviderName = "mock" | "microsoft" | "google";
@@ -62,4 +77,16 @@ export interface EmailProvider {
    * validateOutgoingEmail() — this method trusts its input is already
    * validated and permitted. */
   sendEmail(account: ConnectedAccount, input: SendEmailInput): Promise<SendEmailResult>;
+
+  /** Creates a calendar event (demo/trial-review/follow-up) on the
+   * connected account's primary calendar, inviting every attendee email. */
+  createCalendarEvent(account: ConnectedAccount, input: CalendarEventInput): Promise<CalendarEventResult>;
+
+  /** Updates an existing event's time/attendees — attendees are notified
+   * of the change by the provider itself, not by this app. */
+  updateCalendarEvent(account: ConnectedAccount, providerEventId: string, input: CalendarEventInput): Promise<void>;
+
+  /** Cancels an event, notifying attendees — the provider's own
+   * notification, this app never sends a competing cancellation email. */
+  cancelCalendarEvent(account: ConnectedAccount, providerEventId: string): Promise<void>;
 }

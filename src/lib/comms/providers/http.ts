@@ -35,14 +35,20 @@ export type EmailProviderCallOptions = {
    * a post-Phase-C review and fixed here rather than left as a known
    * limitation. */
   connectionId?: string;
+  /** Defaults to "email-send" — pass "calendar" for calendar create/
+   * update/cancel calls so they get their own bucket rather than
+   * competing with the same connection's email-send budget (a burst of
+   * appointment scheduling shouldn't be able to exhaust the quota a
+   * sequence/scheduled-send needs). */
+  bucketPrefix?: string;
   timeoutMs?: number;
   rateLimit?: { windowMs: number; limit: number };
 };
 
 export async function callEmailProvider<T>(options: EmailProviderCallOptions, fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
-  const { providerName, connectionId, timeoutMs = 30_000, rateLimit = { windowMs: 60_000, limit: 20 } } = options;
+  const { providerName, connectionId, bucketPrefix = "email-send", timeoutMs = 30_000, rateLimit = { windowMs: 60_000, limit: 20 } } = options;
 
-  const rateLimitKey = connectionId ? `email-send:${providerName}:${connectionId}` : `email-send:${providerName}`;
+  const rateLimitKey = connectionId ? `${bucketPrefix}:${providerName}:${connectionId}` : `${bucketPrefix}:${providerName}`;
   const result = await checkRateLimit(rateLimitKey, rateLimit);
   if (!result.allowed) {
     throw new EmailProviderRateLimitError(providerName);
