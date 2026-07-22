@@ -33,6 +33,15 @@ export function describeNotification(type: string, payload: Record<string, unkno
       return "Your connected mailbox was disconnected — reconnect it in Settings.";
     case "FOLLOW_UP_DUE":
       return "A follow-up is due.";
+    case "EMAIL_BOUNCED": {
+      const target = typeof payload.companyName === "string" ? ` to ${payload.companyName}` : "";
+      const subject = typeof payload.subject === "string" ? `: "${payload.subject}"` : "";
+      return `Email bounced${target}${subject}.`;
+    }
+    case "REPORT_GENERATED": {
+      const name = typeof payload.name === "string" ? payload.name : "A scheduled report";
+      return payload.status === "FAILED" ? `${name} failed to generate.` : `${name} is ready.`;
+    }
     default:
       return "You have a new notification.";
   }

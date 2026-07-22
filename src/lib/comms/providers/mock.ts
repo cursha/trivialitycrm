@@ -35,6 +35,11 @@ export type MockInboundFixture = {
   fromAddress: string;
   subject: string;
   bodyHtml: string;
+  /** Optional — set this to simulate a bounce (Non-Delivery Report)
+   * arriving in the same conversation as an already-sent message, so
+   * linkBounceToOriginalSend (src/lib/comms/inbound-sync.ts) has something
+   * to match against. Omitted for an ordinary inbound reply fixture. */
+  providerThreadId?: string;
 };
 
 /**
@@ -57,7 +62,7 @@ export function buildMockWebhookBody(notifications: MockInboundFixture[]): strin
  * Encoding the content directly is also what makes eventId/providerMessageId
  * deterministic for identical fixtures — required for the redelivery-dedup
  * test case (the same fixture posted twice must produce the same ids). */
-function encodeMockProviderMessageId(content: { fromAddress: string; subject: string; bodyHtml: string }): string {
+function encodeMockProviderMessageId(content: { fromAddress: string; subject: string; bodyHtml: string; providerThreadId?: string }): string {
   return MOCK_INBOUND_ID_PREFIX + Buffer.from(JSON.stringify(content), "utf8").toString("base64url");
 }
 
@@ -135,6 +140,7 @@ export class MockEmailProvider implements EmailProvider {
         fromAddress: notification.fromAddress,
         subject: notification.subject,
         bodyHtml: notification.bodyHtml,
+        providerThreadId: notification.providerThreadId,
       });
       return {
         eventId: `${notification.subscriptionId}:${providerMessageId}`,
@@ -151,7 +157,7 @@ export class MockEmailProvider implements EmailProvider {
     }
     const decoded = JSON.parse(
       Buffer.from(providerMessageId.slice(MOCK_INBOUND_ID_PREFIX.length), "base64url").toString("utf8"),
-    ) as { fromAddress: string; subject: string; bodyHtml: string };
+    ) as { fromAddress: string; subject: string; bodyHtml: string; providerThreadId?: string };
 
     if (decoded.fromAddress === SIMULATED_INBOUND_FETCH_FAILURE_ADDRESS) {
       throw new Error("Simulated inbound fetch failure for testing.");
@@ -159,6 +165,7 @@ export class MockEmailProvider implements EmailProvider {
 
     return {
       providerMessageId,
+      providerThreadId: decoded.providerThreadId,
       fromAddress: decoded.fromAddress,
       subject: decoded.subject,
       bodyHtml: decoded.bodyHtml,

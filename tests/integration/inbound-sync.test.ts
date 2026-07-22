@@ -45,7 +45,7 @@ async function connectMailbox(userId: string) {
 /** Encodes a fixture the same way MockEmailProvider does internally, so
  * processInboundNotification (which calls fetchInboundMessage under the
  * hood) can be driven directly without going through the webhook route. */
-function mockProviderMessageId(fixture: { fromAddress: string; subject: string; bodyHtml: string }): string {
+function mockProviderMessageId(fixture: { fromAddress: string; subject: string; bodyHtml: string; providerThreadId?: string }): string {
   const provider = new MockEmailProvider();
   const [notification] = provider.parseInboundWebhookPayload(
     buildMockWebhookBody([{ subscriptionId: "sub-1", clientState: "secret", ...fixture }]),
@@ -154,5 +154,71 @@ describe("processInboundNotification", () => {
       /Simulated inbound fetch failure/,
     );
     expect(await testPrisma.emailMessage.count()).toBe(0);
+  });
+});
+
+describe("processInboundNotification — bounce detection", () => {
+  it("flips the matching sent message to BOUNCED and notifies its sender, creating no inbound EmailMessage row", async () => {
+    const { user, company } = await baseFixtures();
+    const connection = await connectMailbox(user.id);
+    const sent = await testPrisma.emailMessage.create({
+      data: {
+        companyId: company.id,
+        direction: "OUTBOUND",
+        providerConnectionId: connection.id,
+        toAddresses: ["lead@example.com"],
+        subject: "Following up",
+        body: "Hi there",
+        status: "SENT",
+        providerThreadId: "thread-123",
+        createdById: user.id,
+      },
+    });
+
+    const providerMessageId = mockProviderMessageId({
+      fromAddress: "postmaster@example.com",
+      subject: "Undeliverable: Following up",
+      bodyHtml: "The following message could not be delivered.",
+      providerThreadId: "thread-123",
+    });
+    await processInboundNotification({ connectionId: connection.id, providerMessageId });
+
+    const updated = await testPrisma.emailMessage.findUniqueOrThrow({ where: { id: sent.id } });
+    expect(updated.status).toBe("BOUNCED");
+    expect(updated.errorMessage).toBeTruthy();
+
+    expect(await testPrisma.emailMessage.count({ where: { direction: "INBOUND" } })).toBe(0);
+
+    const notification = await testPrisma.notification.findFirstOrThrow({ where: { type: "EMAIL_BOUNCED" } });
+    expect(notification.userId).toBe(user.id);
+    expect((notification.payload as Record<string, unknown>).emailMessageId).toBe(sent.id);
+  });
+
+  it("logs and does nothing when a recognized bounce matches no sent message", async () => {
+    const { user } = await baseFixtures();
+    const connection = await connectMailbox(user.id);
+
+    const providerMessageId = mockProviderMessageId({
+      fromAddress: "mailer-daemon@example.com",
+      subject: "Mail delivery failed",
+      bodyHtml: "no match",
+      providerThreadId: "thread-no-such-sent-message",
+    });
+    await processInboundNotification({ connectionId: connection.id, providerMessageId });
+
+    expect(await testPrisma.emailMessage.count()).toBe(0);
+    expect(await testPrisma.notification.count({ where: { type: "EMAIL_BOUNCED" } })).toBe(0);
+  });
+
+  it("does not treat an ordinary reply as a bounce", async () => {
+    const { user, company } = await baseFixtures();
+    const connection = await connectMailbox(user.id);
+    await testPrisma.contact.create({ data: { companyId: company.id, firstName: "Jamie", lastName: "Lead", email: "jamie@example.com" } });
+
+    const providerMessageId = mockProviderMessageId({ fromAddress: "jamie@example.com", subject: "Re: Following up", bodyHtml: "Sounds good" });
+    await processInboundNotification({ connectionId: connection.id, providerMessageId });
+
+    expect(await testPrisma.emailMessage.count({ where: { direction: "INBOUND" } })).toBe(1);
+    expect(await testPrisma.notification.count({ where: { type: "EMAIL_BOUNCED" } })).toBe(0);
   });
 });

@@ -20,7 +20,10 @@ function formatPeriod(start: Date, end: Date): string {
  * generation time (GeneratedReport.payload) — never a live re-query. A
  * scheduled report's recipient, the schedule's creator, or an
  * administrator with manage_scheduled_reports may download it; anyone else
- * gets 403. Opening this link also marks the report seen for this viewer.
+ * gets 403. Opening this link also marks this viewer's REPORT_GENERATED
+ * notification for this report read (Module Six Phase E — replaces the
+ * old GeneratedReport.seenByIds push with the same Notification.readAt
+ * mechanism every other event type in this app uses).
  */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
@@ -48,9 +51,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "This report run did not succeed — nothing to download." }, { status: 409 });
   }
 
-  if (!generated.seenByIds.includes(user.id)) {
-    await prisma.generatedReport.update({ where: { id }, data: { seenByIds: { push: user.id } } });
-  }
+  await prisma.notification.updateMany({
+    where: { userId: user.id, type: "REPORT_GENERATED", readAt: null, payload: { path: ["generatedReportId"], equals: id } },
+    data: { readAt: new Date() },
+  });
 
   const payload = generated.payload as unknown as StoredPayload;
   const meta = {
