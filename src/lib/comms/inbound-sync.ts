@@ -142,6 +142,65 @@ export async function recordWebhookEventOnce(provider: ProviderKind, eventId: st
   }
 }
 
+/**
+ * Recognizes a Non-Delivery Report (bounce), not a real reply. Neither
+ * Microsoft Graph nor Gmail expose a dedicated "delivery status" webhook
+ * for mail sent from a regular delegated mailbox (that's a transactional-
+ * ESP-only feature) — a bounce instead arrives as an ordinary inbound
+ * email from the mail system itself. This is a best-effort heuristic on
+ * sender address and subject line, not a parse of the message's MIME
+ * structure (a real RFC 3464 `multipart/report` isn't reachable through
+ * the simple `$select=from,subject,body` fetch this module uses) — see
+ * MODULE_6_REPORT.md's Phase E section for this documented as a known
+ * limitation, not silently assumed reliable.
+ */
+export function isBounceMessage(message: { fromAddress: string; subject: string }): boolean {
+  if (/^(postmaster|mailer-daemon)@/i.test(message.fromAddress)) return true;
+  return /^(undeliverable|delivery (has failed|status notification)|mail delivery failed|returned mail)/i.test(message.subject);
+}
+
+/**
+ * Links a recognized bounce back to the sent message it's bouncing —
+ * matched by `providerThreadId` (Graph's conversationId; the NDR lands in
+ * the same conversation as the message that triggered it) plus the same
+ * `providerConnectionId`, picking the most recent still-`SENT` message in
+ * that thread if more than one exists. Flips it to `BOUNCED` and notifies
+ * whoever sent it. Returns whether a match was found — when it isn't (no
+ * `providerThreadId` on the bounce, or no matching sent message), the
+ * bounce is logged and otherwise dropped rather than guessed at.
+ */
+async function linkBounceToOriginalSend(
+  connection: { id: string; userId: string },
+  message: { providerThreadId?: string; subject: string },
+): Promise<boolean> {
+  if (!message.providerThreadId) return false;
+
+  const original = await prisma.emailMessage.findFirst({
+    where: { providerConnectionId: connection.id, providerThreadId: message.providerThreadId, direction: "OUTBOUND", status: "SENT" },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, companyId: true, subject: true, createdById: true },
+  });
+  if (!original) return false;
+
+  await prisma.emailMessage.update({
+    where: { id: original.id },
+    data: { status: "BOUNCED", errorMessage: "This message bounced (a delivery failure notice was received)." },
+  });
+
+  if (original.createdById) {
+    const company = original.companyId ? await prisma.company.findUnique({ where: { id: original.companyId }, select: { name: true } }) : null;
+    await prisma.notification.create({
+      data: {
+        userId: original.createdById,
+        type: "EMAIL_BOUNCED",
+        payload: { emailMessageId: original.id, companyName: company?.name, subject: original.subject },
+      },
+    });
+  }
+
+  return true;
+}
+
 export type ContactMatch = { contactId: string; companyId: string };
 
 /**
@@ -166,14 +225,18 @@ export async function matchContactForAddress(address: string): Promise<ContactMa
 
 /**
  * The actual work behind the process-inbound-notification worker job:
- * fetches the message's real content, writes the EmailMessage row
- * (matched or unmatched — see matchContactForAddress), and — only for a
- * matched contact — stops any active/paused sequence enrollment via
- * stopEnrollmentsForReply. Idempotent at the message-content level too:
- * EmailMessage's (providerConnectionId, providerMessageId) unique
- * constraint means a duplicate call for the same message (the job queue's
- * own singletonKey should already prevent this, but a retried job after a
- * partial failure is a real scenario) is a safe no-op, not a duplicate row.
+ * fetches the message's real content and either (a) links it to one of
+ * our own sent messages as a bounce (see isBounceMessage/
+ * linkBounceToOriginalSend — no EmailMessage row is created for the bounce
+ * itself, only the original sent message's status changes), or (b) writes
+ * a new inbound EmailMessage row (matched or unmatched — see
+ * matchContactForAddress) and, only for a matched contact, stops any
+ * active/paused sequence enrollment via stopEnrollmentsForReply.
+ * Idempotent at the message-content level too: EmailMessage's
+ * (providerConnectionId, providerMessageId) unique constraint means a
+ * duplicate call for the same message (the job queue's own singletonKey
+ * should already prevent this, but a retried job after a partial failure
+ * is a real scenario) is a safe no-op, not a duplicate row.
  */
 export async function processInboundNotification(params: { connectionId: string; providerMessageId: string }): Promise<void> {
   const connection = await prisma.providerConnection.findUnique({ where: { id: params.connectionId } });
@@ -185,6 +248,14 @@ export async function processInboundNotification(params: { connectionId: string;
   const account = await getUsableAccessToken(connection.userId);
   const provider = getEmailProvider(providerSlugFromKind(connection.provider));
   const message = await provider.fetchInboundMessage(account, params.providerMessageId);
+
+  if (isBounceMessage(message)) {
+    const linked = await linkBounceToOriginalSend(connection, message);
+    if (!linked) {
+      logger.warn({ connectionId: connection.id }, "process-inbound-notification: recognized a bounce but found no matching sent message");
+    }
+    return;
+  }
 
   const match = await matchContactForAddress(message.fromAddress);
 

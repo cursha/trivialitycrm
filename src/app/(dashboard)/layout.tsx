@@ -15,30 +15,24 @@ export default async function DashboardLayout({ children }: { children: React.Re
     (item) => !item.requiresAnyPermission || item.requiresAnyPermission.some((key) => hasPermission(user, key)),
   );
 
-  const [unseenReports, unreadNotifications] = await Promise.all([
-    prisma.generatedReport.findMany({
-      where: { recipientIds: { has: user.id }, NOT: { seenByIds: { has: user.id } } },
-      orderBy: { createdAt: "desc" },
-      take: 10,
-      include: { scheduledReport: { select: { name: true } } },
-    }),
-    prisma.notification.findMany({
-      where: { userId: user.id, readAt: null },
-      orderBy: { createdAt: "desc" },
-      take: 10,
-    }),
-  ]);
-  const notifications = unseenReports.map((r) => ({
-    id: r.id,
-    name: r.scheduledReport?.name ?? r.reportKey,
-    status: r.status,
-    createdAt: r.createdAt.toISOString(),
-  }));
-  const generalNotifications = unreadNotifications.map((n) => ({
-    id: n.id,
-    message: describeNotification(n.type, n.payload as Record<string, unknown>),
-    createdAt: n.createdAt.toISOString(),
-  }));
+  const unreadNotifications = await prisma.notification.findMany({
+    where: { userId: user.id, readAt: null },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+  });
+  const notifications = unreadNotifications.map((n) => {
+    const payload = n.payload as Record<string, unknown>;
+    const downloadHref =
+      n.type === "REPORT_GENERATED" && payload.status === "SUCCEEDED" && typeof payload.generatedReportId === "string"
+        ? `/api/reports/generated/${payload.generatedReportId}/download?format=csv`
+        : undefined;
+    return {
+      id: n.id,
+      message: describeNotification(n.type, payload),
+      createdAt: n.createdAt.toISOString(),
+      downloadHref,
+    };
+  });
 
   const initials =
     user.name
@@ -56,7 +50,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
       userInitials={initials}
       roleName={user.role.name}
       notifications={notifications}
-      generalNotifications={generalNotifications}
     >
       {children}
     </DashboardShell>

@@ -537,11 +537,17 @@ model ScheduledReport {
   @@index([createdById])
 }
 
-// One row per actual report run — deliberately serves both roles Module
-// Five needs ("store an in-app notification or downloadable report
-// record"): seenByIds drives the notification-bell unread state, and the
-// row (plus reportKey/scheduledReportId) is what a "download again" link
-// re-runs against. Avoids a second, parallel Notification model.
+// One row per actual report run — the source of truth for "download again"
+// (reportKey/scheduledReportId/payload) and for access control
+// (recipientIds). Through Phase D2 it also drove the notification-bell's
+// unread state directly via a `seenByIds` column — Module Six Phase E
+// removed that column and replaced it with the same mechanism every other
+// event type in this app already uses: one Notification row per recipient
+// (type REPORT_GENERATED, payload carrying generatedReportId), read-tracked
+// via Notification.readAt. This is the "eventually one system instead of
+// two" unification GeneratedReport's Phase-D1-era doc comment deferred —
+// GeneratedReport itself still exists and still owns report *data*
+// (unaffected), it just no longer separately tracks read state.
 model GeneratedReport {
   id                String           @id @default(cuid())
   scheduledReportId String? // null = ad-hoc/manual export, not from a schedule
@@ -562,7 +568,6 @@ model GeneratedReport {
   // the original scope no longer permits.
   payload           Json
   recipientIds      String[]
-  seenByIds         String[]         @default([])
   errorMessage      String?
   createdAt         DateTime         @default(now())
 
@@ -1354,6 +1359,19 @@ enum NotificationType {
   PROVIDER_DISCONNECTED
   FOLLOW_UP_DUE
   SCHEDULED_EMAIL_FAILED
+  // Module Six Phase E: a sent message bounced, detected via inbound sync
+  // recognizing a Non-Delivery Report referencing it — see
+  // src/lib/comms/inbound-sync.ts's isBounceMessage()/linkBounceToOriginalSend().
+  // Deliberately its own type rather than reusing DELIVERY_FAILURE: that
+  // type means "the provider call itself failed" (never even accepted for
+  // delivery); a bounce means the provider accepted and attempted delivery,
+  // then it failed downstream — a materially different, more specific
+  // signal worth distinguishing in the bell.
+  EMAIL_BOUNCED
+  // Module Six Phase E: replaces GeneratedReport.seenByIds as the
+  // notification-bell's read-tracking mechanism for report generation —
+  // see GeneratedReport's doc comment for the unification this completes.
+  REPORT_GENERATED
 }
 
 /**

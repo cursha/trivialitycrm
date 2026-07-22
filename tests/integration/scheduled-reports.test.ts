@@ -6,7 +6,8 @@ import { resetFakeCookies } from "../setup/mock-next";
 import { runReportsTick } from "../../worker/handlers/reports-tick";
 import { handleGenerateReportJob } from "../../worker/handlers/generate-report";
 import type { GenerateReportJobData } from "../../src/lib/jobs/enqueue";
-import { createScheduledReport, setScheduledReportActive, deleteScheduledReport, markGeneratedReportSeen } from "../../src/app/(dashboard)/reports/scheduled/actions";
+import { createScheduledReport, setScheduledReportActive, deleteScheduledReport } from "../../src/app/(dashboard)/reports/scheduled/actions";
+import { markNotificationRead } from "../../src/app/(dashboard)/notifications-actions";
 import { GET as downloadGeneratedReport } from "../../src/app/api/reports/generated/[id]/download/route";
 
 beforeEach(async () => {
@@ -180,23 +181,59 @@ describe("scheduled report CRUD actions", () => {
   });
 });
 
-describe("markGeneratedReportSeen", () => {
-  it("only lets an actual recipient mark a notification seen", async () => {
+describe("REPORT_GENERATED notifications (Module Six Phase E)", () => {
+  it("creates one REPORT_GENERATED notification per recipient when a report succeeds", async () => {
+    const { user, leadType, stage } = await baseFixtures();
+    await createCompanyFixture({ leadTypeId: leadType.id, pipelineStageId: stage.id, assignedToId: user.id, createdById: user.id, source: "MANUAL" });
+    const otherRole = await createRoleWithPermissions("Other", ["view_own_reports"]);
+    const otherUser = await createTestUser({ roleId: otherRole.id });
+
+    const nextRunAt = new Date();
+    const schedule = await testPrisma.scheduledReport.create({
+      data: { name: "Weekly sources", reportKey: "sources", cadence: "DAILY", recipientIds: [user.id, otherUser.id], createdById: user.id, active: true, nextRunAt },
+    });
+    await handleGenerateReportJob(fakeJob({ scheduledReportId: schedule.id, periodKey: nextRunAt.toISOString() }));
+    const generated = await testPrisma.generatedReport.findFirstOrThrow({ where: { scheduledReportId: schedule.id } });
+
+    const notifications = await testPrisma.notification.findMany({ where: { type: "REPORT_GENERATED" } });
+    expect(notifications).toHaveLength(2);
+    expect(notifications.map((n) => n.userId).sort()).toEqual([user.id, otherUser.id].sort());
+    for (const notification of notifications) {
+      const payload = notification.payload as Record<string, unknown>;
+      expect(payload.generatedReportId).toBe(generated.id);
+      expect(payload.status).toBe("SUCCEEDED");
+      expect(payload.name).toBe("Weekly sources");
+    }
+  });
+
+  it("creates a FAILED-status REPORT_GENERATED notification when generation permanently fails", async () => {
+    const { user } = await baseFixtures();
+    const schedule = await testPrisma.scheduledReport.create({
+      data: { name: "Bad key", reportKey: "not-a-real-key", cadence: "DAILY", recipientIds: [user.id], createdById: user.id, active: true, nextRunAt: new Date() },
+    });
+
+    await handleGenerateReportJob(fakeJob({ scheduledReportId: schedule.id, periodKey: new Date().toISOString() }));
+
+    const notification = await testPrisma.notification.findFirstOrThrow({ where: { type: "REPORT_GENERATED", userId: user.id } });
+    expect((notification.payload as Record<string, unknown>).status).toBe("FAILED");
+  });
+
+  it("only lets the owning recipient mark their own REPORT_GENERATED notification read", async () => {
     const { user } = await baseFixtures();
     const otherRole = await createRoleWithPermissions("Other", ["view_own_reports"]);
     const otherUser = await createTestUser({ roleId: otherRole.id });
 
-    const generated = await testPrisma.generatedReport.create({
-      data: { reportKey: "sources", status: "SUCCEEDED", periodStart: new Date(), periodEnd: new Date(), payload: { columns: [], rows: [] }, recipientIds: [user.id] },
+    const notification = await testPrisma.notification.create({
+      data: { userId: user.id, type: "REPORT_GENERATED", payload: { generatedReportId: "does-not-matter", status: "SUCCEEDED" } },
     });
 
     await loginAs(otherUser.id);
-    await markGeneratedReportSeen(generated.id);
-    expect((await testPrisma.generatedReport.findUniqueOrThrow({ where: { id: generated.id } })).seenByIds).toEqual([]);
+    await markNotificationRead(notification.id);
+    expect((await testPrisma.notification.findUniqueOrThrow({ where: { id: notification.id } })).readAt).toBeNull();
 
     await loginAs(user.id);
-    await markGeneratedReportSeen(generated.id);
-    expect((await testPrisma.generatedReport.findUniqueOrThrow({ where: { id: generated.id } })).seenByIds).toEqual([user.id]);
+    await markNotificationRead(notification.id);
+    expect((await testPrisma.notification.findUniqueOrThrow({ where: { id: notification.id } })).readAt).not.toBeNull();
   });
 });
 
@@ -224,8 +261,10 @@ describe("GET /api/reports/generated/[id]/download", () => {
     const body = await response.text();
     expect(body).toContain("Manual,1");
 
-    const afterDownload = await testPrisma.generatedReport.findUniqueOrThrow({ where: { id: generated.id } });
-    expect(afterDownload.seenByIds).toContain(user.id);
+    const notification = await testPrisma.notification.findFirstOrThrow({
+      where: { userId: user.id, type: "REPORT_GENERATED", payload: { path: ["generatedReportId"], equals: generated.id } },
+    });
+    expect(notification.readAt).not.toBeNull();
   });
 
   it("blocks a user who is neither a recipient, the creator, nor a report manager", async () => {

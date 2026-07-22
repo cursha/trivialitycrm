@@ -1,4 +1,5 @@
 import type { Job } from "pg-boss";
+import type { Prisma } from "../../src/generated/prisma/client";
 import { prisma } from "../../src/lib/prisma";
 import { logger } from "../../src/lib/logger";
 import { captureException } from "../../src/lib/error-reporting";
@@ -7,6 +8,30 @@ import { parseReportFilters, resolveValidatedDateRange, type ReportFilters } fro
 import { buildReportRows, REPORT_KEYS, type ReportKey } from "../../src/lib/reports/build-rows";
 import { computeNextRunAt, dateRangeKeyForCadence, type ReportCadenceValue } from "../../src/lib/reports/schedule";
 import type { GenerateReportJobData } from "../../src/lib/jobs/enqueue";
+
+/**
+ * One Notification per recipient (type REPORT_GENERATED) — the
+ * notification-bell's unread state for report generation, replacing the
+ * seenByIds column Phase E removed from GeneratedReport. Fans out because
+ * Notification is inherently per-user while a single GeneratedReport row
+ * can have many recipients (ScheduledReport.recipientIds) with
+ * independent read state.
+ */
+async function notifyRecipients(
+  tx: Prisma.TransactionClient,
+  schedule: { name: string; reportKey: string; recipientIds: string[] },
+  generatedReportId: string,
+  status: "SUCCEEDED" | "FAILED",
+): Promise<void> {
+  if (schedule.recipientIds.length === 0) return;
+  await tx.notification.createMany({
+    data: schedule.recipientIds.map((userId) => ({
+      userId,
+      type: "REPORT_GENERATED" as const,
+      payload: { generatedReportId, reportKey: schedule.reportKey, name: schedule.name, status },
+    })),
+  });
+}
 
 /**
  * Writes a FAILED GeneratedReport row and advances the schedule to its next
@@ -18,12 +43,12 @@ import type { GenerateReportJobData } from "../../src/lib/jobs/enqueue";
  * the period is done.
  */
 async function recordPermanentFailure(
-  schedule: { id: string; reportKey: string; cadence: ReportCadenceValue; nextRunAt: Date; recipientIds: string[] },
+  schedule: { id: string; name: string; reportKey: string; cadence: ReportCadenceValue; nextRunAt: Date; recipientIds: string[] },
   message: string,
 ): Promise<void> {
   logger.warn({ scheduledReportId: schedule.id }, `generate-report: ${message}`);
-  await prisma.$transaction([
-    prisma.generatedReport.create({
+  await prisma.$transaction(async (tx) => {
+    const generated = await tx.generatedReport.create({
       data: {
         scheduledReportId: schedule.id,
         reportKey: schedule.reportKey,
@@ -34,12 +59,13 @@ async function recordPermanentFailure(
         recipientIds: schedule.recipientIds,
         errorMessage: message,
       },
-    }),
-    prisma.scheduledReport.update({
+    });
+    await tx.scheduledReport.update({
       where: { id: schedule.id },
       data: { lastRunAt: new Date(), lastRunStatus: "FAILED", nextRunAt: computeNextRunAt(schedule.cadence, schedule.nextRunAt) },
-    }),
-  ]);
+    });
+    await notifyRecipients(tx, schedule, generated.id, "FAILED");
+  });
 }
 
 export async function handleGenerateReportJob(jobs: Job<GenerateReportJobData>[]): Promise<void> {
@@ -80,8 +106,8 @@ export async function handleGenerateReportJob(jobs: Job<GenerateReportJobData>[]
 
     const period = resolveValidatedDateRange(filters);
 
-    await prisma.$transaction([
-      prisma.generatedReport.create({
+    await prisma.$transaction(async (tx) => {
+      const generated = await tx.generatedReport.create({
         data: {
           scheduledReportId: schedule.id,
           reportKey: schedule.reportKey,
@@ -91,12 +117,13 @@ export async function handleGenerateReportJob(jobs: Job<GenerateReportJobData>[]
           payload: { columns: result.columns, rows: result.rows },
           recipientIds: schedule.recipientIds,
         },
-      }),
-      prisma.scheduledReport.update({
+      });
+      await tx.scheduledReport.update({
         where: { id: schedule.id },
         data: { lastRunAt: new Date(), lastRunStatus: "SUCCEEDED", nextRunAt: computeNextRunAt(schedule.cadence, schedule.nextRunAt) },
-      }),
-    ]);
+      });
+      await notifyRecipients(tx, schedule, generated.id, "SUCCEEDED");
+    });
   } catch (error) {
     logger.error({ err: error, jobId: job.id, scheduledReportId }, "generate-report job failed");
     await captureException(error, { jobId: job.id, scheduledReportId });

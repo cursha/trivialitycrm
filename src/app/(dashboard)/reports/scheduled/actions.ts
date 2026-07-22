@@ -60,25 +60,3 @@ export async function deleteScheduledReport(id: string): Promise<void> {
   await prisma.scheduledReport.delete({ where: { id } });
   revalidatePath(PATH);
 }
-
-/** Marks one GeneratedReport seen for the current user — only if they're
- * actually a recipient, so a stray id can't be used to tamper with someone
- * else's unread state. */
-export async function markGeneratedReportSeen(id: string): Promise<void> {
-  const user = await requireUser();
-  const generated = await prisma.generatedReport.findUnique({ where: { id }, select: { seenByIds: true, recipientIds: true } });
-  if (!generated || !generated.recipientIds.includes(user.id) || generated.seenByIds.includes(user.id)) return;
-
-  await prisma.generatedReport.update({ where: { id }, data: { seenByIds: { push: user.id } } });
-  revalidatePath("/", "layout");
-}
-
-export async function markAllGeneratedReportsSeen(): Promise<void> {
-  const user = await requireUser();
-  const unseen = await prisma.generatedReport.findMany({
-    where: { recipientIds: { has: user.id }, NOT: { seenByIds: { has: user.id } } },
-    select: { id: true },
-  });
-  await Promise.all(unseen.map((row) => prisma.generatedReport.update({ where: { id: row.id }, data: { seenByIds: { push: user.id } } })));
-  revalidatePath("/", "layout");
-}
