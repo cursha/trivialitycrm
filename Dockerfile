@@ -105,3 +105,5 @@ EXPOSE 8080
 # shutting down gracefully..." — never ran; npm intercepted the signal and
 # killed the child instead of letting it propagate).
 CMD ["node_modules/.bin/tsx", "worker/index.ts"]
+# Use the website when no Docker target is selected
+FROM web AS final
