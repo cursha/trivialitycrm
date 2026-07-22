@@ -4,12 +4,20 @@
 // execution. Every consumer of this module is itself a server-only context
 // (Server Actions in the web process, or the worker process), same reasoning
 // as src/lib/prisma.ts's identical omission.
-import { startBoss, QUEUE_RUN_SEARCH, QUEUE_GENERATE_REPORT, QUEUE_SEND_SCHEDULED_EMAIL, QUEUE_RUN_SEQUENCE_STEP } from "./boss-client";
+import {
+  startBoss,
+  QUEUE_RUN_SEARCH,
+  QUEUE_GENERATE_REPORT,
+  QUEUE_SEND_SCHEDULED_EMAIL,
+  QUEUE_RUN_SEQUENCE_STEP,
+  QUEUE_PROCESS_INBOUND_NOTIFICATION,
+} from "./boss-client";
 
 export type RunSearchJobData = { searchId: string };
 export type GenerateReportJobData = { scheduledReportId: string; periodKey: string };
 export type SendScheduledEmailJobData = { emailMessageId: string };
 export type RunSequenceStepJobData = { enrollmentId: string; stepId: string };
+export type ProcessInboundNotificationJobData = { connectionId: string; providerMessageId: string };
 
 /** Enqueues a durable run-search job and returns pg-boss's job id (stored on
  * LeadSearch.providerJobId for cancellation lookup / log correlation). The
@@ -71,4 +79,21 @@ export async function enqueueRunSequenceStepJob(enrollmentId: string, stepId: st
     { enrollmentId, stepId } satisfies RunSequenceStepJobData,
     { singletonKey: `${enrollmentId}:${stepId}` },
   );
+}
+
+/**
+ * Enqueues one inbound webhook notification for the worker to actually
+ * fetch and process — called from the webhook route
+ * (src/app/api/comms/webhooks/[provider]/route.ts) only after that route
+ * has already verified clientState and recorded the notification's
+ * WebhookEvent row itself, so this only ever runs for a notification
+ * that's genuinely new. singletonKey = eventId, defense in depth on top
+ * of that WebhookEvent uniqueness (see PROCESS_INBOUND_NOTIFICATION_QUEUE_OPTIONS).
+ */
+export async function enqueueProcessInboundNotificationJob(
+  eventId: string,
+  data: ProcessInboundNotificationJobData,
+): Promise<string | null> {
+  const boss = await startBoss({ supervise: false });
+  return boss.send(QUEUE_PROCESS_INBOUND_NOTIFICATION, data, { singletonKey: eventId });
 }

@@ -9,6 +9,9 @@ import type {
   SendEmailResult,
   CalendarEventInput,
   CalendarEventResult,
+  InboundSubscription,
+  ParsedInboundNotification,
+  InboundMessage,
 } from "./types";
 
 // Deliberately no `import "server-only"` — the worker's send-job handler
@@ -18,13 +21,18 @@ const AUTHORIZE_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/auth
 const TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token";
 const GRAPH_BASE = "https://graph.microsoft.com/v1.0";
 
-// offline_access is required to receive a refresh_token at all. Mail.Send +
-// Mail.Read cover Phase A (send + read-for-inbound-sync in a later phase);
-// Calendars.ReadWrite is requested now too since Microsoft grants calendar
-// scope in the same consent (see the plan's §3) even though calendar
-// features aren't built until Phase D — asking once up front avoids making
-// a connected user re-consent later.
+// offline_access is required to receive a refresh_token at all. Mail.Send
+// covers outbound (Phase A); Mail.Read covers inbound sync (Phase D2 —
+// reading the message a webhook notification points at); Calendars.ReadWrite
+// covers calendar (Phase D1). All requested from the very first connection,
+// even before every scope's feature existed, since Microsoft grants them in
+// one consent — asking once up front avoids making an already-connected
+// user re-consent later.
 const SCOPES = ["offline_access", "Mail.Send", "Mail.Read", "Calendars.ReadWrite", "User.Read"].join(" ");
+
+/** Graph's documented max lifetime for a subscription on a mail resource is
+ * 4230 minutes (~2.94 days) — requesting comfortably under that ceiling. */
+const SUBSCRIPTION_LIFETIME_MINUTES = 4200;
 
 function requireCredentials(): { clientId: string; clientSecret: string } {
   const { MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET } = getEnv();
@@ -242,5 +250,124 @@ export class MicrosoftGraphProvider implements EmailProvider {
         }
       },
     );
+  }
+
+  async createInboundSubscription(account: ConnectedAccount, notificationUrl: string, clientState: string): Promise<InboundSubscription> {
+    const subscription = await callEmailProvider(
+      { providerName: "microsoft", connectionId: account.connectionId, bucketPrefix: "webhook-subscription" },
+      async (signal) => {
+        const response = await fetch(`${GRAPH_BASE}/subscriptions`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${account.accessToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            changeType: "created",
+            notificationUrl,
+            resource: "me/mailFolders('inbox')/messages",
+            expirationDateTime: new Date(Date.now() + SUBSCRIPTION_LIFETIME_MINUTES * 60 * 1000).toISOString(),
+            clientState,
+          }),
+          signal,
+        });
+        if (!response.ok) {
+          throw new Error(`Creating the Microsoft inbound subscription failed (${response.status}).`);
+        }
+        return (await response.json()) as { id: string; expirationDateTime: string };
+      },
+    );
+    return { subscriptionId: subscription.id, expiresAt: new Date(subscription.expirationDateTime) };
+  }
+
+  async renewInboundSubscription(account: ConnectedAccount, subscriptionId: string): Promise<InboundSubscription> {
+    const subscription = await callEmailProvider(
+      { providerName: "microsoft", connectionId: account.connectionId, bucketPrefix: "webhook-subscription" },
+      async (signal) => {
+        const response = await fetch(`${GRAPH_BASE}/subscriptions/${subscriptionId}`, {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${account.accessToken}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            expirationDateTime: new Date(Date.now() + SUBSCRIPTION_LIFETIME_MINUTES * 60 * 1000).toISOString(),
+          }),
+          signal,
+        });
+        if (!response.ok) {
+          throw new Error(`Renewing the Microsoft inbound subscription failed (${response.status}).`);
+        }
+        return (await response.json()) as { id: string; expirationDateTime: string };
+      },
+    );
+    return { subscriptionId: subscription.id, expiresAt: new Date(subscription.expirationDateTime) };
+  }
+
+  async cancelInboundSubscription(account: ConnectedAccount, subscriptionId: string): Promise<void> {
+    await callEmailProvider(
+      { providerName: "microsoft", connectionId: account.connectionId, bucketPrefix: "webhook-subscription" },
+      async (signal) => {
+        const response = await fetch(`${GRAPH_BASE}/subscriptions/${subscriptionId}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${account.accessToken}` },
+          signal,
+        });
+        // 404 means the subscription is already gone (expired or already
+        // cancelled) — treat as success, same idempotency reasoning as
+        // appointments.ts's cancelAppointment.
+        if (!response.ok && response.status !== 404) {
+          throw new Error(`Cancelling the Microsoft inbound subscription failed (${response.status}).`);
+        }
+      },
+    );
+  }
+
+  /**
+   * Graph's change-notification envelope: `{ value: [{ subscriptionId,
+   * clientState, changeType, resourceData: { id } }] }`. There is no
+   * single canonical notification id in this payload, so eventId is
+   * synthesized from (subscriptionId, message id) — stable across a
+   * genuine redelivery of the same notification, which is exactly the
+   * dedup key WebhookEvent needs. Only "created" entries are surfaced
+   * (the subscription itself only ever requests that changeType, but
+   * filtering here costs nothing and documents the assumption).
+   */
+  parseInboundWebhookPayload(rawBody: string): ParsedInboundNotification[] {
+    const parsed = JSON.parse(rawBody) as {
+      value: Array<{ subscriptionId: string; clientState: string; changeType: string; resourceData: { id: string } }>;
+    };
+    return parsed.value
+      .filter((entry) => entry.changeType === "created")
+      .map((entry) => ({
+        eventId: `${entry.subscriptionId}:${entry.resourceData.id}`,
+        subscriptionId: entry.subscriptionId,
+        clientState: entry.clientState,
+        providerMessageId: entry.resourceData.id,
+      }));
+  }
+
+  async fetchInboundMessage(account: ConnectedAccount, providerMessageId: string): Promise<InboundMessage> {
+    const message = await callEmailProvider(
+      { providerName: "microsoft", connectionId: account.connectionId, bucketPrefix: "inbound-fetch" },
+      async (signal) => {
+        const response = await fetch(
+          `${GRAPH_BASE}/me/messages/${providerMessageId}?$select=from,subject,body,receivedDateTime,conversationId`,
+          { headers: { Authorization: `Bearer ${account.accessToken}` }, signal },
+        );
+        if (!response.ok) {
+          throw new Error(`Fetching the Microsoft inbound message failed (${response.status}).`);
+        }
+        return (await response.json()) as {
+          from: { emailAddress: { address: string } };
+          subject: string;
+          body: { content: string };
+          receivedDateTime: string;
+          conversationId: string;
+        };
+      },
+    );
+    return {
+      providerMessageId,
+      providerThreadId: message.conversationId,
+      fromAddress: message.from.emailAddress.address,
+      subject: message.subject,
+      bodyHtml: message.body.content,
+      receivedAt: new Date(message.receivedDateTime),
+    };
   }
 }

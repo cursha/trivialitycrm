@@ -8,6 +8,7 @@ export const QUEUE_RUN_SEARCH = "run-search";
 export const QUEUE_GENERATE_REPORT = "generate-report";
 export const QUEUE_SEND_SCHEDULED_EMAIL = "send-scheduled-email";
 export const QUEUE_RUN_SEQUENCE_STEP = "run-sequence-step";
+export const QUEUE_PROCESS_INBOUND_NOTIFICATION = "process-inbound-notification";
 
 /**
  * Retry/expiry defaults for the run-search queue. expireInSeconds is
@@ -76,6 +77,22 @@ const RUN_SEQUENCE_STEP_QUEUE_OPTIONS = {
   retentionSeconds: 30 * 24 * 60 * 60,
 };
 
+/**
+ * Keyed per notification eventId (see ParsedInboundNotification) — the
+ * same id WebhookEvent's own unique constraint dedups at the database
+ * level, so this is defense in depth against the webhook route enqueuing
+ * a duplicate before its own WebhookEvent insert had a chance to reject
+ * one, not the only guard.
+ */
+const PROCESS_INBOUND_NOTIFICATION_QUEUE_OPTIONS = {
+  policy: "singleton" as const,
+  retryLimit: 3,
+  retryBackoff: true,
+  retryDelayMax: 60,
+  expireInSeconds: 120,
+  retentionSeconds: 30 * 24 * 60 * 60,
+};
+
 let instance: PgBoss | null = null;
 
 /**
@@ -110,6 +127,7 @@ export async function startBoss(options: { supervise?: boolean } = {}): Promise<
   await boss.createQueue(QUEUE_GENERATE_REPORT, GENERATE_REPORT_QUEUE_OPTIONS);
   await boss.createQueue(QUEUE_SEND_SCHEDULED_EMAIL, SEND_SCHEDULED_EMAIL_QUEUE_OPTIONS);
   await boss.createQueue(QUEUE_RUN_SEQUENCE_STEP, RUN_SEQUENCE_STEP_QUEUE_OPTIONS);
+  await boss.createQueue(QUEUE_PROCESS_INBOUND_NOTIFICATION, PROCESS_INBOUND_NOTIFICATION_QUEUE_OPTIONS);
   return boss;
 }
 

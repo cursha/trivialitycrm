@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { MockEmailProvider, SIMULATED_CALENDAR_FAILURE_TITLE } from "../../src/lib/comms/providers/mock";
+import {
+  MockEmailProvider,
+  SIMULATED_CALENDAR_FAILURE_TITLE,
+  SIMULATED_INBOUND_FETCH_FAILURE_ADDRESS,
+  buildMockWebhookBody,
+} from "../../src/lib/comms/providers/mock";
 import { MicrosoftGraphProvider } from "../../src/lib/comms/providers/microsoft-graph";
 import { GoogleProvider } from "../../src/lib/comms/providers/google";
 import { getEmailProvider } from "../../src/lib/comms/providers/factory";
@@ -58,6 +63,46 @@ describe("MockEmailProvider", () => {
 
     await expect(provider.createCalendarEvent(account, input)).rejects.toThrow(/Simulated calendar provider failure/);
   });
+
+  it("round-trips an inbound webhook notification through parse then fetch", async () => {
+    const provider: EmailProvider = new MockEmailProvider();
+    const rawBody = buildMockWebhookBody([
+      { subscriptionId: "sub-1", clientState: "secret-1", fromAddress: "lead@example.com", subject: "Re: Demo", bodyHtml: "<p>Sounds great</p>" },
+    ]);
+
+    const [notification] = provider.parseInboundWebhookPayload(rawBody);
+    expect(notification.subscriptionId).toBe("sub-1");
+    expect(notification.clientState).toBe("secret-1");
+
+    const account = { accessToken: "token", refreshToken: "refresh" };
+    const message = await provider.fetchInboundMessage(account, notification.providerMessageId);
+    expect(message.fromAddress).toBe("lead@example.com");
+    expect(message.subject).toBe("Re: Demo");
+    expect(message.bodyHtml).toBe("<p>Sounds great</p>");
+  });
+
+  it("produces the same eventId for an identical notification posted twice (redelivery dedup)", () => {
+    const provider: EmailProvider = new MockEmailProvider();
+    const rawBody = buildMockWebhookBody([
+      { subscriptionId: "sub-1", clientState: "secret-1", fromAddress: "lead@example.com", subject: "Re: Demo", bodyHtml: "<p>Hi</p>" },
+    ]);
+
+    const [first] = provider.parseInboundWebhookPayload(rawBody);
+    const [second] = provider.parseInboundWebhookPayload(rawBody);
+    expect(second.eventId).toBe(first.eventId);
+  });
+
+  it("simulates an inbound fetch failure for a specific sender, the only way tests exercise process-inbound-notification's failure path", async () => {
+    const provider: EmailProvider = new MockEmailProvider();
+    const rawBody = buildMockWebhookBody([
+      { subscriptionId: "sub-1", clientState: "secret-1", fromAddress: SIMULATED_INBOUND_FETCH_FAILURE_ADDRESS, subject: "x", bodyHtml: "x" },
+    ]);
+    const [notification] = provider.parseInboundWebhookPayload(rawBody);
+
+    await expect(
+      provider.fetchInboundMessage({ accessToken: "token", refreshToken: "refresh" }, notification.providerMessageId),
+    ).rejects.toThrow(/Simulated inbound fetch failure/);
+  });
 });
 
 describe("MicrosoftGraphProvider.getAuthorizationUrl", () => {
@@ -102,6 +147,32 @@ describe("MicrosoftGraphProvider.getAuthorizationUrl", () => {
   });
 });
 
+describe("MicrosoftGraphProvider.parseInboundWebhookPayload", () => {
+  it("extracts subscriptionId/clientState/providerMessageId from Graph's change-notification envelope", () => {
+    const provider = new MicrosoftGraphProvider();
+    const rawBody = JSON.stringify({
+      value: [
+        { subscriptionId: "graph-sub-1", clientState: "secret-1", changeType: "created", resourceData: { id: "graph-msg-1" } },
+      ],
+    });
+
+    const [notification] = provider.parseInboundWebhookPayload(rawBody);
+    expect(notification.subscriptionId).toBe("graph-sub-1");
+    expect(notification.clientState).toBe("secret-1");
+    expect(notification.providerMessageId).toBe("graph-msg-1");
+    expect(notification.eventId).toBe("graph-sub-1:graph-msg-1");
+  });
+
+  it("filters out non-'created' change types (this app only ever subscribes to created)", () => {
+    const provider = new MicrosoftGraphProvider();
+    const rawBody = JSON.stringify({
+      value: [{ subscriptionId: "graph-sub-1", clientState: "secret-1", changeType: "updated", resourceData: { id: "graph-msg-1" } }],
+    });
+
+    expect(provider.parseInboundWebhookPayload(rawBody)).toEqual([]);
+  });
+});
+
 describe("GoogleProvider.getAuthorizationUrl", () => {
   let savedId: string | undefined;
   let savedSecret: string | undefined;
@@ -131,6 +202,21 @@ describe("GoogleProvider.getAuthorizationUrl", () => {
     expect(url.searchParams.get("prompt")).toBe("consent");
     expect(url.searchParams.get("scope")).toContain("gmail.send");
     expect(url.searchParams.get("scope")).toContain("calendar");
+  });
+});
+
+describe("GoogleProvider inbound sync", () => {
+  it("throws a clear 'not implemented' error for every inbound method — Phase D2 scoped inbound sync to Microsoft only", async () => {
+    const provider: EmailProvider = new GoogleProvider();
+    const account = { accessToken: "token", refreshToken: "refresh" };
+
+    await expect(provider.createInboundSubscription(account, "https://app.example.com/webhook", "state")).rejects.toThrow(
+      /not implemented/,
+    );
+    await expect(provider.renewInboundSubscription(account, "sub-1")).rejects.toThrow(/not implemented/);
+    await expect(provider.cancelInboundSubscription(account, "sub-1")).rejects.toThrow(/not implemented/);
+    expect(() => provider.parseInboundWebhookPayload("{}")).toThrow(/not implemented/);
+    await expect(provider.fetchInboundMessage(account, "msg-1")).rejects.toThrow(/not implemented/);
   });
 });
 

@@ -258,9 +258,14 @@ export async function processDueScheduledEmail(emailMessageId: string): Promise<
   if (row.status !== "SCHEDULED") {
     return { ok: true, emailMessageId };
   }
-  if (!row.contactId || !row.createdById) {
-    await prisma.emailMessage.update({ where: { id: row.id }, data: { status: "FAILED", errorMessage: "Missing contact or creator." } });
-    return { ok: false, error: "Missing contact or creator." };
+  if (!row.contactId || !row.createdById || !row.companyId) {
+    // A scheduled *outbound* send always has all three (set at schedule
+    // time by scheduleEmail() — see that function) — companyId only goes
+    // null on an *inbound* row (Phase D2's unmatched-sender case), which
+    // is never SCHEDULED, so this branch is a data-integrity guard, not a
+    // real expected path.
+    await prisma.emailMessage.update({ where: { id: row.id }, data: { status: "FAILED", errorMessage: "Missing contact, creator, or company." } });
+    return { ok: false, error: "Missing contact, creator, or company." };
   }
 
   const result = await prepareSend({

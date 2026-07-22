@@ -204,6 +204,7 @@ model User {
   emailTemplatesCreated    EmailTemplate[]         @relation("EmailTemplateCreator")
   emailTemplatesUpdated    EmailTemplate[]         @relation("EmailTemplateUpdater")
   emailMessagesCreated     EmailMessage[]          @relation("EmailMessageCreator")
+  emailMessagesReviewed    EmailMessage[]          @relation("EmailMessageReviewer")
   notifications            Notification[]
   consentRecordsRecorded   ConsentRecord[]
   followUpSequencesCreated FollowUpSequence[]
@@ -957,6 +958,20 @@ model ProviderConnection {
   connectedAt               DateTime                 @default(now())
   disconnectedAt            DateTime?
 
+  // Module Six Phase D2: inbound sync. inboundClientState is a per-
+  // connection random secret this app generates and hands to the provider
+  // when creating the subscription; the provider echoes it back on every
+  // notification, and the webhook route rejects anything that doesn't
+  // match — proof the notification actually came from a subscription this
+  // app created, not a forged POST to the public webhook URL. It's a
+  // shared secret analogous to a webhook signing secret, not a bearer
+  // credential to the mailbox itself, so unlike the access/refresh tokens
+  // above it isn't run through token-crypto.ts. Only ever populated for
+  // Microsoft connections in this phase — see google.ts's inbound methods.
+  inboundSubscriptionId        String?
+  inboundSubscriptionExpiresAt DateTime?
+  inboundClientState           String?
+
   emailMessages EmailMessage[]
   appointments  Appointment[]
 
@@ -1019,6 +1034,12 @@ enum EmailMessageStatus {
   BOUNCED
   CANCELLED
   REPLIED
+  // Module Six Phase D2: an inbound message that arrived via webhook sync.
+  // Deliberately its own value rather than overloading DELIVERED (which
+  // means "an outbound send was confirmed delivered") or REPLIED (reserved
+  // for a display-layer "this outbound message got a reply" marker, not
+  // implemented yet) — see the inbound-sync doc comment below.
+  RECEIVED
 }
 
 /**
@@ -1028,20 +1049,26 @@ enum EmailMessageStatus {
  * audit trail already logs a plain-language "email sent" note via
  * logEmailSent — see src/lib/companies/activity-log.ts's existing
  * convention) — same split Module Five established for
- * PipelineStageHistory vs. the PIPELINE_CHANGE activity. Phase A is
- * outbound-only; direction/status values for inbound and
- * sequence/appointment linkage are added by later phases' migrations, not
- * forward-referenced here.
+ * PipelineStageHistory vs. the PIPELINE_CHANGE activity.
+ * Phase D2 (inbound sync): companyId/contactId are nullable because an
+ * inbound message from a sender address matching no Contact (or matching
+ * more than one, across different companies) can't be attached to
+ * anything yet — it lands with both null and reviewedAt/reviewedById null,
+ * for authorized review at /settings/communications-review (the plan's
+ * explicit "never auto-create a company from an unknown sender"
+ * requirement). fromAddress is the raw inbound sender; null for outbound
+ * rows, where the sender is implied by providerConnection.
  */
 model EmailMessage {
   id                   String              @id @default(cuid())
-  companyId            String
-  company              Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companyId            String?
+  company              Company?            @relation(fields: [companyId], references: [id], onDelete: SetNull)
   contactId            String?
   contact              Contact?            @relation(fields: [contactId], references: [id], onDelete: SetNull)
   direction            EmailDirection      @default(OUTBOUND)
   providerConnectionId String?
   providerConnection   ProviderConnection? @relation(fields: [providerConnectionId], references: [id], onDelete: SetNull)
+  fromAddress          String?
   toAddresses          String[]
   ccAddresses          String[]            @default([])
   bccAddresses         String[]            @default([])
@@ -1055,15 +1082,41 @@ model EmailMessage {
   providerMessageId    String?
   providerThreadId     String?
   errorMessage         String?
+  reviewedAt           DateTime?
+  reviewedById         String?
+  reviewedBy           User?               @relation("EmailMessageReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
   createdById          String?
   createdBy            User?               @relation("EmailMessageCreator", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt            DateTime            @default(now())
 
   sequenceStepRun SequenceStepRun?
 
+  @@unique([providerConnectionId, providerMessageId])
   @@index([companyId])
   @@index([contactId])
   @@index([status, scheduledFor])
+  @@index([direction, reviewedAt])
+}
+
+/**
+ * Notification-level idempotency for inbound webhook delivery — a provider
+ * may redeliver the same notification (Graph and Google both document this
+ * as expected, not a bug), and this table makes a redelivery a cheap no-op
+ * before any Graph/Google API call is even made to fetch the message
+ * content. providerEventId is synthesized per provider (Graph doesn't
+ * issue a single canonical notification id): see
+ * src/lib/comms/inbound-sync.ts's buildWebhookEventId(). This is separate
+ * from, and a first line of defense ahead of, EmailMessage's own
+ * (providerConnectionId, providerMessageId) unique constraint, which
+ * catches a duplicate at the message-content level too.
+ */
+model WebhookEvent {
+  id              String       @id @default(cuid())
+  provider        ProviderKind
+  providerEventId String
+  receivedAt      DateTime     @default(now())
+
+  @@unique([provider, providerEventId])
 }
 
 enum ConsentType {
