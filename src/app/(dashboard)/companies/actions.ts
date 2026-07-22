@@ -8,6 +8,7 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { companyScope, canAssignTo } from "@/lib/companies/scope";
 import { CompanySchema } from "@/lib/validation/company";
 import { findPotentialDuplicates, computeNormalizedFields, type DuplicateMatch } from "@/lib/duplicates/match";
+import { computeAddressNormalizedFields } from "@/lib/data-quality/normalize";
 import { logAssignmentChange, logPipelineChange, logInitialPipelineStage } from "@/lib/companies/activity-log";
 import { formString } from "@/lib/form-data";
 
@@ -56,7 +57,7 @@ export async function createCompany(_prevState: CompanyFormState, formData: Form
     return { error: "Only an Administrator can add a company despite a possible duplicate match." };
   }
 
-  const normalized = computeNormalizedFields(parsed.data);
+  const normalized = { ...computeNormalizedFields(parsed.data), ...computeAddressNormalizedFields(parsed.data) };
 
   const company = await prisma.$transaction(async (tx) => {
     const created = await tx.company.create({
@@ -134,7 +135,7 @@ export async function updateCompany(
     return { error: "Only an Administrator can save despite a possible duplicate match." };
   }
 
-  const normalized = computeNormalizedFields(parsed.data);
+  const normalized = { ...computeNormalizedFields(parsed.data), ...computeAddressNormalizedFields(parsed.data) };
   const pipelineStageChanged = parsed.data.pipelineStageId !== existing.pipelineStageId;
 
   await prisma.$transaction(async (tx) => {

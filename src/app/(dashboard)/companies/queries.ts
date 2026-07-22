@@ -163,7 +163,7 @@ export async function getScopedCompany(user: AuthenticatedUser, id: string) {
       createdBy: true,
       updatedBy: true,
       archivedBy: true,
-      contacts: { orderBy: { lastName: "asc" } },
+      contacts: { where: { status: "ACTIVE" }, orderBy: { lastName: "asc" } },
     },
   });
 }

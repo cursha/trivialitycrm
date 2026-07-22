@@ -12,6 +12,7 @@ import {
   ShieldAlert,
   Workflow,
   Inbox,
+  ListChecks,
 } from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -87,6 +88,13 @@ export default async function SettingsPage() {
       description: "Inbound replies that couldn't be matched to a contact automatically — review and link them by hand.",
       icon: Inbox,
       visible: hasPermission(user, "view_team_communications"),
+    },
+    {
+      href: "/data-quality/rules",
+      label: "Data Quality Rules",
+      description: "Table-driven rules for missing fields, invalid formats, duplicates, and stale records.",
+      icon: ListChecks,
+      visible: hasPermission(user, "manage_data_quality_rules"),
     },
     {
       href: "/settings/territories",

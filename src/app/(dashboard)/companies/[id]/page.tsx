@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Pencil } from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/prisma";
 import { getScopedCompany, listCompanyActivities, listCompanyTasks, listCompanyEvidence, listCompanyScoreHistory } from "../queries";
+import { resolveSurvivingCompanyId } from "@/lib/data-quality/merge-company";
 import { CompanyActions } from "./company-actions";
 import { QuickActionsBar } from "./quick-actions-bar";
 import { ContactsPanel } from "./contacts/contacts-panel";
@@ -35,6 +36,17 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
 
   const company = await getScopedCompany(user, id);
   if (!company) notFound();
+
+  // Module Seven: a MERGED company was absorbed into another via a safe
+  // merge (src/lib/data-quality/merge-company.ts) — old links to it
+  // resolve to its current survivor rather than 404ing. Resolves a
+  // possibly-chained mergedIntoId to its final target. `redirect()` never
+  // returns (typed `never`), so TypeScript narrows company.status to
+  // "ACTIVE" | "ARCHIVED" for the rest of this function.
+  if (company.status === "MERGED") {
+    const survivingId = await resolveSurvivingCompanyId(company.id);
+    redirect(`/companies/${survivingId}`);
+  }
 
   const [
     activities,

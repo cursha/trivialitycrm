@@ -38,7 +38,7 @@ export async function matchInboundMessageAction(
   }
 
   const matches = await prisma.contact.findMany({
-    where: { email: { equals: email, mode: "insensitive" } },
+    where: { email: { equals: email, mode: "insensitive" }, status: "ACTIVE" },
     select: { id: true, companyId: true },
     take: 2,
   });

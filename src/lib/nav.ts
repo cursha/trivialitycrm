@@ -10,7 +10,8 @@ export type NavIconKey =
   | "search"
   | "pipeline"
   | "team"
-  | "reports";
+  | "reports"
+  | "dataQuality";
 
 export type NavItem = {
   label: string;
@@ -39,6 +40,12 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/reports",
     icon: "reports",
     requiresAnyPermission: ["view_own_reports", "view_team_reports", "view_all_reports"],
+  },
+  {
+    label: "Data Quality",
+    href: "/data-quality",
+    icon: "dataQuality",
+    requiresAnyPermission: ["view_data_quality"],
   },
   {
     label: "Settings",

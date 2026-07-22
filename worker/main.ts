@@ -11,6 +11,7 @@ import {
   QUEUE_SEND_SCHEDULED_EMAIL,
   QUEUE_RUN_SEQUENCE_STEP,
   QUEUE_PROCESS_INBOUND_NOTIFICATION,
+  QUEUE_DATA_QUALITY_SCAN,
 } from "../src/lib/jobs/boss-client";
 import { handleRunSearchJob } from "./handlers/run-search";
 import { sweepExpiredSessions, sweepExpiredImportBatches, sweepExpiredRateLimitBuckets } from "./handlers/cleanup";
@@ -22,6 +23,7 @@ import { runSequenceTick } from "./handlers/sequence-tick";
 import { handleRunSequenceStepJob } from "./handlers/run-sequence-step";
 import { runInboundSubscriptionTick } from "./handlers/inbound-subscription-tick";
 import { handleProcessInboundNotificationJob } from "./handlers/process-inbound-notification";
+import { handleDataQualityScanJob } from "./handlers/data-quality-scan";
 import { shutdownBoss } from "./shutdown";
 
 const execAsync = promisify(exec);
@@ -132,6 +134,9 @@ async function main(): Promise<void> {
   await boss.work(QUEUE_SEND_SCHEDULED_EMAIL, { localConcurrency: 1 }, handleSendScheduledEmailJob);
   await boss.work(QUEUE_RUN_SEQUENCE_STEP, { localConcurrency: 1 }, handleRunSequenceStepJob);
   await boss.work(QUEUE_PROCESS_INBOUND_NOTIFICATION, { localConcurrency: 1 }, handleProcessInboundNotificationJob);
+  // Manual-trigger only (like run-search) — no recurring tick. A user with
+  // run_duplicate_scan enqueues one via the /data-quality/scans action.
+  await boss.work(QUEUE_DATA_QUALITY_SCAN, { localConcurrency: 1 }, handleDataQualityScanJob);
   await boss.work(QUEUE_CLEANUP_SESSIONS, async () => {
     await sweepExpiredSessions();
   });

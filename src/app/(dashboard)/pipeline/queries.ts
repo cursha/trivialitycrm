@@ -98,7 +98,7 @@ const CARD_INCLUDE = {
   leadType: true,
   assignedTo: true,
   competitor: true,
-  contacts: { orderBy: { lastName: "asc" as const }, take: 1 },
+  contacts: { where: { status: "ACTIVE" as const }, orderBy: { lastName: "asc" as const }, take: 1 },
   activities: { orderBy: { occurredAt: "desc" as const }, take: 1 },
 };
 

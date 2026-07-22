@@ -9,6 +9,7 @@ export const QUEUE_GENERATE_REPORT = "generate-report";
 export const QUEUE_SEND_SCHEDULED_EMAIL = "send-scheduled-email";
 export const QUEUE_RUN_SEQUENCE_STEP = "run-sequence-step";
 export const QUEUE_PROCESS_INBOUND_NOTIFICATION = "process-inbound-notification";
+export const QUEUE_DATA_QUALITY_SCAN = "data-quality-scan";
 
 /**
  * Retry/expiry defaults for the run-search queue. expireInSeconds is
@@ -93,6 +94,25 @@ const PROCESS_INBOUND_NOTIFICATION_QUEUE_OPTIONS = {
   retentionSeconds: 30 * 24 * 60 * 60,
 };
 
+/**
+ * Same singleton+singletonKey dedup idiom as run-search, keyed per scan id
+ * (see enqueueDataQualityScanJob) — at most one active job per scan row.
+ * expireInSeconds is generous like run-search's (a full scan over many
+ * companies/contacts can legitimately run for minutes), safe because the
+ * per-record issue-evaluation phase is cursor-checkpointed (see
+ * src/lib/data-quality/scan.ts) — a retried job resumes rather than
+ * restarting, and the duplicate-detection phase's writes are all
+ * idempotent upserts either way.
+ */
+const DATA_QUALITY_SCAN_QUEUE_OPTIONS = {
+  policy: "singleton" as const,
+  retryLimit: 2,
+  retryBackoff: true,
+  retryDelayMax: 300,
+  expireInSeconds: 3600,
+  retentionSeconds: 30 * 24 * 60 * 60,
+};
+
 let instance: PgBoss | null = null;
 
 /**
@@ -128,6 +148,7 @@ export async function startBoss(options: { supervise?: boolean } = {}): Promise<
   await boss.createQueue(QUEUE_SEND_SCHEDULED_EMAIL, SEND_SCHEDULED_EMAIL_QUEUE_OPTIONS);
   await boss.createQueue(QUEUE_RUN_SEQUENCE_STEP, RUN_SEQUENCE_STEP_QUEUE_OPTIONS);
   await boss.createQueue(QUEUE_PROCESS_INBOUND_NOTIFICATION, PROCESS_INBOUND_NOTIFICATION_QUEUE_OPTIONS);
+  await boss.createQueue(QUEUE_DATA_QUALITY_SCAN, DATA_QUALITY_SCAN_QUEUE_OPTIONS);
   return boss;
 }
 

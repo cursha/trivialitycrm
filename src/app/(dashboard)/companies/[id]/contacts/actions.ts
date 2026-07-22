@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { companyScope } from "@/lib/companies/scope";
 import { ContactSchema } from "@/lib/validation/contact";
 import { formString } from "@/lib/form-data";
+import { computeContactNormalizedFields } from "@/lib/data-quality/normalize";
 
 export type ContactActionResult = { error?: string } | undefined;
 
@@ -57,6 +58,7 @@ export async function createContact(
       title: parsed.data.title ?? null,
       phone: parsed.data.phone ?? null,
       email: parsed.data.email ?? null,
+      ...computeContactNormalizedFields(parsed.data),
     },
   });
 
@@ -71,7 +73,7 @@ export async function updateContact(companyId: string, contactId: string, formDa
     return { error: parsed.error.issues[0]?.message ?? "Please correct the highlighted fields." };
   }
 
-  const existing = await prisma.contact.findFirst({ where: { id: contactId, companyId } });
+  const existing = await prisma.contact.findFirst({ where: { id: contactId, companyId, status: "ACTIVE" } });
   if (!existing) {
     return { error: "Contact not found." };
   }
@@ -84,6 +86,7 @@ export async function updateContact(companyId: string, contactId: string, formDa
       title: parsed.data.title ?? null,
       phone: parsed.data.phone ?? null,
       email: parsed.data.email ?? null,
+      ...computeContactNormalizedFields(parsed.data),
     },
   });
 
@@ -93,7 +96,7 @@ export async function updateContact(companyId: string, contactId: string, formDa
 export async function deleteContact(companyId: string, contactId: string): Promise<ContactActionResult> {
   await requireCompanyAccess(companyId);
 
-  const existing = await prisma.contact.findFirst({ where: { id: contactId, companyId } });
+  const existing = await prisma.contact.findFirst({ where: { id: contactId, companyId, status: "ACTIVE" } });
   if (!existing) {
     return { error: "Contact not found." };
   }

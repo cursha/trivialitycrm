@@ -131,6 +131,39 @@ export const CLASSIFICATION_TONE: Record<string, BadgeTone> = {
   EXISTING_CUSTOMER: "accent",
 };
 
+// Module Seven: Data Quality, Duplicate Management, Record Merging, and
+// Enrichment History. DUPLICATE_CONFIDENCE_TONE reuses the existing
+// ConfidenceLevel enum's tone mapping (CONFIDENCE_TONE above) directly —
+// PotentialDuplicate.confidence is that same enum, no separate map needed.
+export const DATA_QUALITY_ISSUE_STATUS_TONE: Record<string, BadgeTone> = {
+  OPEN: "warning",
+  DEFERRED: "neutral",
+  RESOLVED: "success",
+  IGNORED: "neutral",
+  REOPENED: "danger",
+};
+
+export const DUPLICATE_REVIEW_STATUS_TONE: Record<string, BadgeTone> = {
+  PENDING: "warning",
+  NOT_DUPLICATE: "neutral",
+  CONFIRMED: "focus",
+  DEFERRED: "neutral",
+  MERGED: "success",
+};
+
+export const DATA_QUALITY_SEVERITY_TONE: Record<string, BadgeTone> = {
+  LOW: "neutral",
+  MEDIUM: "warning",
+  HIGH: "danger",
+  CRITICAL: "danger",
+};
+
+export const ENRICHMENT_DECISION_TONE: Record<string, BadgeTone> = {
+  PENDING: "warning",
+  ACCEPTED: "success",
+  REJECTED: "neutral",
+};
+
 /** Fallback for any enum without a dedicated label map above: title-cases
  * "SOME_VALUE" -> "Some Value", replacing the app's previous convention of
  * leaving values SHOUTING ("CURRENT TRIVIA") after a bare underscore swap. */
