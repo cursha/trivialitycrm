@@ -11,6 +11,7 @@ import {
   QUEUE_SEND_SCHEDULED_EMAIL,
   QUEUE_RUN_SEQUENCE_STEP,
   QUEUE_PROCESS_INBOUND_NOTIFICATION,
+  QUEUE_DATA_QUALITY_SCAN,
 } from "./boss-client";
 
 export type RunSearchJobData = { searchId: string };
@@ -18,6 +19,7 @@ export type GenerateReportJobData = { scheduledReportId: string; periodKey: stri
 export type SendScheduledEmailJobData = { emailMessageId: string };
 export type RunSequenceStepJobData = { enrollmentId: string; stepId: string };
 export type ProcessInboundNotificationJobData = { connectionId: string; providerMessageId: string };
+export type DataQualityScanJobData = { scanId: string };
 
 /** Enqueues a durable run-search job and returns pg-boss's job id (stored on
  * LeadSearch.providerJobId for cancellation lookup / log correlation). The
@@ -96,4 +98,24 @@ export async function enqueueProcessInboundNotificationJob(
 ): Promise<string | null> {
   const boss = await startBoss({ supervise: false });
   return boss.send(QUEUE_PROCESS_INBOUND_NOTIFICATION, data, { singletonKey: eventId });
+}
+
+/** Enqueues a durable data-quality scan job. singletonKey = the scan id
+ * (mirrors enqueueSearchJob's use of the LeadSearch id), returning pg-boss's
+ * job id for cancellation lookup (stored on DataQualityScan.providerJobId). */
+export async function enqueueDataQualityScanJob(scanId: string): Promise<string> {
+  const boss = await startBoss({ supervise: false });
+  const jobId = await boss.send(QUEUE_DATA_QUALITY_SCAN, { scanId } satisfies DataQualityScanJobData, { singletonKey: scanId });
+  if (!jobId) {
+    throw new Error(`Failed to enqueue a data-quality scan job for scan ${scanId}.`);
+  }
+  return jobId;
+}
+
+/** Same cooperative-cancel idiom as cancelSearchJob — prevents a
+ * not-yet-started scan job from running; an already-running job polls
+ * isCancelled() between batches (see runDataQualityScan). */
+export async function cancelDataQualityScanJob(providerJobId: string): Promise<void> {
+  const boss = await startBoss({ supervise: false });
+  await boss.cancel(QUEUE_DATA_QUALITY_SCAN, providerJobId);
 }

@@ -48,6 +48,11 @@ enum ActivityType {
   PIPELINE_CHANGE
   LEAD_TRANSFERRED
   ASSIGNMENT_CHANGE
+  // Module Seven: written on the surviving company when a duplicate company
+  // is merged into it — the human-readable narrative twin of the structured
+  // DataQualityAuditEvent, same split logPipelineChange already establishes
+  // for PIPELINE_CHANGE/PipelineStageHistory.
+  COMPANY_MERGED
 }
 
 enum TaskStatus {
@@ -59,6 +64,12 @@ enum TaskStatus {
 enum CompanyStatus {
   ACTIVE
   ARCHIVED
+  // Module Seven: a company absorbed into another via a safe merge. Distinct
+  // from ARCHIVED (an intentional "set this aside" decision) — a MERGED
+  // company was never rejected, it was subsumed into mergedIntoId, and its
+  // data lives on there. Never hard-deleted; see mergedIntoId/mergedAt/
+  // mergedById below.
+  MERGED
 }
 
 // Optional flag on PipelineStage identifying the Won/Lost stage(s) without
@@ -210,8 +221,23 @@ model User {
   followUpSequencesCreated FollowUpSequence[]
   sequenceEnrollmentsMade  SequenceEnrollment[]
   appointmentsCreated      Appointment[]
-  createdAt                DateTime                @default(now())
-  updatedAt                DateTime                @updatedAt
+
+  // Module Seven: Data Quality, Duplicate Management, Record Merging, and
+  // Enrichment History.
+  mergedCompanies             Company[]               @relation("CompanyMerger")
+  mergedContacts              Contact[]               @relation("ContactMerger")
+  dataQualityRulesCreated     DataQualityRule[]       @relation("DataQualityRuleCreator")
+  dataQualityRulesUpdated     DataQualityRule[]       @relation("DataQualityRuleUpdater")
+  dataQualityIssuesResolved   DataQualityIssue[]      @relation("DataQualityIssueResolver")
+  dataQualityIssuesAssigned   DataQualityIssue[]      @relation("DataQualityIssueAssignee")
+  potentialDuplicatesAssigned PotentialDuplicate[]    @relation("PotentialDuplicateAssignee")
+  potentialDuplicatesReviewed PotentialDuplicate[]    @relation("PotentialDuplicateReviewer")
+  dataQualityScansTriggered   DataQualityScan[]       @relation("DataQualityScanTrigger")
+  enrichmentDecisions         EnrichmentRecord[]      @relation("EnrichmentDecider")
+  dataQualityAuditEvents      DataQualityAuditEvent[] @relation("DataQualityAuditActor")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Session {
@@ -305,42 +331,55 @@ model Competitor {
 }
 
 model Company {
-  id              String        @id @default(cuid())
-  name            String
-  normalizedName  String
-  address1        String?
-  city            String
-  region          String
-  postalCode      String?
-  country         String
-  phone           String?
-  normalizedPhone String?
-  email           String?
-  normalizedEmail String?
-  websiteUrl      String?
-  websiteDomain   String?
-  notes           String?       @db.Text
-  aiScore         Int?
-  aiExplanation   String?       @db.Text
-  triviaStatus    TriviaStatus  @default(UNCERTAIN)
-  nextFollowUpAt  DateTime?
-  leadTypeId      String
-  pipelineStageId String
-  competitorId    String?
+  id                   String        @id @default(cuid())
+  name                 String
+  normalizedName       String
+  address1             String?
+  city                 String
+  region               String
+  postalCode           String?
+  country              String
+  phone                String?
+  normalizedPhone      String?
+  email                String?
+  normalizedEmail      String?
+  websiteUrl           String?
+  websiteDomain        String?
+  // Module Seven: address-matching normalization, computed by the new,
+  // separate computeAddressNormalizedFields() (src/lib/data-quality/
+  // normalize.ts) — deliberately NOT added to the existing
+  // computeNormalizedFields() in src/lib/duplicates/match.ts, whose return
+  // value is also spread onto SearchResult (a model with no matching
+  // columns). Populated going forward at write time, self-healed by the
+  // duplicate-quality scan for pre-existing rows — no SQL backfill
+  // migration, same "populated going forward" precedent as
+  // PipelineStageHistory. Original city/region/postalCode display values
+  // are never overwritten.
+  normalizedRegion     String?
+  normalizedCity       String?
+  normalizedPostalCode String?
+  notes                String?       @db.Text
+  aiScore              Int?
+  aiExplanation        String?       @db.Text
+  triviaStatus         TriviaStatus  @default(UNCERTAIN)
+  nextFollowUpAt       DateTime?
+  leadTypeId           String
+  pipelineStageId      String
+  competitorId         String?
   // Nullable: a company can be unassigned (created without an owner, or
   // explicitly unassigned) — Module Four's "Unassigned Leads" view relies on
   // this. Never auto-cleared by any automated process; only an explicit
   // assign/reassign/unassign action changes it, always logging an
   // ASSIGNMENT_CHANGE Activity.
-  assignedToId    String?
-  createdById     String
-  updatedById     String?
-  leadType        LeadType      @relation(fields: [leadTypeId], references: [id])
-  pipelineStage   PipelineStage @relation(fields: [pipelineStageId], references: [id])
-  competitor      Competitor?   @relation(fields: [competitorId], references: [id], onDelete: SetNull)
-  assignedTo      User?         @relation("AssignedSalesperson", fields: [assignedToId], references: [id])
-  createdBy       User          @relation("CompanyCreator", fields: [createdById], references: [id])
-  updatedBy       User?         @relation("CompanyUpdater", fields: [updatedById], references: [id])
+  assignedToId         String?
+  createdById          String
+  updatedById          String?
+  leadType             LeadType      @relation(fields: [leadTypeId], references: [id])
+  pipelineStage        PipelineStage @relation(fields: [pipelineStageId], references: [id])
+  competitor           Competitor?   @relation(fields: [competitorId], references: [id], onDelete: SetNull)
+  assignedTo           User?         @relation("AssignedSalesperson", fields: [assignedToId], references: [id])
+  createdBy            User          @relation("CompanyCreator", fields: [createdById], references: [id])
+  updatedBy            User?         @relation("CompanyUpdater", fields: [updatedById], references: [id])
 
   // Module Five: origin attribution. Nullable — set once at creation by
   // each of the three creation paths (manual add, AI transfer, import
@@ -356,6 +395,22 @@ model Company {
   archivedAt   DateTime?
   archivedById String?
   archivedBy   User?         @relation("CompanyArchiver", fields: [archivedById], references: [id])
+
+  // Module Seven: merge tombstone, parallel in shape to archivedAt/
+  // archivedById above. Set once, together with status: MERGED, by
+  // mergeCompanies() (src/lib/data-quality/merge-company.ts) — never
+  // cleared afterward. A merged company's own fields are left exactly as
+  // they were at merge time (never overwritten/cleared) so its data remains
+  // inspectable as history, not silently deleted. mergedIntoId can itself
+  // point at a company that was later merged again — readers resolve the
+  // chain to its final survivor (bounded-loop-safe) rather than assuming
+  // one hop.
+  mergedIntoId String?
+  mergedInto   Company?  @relation("CompanyMerge", fields: [mergedIntoId], references: [id], onDelete: SetNull)
+  mergedFrom   Company[] @relation("CompanyMerge")
+  mergedAt     DateTime?
+  mergedById   String?
+  mergedBy     User?     @relation("CompanyMerger", fields: [mergedById], references: [id], onDelete: SetNull)
 
   // EOS-1.0 current/summary outputs. Category-level scores and full
   // scoring snapshots live only in HistoricalScoreRecord (append-only audit
@@ -398,16 +453,29 @@ model Company {
   emailMessages       EmailMessage[]
   sequenceEnrollments SequenceEnrollment[]
   appointments        Appointment[]
-  createdAt           DateTime               @default(now())
-  updatedAt           DateTime               @updatedAt
+
+  // Module Seven: Data Quality, Duplicate Management, Record Merging, and
+  // Enrichment History.
+  dataQualityIssues    DataQualityIssue[]
+  duplicatesAsA        PotentialDuplicate[]    @relation("PotentialDuplicateCompanyA")
+  duplicatesAsB        PotentialDuplicate[]    @relation("PotentialDuplicateCompanyB")
+  enrichmentRecords    EnrichmentRecord[]
+  dataQualityAuditRefs DataQualityAuditEvent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([normalizedName])
   @@index([websiteDomain])
   @@index([normalizedPhone])
   @@index([normalizedEmail])
+  @@index([normalizedRegion])
+  @@index([normalizedCity])
+  @@index([normalizedPostalCode])
   @@index([city, region, country])
   @@index([assignedToId, pipelineStageId])
   @@index([status])
+  @@index([mergedIntoId])
   @@index([eosScore])
   @@index([opportunityGrade])
   @@index([primaryClassification])
@@ -575,6 +643,15 @@ model GeneratedReport {
   @@index([createdAt])
 }
 
+enum ContactStatus {
+  ACTIVE
+  // Module Seven: absorbed into another Contact via a safe merge, mirroring
+  // Company's MERGED tombstone convention. Contact had no status/archive
+  // concept before this module — see mergeContacts() (src/lib/data-quality/
+  // merge-contact.ts).
+  MERGED
+}
+
 model Contact {
   id            String         @id @default(cuid())
   companyId     String
@@ -603,6 +680,39 @@ model Contact {
 
   sequenceEnrollments SequenceEnrollment[]
   appointments        Appointment[]
+
+  // Module Seven: matching normalization (see Company.normalizedRegion's
+  // doc comment — same "populated going forward + self-healed by scan"
+  // convention, own display fields never overwritten) and merge tombstone
+  // (parallel to Company.status/mergedIntoId/mergedAt/mergedById). Every
+  // pre-existing read site (contact list panels, pickers, search) must
+  // filter status: ACTIVE explicitly — Contact had no status filter to
+  // carry forward from before this module.
+  normalizedFirstName String?
+  normalizedLastName  String?
+  normalizedPhone     String?
+  normalizedEmail     String?
+
+  status       ContactStatus @default(ACTIVE)
+  mergedIntoId String?
+  mergedInto   Contact?      @relation("ContactMerge", fields: [mergedIntoId], references: [id], onDelete: SetNull)
+  mergedFrom   Contact[]     @relation("ContactMerge")
+  mergedAt     DateTime?
+  mergedById   String?
+  mergedBy     User?         @relation("ContactMerger", fields: [mergedById], references: [id], onDelete: SetNull)
+
+  dataQualityIssues    DataQualityIssue[]
+  duplicatesAsA        PotentialDuplicate[]    @relation("PotentialDuplicateContactA")
+  duplicatesAsB        PotentialDuplicate[]    @relation("PotentialDuplicateContactB")
+  enrichmentRecords    EnrichmentRecord[]
+  dataQualityAuditRefs DataQualityAuditEvent[]
+
+  @@index([normalizedFirstName, normalizedLastName])
+  @@index([normalizedPhone])
+  @@index([normalizedEmail])
+  @@index([status])
+  @@index([mergedIntoId])
+  @@index([companyId, status])
 }
 
 model CompanySource {
@@ -1392,4 +1502,314 @@ model Notification {
   createdAt   DateTime         @default(now())
 
   @@index([userId, readAt])
+}
+
+// ===== Module Seven: Data Quality, Duplicate Management, Record Merging,
+// and Enrichment History =====
+
+enum DataQualityEntityType {
+  COMPANY
+  CONTACT
+}
+
+enum DataQualityRuleType {
+  REQUIRED_FIELD
+  INVALID_EMAIL_FORMAT
+  INVALID_PHONE_FORMAT
+  INVALID_URL_FORMAT
+  DUPLICATE_EXACT_MATCH
+  DUPLICATE_NORMALIZED_MATCH
+  DUPLICATE_FUZZY_MATCH
+  STALE_RECORD
+  CUSTOM_REVIEW_FLAG
+}
+
+enum DataQualitySeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum DataQualityIssueStatus {
+  OPEN
+  DEFERRED
+  RESOLVED
+  IGNORED
+  REOPENED
+}
+
+enum DuplicateReviewStatus {
+  PENDING
+  NOT_DUPLICATE
+  CONFIRMED
+  DEFERRED
+  MERGED
+}
+
+enum EnrichmentDecision {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum DataQualityAuditAction {
+  RULE_CREATED
+  RULE_UPDATED
+  RULE_ARCHIVED
+  RULE_RESTORED
+  ISSUE_STATUS_CHANGED
+  ISSUE_ASSIGNED
+  ISSUE_BULK_UPDATED
+  RECORD_CORRECTED
+  DUPLICATE_REVIEWED
+  COMPANY_MERGED
+  CONTACT_MERGED
+  SCAN_STARTED
+  SCAN_COMPLETED
+  SCAN_FAILED
+  SCAN_CANCELLED
+  ENRICHMENT_SUGGESTED
+  ENRICHMENT_ACCEPTED
+  ENRICHMENT_REJECTED
+}
+
+/**
+ * Table-driven, editable data-quality rules — never hardcoded checks.
+ * `field` names the record field being checked (meaningful for
+ * REQUIRED_FIELD/INVALID_*_FORMAT/STALE_RECORD; largely unused for the
+ * DUPLICATE_* types, which compare several fields at once per
+ * src/lib/data-quality/company-match.ts / contact-match.ts). `config` is
+ * validated per-ruleType by DataQualityRuleConfigSchema (src/lib/
+ * data-quality/rules.ts, a Zod discriminated union) before every save —
+ * structured data, never trusted raw. Archived rather than deleted
+ * (archivedAt nullable timestamp only — same convention as SavedView),
+ * since an issue/duplicate a since-archived rule already produced must
+ * stay explainable.
+ */
+model DataQualityRule {
+  id          String                @id @default(cuid())
+  name        String
+  description String?               @db.Text
+  entityType  DataQualityEntityType
+  field       String
+  ruleType    DataQualityRuleType
+  severity    DataQualitySeverity   @default(MEDIUM)
+  enabled     Boolean               @default(true)
+  sortOrder   Int                   @default(0)
+  config      Json                  @default("{}")
+  archivedAt  DateTime?
+  createdById String
+  createdBy   User                  @relation("DataQualityRuleCreator", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?                 @relation("DataQualityRuleUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  issues DataQualityIssue[]
+
+  @@index([entityType, enabled, archivedAt])
+  @@index([ruleType])
+}
+
+/**
+ * One row per (record, rule) violation — upserted by the scan
+ * (src/lib/data-quality/scan.ts), never duplicated across re-scans. A
+ * record that stops violating a rule is auto-resolved (status: RESOLVED,
+ * resolutionAction: "auto: rule no longer applies") rather than deleted, so
+ * the resolution itself stays in the workflow history. Exactly one of
+ * companyId/contactId is set, matching entityType — enforced at the
+ * application layer (see evaluateRule()).
+ */
+model DataQualityIssue {
+  id               String                 @id @default(cuid())
+  entityType       DataQualityEntityType
+  companyId        String?
+  company          Company?               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contactId        String?
+  contact          Contact?               @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  ruleId           String
+  rule             DataQualityRule        @relation(fields: [ruleId], references: [id])
+  field            String
+  // Own copy, snapshotted at detection time — a later edit to the rule's
+  // configured severity must not silently rewrite the history of an
+  // already-detected issue.
+  severity         DataQualitySeverity
+  status           DataQualityIssueStatus @default(OPEN)
+  description      String                 @db.Text
+  detectedAt       DateTime               @default(now())
+  resolvedAt       DateTime?
+  resolvedById     String?
+  resolvedBy       User?                  @relation("DataQualityIssueResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolutionAction String?
+  assignedToId     String?
+  assignedTo       User?                  @relation("DataQualityIssueAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  notes            String?                @db.Text
+  updatedAt        DateTime               @updatedAt
+
+  @@unique([companyId, ruleId])
+  @@unique([contactId, ruleId])
+  @@index([entityType, status, severity])
+  @@index([assignedToId])
+  @@index([status, detectedAt])
+}
+
+/**
+ * A candidate duplicate pair (Section 5/8 of the plan) — pairwise, not
+ * n-way grouped, matching the existing findPotentialDuplicates() precedent
+ * (src/lib/duplicates/match.ts) and keeping merge UX tractable; 3+
+ * overlapping duplicates surface as multiple reviewable pairs. Only the
+ * companyA/B or contactA/B pair matching `entityType` is ever populated —
+ * always stored in canonical lower-id-first order so the unique
+ * constraints actually dedupe re-detection of the same pair. `confidence`
+ * reuses the existing ConfidenceLevel enum. `dismissedFieldsSnapshot`
+ * captures the matched fields' values at the moment of a NOT_DUPLICATE
+ * decision; a later scan compares current values against it and, if any
+ * meaningfully differ, flips status back to PENDING for reconsideration
+ * (never re-suggests an unchanged dismissed pair — see runDataQualityScan).
+ */
+model PotentialDuplicate {
+  id         String                @id @default(cuid())
+  entityType DataQualityEntityType
+
+  companyAId String?
+  companyA   Company? @relation("PotentialDuplicateCompanyA", fields: [companyAId], references: [id], onDelete: Cascade)
+  companyBId String?
+  companyB   Company? @relation("PotentialDuplicateCompanyB", fields: [companyBId], references: [id], onDelete: Cascade)
+
+  contactAId String?
+  contactA   Contact? @relation("PotentialDuplicateContactA", fields: [contactAId], references: [id], onDelete: Cascade)
+  contactBId String?
+  contactB   Contact? @relation("PotentialDuplicateContactB", fields: [contactBId], references: [id], onDelete: Cascade)
+
+  score                   Int
+  confidence              ConfidenceLevel
+  reasons                 String[]
+  matchedFields           String[]
+  conflictingFields       String[]
+  status                  DuplicateReviewStatus @default(PENDING)
+  dismissedFieldsSnapshot Json?
+  assignedToId            String?
+  assignedTo              User?                 @relation("PotentialDuplicateAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  reviewNote              String?               @db.Text
+  detectedAt              DateTime              @default(now())
+  lastSeenAt              DateTime              @default(now())
+  reviewedAt              DateTime?
+  reviewedById            String?
+  reviewedBy              User?                 @relation("PotentialDuplicateReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@unique([companyAId, companyBId])
+  @@unique([contactAId, contactBId])
+  @@index([entityType, status, score])
+  @@index([assignedToId])
+}
+
+/**
+ * Job-tracking row for one data-quality scan run, deliberately mirroring
+ * LeadSearch's shape (src/lib/research/run-search.ts) — reuses the
+ * existing SearchJobStatus enum rather than a new one.
+ * lastProcessedCompanyId/lastProcessedContactId are resumable keyset-
+ * pagination cursors (see runDataQualityScan, src/lib/data-quality/
+ * scan.ts): a crash/retry resumes from the cursor instead of restarting,
+ * the same restart-safety guarantee run-search.ts gives per-candidate,
+ * applied here per-batch since this scan is cheap local computation, not
+ * expensive billed provider calls.
+ */
+model DataQualityScan {
+  id                     String                 @id @default(cuid())
+  entityType             DataQualityEntityType?
+  status                 SearchJobStatus        @default(PENDING)
+  startedAt              DateTime?
+  completedAt            DateTime?
+  heartbeatAt            DateTime?
+  errorMessage           String?                @db.Text
+  recordsScanned         Int                    @default(0)
+  issuesFound            Int                    @default(0)
+  duplicatesFound        Int                    @default(0)
+  lastProcessedCompanyId String?
+  lastProcessedContactId String?
+  triggeredById          String?
+  triggeredBy            User?                  @relation("DataQualityScanTrigger", fields: [triggeredById], references: [id], onDelete: SetNull)
+  providerJobId          String?
+  createdAt              DateTime               @default(now())
+
+  @@index([status, heartbeatAt])
+  @@index([providerJobId])
+}
+
+/**
+ * Append-only enrichment suggestion + provenance, structurally mirroring
+ * HistoricalScoreRecord/ConsentRecord's "full history, never edited after
+ * the fact" convention. A suggestion never auto-applies — decision starts
+ * PENDING and is only ever moved to ACCEPTED/REJECTED by an explicit user
+ * action (src/app/(dashboard)/data-quality/enrichment/actions.ts), which
+ * also performs the actual field write via the record-correction path
+ * (Section 10) when accepted. A rejected suggestion is kept, never deleted,
+ * for audit. `provider` mirrors AiUsageRecord.provider's plain-string
+ * convention; only "mock" is implemented in this module (src/lib/
+ * enrichment/providers/mock.ts) — no real provider, no live calls, no cost.
+ */
+model EnrichmentRecord {
+  id               String                @id @default(cuid())
+  entityType       DataQualityEntityType
+  companyId        String?
+  company          Company?              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contactId        String?
+  contact          Contact?              @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  field            String
+  previousValue    String?
+  suggestedValue   String
+  provider         String
+  sourceUrl        String?
+  evidence         String?               @db.Text
+  confidence       ConfidenceLevel
+  requestId        String?
+  suggestedAt      DateTime              @default(now())
+  decision         EnrichmentDecision    @default(PENDING)
+  decidedAt        DateTime?
+  decidedById      String?
+  decidedBy        User?                 @relation("EnrichmentDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+  estimatedCostUsd Decimal?              @db.Decimal(10, 6)
+
+  @@index([entityType, decision])
+  @@index([companyId])
+  @@index([contactId])
+  @@index([requestId])
+}
+
+/**
+ * The one generic, cross-cutting audit log this codebase introduces —
+ * every other audit trail in this app is a typed table purpose-built for
+ * one kind of event (Activity, PipelineStageHistory, ConsentRecord). This
+ * module needs to audit six structurally different action kinds (rule
+ * changes, review decisions, corrections, merges, scans, enrichment
+ * decisions) uniformly, which a single typed table can't do cleanly.
+ * beforeData/afterData carry full snapshots — this is where a merge's
+ * required "before/after data... field decisions" audit trail actually
+ * lives (see mergeCompanies()/mergeContacts(), src/lib/data-quality/
+ * merge-company.ts / merge-contact.ts). actorId is null for a
+ * system/worker-initiated event (e.g. SCAN_STARTED from a tick — though
+ * this module has no recurring tick, a future one could).
+ */
+model DataQualityAuditEvent {
+  id                   String                 @id @default(cuid())
+  action               DataQualityAuditAction
+  actorId              String?
+  actor                User?                  @relation("DataQualityAuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  companyId            String?
+  company              Company?               @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  contactId            String?
+  contact              Contact?               @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  ruleId               String?
+  issueId              String?
+  potentialDuplicateId String?
+  enrichmentRecordId   String?
+  beforeData           Json?
+  afterData            Json?
+  metadata             Json?
+  occurredAt           DateTime               @default(now())
+
+  @@index([action, occurredAt])
+  @@index([companyId])
+  @@index([contactId])
 }

@@ -26,16 +26,19 @@ export default async function CommunicationCompliancePage({
   const q = toSingle(params.q)?.trim();
 
   const contacts = await prisma.contact.findMany({
-    where: q
-      ? {
-          OR: [
-            { firstName: { contains: q, mode: "insensitive" } },
-            { lastName: { contains: q, mode: "insensitive" } },
-            { email: { contains: q, mode: "insensitive" } },
-            { company: { name: { contains: q, mode: "insensitive" } } },
-          ],
-        }
-      : undefined,
+    where: {
+      status: "ACTIVE",
+      ...(q
+        ? {
+            OR: [
+              { firstName: { contains: q, mode: "insensitive" as const } },
+              { lastName: { contains: q, mode: "insensitive" as const } },
+              { email: { contains: q, mode: "insensitive" as const } },
+              { company: { name: { contains: q, mode: "insensitive" as const } } },
+            ],
+          }
+        : {}),
+    },
     include: {
       company: { select: { id: true, name: true } },
       consentRecords: { orderBy: { occurredAt: "desc" }, take: 10, include: { recordedBy: { select: { name: true } } } },

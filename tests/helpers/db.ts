@@ -25,6 +25,14 @@ const TABLES_TO_RESET = [
   "EvidenceRecord",
   "HistoricalScoreRecord",
   "ConsentRecord",
+  // Module Seven: children before parents, matching the existing
+  // convention — these all reference Company/Contact/User/DataQualityRule.
+  "DataQualityAuditEvent",
+  "EnrichmentRecord",
+  "PotentialDuplicate",
+  "DataQualityIssue",
+  "DataQualityScan",
+  "DataQualityRule",
   "Contact",
   "CompanySource",
   "AiUsageRecord",

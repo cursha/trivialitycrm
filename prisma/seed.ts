@@ -1,6 +1,7 @@
 import { prisma } from "../src/lib/prisma";
 import bcrypt from "bcryptjs";
 import type { PipelineStageOutcome } from "../src/generated/prisma/enums";
+import type { Prisma } from "../src/generated/prisma/client";
 
 // Duplicated from src/lib/auth/password.ts rather than imported: that module
 // is guarded with `import "server-only"`, which throws under plain Node/tsx
@@ -74,6 +75,16 @@ const permissions: { key: string; label: string }[] = [
   { key: "manage_calendar_connections", label: "Manage calendar connections" },
   { key: "manage_communication_compliance", label: "Manage communication consent and compliance" },
   { key: "send_bulk_email", label: "Send bulk email" },
+  // Module Seven: Data Quality, Duplicate Management, Record Merging, and
+  // Enrichment History
+  { key: "view_data_quality", label: "View the data quality workspace" },
+  { key: "review_data_quality", label: "Review data quality issues and possible duplicates" },
+  { key: "manage_data_quality_rules", label: "Manage data quality rules" },
+  { key: "merge_companies", label: "Merge duplicate companies" },
+  { key: "merge_contacts", label: "Merge duplicate contacts" },
+  { key: "run_duplicate_scan", label: "Run a data quality scan" },
+  { key: "review_enrichment", label: "Review enrichment suggestions" },
+  { key: "manage_enrichment_settings", label: "Manage enrichment settings" },
 ];
 
 // Initial role -> permission grants. All grants are stored as editable
@@ -174,6 +185,87 @@ async function seedRolesAndGrants() {
   console.log(`Seeded ${roles.length} roles and their permission grants.`);
 }
 
+// Module Seven default rules. Idempotent by (name, entityType) at the app
+// layer rather than a DB unique constraint — a global unique on `name`
+// would block an admin from legitimately naming two rules for different
+// entity types the same thing (e.g. "Missing phone" for both COMPANY and
+// CONTACT). On re-run, only description/severity/field/config are synced
+// (matching pipelineStage's outcomeType-sync precedent below) — enabled/
+// sortOrder are left alone once an Administrator may have changed them.
+const dataQualityRules: {
+  name: string;
+  description: string;
+  entityType: "COMPANY" | "CONTACT";
+  field: string;
+  ruleType:
+    | "REQUIRED_FIELD"
+    | "INVALID_EMAIL_FORMAT"
+    | "INVALID_PHONE_FORMAT"
+    | "INVALID_URL_FORMAT"
+    | "DUPLICATE_EXACT_MATCH"
+    | "DUPLICATE_NORMALIZED_MATCH"
+    | "DUPLICATE_FUZZY_MATCH"
+    | "STALE_RECORD"
+    | "CUSTOM_REVIEW_FLAG";
+  severity: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+  enabled: boolean;
+  config: Record<string, unknown>;
+}[] = [
+  { name: "Company missing phone", description: "Flags a company with no phone number on file.", entityType: "COMPANY", field: "phone", ruleType: "REQUIRED_FIELD", severity: "MEDIUM", enabled: true, config: {} },
+  { name: "Company missing email", description: "Flags a company with no email address on file.", entityType: "COMPANY", field: "email", ruleType: "REQUIRED_FIELD", severity: "MEDIUM", enabled: true, config: {} },
+  { name: "Company missing street address", description: "Flags a company with no street address on file.", entityType: "COMPANY", field: "address1", ruleType: "REQUIRED_FIELD", severity: "MEDIUM", enabled: true, config: {} },
+  { name: "Company missing website", description: "Flags a company with no website URL on file.", entityType: "COMPANY", field: "websiteUrl", ruleType: "REQUIRED_FIELD", severity: "LOW", enabled: true, config: {} },
+  { name: "Contact missing phone", description: "Flags a contact with no phone number on file.", entityType: "CONTACT", field: "phone", ruleType: "REQUIRED_FIELD", severity: "LOW", enabled: true, config: {} },
+  { name: "Contact missing email", description: "Flags a contact with no email address on file.", entityType: "CONTACT", field: "email", ruleType: "REQUIRED_FIELD", severity: "MEDIUM", enabled: true, config: {} },
+  { name: "Invalid company email format", description: "Flags a company email that is malformed or a placeholder address.", entityType: "COMPANY", field: "email", ruleType: "INVALID_EMAIL_FORMAT", severity: "HIGH", enabled: true, config: {} },
+  { name: "Invalid contact email format", description: "Flags a contact email that is malformed or a placeholder address.", entityType: "CONTACT", field: "email", ruleType: "INVALID_EMAIL_FORMAT", severity: "HIGH", enabled: true, config: {} },
+  { name: "Invalid company phone format", description: "Flags a company phone number that isn't a plausible North American number.", entityType: "COMPANY", field: "phone", ruleType: "INVALID_PHONE_FORMAT", severity: "MEDIUM", enabled: true, config: {} },
+  { name: "Invalid contact phone format", description: "Flags a contact phone number that isn't a plausible North American number.", entityType: "CONTACT", field: "phone", ruleType: "INVALID_PHONE_FORMAT", severity: "MEDIUM", enabled: true, config: {} },
+  { name: "Invalid company website URL", description: "Flags a company website URL that doesn't look like a real address.", entityType: "COMPANY", field: "websiteUrl", ruleType: "INVALID_URL_FORMAT", severity: "LOW", enabled: true, config: {} },
+  { name: "Possible duplicate companies — normalized match", description: "Flags companies whose normalized name, phone, email, or website domain matches another company.", entityType: "COMPANY", field: "name", ruleType: "DUPLICATE_NORMALIZED_MATCH", severity: "HIGH", enabled: true, config: {} },
+  { name: "Possible duplicate companies — exact match", description: "Flags companies with byte-identical email, phone, or website domain. Disabled by default — normalized match already covers this case.", entityType: "COMPANY", field: "email", ruleType: "DUPLICATE_EXACT_MATCH", severity: "HIGH", enabled: false, config: {} },
+  { name: "Possible duplicate companies — similar name", description: "Flags companies in the same city/region with a very similar (but not identical) name.", entityType: "COMPANY", field: "name", ruleType: "DUPLICATE_FUZZY_MATCH", severity: "MEDIUM", enabled: true, config: { minSimilarity: 85 } },
+  { name: "Possible duplicate contacts — normalized match", description: "Flags contacts whose normalized email or full name matches another contact.", entityType: "CONTACT", field: "email", ruleType: "DUPLICATE_NORMALIZED_MATCH", severity: "MEDIUM", enabled: true, config: {} },
+  { name: "Stale company record", description: "Flags a company with no logged activity in a long time.", entityType: "COMPANY", field: "activity", ruleType: "STALE_RECORD", severity: "LOW", enabled: true, config: { staleDays: 180 } },
+];
+
+async function seedDataQualityRules() {
+  const attributedTo = await prisma.user.findFirst({ where: { role: { name: "Administrator" } }, orderBy: { createdAt: "asc" } });
+  if (!attributedTo) {
+    console.log("No Administrator user exists yet — skipping default data quality rules (they'll need a creator; re-run the seed after creating one).");
+    return;
+  }
+
+  const nextSortOrderByEntity: Record<string, number> = {};
+  for (const rule of dataQualityRules) {
+    const existing = await prisma.dataQualityRule.findFirst({ where: { name: rule.name, entityType: rule.entityType } });
+    if (existing) {
+      await prisma.dataQualityRule.update({
+        where: { id: existing.id },
+        data: { description: rule.description, field: rule.field, ruleType: rule.ruleType, severity: rule.severity, updatedById: attributedTo.id },
+      });
+    } else {
+      const sortOrder = nextSortOrderByEntity[rule.entityType] ?? 0;
+      nextSortOrderByEntity[rule.entityType] = sortOrder + 1;
+      await prisma.dataQualityRule.create({
+        data: {
+          name: rule.name,
+          description: rule.description,
+          entityType: rule.entityType,
+          field: rule.field,
+          ruleType: rule.ruleType,
+          severity: rule.severity,
+          enabled: rule.enabled,
+          sortOrder,
+          config: rule.config as Prisma.InputJsonValue,
+          createdById: attributedTo.id,
+        },
+      });
+    }
+  }
+  console.log(`Seeded ${dataQualityRules.length} default data quality rules.`);
+}
+
 async function seedBootstrapAdmin() {
   const email = process.env.SEED_ADMIN_EMAIL;
   const password = process.env.SEED_ADMIN_PASSWORD;
@@ -213,6 +305,7 @@ async function main() {
   await seedPermissions();
   await seedRolesAndGrants();
   await seedBootstrapAdmin();
+  await seedDataQualityRules();
 
   console.log(
     "Seed complete. No Lead Types, Competitors, or sample Companies were created — " +

@@ -215,7 +215,7 @@ export type ContactMatch = { contactId: string; companyId: string };
  */
 export async function matchContactForAddress(address: string): Promise<ContactMatch | null> {
   const matches = await prisma.contact.findMany({
-    where: { email: { equals: address, mode: "insensitive" } },
+    where: { email: { equals: address, mode: "insensitive" }, status: "ACTIVE" },
     select: { id: true, companyId: true },
     take: 2,
   });

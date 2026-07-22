@@ -70,7 +70,7 @@ async function prepareSend(params: {
     prisma.company.findUniqueOrThrow({ where: { id: params.companyId }, select: { name: true, doNotContact: true } }),
     prisma.contact.findUnique({
       where: { id: params.contactId },
-      select: { id: true, firstName: true, lastName: true, email: true, emailPermitted: true, doNotContact: true },
+      select: { id: true, firstName: true, lastName: true, email: true, emailPermitted: true, doNotContact: true, status: true },
     }),
     prisma.user.findUniqueOrThrow({ where: { id: params.userId }, select: { name: true } }),
     prisma.workspaceSettings.findUnique({ where: { id: 1 }, select: { mailingAddress: true } }),
@@ -80,7 +80,7 @@ async function prepareSend(params: {
   if (company.doNotContact) {
     return { ok: false, error: "This company is marked Do Not Contact." };
   }
-  if (!contact) {
+  if (!contact || contact.status === "MERGED") {
     return { ok: false, error: "Contact not found." };
   }
   if (!contact.email) {

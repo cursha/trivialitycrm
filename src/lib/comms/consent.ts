@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { verifyUnsubscribeToken } from "@/lib/comms/unsubscribe-token";
+import { resolveSurvivingContactId } from "@/lib/data-quality/merge-contact";
 
 // No `import "server-only"` — reachable from the public, unauthenticated
 // /unsubscribe route as well as authenticated Server Actions, and
@@ -65,10 +66,20 @@ export async function unsubscribeByToken(token: string): Promise<UnsubscribeOutc
     return { ok: false, error: "This unsubscribe link is invalid or has expired." };
   }
 
-  const contact = await prisma.contact.findUnique({ where: { id: verified.contactId }, select: { id: true, doNotContact: true } });
-  if (!contact) {
+  const rawContact = await prisma.contact.findUnique({ where: { id: verified.contactId }, select: { id: true, doNotContact: true, status: true } });
+  if (!rawContact) {
     return { ok: false, error: "This unsubscribe link is invalid or has expired." };
   }
+
+  // Module Seven: a since-merged contact's own row is a tombstone — the
+  // person it represents is now the surviving contact, so their intent
+  // ("stop emailing me") must apply there, not to a row nothing sends to
+  // anymore. Never let a merge accidentally revive contactability for
+  // someone who unsubscribed.
+  const contact =
+    rawContact.status === "MERGED"
+      ? await prisma.contact.findUniqueOrThrow({ where: { id: await resolveSurvivingContactId(rawContact.id) }, select: { id: true, doNotContact: true } })
+      : rawContact;
 
   if (!contact.doNotContact) {
     await recordConsent({ contactId: contact.id, type: "WITHDRAWN", source: "unsubscribe_link" });
