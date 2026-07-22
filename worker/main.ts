@@ -10,6 +10,7 @@ import {
   QUEUE_GENERATE_REPORT,
   QUEUE_SEND_SCHEDULED_EMAIL,
   QUEUE_RUN_SEQUENCE_STEP,
+  QUEUE_PROCESS_INBOUND_NOTIFICATION,
 } from "../src/lib/jobs/boss-client";
 import { handleRunSearchJob } from "./handlers/run-search";
 import { sweepExpiredSessions, sweepExpiredImportBatches, sweepExpiredRateLimitBuckets } from "./handlers/cleanup";
@@ -19,6 +20,8 @@ import { runSendScheduledEmailTick } from "./handlers/send-scheduled-email-tick"
 import { handleSendScheduledEmailJob } from "./handlers/send-scheduled-email";
 import { runSequenceTick } from "./handlers/sequence-tick";
 import { handleRunSequenceStepJob } from "./handlers/run-sequence-step";
+import { runInboundSubscriptionTick } from "./handlers/inbound-subscription-tick";
+import { handleProcessInboundNotificationJob } from "./handlers/process-inbound-notification";
 import { shutdownBoss } from "./shutdown";
 
 const execAsync = promisify(exec);
@@ -29,6 +32,7 @@ const QUEUE_CLEANUP_RATE_LIMIT_BUCKETS = "cleanup-rate-limit-buckets";
 const QUEUE_REPORTS_TICK = "reports-tick";
 const QUEUE_SEND_SCHEDULED_EMAIL_TICK = "send-scheduled-email-tick";
 const QUEUE_SEQUENCE_TICK = "sequence-tick";
+const QUEUE_INBOUND_SUBSCRIPTION_TICK = "inbound-subscription-tick";
 const MIGRATION_GATE_POLL_MS = 5_000;
 const MIGRATION_GATE_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -120,10 +124,14 @@ async function main(): Promise<void> {
   await boss.createQueue(QUEUE_SEQUENCE_TICK, { retryLimit: 1 });
   await boss.schedule(QUEUE_SEQUENCE_TICK, "*/5 * * * *");
 
+  await boss.createQueue(QUEUE_INBOUND_SUBSCRIPTION_TICK, { retryLimit: 1 });
+  await boss.schedule(QUEUE_INBOUND_SUBSCRIPTION_TICK, "0 * * * *");
+
   await boss.work(QUEUE_RUN_SEARCH, { localConcurrency: 1 }, handleRunSearchJob);
   await boss.work(QUEUE_GENERATE_REPORT, { localConcurrency: 1 }, handleGenerateReportJob);
   await boss.work(QUEUE_SEND_SCHEDULED_EMAIL, { localConcurrency: 1 }, handleSendScheduledEmailJob);
   await boss.work(QUEUE_RUN_SEQUENCE_STEP, { localConcurrency: 1 }, handleRunSequenceStepJob);
+  await boss.work(QUEUE_PROCESS_INBOUND_NOTIFICATION, { localConcurrency: 1 }, handleProcessInboundNotificationJob);
   await boss.work(QUEUE_CLEANUP_SESSIONS, async () => {
     await sweepExpiredSessions();
   });
@@ -141,6 +149,9 @@ async function main(): Promise<void> {
   });
   await boss.work(QUEUE_SEQUENCE_TICK, async () => {
     await runSequenceTick();
+  });
+  await boss.work(QUEUE_INBOUND_SUBSCRIPTION_TICK, async () => {
+    await runInboundSubscriptionTick();
   });
 
   boss.on("error", (error) => logger.error({ err: error }, "pg-boss error"));

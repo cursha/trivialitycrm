@@ -8,6 +8,9 @@ import type {
   SendEmailResult,
   CalendarEventInput,
   CalendarEventResult,
+  InboundSubscription,
+  ParsedInboundNotification,
+  InboundMessage,
 } from "./types";
 
 // Deliberately no `import "server-only"` — the worker's send-job handler
@@ -19,9 +22,13 @@ const USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
 const GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
 const CALENDAR_EVENTS_URL = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
 
-// gmail.send + gmail.readonly cover Phase A (send) and a later inbound-sync
-// phase; calendar is requested now for the same one-consent reason as the
-// Microsoft provider (see microsoft-graph.ts's identical comment).
+// gmail.send covers outbound (Phase A). gmail.readonly and calendar are
+// both requested now for the same one-consent reason as the Microsoft
+// provider (see microsoft-graph.ts's identical comment) even though this
+// class's inbound methods below aren't implemented yet (Phase D2 scoped
+// inbound sync to Microsoft first — see those methods' doc comments) —
+// requesting the scope up front still avoids a future re-consent once
+// Gmail inbound sync is actually built.
 const SCOPES = [
   "https://www.googleapis.com/auth/gmail.send",
   "https://www.googleapis.com/auth/gmail.readonly",
@@ -258,5 +265,40 @@ export class GoogleProvider implements EmailProvider {
         }
       },
     );
+  }
+
+  /**
+   * Gmail inbound push notifications work fundamentally differently from
+   * Graph's: they require a Google Cloud Pub/Sub topic and service account
+   * provisioned outside this app (via `users.watch()` + a push
+   * subscription on that topic), not just an OAuth client id/secret —
+   * real infrastructure a deploying team must set up themselves in GCP
+   * Console. Given that prerequisite, Phase D2 scoped inbound sync to
+   * Microsoft Graph only (see the approved plan's D2 scoping discussion);
+   * these methods throw clearly rather than silently no-op, so a future
+   * pass implementing Gmail inbound sync has an unambiguous marker of
+   * what's still stubbed, and nothing upstream can mistake "not
+   * implemented" for "nothing to sync."
+   */
+  async createInboundSubscription(): Promise<InboundSubscription> {
+    throw new Error(
+      "Gmail inbound sync is not implemented — it requires a Google Cloud Pub/Sub topic provisioned outside this app. See google.ts's createInboundSubscription doc comment.",
+    );
+  }
+
+  async renewInboundSubscription(): Promise<InboundSubscription> {
+    throw new Error("Gmail inbound sync is not implemented — see createInboundSubscription's doc comment.");
+  }
+
+  async cancelInboundSubscription(): Promise<void> {
+    throw new Error("Gmail inbound sync is not implemented — see createInboundSubscription's doc comment.");
+  }
+
+  parseInboundWebhookPayload(): ParsedInboundNotification[] {
+    throw new Error("Gmail inbound sync is not implemented — see createInboundSubscription's doc comment.");
+  }
+
+  async fetchInboundMessage(): Promise<InboundMessage> {
+    throw new Error("Gmail inbound sync is not implemented — see createInboundSubscription's doc comment.");
   }
 }

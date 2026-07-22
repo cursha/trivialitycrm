@@ -271,6 +271,45 @@ async function stopEnrollment(enrollmentId: string, status: "STOPPED_OPT_OUT" | 
   });
 }
 
+/**
+ * Called by inbound-sync (src/lib/comms/inbound-sync.ts) the moment a
+ * newly-received message is matched to a contact — not by the tick, unlike
+ * every other stop condition. A reply should end the sequence promptly,
+ * and there's no reason to wait up to 5 minutes for the next
+ * sequence-tick when the ingestion path already knows right now. Stops
+ * every ACTIVE *or* PAUSED enrollment for this contact (a paused
+ * enrollment the salesperson meant to resume manually shouldn't resume
+ * into a conversation that's already moved on) and sends one NEW_REPLY
+ * notification per enrollment stopped — distinct from stopEnrollment's
+ * SEQUENCE_PAUSED notification above, since "they replied" is a different,
+ * more actionable signal than a generic stop. Returns the stopped
+ * enrollment ids so the caller (src/lib/comms/inbound-sync.ts) can decide
+ * whether a *general* "your lead replied" notification is still needed —
+ * it isn't, when a per-enrollment NEW_REPLY notification was already sent
+ * here.
+ */
+export async function stopEnrollmentsForReply(contactId: string): Promise<string[]> {
+  const enrollments = await prisma.sequenceEnrollment.findMany({
+    where: { contactId, status: { in: ["ACTIVE", "PAUSED"] } },
+  });
+
+  for (const enrollment of enrollments) {
+    await prisma.sequenceEnrollment.update({
+      where: { id: enrollment.id },
+      data: { status: "STOPPED_REPLY", stoppedAt: new Date(), stopReason: "The contact replied.", nextStepDueAt: null },
+    });
+    await prisma.notification.create({
+      data: {
+        userId: enrollment.enrolledById,
+        type: "NEW_REPLY",
+        payload: { enrollmentId: enrollment.id, sequenceId: enrollment.sequenceId, contactId },
+      },
+    });
+  }
+
+  return enrollments.map((enrollment) => enrollment.id);
+}
+
 export async function pauseEnrollment(enrollmentId: string): Promise<void> {
   await prisma.sequenceEnrollment.updateMany({ where: { id: enrollmentId, status: "ACTIVE" }, data: { status: "PAUSED" } });
 }

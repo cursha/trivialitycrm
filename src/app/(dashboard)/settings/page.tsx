@@ -1,5 +1,18 @@
 import Link from "next/link";
-import { ListTree, GitBranch, Users, ShieldCheck, XCircle, FileSpreadsheet, MapPin, Mail, FileText, ShieldAlert, Workflow } from "lucide-react";
+import {
+  ListTree,
+  GitBranch,
+  Users,
+  ShieldCheck,
+  XCircle,
+  FileSpreadsheet,
+  MapPin,
+  Mail,
+  FileText,
+  ShieldAlert,
+  Workflow,
+  Inbox,
+} from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
 import { PageHeader } from "@/components/ui/page-header";
@@ -67,6 +80,13 @@ export default async function SettingsPage() {
       description: "View and record each contact's email consent (CASL/CAN-SPAM compliance support).",
       icon: ShieldAlert,
       visible: hasPermission(user, "manage_communication_compliance"),
+    },
+    {
+      href: "/settings/communications-review",
+      label: "Communications Review",
+      description: "Inbound replies that couldn't be matched to a contact automatically — review and link them by hand.",
+      icon: Inbox,
+      visible: hasPermission(user, "view_team_communications"),
     },
     {
       href: "/settings/territories",
