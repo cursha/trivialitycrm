@@ -106,6 +106,20 @@ Module Seven gives administrators a dedicated workspace (`/data-quality`, permis
 
 Not in Module Seven (by design): a real (non-mock) enrichment provider, n-way duplicate grouping (duplicates are reviewed pairwise), cross-company contact merging (merge the companies first), and an automatic/scheduled recurring scan (scans are manually triggered, like AI research searches).
 
+## Module 8A: Essential Version 1 Administration
+
+Module 8A adds only the administration essential for a safe V1 launch — not the full Module Eight vision (see `MODULE_8A_REPORT.md` for the full report, schema, and explicitly deferred items: custom fields, a full notification centre, an advanced retention-policy editor, feature flags, calendar/webhook/accounting integrations, and multi-tenancy).
+
+- **Administration home** (`/administration`, `view_administration`): links to every section below the current user has permission for, plus safe summary cards (active/inactive users, roles, recent administrative changes, failed/retrying jobs, AI provider mode and budget status) — never a credential, connection string, or raw stack trace.
+- **Organization Settings** (`/administration/organization`, `manage_organization_settings`): one singleton record (name, default country/region/timezone/currency/date format, default pipeline stage/lead type, business contact info) — no multi-tenancy, no domain/DNS management. Every change is validated server-side and recorded (who, when, before/after) in the new audit log.
+- **User safety** (extends the existing `/settings/users`, `manage_users`): search/filter, last-login and lockout visibility, a dedicated account-unlock action, a dedicated revoke-all-sessions action, and a transactional ownership-transfer tool (companies + open tasks) surfaced right where deactivation happens. The final active Administrator can never be demoted or deactivated — by anyone, including themselves — and a blocked attempt is still recorded in the audit log.
+- **Roles & Permissions** (extends the existing `/settings/roles`, now gated by a new `manage_roles` permission instead of `manage_users`): permissions grouped by module with human-readable descriptions, a per-role active-user count with a confirmation warning before changing a role in active use, an effective-permissions preview, a duplicate-role function, and a guard preventing the Administrator role's own `manage_users`/`manage_roles` grants from ever being revoked with no other active role able to replace them.
+- **AI Settings and budget controls** (`/administration/ai-settings`, `manage_ai_settings`): research enabled/disabled, an approved-model allowlist (validated, not decorative — `src/lib/research/providers/anthropic.ts` reads it), default minimum score, max cities/results per search, daily/monthly/warning budget thresholds, and an optional per-user daily search limit. The Anthropic API key itself is never stored or shown — only whether one is configured. **Budget enforcement is new in this module** — `AI_DAILY_BUDGET_USD`/`AI_MONTHLY_BUDGET_USD` existed as env vars since Module Three but were never actually read anywhere before now; a configured hard budget now genuinely refuses new AI research jobs once reached (mock mode is never blocked).
+- **Audit Log** (`/administration/audit-log`, `view_audit_log`/`export_audit_log`): a new, genuinely generic `AuditEvent` model (deliberately separate from Module Seven's `DataQualityAuditEvent`, which stays untouched) — filterable by date/user/module/action/entity/success/correlation id, human-readable summaries, redacted before/after diffs, and a rate-limited, redacted, row-capped CSV export. No update/delete action exists for this model anywhere in the app.
+- **System Health** (`/administration/system-health`, `view_system_health`/`manage_background_jobs`): web/database/worker/migration status, a genuine worker heartbeat (a new lightweight tick — nothing tracked worker liveness before this), per-queue job totals, a failed-jobs list with idempotent retry/cancel (verified against pg-boss's actual source before use — both are safe no-ops on an already-terminal job, never an error), scheduled-cleanup status, app version, and AI/email provider configuration status. Never exposes secrets, environment values, raw job payloads, or stack traces.
+
+Not in Module 8A (deferred to a future, fuller Module Eight): custom fields, a full notification centre, an advanced retention-policy editor, a large feature-flag system, calendar integrations, webhooks, accounting integrations, arbitrary provider integrations, and multi-tenancy.
+
 ## Installation
 
 1. Install [Node.js 20+](https://nodejs.org/), [Docker](https://www.docker.com/) (for local Postgres), and Git.
@@ -163,12 +177,16 @@ Module Six adds `connect_mailbox`, `send_email`, `schedule_email`, `manage_perso
 
 Module Seven adds `view_data_quality`, `review_data_quality`, `manage_data_quality_rules`, `merge_companies`, `merge_contacts`, `run_duplicate_scan`, `review_enrichment`, and `manage_enrichment_settings` — see `MODULE_7_REPORT.md` for the full matrix. Administrator gets all eight; Manager and Salesperson get none of them by default (this is an administrators' workspace by design, per the module's own scope) — grant individual permissions from Settings → Roles & Permissions if a team wants to extend review access.
 
+Module 8A adds `view_administration`, `manage_organization_settings`, `manage_roles`, `manage_ai_settings`, `view_audit_log`, `export_audit_log`, `view_system_health`, and `manage_background_jobs` — see `MODULE_8A_REPORT.md` for the full matrix. Administrator gets all eight (plus the pre-existing `manage_users`); Manager and Salesperson get none of them by default. **`manage_roles` is a new, separate permission from `manage_users`** — the Roles & Permissions page (`/settings/roles`) now requires it specifically, rather than reusing `manage_users` as it did through Module Seven; a role that had `manage_users` alone no longer edits roles unless `manage_roles` is also granted.
+
 ## AI research provider
 
 Set `AI_PROVIDER` in `.env`:
 
 - `"mock"` (default) — no network calls, no cost, deterministic fixture data. Used for local dev without API keys and unconditionally by every automated test (`.env.test` forces this regardless of `.env`).
 - `"anthropic"` — live AI-assisted research using Claude with its server-side web search/fetch tools. Requires `AI_API_KEY`. See `MODULE_2_REPORT.md` for cost and legal considerations, and for why this was chosen over Google Places API and Yelp Fusion for v1.
+
+**Module 8A**: the approved model, research enabled/disabled, per-search limits, and daily/monthly/warning budget thresholds are now Administrator-editable at `/administration/ai-settings` (`manage_ai_settings`) — no redeploy needed to change a budget. `AI_DAILY_BUDGET_USD`/`AI_MONTHLY_BUDGET_USD` in `.env` are used only to seed that setting's initial value the first time the app seeds; after that the database row is authoritative. Once a configured hard budget is reached, starting a new AI research search is refused with a clear message — mock mode is never blocked (it costs nothing and never calls a real provider).
 
 ## Email provider (Module Six)
 

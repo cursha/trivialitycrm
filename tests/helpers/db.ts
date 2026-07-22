@@ -33,6 +33,14 @@ const TABLES_TO_RESET = [
   "DataQualityIssue",
   "DataQualityScan",
   "DataQualityRule",
+  // Module 8A: Essential Version 1 Administration — AuditEvent/
+  // OrganizationSettings/AiSettings all reference User (and Organization
+  // Settings also PipelineStage/LeadType), so they come before those;
+  // WorkerHeartbeat has no FK at all.
+  "AuditEvent",
+  "OrganizationSettings",
+  "AiSettings",
+  "WorkerHeartbeat",
   "Contact",
   "CompanySource",
   "AiUsageRecord",

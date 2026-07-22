@@ -188,6 +188,10 @@ model User {
   disabled                 Boolean                 @default(false)
   failedLoginAttempts      Int                     @default(0)
   lockedUntil              DateTime?
+  // Module 8A: set by recordSuccessfulLogin() (src/lib/auth/rate-limit.ts) —
+  // never a security control by itself (lockout/failedLoginAttempts already
+  // cover that), just a visibility field for admin account review.
+  lastLoginAt              DateTime?
   roleId                   String
   teamId                   String?
   role                     Role                    @relation(fields: [roleId], references: [id])
@@ -236,6 +240,11 @@ model User {
   enrichmentDecisions         EnrichmentRecord[]      @relation("EnrichmentDecider")
   dataQualityAuditEvents      DataQualityAuditEvent[] @relation("DataQualityAuditActor")
 
+  // Module 8A: Essential Version 1 Administration.
+  auditEvents               AuditEvent[]           @relation("AuditEventActor")
+  organizationSettingsEdits OrganizationSettings[] @relation("OrganizationSettingsEditor")
+  aiSettingsEdits           AiSettings[]           @relation("AiSettingsEditor")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -267,10 +276,16 @@ model Role {
 }
 
 model Permission {
-  id    String           @id @default(cuid())
-  key   String           @unique
-  label String
-  roles RolePermission[]
+  id          String           @id @default(cuid())
+  key         String           @unique
+  label       String
+  // Module 8A: grouping/description for the Roles & Permissions UI.
+  // Nullable so this is purely additive — an ungrouped/undescribed
+  // permission (there shouldn't be any after the seed backfill) simply
+  // renders without a category heading rather than erroring.
+  category    String?
+  description String?
+  roles       RolePermission[]
 }
 
 model RolePermission {
@@ -284,13 +299,14 @@ model RolePermission {
 }
 
 model LeadType {
-  id             String          @id @default(cuid())
-  name           String          @unique
-  active         Boolean         @default(true)
-  sortOrder      Int             @default(0)
+  id             String                 @id @default(cuid())
+  name           String                 @unique
+  active         Boolean                @default(true)
+  sortOrder      Int                    @default(0)
   companies      Company[]
   searches       LeadSearch[]
   emailTemplates EmailTemplate[]
+  orgDefaultFor  OrganizationSettings[]
 }
 
 model PipelineStage {
@@ -306,6 +322,7 @@ model PipelineStage {
   historyTo         PipelineStageHistory[] @relation("StageHistoryTo")
   emailTemplates    EmailTemplate[]
   followUpSequences FollowUpSequence[]
+  orgDefaultFor     OrganizationSettings[]
 }
 
 model RejectionReason {
@@ -1812,4 +1829,119 @@ model DataQualityAuditEvent {
   @@index([action, occurredAt])
   @@index([companyId])
   @@index([contactId])
+}
+
+// ===== Module 8A: Essential Version 1 Administration =====
+
+/**
+ * The app's first genuinely generic, cross-module audit log — deliberately
+ * separate from Module Seven's DataQualityAuditEvent (confirmed with the
+ * user rather than generalizing that model): DataQualityAuditEvent has real
+ * FKs into Company/Contact and a fixed, Module-Seven-specific action enum,
+ * both wrong fits for auditing User/Role/OrganizationSettings/AiSettings
+ * changes. entityType/entityId are loose strings, not FKs — this table must
+ * never gain a hard dependency on any one domain model, since its whole
+ * purpose is being usable from every admin surface. No update/delete action
+ * for this model exists anywhere in the codebase — that absence of a code
+ * path is what makes rows "cannot be modified or deleted through the
+ * application" true, the same guarantee DataQualityAuditEvent relies on.
+ */
+model AuditEvent {
+  id            String   @id @default(cuid())
+  actorId       String?
+  actor         User?    @relation("AuditEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+  module        String
+  action        String
+  entityType    String?
+  entityId      String?
+  // A blocked/failed attempt (e.g. "tried to demote the last
+  // Administrator") is recorded too, not only successes — the audit log
+  // must show what was *attempted*, not just what changed.
+  success       Boolean  @default(true)
+  // Shared by every row written as part of one logical multi-step
+  // operation (e.g. an ownership transfer writes one row for the company
+  // reassignment and one for the task reassignment) so they can be viewed
+  // together — see src/lib/audit/log.ts's newCorrelationId().
+  correlationId String?
+  beforeData    Json?
+  afterData     Json?
+  metadata      Json?
+  occurredAt    DateTime @default(now())
+
+  @@index([occurredAt])
+  @@index([actorId])
+  @@index([module, action])
+  @@index([entityType, entityId])
+  @@index([correlationId])
+  @@index([success])
+}
+
+/**
+ * Single-organization settings row (id fixed at 1, same upsert-by-id-1
+ * idiom as WorkspaceSettings below) — deliberately does NOT duplicate
+ * WorkspaceSettings' fields (noActivityThresholdDays/mailingAddress stay
+ * exactly where they are); this owns genuinely distinct org-identity/
+ * locale-default fields. No multi-tenancy: there is exactly one row, ever.
+ */
+model OrganizationSettings {
+  id                     Int            @id @default(1)
+  organizationName       String
+  defaultCountry         String
+  defaultRegion          String?
+  defaultTimezone        String
+  defaultCurrency        String
+  defaultDateFormat      String
+  defaultPipelineStageId String?
+  defaultPipelineStage   PipelineStage? @relation(fields: [defaultPipelineStageId], references: [id], onDelete: SetNull)
+  defaultLeadTypeId      String?
+  defaultLeadType        LeadType?      @relation(fields: [defaultLeadTypeId], references: [id], onDelete: SetNull)
+  businessPhone          String?
+  businessEmail          String?
+  businessWebsite        String?
+  businessAddress        String?        @db.Text
+  updatedAt              DateTime       @updatedAt
+  updatedById            String?
+  updatedBy              User?          @relation("OrganizationSettingsEditor", fields: [updatedById], references: [id], onDelete: SetNull)
+}
+
+/**
+ * Single-row, DB-backed AI configuration — the runtime source of truth for
+ * budget enforcement (src/lib/ai/budget.ts), replacing the previously-inert
+ * AI_DAILY_BUDGET_USD/AI_MONTHLY_BUDGET_USD env vars (declared and
+ * validated in src/lib/env.ts but never actually read anywhere before this
+ * module). Those env vars, if set, only seed this row's initial values —
+ * afterward this table is authoritative and editable without a redeploy.
+ * approvedModel is validated against a small allowlist
+ * (src/lib/ai/budget.ts) that currently has exactly one entry
+ * ("claude-sonnet-5", the only model src/lib/research/providers/pricing.ts
+ * can price) — a real, enforced setting, not a decorative one.
+ */
+model AiSettings {
+  id                      Int      @id @default(1)
+  researchEnabled         Boolean  @default(true)
+  approvedModel           String   @default("claude-sonnet-5")
+  defaultMinimumScore     Int      @default(80)
+  maxCitiesPerSearch      Int      @default(50)
+  maxResultsPerSearch     Int?
+  dailyBudgetUsd          Decimal? @db.Decimal(10, 2)
+  monthlyBudgetUsd        Decimal? @db.Decimal(10, 2)
+  warningThresholdUsd     Decimal? @db.Decimal(10, 2)
+  perUserDailySearchLimit Int?
+  updatedAt               DateTime @updatedAt
+  updatedById             String?
+  updatedBy               User?    @relation("AiSettingsEditor", fields: [updatedById], references: [id], onDelete: SetNull)
+}
+
+/**
+ * A genuine worker heartbeat — nothing in this codebase read pg-boss's own
+ * job-state tables or tracked worker liveness before this module. Touched
+ * only by the new worker-heartbeat-tick (every 2 minutes, worker/main.ts),
+ * the same createQueue/boss.schedule/boss.work idiom every other tick job
+ * already uses. System Health (src/app/(dashboard)/administration/
+ * system-health/) reads freshness relative to now — stale means the worker
+ * process isn't running, not a guess from indirect signals.
+ */
+model WorkerHeartbeat {
+  id        Int      @id @default(1)
+  updatedAt DateTime @updatedAt
 }

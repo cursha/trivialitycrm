@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Building2, CalendarClock, Kanban, LayoutDashboard, Menu, Search, Settings, ShieldCheck, Trophy, Users2, X } from "lucide-react";
+import { BarChart3, Building2, CalendarClock, Kanban, LayoutDashboard, Menu, Search, Settings, ShieldCheck, ShieldEllipsis, Trophy, Users2, X } from "lucide-react";
 import type { NavItem, NavIconKey } from "@/lib/nav";
 import { logout } from "@/lib/auth/actions";
 import { Logo } from "@/components/ui/logo";
@@ -21,6 +21,7 @@ const ICONS: Record<NavIconKey, typeof LayoutDashboard> = {
   team: Users2,
   reports: BarChart3,
   dataQuality: ShieldCheck,
+  administration: ShieldEllipsis,
 };
 
 export function DashboardShell({

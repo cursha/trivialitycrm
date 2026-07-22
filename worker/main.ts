@@ -24,6 +24,7 @@ import { handleRunSequenceStepJob } from "./handlers/run-sequence-step";
 import { runInboundSubscriptionTick } from "./handlers/inbound-subscription-tick";
 import { handleProcessInboundNotificationJob } from "./handlers/process-inbound-notification";
 import { handleDataQualityScanJob } from "./handlers/data-quality-scan";
+import { runWorkerHeartbeatTick } from "./handlers/worker-heartbeat-tick";
 import { shutdownBoss } from "./shutdown";
 
 const execAsync = promisify(exec);
@@ -35,6 +36,10 @@ const QUEUE_REPORTS_TICK = "reports-tick";
 const QUEUE_SEND_SCHEDULED_EMAIL_TICK = "send-scheduled-email-tick";
 const QUEUE_SEQUENCE_TICK = "sequence-tick";
 const QUEUE_INBOUND_SUBSCRIPTION_TICK = "inbound-subscription-tick";
+// Module 8A: a genuine worker liveness signal for System Health — 2 minutes
+// is cheap (a single-row upsert) and frequent enough that "stale" reliably
+// means "not running," not just "hasn't ticked yet."
+const QUEUE_WORKER_HEARTBEAT_TICK = "worker-heartbeat-tick";
 const MIGRATION_GATE_POLL_MS = 5_000;
 const MIGRATION_GATE_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -129,6 +134,9 @@ async function main(): Promise<void> {
   await boss.createQueue(QUEUE_INBOUND_SUBSCRIPTION_TICK, { retryLimit: 1 });
   await boss.schedule(QUEUE_INBOUND_SUBSCRIPTION_TICK, "0 * * * *");
 
+  await boss.createQueue(QUEUE_WORKER_HEARTBEAT_TICK, { retryLimit: 1 });
+  await boss.schedule(QUEUE_WORKER_HEARTBEAT_TICK, "*/2 * * * *");
+
   await boss.work(QUEUE_RUN_SEARCH, { localConcurrency: 1 }, handleRunSearchJob);
   await boss.work(QUEUE_GENERATE_REPORT, { localConcurrency: 1 }, handleGenerateReportJob);
   await boss.work(QUEUE_SEND_SCHEDULED_EMAIL, { localConcurrency: 1 }, handleSendScheduledEmailJob);
@@ -157,6 +165,9 @@ async function main(): Promise<void> {
   });
   await boss.work(QUEUE_INBOUND_SUBSCRIPTION_TICK, async () => {
     await runInboundSubscriptionTick();
+  });
+  await boss.work(QUEUE_WORKER_HEARTBEAT_TICK, async () => {
+    await runWorkerHeartbeatTick();
   });
 
   boss.on("error", (error) => logger.error({ err: error }, "pg-boss error"));

@@ -7,12 +7,30 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { SearchSetupSchema } from "@/lib/validation/search";
 import { formString } from "@/lib/form-data";
 import { enqueueSearchJob, cancelSearchJob } from "@/lib/jobs/enqueue";
+import { checkAiBudget, getAiSettings } from "@/lib/ai/budget";
+import { checkRateLimit } from "@/lib/rate-limit/postgres-bucket";
 
 export type SearchFormState = { error?: string } | undefined;
 
 export async function startSearch(_prevState: SearchFormState, formData: FormData): Promise<SearchFormState> {
   const user = await requireUser();
   requirePermission(user, "run_research");
+
+  // Module 8A: refuse a new paid AI job once research is disabled or a
+  // configured hard budget is already reached — never blocks mock mode.
+  const budgetCheck = await checkAiBudget();
+  if (!budgetCheck.allowed) {
+    return { error: budgetCheck.reason };
+  }
+
+  const aiSettings = await getAiSettings();
+
+  if (aiSettings.perUserDailySearchLimit !== null) {
+    const rateLimit = await checkRateLimit(`ai-search:user:${user.id}`, { windowMs: 24 * 60 * 60 * 1000, limit: aiSettings.perUserDailySearchLimit });
+    if (!rateLimit.allowed) {
+      return { error: "You've reached today's search limit — please try again tomorrow." };
+    }
+  }
 
   const parsed = SearchSetupSchema.safeParse({
     promptId: formString(formData, "promptId"),
@@ -23,13 +41,17 @@ export async function startSearch(_prevState: SearchFormState, formData: FormDat
       .map((value) => String(value).trim())
       .filter(Boolean),
     leadTypeId: formString(formData, "leadTypeId"),
-    minimumScore: formString(formData, "minimumScore") || "80",
+    minimumScore: formString(formData, "minimumScore") || String(aiSettings.defaultMinimumScore),
     mode: formString(formData, "mode"),
     competitorId: formString(formData, "competitorId"),
   });
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Please correct the highlighted fields." };
+  }
+
+  if (parsed.data.cities.length > aiSettings.maxCitiesPerSearch) {
+    return { error: `An administrator has limited searches to ${aiSettings.maxCitiesPerSearch} cities at a time.` };
   }
 
   const prompt = await prisma.promptTemplate.findUnique({ where: { id: parsed.data.promptId } });
