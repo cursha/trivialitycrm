@@ -8,6 +8,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { callProvider } from "./http";
 import { estimateCostUsd } from "./pricing";
 import { prisma } from "../../prisma";
+import { getAiSettings } from "../../ai/budget";
 import type {
   CandidateDiscoveryProvider,
   DiscoverParams,
@@ -27,7 +28,21 @@ import type {
 // combination of server-side tool use with structured JSON output is
 // implemented to the documented API contract but hasn't been exercised
 // against the live API in this environment.
-const MODEL = "claude-sonnet-5";
+// Module 8A: the model is now Administrator-configurable
+// (AiSettings.approvedModel, src/app/(dashboard)/administration/ai-settings/)
+// rather than hardcoded — resolveModel() below reads it. This fallback is
+// used only if that DB read somehow fails (matches WorkspaceSettings' own
+// defensive-fallback convention) — never silently used otherwise.
+const FALLBACK_MODEL = "claude-sonnet-5";
+
+async function resolveModel(): Promise<string> {
+  try {
+    const settings = await getAiSettings();
+    return settings.approvedModel;
+  } catch {
+    return FALLBACK_MODEL;
+  }
+}
 
 const CANDIDATE_SCHEMA = {
   type: "object",
@@ -181,10 +196,11 @@ function modeInstructions(mode: DiscoverParams["mode"], competitorName?: string)
 
 export class AnthropicPromptAssistant implements PromptAssistant {
   async refine(input: { description: string; currentPrompt?: string; userId?: string }): Promise<{ prompt: string }> {
+    const model = await resolveModel();
     return callProvider({ providerName: "anthropic-prompt-assist" }, async (signal) => {
       const response = await client().messages.create(
         {
-          model: MODEL,
+          model,
           max_tokens: 1024,
           messages: [
             {
@@ -197,7 +213,7 @@ export class AnthropicPromptAssistant implements PromptAssistant {
         },
         { signal },
       );
-      await recordUsage({ operation: "promptAssist", model: MODEL, usage: response.usage, userId: input.userId });
+      await recordUsage({ operation: "promptAssist", model, usage: response.usage, userId: input.userId });
       const text = response.content.find((block) => block.type === "text");
       return { prompt: text && "text" in text ? text.text.trim() : input.description };
     });
@@ -206,12 +222,13 @@ export class AnthropicPromptAssistant implements PromptAssistant {
 
 export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryProvider {
   async discover(params: DiscoverParams): Promise<ResearchCandidate[]> {
+    const model = await resolveModel();
     return callProvider({ providerName: "anthropic-discovery", timeoutMs: 120_000 }, async (signal) => {
       const locationScope = params.cities.length > 0 ? params.cities.join(", ") : `all of ${params.region} (no city filter given)`;
 
       const response = await client().messages.create(
         {
-          model: MODEL,
+          model,
           max_tokens: 8000,
           tools: [
             { type: "web_search_20260209", name: "web_search", max_uses: 8 },
@@ -232,7 +249,7 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
         { signal },
       );
 
-      await recordUsage({ operation: "discover", model: MODEL, usage: response.usage, searchId: params.searchId, userId: params.userId });
+      await recordUsage({ operation: "discover", model, usage: response.usage, searchId: params.searchId, userId: params.userId });
 
       const jsonBlock = response.content.find((block) => block.type === "text");
       if (!jsonBlock || !("text" in jsonBlock)) return [];
@@ -244,10 +261,11 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
 
 export class AnthropicEvidenceVerificationProvider implements EvidenceVerificationProvider {
   async verify(candidate: ResearchCandidate, params: DiscoverParams): Promise<ResearchCandidate> {
+    const model = await resolveModel();
     return callProvider({ providerName: "anthropic-verification", timeoutMs: 60_000 }, async (signal) => {
       const response = await client().messages.create(
         {
-          model: MODEL,
+          model,
           max_tokens: 2000,
           tools: [
             { type: "web_search_20260209", name: "web_search", max_uses: 3 },
@@ -269,7 +287,7 @@ export class AnthropicEvidenceVerificationProvider implements EvidenceVerificati
         },
         { signal },
       );
-      await recordUsage({ operation: "verify", model: MODEL, usage: response.usage, searchId: params.searchId, userId: params.userId });
+      await recordUsage({ operation: "verify", model, usage: response.usage, searchId: params.searchId, userId: params.userId });
       const jsonBlock = response.content.find((block) => block.type === "text");
       if (!jsonBlock || !("text" in jsonBlock)) return candidate;
       return { ...candidate, ...(JSON.parse(jsonBlock.text) as Partial<ResearchCandidate>) };
@@ -279,10 +297,11 @@ export class AnthropicEvidenceVerificationProvider implements EvidenceVerificati
 
 export class AnthropicScoringProvider implements ScoringProvider {
   async score(candidate: ResearchCandidate, params: DiscoverParams): Promise<{ score: number; explanation: string }> {
+    const model = await resolveModel();
     return callProvider({ providerName: "anthropic-scoring", timeoutMs: 30_000 }, async (signal) => {
       const response = await client().messages.create(
         {
-          model: MODEL,
+          model,
           max_tokens: 500,
           output_config: {
             format: {
@@ -306,7 +325,7 @@ export class AnthropicScoringProvider implements ScoringProvider {
         },
         { signal },
       );
-      await recordUsage({ operation: "score", model: MODEL, usage: response.usage, searchId: params.searchId, userId: params.userId });
+      await recordUsage({ operation: "score", model, usage: response.usage, searchId: params.searchId, userId: params.userId });
       const jsonBlock = response.content.find((block) => block.type === "text");
       if (!jsonBlock || !("text" in jsonBlock)) return { score: 0, explanation: "Scoring provider returned no output." };
       return JSON.parse(jsonBlock.text) as { score: number; explanation: string };

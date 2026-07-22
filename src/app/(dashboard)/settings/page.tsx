@@ -115,7 +115,7 @@ export default async function SettingsPage() {
       label: "Roles & Permissions",
       description: "Edit the permission grants for each role.",
       icon: ShieldCheck,
-      visible: hasPermission(user, "manage_users"),
+      visible: hasPermission(user, "manage_roles"),
     },
   ].filter((card) => card.visible);
 

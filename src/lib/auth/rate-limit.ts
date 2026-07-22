@@ -26,6 +26,6 @@ export async function recordFailedLogin(userId: string): Promise<void> {
 export async function recordSuccessfulLogin(userId: string): Promise<void> {
   await prisma.user.update({
     where: { id: userId },
-    data: { failedLoginAttempts: 0, lockedUntil: null },
+    data: { failedLoginAttempts: 0, lockedUntil: null, lastLoginAt: new Date() },
   });
 }

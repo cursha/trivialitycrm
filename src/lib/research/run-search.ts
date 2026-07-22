@@ -7,6 +7,7 @@ import { getProviders } from "./providers/factory";
 import { filterByModeExclusivity, dedupeWithinRun } from "./exclusivity";
 import { computeNormalizedFields, findPriorRejectedMatches } from "../duplicates/match";
 import { normalizeCompanyName } from "../duplicates/normalize";
+import { getAiSettings } from "../ai/budget";
 import type { DiscoverParams, ResearchCandidate } from "./providers/types";
 
 function candidateIdentity(candidate: { name: string; city: string }): string {
@@ -81,7 +82,15 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       });
 
       const rawCandidates = await providers.discovery.discover(params);
-      const scoped = dedupeWithinRun(filterByModeExclusivity(rawCandidates, search.mode));
+      const deduped = dedupeWithinRun(filterByModeExclusivity(rawCandidates, search.mode));
+
+      // Module 8A: an administrator-configured cap (AiSettings.
+      // maxResultsPerSearch, null = unlimited) — applied here, after
+      // dedup/exclusivity filtering, not as a discover() parameter, so the
+      // cap is enforced consistently regardless of what a given provider
+      // implementation does or doesn't support natively.
+      const { maxResultsPerSearch } = await getAiSettings();
+      const scoped = maxResultsPerSearch !== null ? deduped.slice(0, maxResultsPerSearch) : deduped;
 
       await prisma.$transaction(
         scoped.map((candidate, index) =>

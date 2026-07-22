@@ -30,61 +30,77 @@ const rejectionReasons = [
 
 const roles = ["Administrator", "Manager", "Salesperson"] as const;
 
-const permissions: { key: string; label: string }[] = [
-  { key: "view_all_leads", label: "View all leads" },
-  { key: "view_team_leads", label: "View team leads" },
-  { key: "view_assigned_leads", label: "View assigned leads" },
-  { key: "add_leads", label: "Add leads" },
-  { key: "edit_leads", label: "Edit leads" },
-  { key: "delete_leads", label: "Delete leads" },
-  { key: "reassign_leads", label: "Reassign leads" },
-  { key: "import_leads", label: "Import leads" },
-  { key: "export_leads", label: "Export leads" },
-  { key: "manage_users", label: "Manage users" },
-  { key: "manage_prompts", label: "Manage prompts" },
-  { key: "manage_competitors", label: "Manage competitors" },
-  { key: "manage_settings", label: "Manage settings" },
-  { key: "restore_rejected", label: "Restore rejected AI search results" },
-  { key: "restore_archived_leads", label: "Restore archived companies" },
-  { key: "run_research", label: "Run AI lead research searches" },
-  { key: "review_research_results", label: "Review AI research results" },
-  { key: "transfer_leads", label: "Transfer AI research results to the CRM" },
-  { key: "view_evidence", label: "View AI research evidence and citations" },
+const LEADS_CATEGORY = "Leads & Companies";
+const WORKSPACE_CATEGORY = "Sales Workspace";
+const REPORTING_CATEGORY = "Reporting";
+const COMMUNICATIONS_CATEGORY = "Communications";
+const DATA_QUALITY_CATEGORY = "Data Quality";
+const ADMINISTRATION_CATEGORY = "Administration";
+
+const permissions: { key: string; label: string; category: string; description: string }[] = [
+  { key: "view_all_leads", label: "View all leads", category: LEADS_CATEGORY, description: "View every company and contact in the CRM, regardless of assignment or team." },
+  { key: "view_team_leads", label: "View team leads", category: LEADS_CATEGORY, description: "View companies and contacts assigned to your team." },
+  { key: "view_assigned_leads", label: "View assigned leads", category: LEADS_CATEGORY, description: "View companies and contacts assigned to you." },
+  { key: "add_leads", label: "Add leads", category: LEADS_CATEGORY, description: "Create new companies." },
+  { key: "edit_leads", label: "Edit leads", category: LEADS_CATEGORY, description: "Edit company and contact details." },
+  { key: "delete_leads", label: "Delete leads", category: LEADS_CATEGORY, description: "Archive a company (and, for an Administrator, permanently delete an already-archived one)." },
+  { key: "reassign_leads", label: "Reassign leads", category: LEADS_CATEGORY, description: "Assign or reassign a company to a different salesperson." },
+  { key: "import_leads", label: "Import leads", category: LEADS_CATEGORY, description: "Import companies from a spreadsheet." },
+  { key: "export_leads", label: "Export leads", category: LEADS_CATEGORY, description: "Export companies and search results to CSV/Excel." },
+  { key: "manage_users", label: "Manage users", category: ADMINISTRATION_CATEGORY, description: "Create and edit user accounts, assign roles and teams, and activate or deactivate access." },
+  { key: "manage_prompts", label: "Manage prompts", category: LEADS_CATEGORY, description: "Create and edit reusable AI research prompts." },
+  { key: "manage_competitors", label: "Manage competitors", category: LEADS_CATEGORY, description: "Manage the list of competitors." },
+  { key: "manage_settings", label: "Manage settings", category: ADMINISTRATION_CATEGORY, description: "Edit lead types, pipeline stages, rejection reasons, and workspace threshold settings." },
+  { key: "restore_rejected", label: "Restore rejected AI search results", category: LEADS_CATEGORY, description: "Restore an AI research result that was previously rejected." },
+  { key: "restore_archived_leads", label: "Restore archived companies", category: LEADS_CATEGORY, description: "Restore an archived company back to active." },
+  { key: "run_research", label: "Run AI lead research searches", category: LEADS_CATEGORY, description: "Start a new AI-assisted lead research search." },
+  { key: "review_research_results", label: "Review AI research results", category: LEADS_CATEGORY, description: "Review and act on AI research results." },
+  { key: "transfer_leads", label: "Transfer AI research results to the CRM", category: LEADS_CATEGORY, description: "Transfer AI research results into the CRM as companies." },
+  { key: "view_evidence", label: "View AI research evidence and citations", category: LEADS_CATEGORY, description: "View the evidence and citations behind an AI research score." },
   // Module Four: Sales Workspace
-  { key: "bulk_update_leads", label: "Use bulk actions on leads" },
-  { key: "manage_territories", label: "Manage territories" },
-  { key: "create_shared_views", label: "Create shared saved views" },
-  { key: "view_manager_workspace", label: "View manager workspace" },
+  { key: "bulk_update_leads", label: "Use bulk actions on leads", category: WORKSPACE_CATEGORY, description: "Use bulk actions (assign, change stage, archive, and more) on multiple leads at once." },
+  { key: "manage_territories", label: "Manage territories", category: WORKSPACE_CATEGORY, description: "Create and edit sales territories." },
+  { key: "create_shared_views", label: "Create shared saved views", category: WORKSPACE_CATEGORY, description: "Create saved pipeline views shared with the whole team." },
+  { key: "view_manager_workspace", label: "View manager workspace", category: WORKSPACE_CATEGORY, description: "View the Manager Workspace — team workload, coverage, and pipeline summaries." },
   // Module Five: Reporting and Analytics
-  { key: "view_own_reports", label: "View own reports" },
-  { key: "view_team_reports", label: "View team reports" },
-  { key: "view_all_reports", label: "View all reports" },
-  { key: "export_reports", label: "Export reports" },
-  { key: "manage_scheduled_reports", label: "Manage scheduled reports" },
-  { key: "view_ai_costs", label: "View AI research cost estimates" },
-  { key: "view_competitor_reports", label: "View competitor reports" },
+  { key: "view_own_reports", label: "View own reports", category: REPORTING_CATEGORY, description: "View reports scoped to your own leads." },
+  { key: "view_team_reports", label: "View team reports", category: REPORTING_CATEGORY, description: "View reports scoped to your team." },
+  { key: "view_all_reports", label: "View all reports", category: REPORTING_CATEGORY, description: "View reports across the whole organization." },
+  { key: "export_reports", label: "Export reports", category: REPORTING_CATEGORY, description: "Export reports to CSV/Excel." },
+  { key: "manage_scheduled_reports", label: "Manage scheduled reports", category: REPORTING_CATEGORY, description: "Create and edit scheduled report deliveries." },
+  { key: "view_ai_costs", label: "View AI research cost estimates", category: REPORTING_CATEGORY, description: "View AI research cost estimates in reports." },
+  { key: "view_competitor_reports", label: "View competitor reports", category: REPORTING_CATEGORY, description: "View competitor-focused reports." },
   // Module Six: Communications and Follow-up Automation
-  { key: "connect_mailbox", label: "Connect a mailbox for sending email" },
-  { key: "send_email", label: "Send email" },
-  { key: "schedule_email", label: "Schedule email" },
-  { key: "manage_personal_templates", label: "Manage personal email templates" },
-  { key: "manage_shared_templates", label: "Manage shared email templates" },
-  { key: "manage_sequences", label: "Manage follow-up sequences" },
-  { key: "enroll_in_sequences", label: "Enroll leads in follow-up sequences" },
-  { key: "view_team_communications", label: "View team communications" },
-  { key: "manage_calendar_connections", label: "Manage calendar connections" },
-  { key: "manage_communication_compliance", label: "Manage communication consent and compliance" },
-  { key: "send_bulk_email", label: "Send bulk email" },
+  { key: "connect_mailbox", label: "Connect a mailbox for sending email", category: COMMUNICATIONS_CATEGORY, description: "Connect your own mailbox for sending email from the CRM." },
+  { key: "send_email", label: "Send email", category: COMMUNICATIONS_CATEGORY, description: "Send email to a contact." },
+  { key: "schedule_email", label: "Schedule email", category: COMMUNICATIONS_CATEGORY, description: "Schedule an email to send later." },
+  { key: "manage_personal_templates", label: "Manage personal email templates", category: COMMUNICATIONS_CATEGORY, description: "Create and edit your own personal email templates." },
+  { key: "manage_shared_templates", label: "Manage shared email templates", category: COMMUNICATIONS_CATEGORY, description: "Create and edit email templates shared with the whole team." },
+  { key: "manage_sequences", label: "Manage follow-up sequences", category: COMMUNICATIONS_CATEGORY, description: "Design multi-step, explicitly-enrolled follow-up sequences." },
+  { key: "enroll_in_sequences", label: "Enroll leads in follow-up sequences", category: COMMUNICATIONS_CATEGORY, description: "Enroll a company in an existing follow-up sequence." },
+  { key: "view_team_communications", label: "View team communications", category: COMMUNICATIONS_CATEGORY, description: "Review inbound messages that couldn't be automatically matched to a contact." },
+  { key: "manage_calendar_connections", label: "Manage calendar connections", category: COMMUNICATIONS_CATEGORY, description: "Connect a calendar and schedule, reschedule, or cancel appointments." },
+  { key: "manage_communication_compliance", label: "Manage communication consent and compliance", category: COMMUNICATIONS_CATEGORY, description: "View and record contact consent for CASL/CAN-SPAM compliance." },
+  { key: "send_bulk_email", label: "Send bulk email", category: COMMUNICATIONS_CATEGORY, description: "Send email to more than one contact at a time." },
   // Module Seven: Data Quality, Duplicate Management, Record Merging, and
   // Enrichment History
-  { key: "view_data_quality", label: "View the data quality workspace" },
-  { key: "review_data_quality", label: "Review data quality issues and possible duplicates" },
-  { key: "manage_data_quality_rules", label: "Manage data quality rules" },
-  { key: "merge_companies", label: "Merge duplicate companies" },
-  { key: "merge_contacts", label: "Merge duplicate contacts" },
-  { key: "run_duplicate_scan", label: "Run a data quality scan" },
-  { key: "review_enrichment", label: "Review enrichment suggestions" },
-  { key: "manage_enrichment_settings", label: "Manage enrichment settings" },
+  { key: "view_data_quality", label: "View the data quality workspace", category: DATA_QUALITY_CATEGORY, description: "View the data quality dashboard and its counts." },
+  { key: "review_data_quality", label: "Review data quality issues and possible duplicates", category: DATA_QUALITY_CATEGORY, description: "Review data-quality issues and possible duplicate records." },
+  { key: "manage_data_quality_rules", label: "Manage data quality rules", category: DATA_QUALITY_CATEGORY, description: "Create, edit, enable/disable, and archive data-quality rules." },
+  { key: "merge_companies", label: "Merge duplicate companies", category: DATA_QUALITY_CATEGORY, description: "Merge two duplicate companies into one, safely, without losing history." },
+  { key: "merge_contacts", label: "Merge duplicate contacts", category: DATA_QUALITY_CATEGORY, description: "Merge two duplicate contacts into one, safely, without losing history." },
+  { key: "run_duplicate_scan", label: "Run a data quality scan", category: DATA_QUALITY_CATEGORY, description: "Trigger a scan for missing/invalid data and possible duplicates." },
+  { key: "review_enrichment", label: "Review enrichment suggestions", category: DATA_QUALITY_CATEGORY, description: "Request and review data-enrichment suggestions before applying them." },
+  { key: "manage_enrichment_settings", label: "Manage enrichment settings", category: DATA_QUALITY_CATEGORY, description: "Configure the data-enrichment provider and its settings." },
+  // Module 8A: Essential Version 1 Administration
+  { key: "view_administration", label: "View administration home", category: ADMINISTRATION_CATEGORY, description: "View the Administration home page and its safe summary cards." },
+  { key: "manage_organization_settings", label: "Manage organization settings", category: ADMINISTRATION_CATEGORY, description: "Edit organization-wide settings — name, locale defaults, and business contact info." },
+  { key: "manage_roles", label: "Manage roles and permissions", category: ADMINISTRATION_CATEGORY, description: "Create roles, duplicate them, and edit permission grants." },
+  { key: "manage_ai_settings", label: "Manage AI settings", category: ADMINISTRATION_CATEGORY, description: "Configure AI research settings and budget controls." },
+  { key: "view_audit_log", label: "View audit log", category: ADMINISTRATION_CATEGORY, description: "View the administrative audit log." },
+  { key: "export_audit_log", label: "Export audit log", category: ADMINISTRATION_CATEGORY, description: "Export the audit log to a redacted CSV file." },
+  { key: "view_system_health", label: "View system health", category: ADMINISTRATION_CATEGORY, description: "View web, database, worker, and queue health status." },
+  { key: "manage_background_jobs", label: "Manage background jobs", category: ADMINISTRATION_CATEGORY, description: "Retry or cancel eligible background jobs." },
 ];
 
 // Initial role -> permission grants. All grants are stored as editable
@@ -157,7 +173,13 @@ async function seedPermissions() {
   for (const permission of permissions) {
     await prisma.permission.upsert({
       where: { key: permission.key },
-      update: { label: permission.label },
+      // category/description are synced on every re-run (like a
+      // permission's label already was) — these are descriptive metadata
+      // about what the permission does, not an operational setting an
+      // Administrator might have customized, so keeping them in sync with
+      // the source of truth here is correct, matching pipelineStage's own
+      // "sync outcomeType, leave sortOrder/active alone" precedent.
+      update: { label: permission.label, category: permission.category, description: permission.description },
       create: permission,
     });
   }
@@ -266,6 +288,49 @@ async function seedDataQualityRules() {
   console.log(`Seeded ${dataQualityRules.length} default data quality rules.`);
 }
 
+// Module 8A: one default OrganizationSettings row (id fixed at 1), same
+// upsert-by-id-1 idiom as WorkspaceSettings. Only genuinely-known facts are
+// seeded (the app's own documented business timezone, the two-country
+// scope every other part of this app already assumes) — business contact
+// fields are left blank rather than invented, matching this codebase's
+// standing rule to never fabricate real-world facts.
+async function seedOrganizationSettings() {
+  const defaultStage = await prisma.pipelineStage.findFirst({ where: { isDefault: true } });
+
+  await prisma.organizationSettings.upsert({
+    where: { id: 1 },
+    update: {},
+    create: {
+      id: 1,
+      organizationName: "Triviality",
+      defaultCountry: "Canada",
+      defaultRegion: "Ontario",
+      defaultTimezone: "America/Toronto",
+      defaultCurrency: "CAD",
+      defaultDateFormat: "YYYY-MM-DD",
+      defaultPipelineStageId: defaultStage?.id ?? null,
+    },
+  });
+  console.log("Seeded default organization settings.");
+}
+
+// Module 8A: one default AiSettings row — seeded from the legacy
+// AI_DAILY_BUDGET_USD/AI_MONTHLY_BUDGET_USD env vars if set (see
+// src/lib/ai/budget.ts's doc comment: after this one-time seed, the DB row
+// is authoritative and editable without a redeploy).
+async function seedAiSettings() {
+  await prisma.aiSettings.upsert({
+    where: { id: 1 },
+    update: {},
+    create: {
+      id: 1,
+      dailyBudgetUsd: process.env.AI_DAILY_BUDGET_USD ? Number(process.env.AI_DAILY_BUDGET_USD) : null,
+      monthlyBudgetUsd: process.env.AI_MONTHLY_BUDGET_USD ? Number(process.env.AI_MONTHLY_BUDGET_USD) : null,
+    },
+  });
+  console.log("Seeded default AI settings.");
+}
+
 async function seedBootstrapAdmin() {
   const email = process.env.SEED_ADMIN_EMAIL;
   const password = process.env.SEED_ADMIN_PASSWORD;
@@ -306,6 +371,8 @@ async function main() {
   await seedRolesAndGrants();
   await seedBootstrapAdmin();
   await seedDataQualityRules();
+  await seedOrganizationSettings();
+  await seedAiSettings();
 
   console.log(
     "Seed complete. No Lead Types, Competitors, or sample Companies were created — " +

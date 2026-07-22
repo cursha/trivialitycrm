@@ -35,6 +35,20 @@ export const ACTIVE_TONE: Record<"active" | "inactive", BadgeTone> = {
   inactive: "neutral",
 };
 
+// Module 8A: Essential Version 1 Administration.
+export const AI_BUDGET_STATUS_TONE: Record<string, BadgeTone> = {
+  ok: "success",
+  "near-threshold": "warning",
+  "over-budget": "danger",
+  "not-configured": "neutral",
+};
+export const AI_BUDGET_STATUS_LABEL: Record<string, string> = {
+  ok: "Within budget",
+  "near-threshold": "Near threshold",
+  "over-budget": "Over budget",
+  "not-configured": "No budget configured",
+};
+
 /** A→D never had a color scale at all before — every grade rendered
  * identical plain emerald regardless of value. Deep Navy/Mayhem Blue read
  * as "top-tier," fading through amber to Mayhem Red-Dark for the weakest
