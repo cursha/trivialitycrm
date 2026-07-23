@@ -125,32 +125,48 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
 
       const raw = candidateRow.rawCandidate as unknown as ResearchCandidate;
       let verified: ResearchCandidate;
-
-      if (candidateRow.status === "PENDING") {
-        verified = await providers.verification.verify(raw, params);
-        await prisma.searchCandidate.update({
-          where: { id: candidateRow.id },
-          data: { status: "VERIFIED", verifiedData: verified as unknown as object },
-        });
-      } else {
-        verified = (candidateRow.verifiedData as unknown as ResearchCandidate | null) ?? raw;
-      }
-
       let score: number;
       let explanation: string;
 
-      if (candidateRow.status === "PENDING" || candidateRow.status === "VERIFIED") {
-        const scored = await providers.scoring.score(verified, params);
-        score = scored.score;
-        explanation = scored.explanation;
-        await prisma.searchCandidate.update({
-          where: { id: candidateRow.id },
-          data: { status: "SCORED", score, explanation },
-        });
+      if (search.mode === "GENERAL") {
+        // Directory-sourced candidates never get an automatic AI verify/score
+        // pass — that's the entire point of the discovery/research split
+        // (see providers/google-places.ts and results/actions.ts#
+        // researchResult): browsing a city's businesses stays fast, cheap,
+        // and off the AI budget entirely. triviaStatus stays "UNCERTAIN" and
+        // evidence/sources stay empty (as returned by the discovery
+        // provider) until a user opts into "Research this business" on a
+        // specific row.
+        verified = raw;
+        score = 0;
+        explanation = 'Not yet researched — use "Research this business" for an AI-evaluated score and trivia status.';
+        if (candidateRow.status !== "SCORED") {
+          await prisma.searchCandidate.update({ where: { id: candidateRow.id }, data: { status: "SCORED", score, explanation } });
+        }
       } else {
-        // SCORED already, resuming after a crash between scoring and result creation.
-        score = candidateRow.score as number;
-        explanation = candidateRow.explanation as string;
+        if (candidateRow.status === "PENDING") {
+          verified = await providers.verification.verify(raw, params);
+          await prisma.searchCandidate.update({
+            where: { id: candidateRow.id },
+            data: { status: "VERIFIED", verifiedData: verified as unknown as object },
+          });
+        } else {
+          verified = (candidateRow.verifiedData as unknown as ResearchCandidate | null) ?? raw;
+        }
+
+        if (candidateRow.status === "PENDING" || candidateRow.status === "VERIFIED") {
+          const scored = await providers.scoring.score(verified, params);
+          score = scored.score;
+          explanation = scored.explanation;
+          await prisma.searchCandidate.update({
+            where: { id: candidateRow.id },
+            data: { status: "SCORED", score, explanation },
+          });
+        } else {
+          // SCORED already, resuming after a crash between scoring and result creation.
+          score = candidateRow.score as number;
+          explanation = candidateRow.explanation as string;
+        }
       }
 
       const priorRejections = await findPriorRejectedMatches(prisma, {
@@ -165,7 +181,12 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
         email: verified.email,
       });
 
-      const disposition = priorRejections.length > 0 ? "REJECTED" : score < search.minimumScore ? "BELOW_SCORE" : "NEW";
+      // Unresearched GENERAL-mode candidates carry a placeholder score of 0,
+      // which is meaningless against minimumScore — sorting them into
+      // BELOW_SCORE would hide every freshly-discovered business from the
+      // default results view before anyone had a chance to research them.
+      const disposition =
+        priorRejections.length > 0 ? "REJECTED" : search.mode === "GENERAL" ? "NEW" : score < search.minimumScore ? "BELOW_SCORE" : "NEW";
       const finalExplanation =
         priorRejections.length > 0
           ? `${explanation}\n\n[Auto-rejected: matches a previously rejected location — use "restore" to reconsider.]`

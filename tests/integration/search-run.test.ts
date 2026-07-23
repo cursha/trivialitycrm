@@ -32,6 +32,23 @@ describe("runSearchJob", () => {
     expect(results.every((r) => r.normalizedName.length > 0)).toBe(true);
   });
 
+  it("GENERAL mode never auto-verifies or auto-scores — candidates stay UNCERTAIN, unresearched, and NEW", async () => {
+    const { user, leadType } = await baseFixtures();
+    const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, cities: ["Milton"], minimumScore: 95 });
+
+    await runSearchJob(search.id);
+
+    const [result] = await testPrisma.searchResult.findMany({ where: { searchId: search.id } });
+    // minimumScore is 95 — if the initial run were still auto-scoring (the
+    // bug this test guards against), a placeholder/low score would push
+    // this to BELOW_SCORE, hiding it from the default results view before
+    // anyone had a chance to research it.
+    expect(result.disposition).toBe("NEW");
+    expect(result.triviaStatus).toBe("UNCERTAIN");
+    expect(result.evidence).toEqual([]);
+    expect(result.score).toBe(0);
+  });
+
   it("respects the geographic filter — statewide when cities is empty", async () => {
     const { user, leadType } = await baseFixtures();
     const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, cities: [], region: "BC" });
@@ -45,7 +62,13 @@ describe("runSearchJob", () => {
 
   it("marks below-minimum-score candidates BELOW_SCORE, not NEW", async () => {
     const { user, leadType } = await baseFixtures();
-    const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, cities: ["Milton"], minimumScore: 95 });
+    // TRIVIA_GAP, not the GENERAL default — GENERAL-mode candidates are
+    // unresearched directory listings with a placeholder score (see
+    // run-search.ts), always disposition NEW regardless of minimumScore,
+    // until a user opts into "Research this business". This test is about
+    // the real score-vs-minimumScore comparison, which only applies once a
+    // candidate has actually been AI-scored.
+    const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, cities: ["Milton"], minimumScore: 95, mode: "TRIVIA_GAP" });
 
     await runSearchJob(search.id);
 
