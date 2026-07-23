@@ -98,7 +98,10 @@ export async function refinePrompt(_prevState: PromptRefineState, formData: Form
     return { error: parsed.error.issues[0]?.message ?? "Describe what you'd like the AI to change." };
   }
 
-  const { promptAssistant } = getProviders();
+  // Prompt refinement happens before a search (and its mode) exists — only
+  // promptAssistant is used here, which is never mode-dependent, so the
+  // mode argument is a placeholder (any value works identically).
+  const { promptAssistant } = getProviders("GENERAL");
   const { prompt } = await promptAssistant.refine({
     description: parsed.data.description,
     currentPrompt: parsed.data.currentPrompt,

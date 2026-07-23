@@ -7,6 +7,8 @@ import { AddLookupForm } from "@/components/add-lookup-form";
 import { createTeam } from "./actions";
 import { PageHeader } from "@/components/ui/page-header";
 import { UserFilters } from "./user-filters";
+import { PasswordResetRequests } from "./password-reset-requests";
+import { getPendingPasswordResetRequests } from "@/lib/auth/password-reset";
 import type { Prisma } from "@/generated/prisma/client";
 
 export const metadata = { title: "Users — Triviality CRM" };
@@ -37,10 +39,11 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
     ...(status === "active" ? { disabled: false } : status === "disabled" ? { disabled: true } : {}),
   };
 
-  const [users, roles, teams] = await Promise.all([
+  const [users, roles, teams, pendingResetRequests] = await Promise.all([
     prisma.user.findMany({ where, orderBy: { name: "asc" } }),
     prisma.role.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
     prisma.team.findMany({ orderBy: { name: "asc" } }),
+    getPendingPasswordResetRequests(),
   ]);
 
   const userTeamIds = Object.fromEntries(users.map((u) => [u.id, u.teamId]));
@@ -53,6 +56,10 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
       />
 
       <UserFilters roles={roles.map((r) => ({ id: r.id, name: r.name }))} />
+
+      <PasswordResetRequests
+        requests={pendingResetRequests.map((r) => ({ id: r.id, userName: r.userName, userEmail: r.userEmail, requestedAt: r.requestedAt.toISOString() }))}
+      />
 
       <UserTable
         users={users.map((u) => ({

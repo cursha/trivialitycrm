@@ -26,10 +26,24 @@ const envSchema = z
     // generate its own key) — required in production only, same reasoning
     // as APP_URL.
     NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
-    AI_PROVIDER: z.enum(["mock", "anthropic"]).default("mock"),
+    // preprocess is required here too (see blankToUndefined's comment above)
+    // — without it, an env var set to "" is a defined-but-invalid enum
+    // value, not "absent", so .default("mock") never kicks in and the whole
+    // app crash-loops at boot instead of falling back safely. Confirmed
+    // live: this exact gap took production down (Railway's AI_PROVIDER was
+    // blank, not unset).
+    AI_PROVIDER: z.preprocess(blankToUndefined, z.enum(["mock", "anthropic"]).default("mock")),
     AI_API_KEY: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
     AI_DAILY_BUDGET_USD: z.preprocess(blankToUndefined, z.coerce.number().positive("must be a positive number").optional()),
     AI_MONTHLY_BUDGET_USD: z.preprocess(blankToUndefined, z.coerce.number().positive("must be a positive number").optional()),
+    // Selects the discovery provider for GENERAL-mode lead searches only
+    // (TRIVIA_GAP/TRIVIA_CONFIRMED/COMPETITOR modes always use AI_PROVIDER's
+    // discovery — see src/lib/research/providers/factory.ts). "mock" is the
+    // safe default; "google" requires GOOGLE_PLACES_API_KEY. Deliberately a
+    // separate setting from AI_PROVIDER — a business-directory lookup is not
+    // an AI call and has its own, unrelated credential/billing account.
+    PLACES_PROVIDER: z.preprocess(blankToUndefined, z.enum(["mock", "google"]).default("mock")),
+    GOOGLE_PLACES_API_KEY: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
     IMPORT_BATCH_TTL_HOURS: z.preprocess(
       blankToUndefined,
       z.coerce.number().positive("must be a positive number").max(24, "must be 24 or less").default(4),
@@ -57,6 +71,9 @@ const envSchema = z
   .superRefine((value, ctx) => {
     if (value.AI_PROVIDER === "anthropic" && !value.AI_API_KEY) {
       ctx.addIssue({ code: "custom", path: ["AI_API_KEY"], message: "is required when AI_PROVIDER=anthropic" });
+    }
+    if (value.PLACES_PROVIDER === "google" && !value.GOOGLE_PLACES_API_KEY) {
+      ctx.addIssue({ code: "custom", path: ["GOOGLE_PLACES_API_KEY"], message: "is required when PLACES_PROVIDER=google" });
     }
     if (Boolean(value.SEED_ADMIN_EMAIL) !== Boolean(value.SEED_ADMIN_PASSWORD)) {
       ctx.addIssue({

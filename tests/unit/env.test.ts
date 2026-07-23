@@ -160,6 +160,20 @@ describe("getEnv", () => {
     expect(env.AI_DAILY_BUDGET_USD).toBeUndefined();
   });
 
+  // Regression: this exact gap took production down — Railway's AI_PROVIDER
+  // was set to "" (blank), not unset, so z.enum(...).default("mock") never
+  // kicked in (default only applies to undefined) and the app crash-looped
+  // at boot on every single request, including /api/health.
+  it("treats a blank AI_PROVIDER as absent and falls back to mock rather than crashing", () => {
+    for (const key of REQUIRED_KEYS) delete process.env[key];
+    setNodeEnv("test");
+    process.env.DATABASE_URL = "postgresql://user:pass@localhost:5432/db";
+    process.env.AI_PROVIDER = "";
+
+    const env = getEnv();
+    expect(env.AI_PROVIDER).toBe("mock");
+  });
+
   it("rejects an invalid AI_DAILY_BUDGET_USD", () => {
     for (const key of REQUIRED_KEYS) delete process.env[key];
     setNodeEnv("test");

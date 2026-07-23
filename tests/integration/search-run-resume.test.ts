@@ -30,7 +30,13 @@ async function baseFixtures() {
 describe("runSearchJob resumability", () => {
   it("resumes after a mid-run failure without re-discovering, re-verifying, or duplicating results", async () => {
     const { user, leadType } = await baseFixtures();
-    const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, cities: ["Milton", "Oakville"] });
+    // TRIVIA_GAP, not the createLeadSearchFixture default of GENERAL — this
+    // test spies on MockCandidateDiscoveryProvider specifically, which only
+    // backs GENERAL mode when a directory provider isn't configured (see
+    // factory.ts's mode-aware discovery routing); any non-GENERAL mode keeps
+    // exercising it, matching this test's actual purpose (job resumability,
+    // not discovery-provider selection).
+    const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, cities: ["Milton", "Oakville"], mode: "TRIVIA_GAP" });
 
     const discoverSpy = vi.spyOn(MockCandidateDiscoveryProvider.prototype, "discover");
     const verifySpy = vi.spyOn(MockEvidenceVerificationProvider.prototype, "verify");

@@ -51,7 +51,7 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
   if (search.status === "CANCELLED") return;
 
   try {
-    const providers = getProviders();
+    const providers = getProviders(search.mode);
     const cities = Array.isArray(search.cities) ? (search.cities as unknown[]).map((city) => String(city)) : [];
 
     const params: DiscoverParams = {

@@ -49,6 +49,14 @@ export function describeAuditEvent(event: AuditEventLike): string {
       return `${prefix}A locked user account was unlocked.`;
     case "user.sessions_revoked":
       return `${prefix}A user's active sessions were revoked.`;
+    case "password_reset.requested":
+      return `${prefix}A self-service password reset was requested.`;
+    case "password_reset.link_generated":
+      return `${prefix}An administrator generated a password reset link.`;
+    case "password_reset.dismissed":
+      return `${prefix}A password reset request was dismissed.`;
+    case "password_reset.completed":
+      return `${prefix}A password was reset via a self-service link.`;
     case "ownership.companies_transferred": {
       const count = metadataString(event.metadata, "companyCount");
       return `${prefix}${count ?? "Some"} companies had their ownership transferred.`;
@@ -71,6 +79,8 @@ export function describeAuditEvent(event: AuditEventLike): string {
       return `${prefix}Organization settings were updated.`;
     case "ai_settings.updated":
       return `${prefix}AI settings were updated.`;
+    case "result.researched":
+      return `${prefix}A lead search result was researched with AI on demand.`;
     case "job.retried":
       return `${prefix}A background job was retried.`;
     case "job.cancelled":

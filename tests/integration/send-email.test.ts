@@ -173,15 +173,13 @@ describe("sendEmail", () => {
     expect(activity.notes).toContain("Hi Jamie");
   });
 
-  it("blocks a send to a contact who has not granted email permission (CASL-safe default-deny)", async () => {
+  it("allows a send to a contact who has not granted email permission — there is no consent gate for cold outreach to new leads", async () => {
     const { user, company } = await baseFixtures();
     await connectMailbox(user.id);
     const contact = await permittedContactFixture(company.id, { emailPermitted: false });
 
     const result = await sendEmail({ userId: user.id, companyId: company.id, contactId: contact.id, subject: "Hi", body: UNSUBSCRIBE_BODY });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/has not granted email permission/);
-    expect(await testPrisma.emailMessage.count()).toBe(0);
+    expect(result.ok).toBe(true);
   });
 
   it("blocks a send to a contact marked doNotContact even if emailPermitted is true", async () => {

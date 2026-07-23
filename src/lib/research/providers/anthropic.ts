@@ -181,6 +181,20 @@ async function recordUsage(params: {
   }
 }
 
+/**
+ * Structured JSON output is only guaranteed well-formed if the response
+ * finishes before max_tokens is hit — a response cut off mid-schema still
+ * comes back as stop_reason "max_tokens" with truncated text, which fails
+ * JSON.parse with a confusing "Expected property name or '}'" error rather
+ * than a clear one. Confirmed live: the discovery call's response was cut
+ * off exactly this way on a broad query before its max_tokens was raised.
+ */
+function assertNotTruncated(stopReason: string | null, providerName: string): void {
+  if (stopReason === "max_tokens") {
+    throw new Error(`Provider "${providerName}" response was truncated (hit max_tokens) before it finished — its output is incomplete, not just slow to parse.`);
+  }
+}
+
 function modeInstructions(mode: DiscoverParams["mode"], competitorName?: string): string {
   switch (mode) {
     case "TRIVIA_GAP":
@@ -223,13 +237,27 @@ export class AnthropicPromptAssistant implements PromptAssistant {
 export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryProvider {
   async discover(params: DiscoverParams): Promise<ResearchCandidate[]> {
     const model = await resolveModel();
-    return callProvider({ providerName: "anthropic-discovery", timeoutMs: 120_000 }, async (signal) => {
+    // Up to 8 web_search + 8 web_fetch tool round-trips for a broad query
+    // (e.g. no city filter, or "all pubs in a city") can genuinely take
+    // several minutes — the run-search job itself is designed for that
+    // (expireInSeconds: 3600 in boss-client.ts, with per-candidate
+    // checkpointing), but this call's own timeout was originally set well
+    // below that. Confirmed by an actual live run: a real search
+    // consistently hit the old 120s ceiling before Claude finished working
+    // through its tool calls.
+    return callProvider({ providerName: "anthropic-discovery", timeoutMs: 300_000 }, async (signal) => {
       const locationScope = params.cities.length > 0 ? params.cities.join(", ") : `all of ${params.region} (no city filter given)`;
 
       const response = await client().messages.create(
         {
           model,
-          max_tokens: 8000,
+          // Was 8000 — too tight for a broad, no-city-filter query returning
+          // several candidates each with an evidence list and a sources
+          // list; confirmed live by a truncated (stop_reason "max_tokens")
+          // response that failed JSON.parse. 16000 stays under the ~16K
+          // ceiling non-streaming requests are safe at (see http.ts/SDK
+          // docs) while giving real headroom.
+          max_tokens: 16000,
           tools: [
             { type: "web_search_20260209", name: "web_search", max_uses: 8 },
             { type: "web_fetch_20260209", name: "web_fetch", max_uses: 8 },
@@ -250,6 +278,7 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
       );
 
       await recordUsage({ operation: "discover", model, usage: response.usage, searchId: params.searchId, userId: params.userId });
+      assertNotTruncated(response.stop_reason, "anthropic-discovery");
 
       const jsonBlock = response.content.find((block) => block.type === "text");
       if (!jsonBlock || !("text" in jsonBlock)) return [];
@@ -262,7 +291,13 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
 export class AnthropicEvidenceVerificationProvider implements EvidenceVerificationProvider {
   async verify(candidate: ResearchCandidate, params: DiscoverParams): Promise<ResearchCandidate> {
     const model = await resolveModel();
-    return callProvider({ providerName: "anthropic-verification", timeoutMs: 60_000 }, async (signal) => {
+    // Was scaled down from discover()'s 300s to 120s under the assumption
+    // that a smaller tool budget (3+3 vs 8+8) means proportionally less
+    // latency — confirmed wrong live: this call hit the 120s ceiling
+    // repeatedly even after discover() was consistently succeeding at 300s,
+    // so per-call fixed overhead (not tool count) dominates here. Matching
+    // discover()'s budget instead of guessing at a smaller number.
+    return callProvider({ providerName: "anthropic-verification", timeoutMs: 300_000 }, async (signal) => {
       const response = await client().messages.create(
         {
           model,
@@ -288,6 +323,7 @@ export class AnthropicEvidenceVerificationProvider implements EvidenceVerificati
         { signal },
       );
       await recordUsage({ operation: "verify", model, usage: response.usage, searchId: params.searchId, userId: params.userId });
+      assertNotTruncated(response.stop_reason, "anthropic-verification");
       const jsonBlock = response.content.find((block) => block.type === "text");
       if (!jsonBlock || !("text" in jsonBlock)) return candidate;
       return { ...candidate, ...(JSON.parse(jsonBlock.text) as Partial<ResearchCandidate>) };
@@ -326,6 +362,7 @@ export class AnthropicScoringProvider implements ScoringProvider {
         { signal },
       );
       await recordUsage({ operation: "score", model, usage: response.usage, searchId: params.searchId, userId: params.userId });
+      assertNotTruncated(response.stop_reason, "anthropic-scoring");
       const jsonBlock = response.content.find((block) => block.type === "text");
       if (!jsonBlock || !("text" in jsonBlock)) return { score: 0, explanation: "Scoring provider returned no output." };
       return JSON.parse(jsonBlock.text) as { score: number; explanation: string };

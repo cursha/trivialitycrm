@@ -16,14 +16,26 @@ export const QUEUE_DATA_QUALITY_SCAN = "data-quality-scan";
  * generous (a large multi-candidate search can legitimately run for many
  * minutes) — safe to be generous because run-search.ts checkpoints its
  * progress per candidate, so a job pg-boss expires and retries resumes
- * exactly where it left off rather than starting over. policy: "singleton"
- * + a per-send singletonKey (the LeadSearch id) means at most one ACTIVE
- * job can exist per search at a time — defense in depth against a
- * double-submit, on top of the app-level guard in the start-search action.
+ * exactly where it left off *once discovery has already succeeded and
+ * candidates exist*. policy: "singleton" + a per-send singletonKey (the
+ * LeadSearch id) means at most one ACTIVE job can exist per search at a
+ * time — defense in depth against a double-submit, on top of the app-level
+ * guard in the start-search action.
+ *
+ * retryLimit was 3 — confirmed live to be a real cost problem, not just a
+ * theoretical one: every discover() failure this module saw happened before
+ * any candidate was ever persisted, meaning "resume where it left off"
+ * didn't apply — each retry reran the full paid discovery call (up to 16
+ * real web_search/web_fetch tool calls) from scratch. A retry only pays off
+ * when the failure was transient (network blip) or happened after discovery
+ * already succeeded (a genuinely resumable per-candidate failure); it makes
+ * a slow/failing discovery call up to 4x as expensive for the same outcome.
+ * 1 retry caps the worst case at 2x instead of 4x while still covering a
+ * genuine one-off blip.
  */
 const RUN_SEARCH_QUEUE_OPTIONS = {
   policy: "singleton" as const,
-  retryLimit: 3,
+  retryLimit: 1,
   retryBackoff: true,
   retryDelayMax: 300,
   expireInSeconds: 3600,

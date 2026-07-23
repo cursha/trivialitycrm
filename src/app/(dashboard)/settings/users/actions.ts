@@ -11,6 +11,8 @@ import { LookupNameSchema } from "@/lib/validation/lookup";
 import { formString } from "@/lib/form-data";
 import { writeAuditEvent } from "@/lib/audit/log";
 import { assertNotLastActiveAdministrator, LastAdministratorError, getOwnershipSummary, transferOwnership, OwnershipTransferError } from "@/lib/administration/user-safety";
+import { getPendingPasswordResetRequests, generatePasswordResetLink, dismissPasswordResetRequest } from "@/lib/auth/password-reset";
+import { getEnv } from "@/lib/env";
 
 export type ActionResult = { error?: string } | undefined;
 
@@ -199,6 +201,39 @@ export async function transferUserOwnership(fromUserId: string, toUserId: string
   revalidatePath(PATH);
   revalidatePath("/companies");
   revalidatePath("/pipeline");
+}
+
+export async function fetchPendingPasswordResetRequests() {
+  await requireUserManager();
+  return getPendingPasswordResetRequests();
+}
+
+export type GenerateLinkResult = { ok: true; link: string; expiresAt: string } | { ok: false; error: string };
+
+/**
+ * Reveals the raw one-time link exactly once, in this action's return value
+ * — see PasswordResetToken's schema doc comment for why only its hash is
+ * ever persisted after this. The admin is expected to copy it and relay it
+ * to the requester out of band (this app has no transactional email sender
+ * for internal users).
+ */
+export async function generatePasswordResetLinkAction(requestId: string): Promise<GenerateLinkResult> {
+  const actor = await requireUserManager();
+
+  const result = await generatePasswordResetLink(requestId, actor.id);
+  if (!result.ok) return result;
+
+  const baseUrl = getEnv().APP_URL ?? "http://localhost:3000";
+  const link = `${baseUrl}/reset-password?token=${result.token}`;
+
+  revalidatePath(PATH);
+  return { ok: true, link, expiresAt: result.expiresAt.toISOString() };
+}
+
+export async function dismissPasswordResetRequestAction(requestId: string): Promise<void> {
+  const actor = await requireUserManager();
+  await dismissPasswordResetRequest(requestId, actor.id);
+  revalidatePath(PATH);
 }
 
 export async function createTeam(_prevState: ActionResult, formData: FormData): Promise<ActionResult> {

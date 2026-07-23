@@ -245,6 +245,12 @@ model User {
   organizationSettingsEdits OrganizationSettings[] @relation("OrganizationSettingsEditor")
   aiSettingsEdits           AiSettings[]           @relation("AiSettingsEditor")
 
+  // Forgot-password: self-service reset requests and admin-generated links.
+  passwordResetRequests         PasswordResetRequest[] @relation("PasswordResetRequestsForUser")
+  passwordResetRequestsResolved PasswordResetRequest[] @relation("PasswordResetRequestsResolvedBy")
+  passwordResetTokens           PasswordResetToken[]   @relation("PasswordResetTokensForUser")
+  passwordResetTokensCreated    PasswordResetToken[]   @relation("PasswordResetTokensCreatedBy")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -1944,4 +1950,56 @@ model AiSettings {
 model WorkerHeartbeat {
   id        Int      @id @default(1)
   updatedAt DateTime @updatedAt
+}
+
+enum PasswordResetRequestResolution {
+  LINK_GENERATED
+  DISMISSED
+}
+
+/**
+ * Self-service "forgot password" queue entry — created anonymously from
+ * /forgot-password by email lookup only (never reveals whether the email
+ * matched, and never itself carries a secret). This app has no
+ * transactional email sender for internal users (src/lib/comms/send-email.ts
+ * is CRM-outreach only — requires a Contact/Company and a salesperson's own
+ * connected mailbox, wrong tool for this), so delivery is admin-mediated:
+ * an administrator with manage_users sees pending requests on /settings/users
+ * and either generates a one-time reset link to relay out of band, or
+ * dismisses the request.
+ */
+model PasswordResetRequest {
+  id           String                          @id @default(cuid())
+  userId       String
+  user         User                            @relation("PasswordResetRequestsForUser", fields: [userId], references: [id], onDelete: Cascade)
+  requestedAt  DateTime                        @default(now())
+  resolvedAt   DateTime?
+  resolvedById String?
+  resolvedBy   User?                           @relation("PasswordResetRequestsResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolution   PasswordResetRequestResolution?
+
+  @@index([userId])
+  @@index([requestedAt])
+}
+
+/**
+ * A single-use, short-lived reset token. Only its SHA-256 hash is ever
+ * persisted (same pattern as Session.tokenHash) — the raw value is returned
+ * exactly once, to the administrator who generates it via
+ * generatePasswordResetLink(), for them to relay to the user out of band. It
+ * is never written to AuditEvent or any log.
+ */
+model PasswordResetToken {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation("PasswordResetTokensForUser", fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdById String?
+  createdBy   User?     @relation("PasswordResetTokensCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }

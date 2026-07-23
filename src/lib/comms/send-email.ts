@@ -44,18 +44,19 @@ type PreparedSend = {
 };
 
 /**
- * The consent gate + placeholder resolution every send path shares (the
+ * The opt-out gate + placeholder resolution every send path shares (the
  * composer's immediate send, a scheduled send, and a sequence-step send).
  * Re-run in full at the moment a send actually happens — never trusted
- * from an earlier check — because state (consent, connection status) can
- * change between when a send is scheduled/enrolled and when it's due.
+ * from an earlier check — because state (doNotContact, connection status)
+ * can change between when a send is scheduled/enrolled and when it's due.
  *
- * Two consent checks apply: `Company.doNotContact` (Phase A) and
- * `Contact.emailPermitted`/`doNotContact` (Phase B's CASL-safe
- * default-deny). The "To" address is never taken from caller input — it's
- * always the contact's own recorded email, resolved server-side, so a send
- * can never be pointed at some other address than the one consent was
- * actually recorded for.
+ * `Company.doNotContact`/`Contact.doNotContact` are enforced — an explicit
+ * opt-out is always respected — but there is deliberately no upfront
+ * express-consent gate (`Contact.emailPermitted` is tracked but not
+ * enforced here): outreach targets new leads who have not granted prior
+ * permission by definition. The "To" address is never taken from caller
+ * input — it's always the contact's own recorded email, resolved
+ * server-side.
  */
 async function prepareSend(params: {
   userId: string;
@@ -89,12 +90,10 @@ async function prepareSend(params: {
   if (contact.doNotContact) {
     return { ok: false, error: "This contact has opted out of email." };
   }
-  if (!contact.emailPermitted) {
-    return {
-      ok: false,
-      error: "This contact has not granted email permission — record consent from Settings → Communication Compliance before sending.",
-    };
-  }
+  // No CASL/express-consent gate here by design — outreach targets new
+  // leads who haven't (and won't have) granted prior permission. doNotContact
+  // above still blocks anyone who has explicitly opted out, and every send
+  // still requires an unsubscribe link (below).
   if (!hasUnsubscribePlaceholder(params.body)) {
     return { ok: false, error: "This email must include an unsubscribe link — use a template or add {{unsubscribeLink}} to the body." };
   }

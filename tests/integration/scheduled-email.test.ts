@@ -87,7 +87,7 @@ describe("scheduleEmail / processDueScheduledEmail", () => {
     expect(message.scheduledFor?.getTime()).toBe(scheduledFor.getTime());
   });
 
-  it("rejects scheduling when the contact lacks consent, before anything is stored", async () => {
+  it("allows scheduling to a contact who has not granted email permission — there is no consent gate for cold outreach to new leads", async () => {
     const { user, company } = await baseFixtures();
     await connectMailbox(user.id);
     const contact = await permittedContactFixture(company.id, { emailPermitted: false });
@@ -100,8 +100,7 @@ describe("scheduleEmail / processDueScheduledEmail", () => {
       body: UNSUBSCRIBE_BODY,
       scheduledFor: new Date(Date.now() + 60 * 60 * 1000),
     });
-    expect(result.ok).toBe(false);
-    expect(await testPrisma.emailMessage.count()).toBe(0);
+    expect(result.ok).toBe(true);
   });
 
   it("sends a due scheduled email, resolving placeholders fresh at send time", async () => {

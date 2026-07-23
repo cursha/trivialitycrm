@@ -73,7 +73,7 @@ export default async function CommunicationCompliancePage({
     <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader
         title="Communication Compliance"
-        description="View and record each contact's email consent — this is a compliance-support tool, not legal advice. A contact cannot receive email from the CRM until consent is recorded here."
+        description="View and record each contact's email consent history. This tracks consent state but does not block sending — outreach to new leads is not gated on it. Marking a contact Do Not Contact still blocks every send. This is a compliance-support tool, not legal advice."
       />
 
       <Card>

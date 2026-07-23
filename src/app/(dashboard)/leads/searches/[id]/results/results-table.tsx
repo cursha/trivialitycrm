@@ -3,8 +3,8 @@
 import { Fragment, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { rejectResult, restoreResult } from "./actions";
+import { ChevronDown, ChevronRight, Sparkles } from "lucide-react";
+import { rejectResult, restoreResult, researchResult } from "./actions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Pagination } from "@/components/ui/pagination";
@@ -38,6 +38,7 @@ export function ResultsTable({
   canViewEvidence,
   canTransfer,
   canExport,
+  canResearch,
   view,
   sort,
   page,
@@ -51,6 +52,7 @@ export function ResultsTable({
   canViewEvidence: boolean;
   canTransfer: boolean;
   canExport: boolean;
+  canResearch: boolean;
   view: string;
   sort: string;
   page: number;
@@ -62,7 +64,17 @@ export function ResultsTable({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [expanded, setExpanded] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [researchErrors, setResearchErrors] = useState<Record<string, string>>({});
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  function setResearchError(id: string, message: string | null) {
+    setResearchErrors((prev) => {
+      const next = { ...prev };
+      if (message) next[id] = message;
+      else delete next[id];
+      return next;
+    });
+  }
 
   const selectableIds = results.filter((r) => r.disposition === "NEW" || r.disposition === "REVIEWED").map((r) => r.id);
   const allSelected = selectableIds.length > 0 && selectableIds.every((id) => selected.has(id));
@@ -186,6 +198,9 @@ export function ResultsTable({
                   </td>
                   <td className="px-4 py-3">
                     <Badge tone={TRIVIA_STATUS_TONE[result.triviaStatus]}>{humanizeEnum(result.triviaStatus)}</Badge>
+                    {result.triviaStatus === "UNCERTAIN" && result.evidence.length === 0 && (
+                      <p className="mt-0.5 text-xs text-text-muted">Not yet researched</p>
+                    )}
                   </td>
                   <td className="px-4 py-3 font-bold text-text">{result.score}</td>
                   <td className="px-4 py-3">
@@ -193,6 +208,24 @@ export function ResultsTable({
                     {result.rejectionReasonName && <span className="ml-1 text-text-muted">— {result.rejectionReasonName}</span>}
                   </td>
                   <td className="px-4 py-3 text-right">
+                    {canResearch && (
+                      <button
+                        type="button"
+                        disabled={isPending}
+                        title="Runs an AI web-research pass on just this business — trivia status, evidence, and a fresh score."
+                        onClick={() =>
+                          startTransition(async () => {
+                            setResearchError(result.id, null);
+                            const outcome = await researchResult(result.id);
+                            if (outcome?.error) setResearchError(result.id, outcome.error);
+                          })
+                        }
+                        className="mr-1 inline-flex items-center gap-1 rounded bg-black/5 px-2 py-1 text-xs font-semibold text-text hover:bg-secondary/10 hover:text-secondary"
+                      >
+                        <Sparkles size={12} />
+                        Research this business
+                      </button>
+                    )}
                     {result.disposition === "REJECTED" && canRestore && (
                       <button
                         type="button"
@@ -230,6 +263,13 @@ export function ResultsTable({
                     )}
                   </td>
                 </tr>
+                {researchErrors[result.id] && (
+                  <tr className="border-t-0">
+                    <td colSpan={7} className="bg-danger/5 px-4 py-2 text-right text-xs font-semibold text-danger">
+                      {researchErrors[result.id]}
+                    </td>
+                  </tr>
+                )}
                 {expanded === result.id && canViewEvidence && (
                   <tr className="border-t border-border bg-black/[0.02]">
                     <td colSpan={7} className="px-4 py-4">

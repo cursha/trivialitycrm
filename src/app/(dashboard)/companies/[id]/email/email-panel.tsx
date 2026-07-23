@@ -135,8 +135,8 @@ export function EmailPanel({
 
       {canSend && contacts.length === 0 && (
         <p className="mt-2 text-sm text-text-muted">
-          Add a contact with an email address to this company before you can send email — every send must be tied to a tracked contact so
-          consent can be checked.
+          Add a contact with an email address to this company before you can send email — every send must be tied to a tracked contact, not
+          a free-text address.
         </p>
       )}
 

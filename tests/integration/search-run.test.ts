@@ -55,11 +55,16 @@ describe("runSearchJob", () => {
 
   it("auto-rejects a candidate matching a previously rejected result", async () => {
     const { user, leadType } = await baseFixtures();
-    const priorSearch = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id });
-    // Mock discovery names candidates deterministically from lead type + city — match that shape.
+    const priorSearch = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, mode: "TRIVIA_GAP" });
+    // TRIVIA_GAP, not GENERAL — GENERAL now routes to the mock *places*
+    // provider by default (see factory.ts), whose naming differs from the
+    // AI mock discovery provider's "Mock {leadType} {city}{index}" shape
+    // this fixture name is matching. This test is about the rejection-
+    // matching integration in run-search.ts, not discovery-provider
+    // selection, so pinning to a non-GENERAL mode preserves its intent.
     await createSearchResultFixture({ searchId: priorSearch.id, name: "Mock Pub Milton0", city: "Milton", disposition: "REJECTED" });
 
-    const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, cities: ["Milton"] });
+    const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, cities: ["Milton"], mode: "TRIVIA_GAP" });
     await runSearchJob(search.id);
 
     const [result] = await testPrisma.searchResult.findMany({ where: { searchId: search.id } });

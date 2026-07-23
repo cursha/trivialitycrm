@@ -53,6 +53,36 @@ export class MockCandidateDiscoveryProvider implements CandidateDiscoveryProvide
   }
 }
 
+/** Mock stand-in for GooglePlacesDiscoveryProvider — deterministic fake
+ * directory listings, used whenever PLACES_PROVIDER is "mock" (the default;
+ * see factory.ts). Every AI-only field is left honestly empty/UNCERTAIN,
+ * same as the real provider — a directory has no way to know them. */
+export class MockPlacesProvider implements CandidateDiscoveryProvider {
+  async discover(params: DiscoverParams): Promise<ResearchCandidate[]> {
+    const cities = params.cities.length > 0 ? params.cities : [params.region];
+
+    return cities.map((city, index) => {
+      const name = `Mock Directory ${params.leadTypeName} ${slugCity(city, index)}`;
+      return {
+        name,
+        address1: `${200 + index} Directory Ave`,
+        city,
+        region: params.region,
+        postalCode: null,
+        country: params.country,
+        phone: "555-0100",
+        email: null,
+        websiteUrl: `https://example.test/${name.toLowerCase().replace(/\s+/g, "-")}`,
+        contactData: null,
+        triviaStatus: "UNCERTAIN",
+        competitorName: null,
+        evidence: [],
+        sources: [],
+      };
+    });
+  }
+}
+
 export class MockEvidenceVerificationProvider implements EvidenceVerificationProvider {
   async verify(candidate: ResearchCandidate, params: DiscoverParams): Promise<ResearchCandidate> {
     return {

@@ -79,6 +79,7 @@ export default async function SearchResultsPage({
         canViewEvidence={hasPermission(user, "view_evidence")}
         canTransfer={hasPermission(user, "transfer_leads")}
         canExport={hasPermission(user, "export_leads")}
+        canResearch={hasPermission(user, "run_research")}
         view={view}
         sort={sort}
         page={page}

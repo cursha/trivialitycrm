@@ -53,6 +53,12 @@ export function SearchForm({ prompts, leadTypes, competitors }: SearchFormOption
             </option>
           ))}
         </Select>
+        {mode === "GENERAL" && (
+          <p className="mt-1 text-xs text-text-muted">
+            When fast directory search is configured, General mode looks up businesses by Lead Type and city — the prompt text isn&apos;t
+            used for discovery. Trivia status isn&apos;t determined until you request it per business from the results page.
+          </p>
+        )}
       </div>
 
       {mode === "COMPETITOR" && (
