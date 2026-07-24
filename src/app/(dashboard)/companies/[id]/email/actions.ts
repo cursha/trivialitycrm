@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
+import { companyScope } from "@/lib/companies/scope";
 import { prisma } from "@/lib/prisma";
 import { formString } from "@/lib/form-data";
 import { sendEmail, scheduleEmail, cancelScheduledEmail } from "@/lib/comms/send-email";
+import type { AuthenticatedUser } from "@/lib/auth/current-user";
 
 export type ActionResult = { error?: string } | undefined;
 
@@ -16,8 +18,33 @@ function parseAddressList(raw: string): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Module Ten: every sibling company sub-resource action file (contacts,
+ * tasks, activities) re-fetches the company through companyScope() before
+ * mutating — this file was the one exception, checking only the role-level
+ * send_email/schedule_email permission and never that companyId is a
+ * company the caller is actually scoped to see. A Salesperson holding
+ * send_email (scoped to view_assigned_leads) could send/schedule outbound
+ * email against any company by ID, outside their assignment/team. Unlike
+ * the shared requireCompanyAccess() helper used elsewhere, this doesn't
+ * bake in a fixed permission key — send/schedule already check the correct
+ * send_email/schedule_email permission themselves, at different points
+ * below, so this only verifies scope.
+ */
+async function requireCompanyInScope(companyId: string, user: AuthenticatedUser): Promise<void> {
+  const scope = companyScope(user);
+  if (!scope) {
+    throw new Error("Forbidden: no access to this company");
+  }
+  const company = await prisma.company.findFirst({ where: { id: companyId, ...scope }, select: { id: true } });
+  if (!company) {
+    throw new Error("Forbidden: no access to this company");
+  }
+}
+
 export async function sendComposedEmail(companyId: string, _prevState: ActionResult, formData: FormData): Promise<ActionResult> {
   const user = await requireUser();
+  await requireCompanyInScope(companyId, user);
 
   const contactId = formString(formData, "contactId").trim();
   if (!contactId) {
@@ -58,6 +85,7 @@ export async function sendComposedEmail(companyId: string, _prevState: ActionRes
 export async function cancelComposedScheduledEmail(companyId: string, emailMessageId: string): Promise<ActionResult> {
   const user = await requireUser();
   requirePermission(user, "schedule_email");
+  await requireCompanyInScope(companyId, user);
 
   const message = await prisma.emailMessage.findUnique({ where: { id: emailMessageId }, select: { createdById: true, companyId: true } });
   if (!message || message.companyId !== companyId) {

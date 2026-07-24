@@ -11,6 +11,8 @@ import { findPotentialDuplicates, computeNormalizedFields, type DuplicateMatch }
 import { computeAddressNormalizedFields } from "@/lib/data-quality/normalize";
 import { logAssignmentChange, logPipelineChange, logInitialPipelineStage } from "@/lib/companies/activity-log";
 import { formString } from "@/lib/form-data";
+import { writeAuditEvent } from "@/lib/audit/log";
+import { checkRateLimit } from "@/lib/rate-limit/postgres-bucket";
 
 export type CompanyFormState = { error?: string; duplicates?: DuplicateMatch[] } | undefined;
 export type SimpleActionResult = { error?: string } | undefined;
@@ -40,6 +42,13 @@ function parseCompanyForm(formData: FormData) {
 export async function createCompany(_prevState: CompanyFormState, formData: FormData): Promise<CompanyFormState> {
   const user = await requireUser();
   requirePermission(user, "add_leads");
+
+  // Module Ten: createCompany/updateCompany had no rate limit at all —
+  // the most expensive/write-heavy authenticated mutation in the app with
+  // zero throttling. 30/min matches the transactional-email send limit,
+  // the closest comparable write-heavy action already rate-limited.
+  const rateLimit = await checkRateLimit(`company-write:${user.id}`, { windowMs: 60_000, limit: 30 });
+  if (!rateLimit.allowed) return { error: "Too many changes — wait a moment and try again." };
 
   const parsed = parseCompanyForm(formData);
   if (!parsed.success) {
@@ -99,6 +108,9 @@ export async function updateCompany(
 ): Promise<CompanyFormState> {
   const user = await requireUser();
   requirePermission(user, "edit_leads");
+
+  const rateLimit = await checkRateLimit(`company-write:${user.id}`, { windowMs: 60_000, limit: 30 });
+  if (!rateLimit.allowed) return { error: "Too many changes — wait a moment and try again." };
 
   const scope = companyScope(user);
   if (!scope) {
@@ -300,9 +312,30 @@ export async function restoreCompany(id: string): Promise<SimpleActionResult> {
   const user = await requireUser();
   requirePermission(user, "restore_archived_leads");
 
+  // Module Ten: this was the one mutating company action with neither a
+  // companyScope check (every sibling — archiveCompany, changeCompanyStage,
+  // assignCompany — re-fetches through scope first) nor an audit trail.
+  // Anyone holding restore_archived_leads could restore any archived
+  // company system-wide, regardless of team/assignment scope, with no
+  // record of who did it.
+  const scope = companyScope(user);
+  if (!scope) return { error: "You do not have access to this company." };
+
+  const existing = await prisma.company.findFirst({ where: { id, ...scope } });
+  if (!existing) return { error: "You do not have access to this company." };
+
   await prisma.company.update({
     where: { id },
     data: { status: "ACTIVE", archivedAt: null, archivedById: null },
+  });
+
+  await writeAuditEvent({
+    actorId: user.id,
+    module: "companies",
+    action: "company.restored",
+    entityType: "Company",
+    entityId: id,
+    metadata: { companyName: existing.name },
   });
 
   revalidatePath("/companies");

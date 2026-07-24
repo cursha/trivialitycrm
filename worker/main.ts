@@ -27,6 +27,7 @@ import { runInboundSubscriptionTick } from "./handlers/inbound-subscription-tick
 import { handleProcessInboundNotificationJob } from "./handlers/process-inbound-notification";
 import { handleDataQualityScanJob } from "./handlers/data-quality-scan";
 import { runWorkerHeartbeatTick } from "./handlers/worker-heartbeat-tick";
+import { runWorkerHeartbeatAlertTick } from "./handlers/worker-heartbeat-alert-tick";
 import { shutdownBoss } from "./shutdown";
 
 const execAsync = promisify(exec);
@@ -42,6 +43,11 @@ const QUEUE_INBOUND_SUBSCRIPTION_TICK = "inbound-subscription-tick";
 // is cheap (a single-row upsert) and frequent enough that "stale" reliably
 // means "not running," not just "hasn't ticked yet."
 const QUEUE_WORKER_HEARTBEAT_TICK = "worker-heartbeat-tick";
+// Module Ten: emails admins when the heartbeat above goes stale. A separate,
+// slower-cadence tick rather than piggybacking on the heartbeat tick itself
+// — this one does real I/O (a query plus, when stale, an email send), which
+// the heartbeat tick deliberately keeps to a single trivial upsert.
+const QUEUE_WORKER_HEARTBEAT_ALERT_TICK = "worker-heartbeat-alert-tick";
 const MIGRATION_GATE_POLL_MS = 5_000;
 const MIGRATION_GATE_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -139,6 +145,9 @@ async function main(): Promise<void> {
   await boss.createQueue(QUEUE_WORKER_HEARTBEAT_TICK, { retryLimit: 1 });
   await boss.schedule(QUEUE_WORKER_HEARTBEAT_TICK, "*/2 * * * *");
 
+  await boss.createQueue(QUEUE_WORKER_HEARTBEAT_ALERT_TICK, { retryLimit: 1 });
+  await boss.schedule(QUEUE_WORKER_HEARTBEAT_ALERT_TICK, "*/5 * * * *");
+
   await boss.work(QUEUE_RUN_SEARCH, { localConcurrency: 1 }, handleRunSearchJob);
   await boss.work(QUEUE_GENERATE_REPORT, { localConcurrency: 1 }, handleGenerateReportJob);
   await boss.work(QUEUE_SEND_SCHEDULED_EMAIL, { localConcurrency: 1 }, handleSendScheduledEmailJob);
@@ -171,6 +180,9 @@ async function main(): Promise<void> {
   });
   await boss.work(QUEUE_WORKER_HEARTBEAT_TICK, async () => {
     await runWorkerHeartbeatTick();
+  });
+  await boss.work(QUEUE_WORKER_HEARTBEAT_ALERT_TICK, async () => {
+    await runWorkerHeartbeatAlertTick();
   });
 
   boss.on("error", (error) => logger.error({ err: error }, "pg-boss error"));

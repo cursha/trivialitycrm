@@ -4,20 +4,20 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Phone, Mail, Users, FileText, Presentation, FlaskConical, StickyNote, CalendarClock } from "lucide-react";
 import { changeCompanyStage } from "../actions";
+import { useQuickActions } from "./quick-action-context";
 import { Card } from "@/components/ui/card";
 import { Label, Select } from "@/components/ui/field";
 
 export type StageOption = { id: string; name: string; active: boolean };
 
-const QUICK_LINKS = [
-  { href: "#activity-panel", label: "Add note", icon: StickyNote },
-  { href: "#activity-panel", label: "Log call", icon: Phone },
-  { href: "#activity-panel", label: "Log email", icon: Mail },
-  { href: "#activity-panel", label: "Log meeting", icon: Users },
-  { href: "#activity-panel", label: "Material sent", icon: FileText },
-  { href: "#activity-panel", label: "Log demo", icon: Presentation },
-  { href: "#activity-panel", label: "Log trial", icon: FlaskConical },
-  { href: "#tasks-panel", label: "Follow-up", icon: CalendarClock },
+const ACTIVITY_LINKS = [
+  { type: "NOTE", label: "Add note", icon: StickyNote },
+  { type: "PHONE", label: "Log call", icon: Phone },
+  { type: "EMAIL", label: "Log email", icon: Mail },
+  { type: "MEETING", label: "Log meeting", icon: Users },
+  { type: "MATERIAL_SENT", label: "Material sent", icon: FileText },
+  { type: "DEMO", label: "Log demo", icon: Presentation },
+  { type: "TRIAL", label: "Log trial", icon: FlaskConical },
 ];
 
 export function QuickActionsBar({
@@ -32,6 +32,7 @@ export function QuickActionsBar({
   canEdit: boolean;
 }) {
   const router = useRouter();
+  const { requestActivity, requestFollowUp } = useQuickActions();
   const [stageId, setStageId] = useState(currentStageId);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | undefined>();
@@ -54,18 +55,31 @@ export function QuickActionsBar({
   return (
     <Card>
       <h2 className="font-bold text-accent">Quick sales actions</h2>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {QUICK_LINKS.map((link) => (
-          <a
-            key={link.label}
-            href={link.href}
+      {canEdit ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {ACTIVITY_LINKS.map((link) => (
+            <button
+              key={link.label}
+              type="button"
+              onClick={() => requestActivity(link.type)}
+              className="flex items-center gap-1.5 rounded-lg border border-border-strong px-3 py-2 text-xs font-semibold text-text hover:bg-black/5"
+            >
+              <link.icon size={14} />
+              {link.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={requestFollowUp}
             className="flex items-center gap-1.5 rounded-lg border border-border-strong px-3 py-2 text-xs font-semibold text-text hover:bg-black/5"
           >
-            <link.icon size={14} />
-            {link.label}
-          </a>
-        ))}
-      </div>
+            <CalendarClock size={14} />
+            Follow-up
+          </button>
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-text-muted">You don&apos;t have permission to log activity for this company.</p>
+      )}
       {canEdit && (
         <div className="mt-3 max-w-xs">
           <Label className="text-xs">Change pipeline stage</Label>

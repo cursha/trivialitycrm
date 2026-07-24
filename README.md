@@ -132,6 +132,22 @@ Connects the two external services Version 1 actually needs — live AI lead res
 
 Deliberately out of scope: no bulk/marketing email, no generic webhook framework, no calendar/accounting/Zapier integrations, no email fan-out for the existing in-app notification centre (it already covers that need in-app).
 
+## Module Ten: Sales Experience, Production Readiness, Deployment, and Version 1 Acceptance
+
+The final polish/launch module — closes real pre-existing security/integrity gaps, adds the handful of genuinely-new sales-UX pieces the app was missing, and builds the production-operations documentation that didn't exist yet. See `MODULE_10_REPORT.md` for the full report and `VERSION_1_ACCEPTANCE.md` for the pre-deployment acceptance checklist.
+
+- **Security/integrity fixes**: company-scoped email send/schedule actions previously skipped the `companyScope` check every sibling action file already enforced (closed); `restoreCompany` gained the same scope check and audit-event logging its sibling archive/restore actions already had; `GeneratedReport` creation gained a real idempotency guard (a new unique constraint plus a redelivery-stable period key) so a pg-boss job redelivery can never duplicate a scheduled report or its notification; `createCompany`/`updateCompany`, import commit, and both export endpoints gained rate limiting.
+- **Global search** (header, all pages): debounced, permission/scope-aware search across companies, contacts, and competitors at once, grouped by type, keyboard-navigable.
+- **Quick Add** (header, all pages): a fast modal for a short Company/Contact/Note/Activity/Follow-up form, reusing the existing create actions and duplicate-warning UI rather than a new mutation path — with a full-form escape hatch for anything the short form doesn't cover.
+- **Fast quick-actions** (company detail page): the existing quick-actions bar now actually pre-fills and opens the right activity form instead of only anchor-scrolling to it, and completing an activity offers a one-click "schedule the next follow-up?" prompt.
+- **Next best action** (company detail page, `src/lib/workspace/next-best-action.ts`): a small, deterministic, table-driven list of plain-language suggestions (overdue follow-up, unresolved duplicate warning, no contact on file, a trial with nothing scheduled to review it, no recent activity) — display-only, never auto-contacts anyone or auto-changes the pipeline stage.
+- **Lead-score explanation** (AI search results): the existing evidence panel now also shows a confidence level derived from evidence verification status, an explicit "Mock data" badge for results that came from the mock research provider, the evidence's last-evaluated date, and a recommended next action — all derived from data already on the result, nothing invented.
+- **First-login onboarding checklist** (`/onboarding`, new `UserOnboardingStep` model): a short, permission-filtered, per-user checklist reachable anytime from the header — dismissible per item, never blocking, never required.
+- **Mobile responsive pass**: the companies list and AI search-results tables, previously scroll-only (or entirely non-responsive) at narrow widths, now switch to a stacked-card layout on mobile with the same information and actions.
+- **Form/navigation safety**: the company and AI-prompt-editor forms now warn before an actual browser navigation away with unsaved changes; the two new modal dialogs (Quick Add, Global Search) got a real focus trap so Tab/Shift+Tab can no longer escape into background content while they're open.
+- **Worker-heartbeat email alerting** (new): if the worker's heartbeat goes stale for more than a few minutes, every user who can manage background jobs gets an automatic email — de-duplicated per stale episode, reusing the existing transactional-email path. Documented, honest limitation: this can only fire while the worker process itself is still running (it's a pg-boss scheduled tick inside that same process), so it can't alert on a fully-crashed worker — only one that's alive but not ticking cleanly.
+- **Production documentation** (new): `RAILWAY.md`, `ENVIRONMENT_VARIABLES.md`, `MIGRATIONS_AND_SEEDING.md`, `BACKUP_RESTORE.md` (including an actually-performed local restore drill), `INCIDENT_RESPONSE.md`, `ADMIN_GUIDE.md`, `SALES_QUICKSTART.md`.
+
 ## Installation
 
 1. Install [Node.js 20+](https://nodejs.org/), [Docker](https://www.docker.com/) (for local Postgres), and Git.

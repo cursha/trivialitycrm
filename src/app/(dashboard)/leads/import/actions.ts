@@ -9,6 +9,7 @@ import { putUpload, getUpload, recordMapping, markImported } from "@/lib/import/
 import { mapAndValidateRow, type ImportMapping, type MappedRow } from "@/lib/validation/import";
 import { findPotentialDuplicates, computeNormalizedFields } from "@/lib/duplicates/match";
 import { logInitialPipelineStage } from "@/lib/companies/activity-log";
+import { checkRateLimit } from "@/lib/rate-limit/postgres-bucket";
 
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
@@ -75,6 +76,12 @@ export async function commitImport(
 ): Promise<CommitResult> {
   const user = await requireUser();
   requirePermission(user, "import_leads");
+
+  // Module Ten: a per-row-writing bulk operation (up to 5000 rows/upload)
+  // had no rate limit at all. A tight window is correct here — this is a
+  // rare, deliberate bulk action, not a frequent single-record write.
+  const rateLimit = await checkRateLimit(`import-commit:${user.id}`, { windowMs: 60 * 60_000, limit: 5 });
+  if (!rateLimit.allowed) return { error: "Too many imports recently — wait a while and try again." };
 
   const upload = await getUpload(sessionId, user.id);
   if (!upload) return { error: "This upload has expired — please upload the file again." };

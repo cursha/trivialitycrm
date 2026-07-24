@@ -41,6 +41,7 @@ const TABLES_TO_RESET = [
   "OrganizationSettings",
   "AiSettings",
   "WorkerHeartbeat",
+  "WorkerHeartbeatAlert",
   // Forgot-password: both reference User only, so must come before it.
   "PasswordResetToken",
   "PasswordResetRequest",

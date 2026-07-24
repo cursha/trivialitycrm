@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CirclePlus, Check, X } from "lucide-react";
 import { createTask, completeTask, cancelTask } from "./actions";
+import { useQuickActions } from "../quick-action-context";
 import { Card } from "@/components/ui/card";
 import { Input, Select, Textarea } from "@/components/ui/field";
 
@@ -31,11 +32,17 @@ export function TasksPanel({
   canManage: boolean;
 }) {
   const router = useRouter();
+  const { registerFollowUpHandler } = useQuickActions();
   const [adding, setAdding] = useState(false);
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [addNext, setAddNext] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!canManage) return;
+    return registerFollowUpHandler(() => setAdding(true));
+  }, [canManage, registerFollowUpHandler]);
 
   const openTasks = tasks.filter((t) => t.status === "OPEN");
   const closedTasks = tasks.filter((t) => t.status !== "OPEN");

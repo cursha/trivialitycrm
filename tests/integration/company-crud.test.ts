@@ -369,6 +369,66 @@ describe("company archive / restore / permanent delete", () => {
     expect(restored.archivedAt).toBeNull();
   });
 
+  it("restore writes an audit event", async () => {
+    const { admin, leadType, stageNew } = await baseFixtures();
+    await loginAs(admin.id);
+
+    const company = await testPrisma.company.create({
+      data: {
+        name: "Audited Restore",
+        normalizedName: "audited restore",
+        city: "Milton",
+        region: "ON",
+        country: "Canada",
+        leadTypeId: leadType.id,
+        pipelineStageId: stageNew.id,
+        assignedToId: admin.id,
+        createdById: admin.id,
+        status: "ARCHIVED",
+        archivedAt: new Date(),
+        archivedById: admin.id,
+      },
+    });
+
+    await restoreCompany(company.id);
+
+    const audit = await testPrisma.auditEvent.findFirst({ where: { action: "company.restored", entityId: company.id } });
+    expect(audit?.actorId).toBe(admin.id);
+  });
+
+  // Module Ten regression: restoreCompany previously had no companyScope
+  // check at all — anyone with restore_archived_leads could restore any
+  // archived company system-wide, regardless of team/assignment scope.
+  it("blocks restoring a company outside the caller's scope", async () => {
+    const { admin, leadType, stageNew } = await baseFixtures();
+    const scopedRole = await createRoleWithPermissions("ScopedRestorer", ["view_assigned_leads", "restore_archived_leads"]);
+    const outsider = await createTestUser({ name: "Outsider", roleId: scopedRole.id });
+
+    const company = await testPrisma.company.create({
+      data: {
+        name: "Not My Company",
+        normalizedName: "not my company",
+        city: "Milton",
+        region: "ON",
+        country: "Canada",
+        leadTypeId: leadType.id,
+        pipelineStageId: stageNew.id,
+        assignedToId: admin.id, // assigned to someone else — outside outsider's view_assigned_leads scope
+        createdById: admin.id,
+        status: "ARCHIVED",
+        archivedAt: new Date(),
+        archivedById: admin.id,
+      },
+    });
+
+    await loginAs(outsider.id);
+    const result = await restoreCompany(company.id);
+    expect(result?.error).toBeTruthy();
+
+    const stillArchived = await testPrisma.company.findUniqueOrThrow({ where: { id: company.id } });
+    expect(stillArchived.status).toBe("ARCHIVED");
+  });
+
   it("only an Administrator can permanently delete, and only once archived", async () => {
     const { admin, salesperson, leadType, stageNew } = await baseFixtures();
 
@@ -423,4 +483,26 @@ describe("company archive / restore / permanent delete", () => {
     await expect(permanentlyDeleteCompany(archivedCompany.id)).rejects.toBeInstanceOf(RedirectSignal);
     expect(await testPrisma.company.count({ where: { id: archivedCompany.id } })).toBe(0);
   });
+});
+
+// Module Ten regression: createCompany/updateCompany had no rate limit at
+// all — the most expensive/write-heavy authenticated mutation in the app
+// with zero throttling.
+describe("company write rate limiting", () => {
+  it("rate-limits repeated company creation", async () => {
+    const { admin, leadType, stageNew } = await baseFixtures();
+    await loginAs(admin.id);
+
+    const outcomes: (Awaited<ReturnType<typeof createCompany>> | { redirected: true })[] = [];
+    for (let i = 0; i < 31; i++) {
+      const fd = companyFormData({ name: `Rate Limit Co ${i}`, leadTypeId: leadType.id, pipelineStageId: stageNew.id, assignedToId: admin.id });
+      try {
+        outcomes.push(await createCompany(undefined, fd));
+      } catch (error) {
+        if (error instanceof RedirectSignal) outcomes.push({ redirected: true });
+        else throw error;
+      }
+    }
+    expect(outcomes.some((o) => o && "error" in o && o.error?.includes("Too many"))).toBe(true);
+  }, 30000);
 });

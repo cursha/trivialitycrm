@@ -8,6 +8,9 @@ import { getScopedCompany, listCompanyActivities, listCompanyTasks, listCompanyE
 import { resolveSurvivingCompanyId } from "@/lib/data-quality/merge-company";
 import { CompanyActions } from "./company-actions";
 import { QuickActionsBar } from "./quick-actions-bar";
+import { QuickActionProvider } from "./quick-action-context";
+import { NextBestActionPanel } from "./next-best-action-panel";
+import { computeNextBestActions } from "@/lib/workspace/next-best-action";
 import { ContactsPanel } from "./contacts/contacts-panel";
 import { ActivityPanel } from "./activities/activity-panel";
 import { TasksPanel } from "./tasks/tasks-panel";
@@ -60,6 +63,8 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     activeSequences,
     enrollments,
     appointments,
+    workspaceSettings,
+    pendingDuplicateCount,
   ] = await Promise.all([
       listCompanyActivities(user, id),
       listCompanyTasks(user, id),
@@ -96,10 +101,26 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         where: { companyId: id },
         orderBy: { startAt: "asc" },
       }),
+      prisma.workspaceSettings.findUnique({ where: { id: 1 } }),
+      prisma.potentialDuplicate.count({
+        where: { status: "PENDING", OR: [{ companyAId: id }, { companyBId: id }] },
+      }),
     ]);
   const canEdit = hasPermission(user, "edit_leads");
 
+  const nextBestActions = computeNextBestActions({
+    now: new Date(),
+    noActivityThresholdDays: workspaceSettings?.noActivityThresholdDays ?? 14,
+    contactCount: company.contacts.length,
+    pipelineOutcomeType: company.pipelineStage.outcomeType,
+    referenceActivityAt: activities[0]?.occurredAt ?? company.createdAt,
+    lastTrialActivityAt: activities.find((a) => a.type === "TRIAL")?.occurredAt ?? null,
+    openTasks: tasks.filter((t) => t.status === "OPEN").map((t) => ({ dueAt: t.dueAt })),
+    hasPendingDuplicate: pendingDuplicateCount > 0,
+  });
+
   return (
+    <QuickActionProvider>
     <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div>
@@ -139,6 +160,8 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         stages={pipelineStages.map((s) => ({ id: s.id, name: s.name, active: s.active }))}
         canEdit={canEdit}
       />
+
+      <NextBestActionPanel items={nextBestActions} canEdit={canEdit} />
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-6">
@@ -187,12 +210,14 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             canEdit={canEdit}
           />
 
-          <ContactsPanel
-            companyId={company.id}
-            contacts={company.contacts}
-            canEdit={canEdit}
-            canManageCompliance={hasPermission(user, "manage_communication_compliance")}
-          />
+          <div id="contacts-panel">
+            <ContactsPanel
+              companyId={company.id}
+              contacts={company.contacts}
+              canEdit={canEdit}
+              canManageCompliance={hasPermission(user, "manage_communication_compliance")}
+            />
+          </div>
 
           <div id="tasks-panel">
             <TasksPanel companyId={company.id} tasks={tasks} salespeople={salespeople} canManage={canEdit} />
@@ -292,5 +317,6 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         </div>
       </div>
     </div>
+    </QuickActionProvider>
   );
 }

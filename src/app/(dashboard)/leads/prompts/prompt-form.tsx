@@ -7,6 +7,7 @@ import { refinePrompt, type PromptFormState } from "./actions";
 import { Card } from "@/components/ui/card";
 import { Label, Input, Textarea, FieldError } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
+import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
 
 export function PromptForm({
   action,
@@ -24,6 +25,8 @@ export function PromptForm({
   const [description, setDescription] = useState("");
   const [assistError, setAssistError] = useState<string | undefined>();
   const [isAssisting, startAssist] = useTransition();
+  const [dirty, setDirty] = useState(false);
+  useUnsavedChangesWarning(dirty);
 
   function handleAssist() {
     if (!description.trim()) {
@@ -40,12 +43,13 @@ export function PromptForm({
         setAssistError(result.error);
       } else if (result?.prompt) {
         setPrompt(result.prompt);
+        setDirty(true);
       }
     });
   }
 
   return (
-    <form action={formAction}>
+    <form action={formAction} onChange={() => setDirty(true)}>
     <Card className="space-y-4">
       <div>
         <Label className="mb-1 block text-xs uppercase">Name</Label>

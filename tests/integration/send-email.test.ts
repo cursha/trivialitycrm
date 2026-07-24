@@ -27,7 +27,7 @@ afterEach(() => {
   resetEnvCacheForTests();
 });
 
-async function baseFixtures(permissions: string[] = ["send_email"]) {
+async function baseFixtures(permissions: string[] = ["send_email", "view_assigned_leads"]) {
   const role = await createRoleWithPermissions("Sender", permissions);
   const user = await createTestUser({ roleId: role.id });
   const leadType = await createLeadTypeFixture();
