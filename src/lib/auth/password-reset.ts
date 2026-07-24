@@ -4,6 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { hashPassword } from "./password";
 import { invalidateAllSessionsForUser } from "./session";
 import { writeAuditEvent } from "@/lib/audit/log";
+import { getEnv } from "@/lib/env";
+import { getIntegrationSettings } from "@/lib/integrations/settings";
+import { sendSystemEmail } from "@/lib/transactional/send-system-email";
 
 const TOKEN_EXPIRY_MS = 60 * 60 * 1000; // 1 hour — short, since delivery is a human relaying a link, not instant email.
 
@@ -71,9 +74,20 @@ export type GenerateResetLinkResult = { ok: true; token: string; expiresAt: Date
  * first — only one active token at a time. The raw token is returned exactly
  * once here, to the calling admin action — after this call returns, only its
  * hash exists anywhere.
+ *
+ * Module Nine: when live transactional email is enabled
+ * (IntegrationSettings.emailSendingEnabled), also emails the reset link
+ * directly to the user — closing the gap this app had no transactional
+ * sender for at all (see MODULE_9_REPORT.md). Best-effort: a send failure
+ * never fails this action or withholds the token, since the admin viewing
+ * this result can always relay it manually as a fallback, exactly as before
+ * this module existed.
  */
 export async function generatePasswordResetLink(requestId: string, adminId: string): Promise<GenerateResetLinkResult> {
-  const request = await prisma.passwordResetRequest.findUnique({ where: { id: requestId } });
+  const request = await prisma.passwordResetRequest.findUnique({
+    where: { id: requestId },
+    include: { user: { select: { email: true, name: true } } },
+  });
   if (!request || request.resolvedAt) {
     return { ok: false, error: "This request has already been handled." };
   }
@@ -81,7 +95,7 @@ export async function generatePasswordResetLink(requestId: string, adminId: stri
   const rawToken = crypto.randomBytes(32).toString("base64url");
   const expiresAt = new Date(Date.now() + TOKEN_EXPIRY_MS);
 
-  await prisma.$transaction([
+  const [, createdToken] = await prisma.$transaction([
     prisma.passwordResetToken.updateMany({ where: { userId: request.userId, usedAt: null }, data: { usedAt: new Date() } }),
     prisma.passwordResetToken.create({
       data: { userId: request.userId, tokenHash: hashToken(rawToken), expiresAt, createdById: adminId },
@@ -100,6 +114,27 @@ export async function generatePasswordResetLink(requestId: string, adminId: stri
     entityId: request.userId,
     metadata: { expiresAt: expiresAt.toISOString() },
   });
+
+  try {
+    const integrationSettings = await getIntegrationSettings();
+    if (integrationSettings.emailSendingEnabled) {
+      const resetLink = `${getEnv().APP_URL ?? "http://localhost:3000"}/reset-password?token=${rawToken}`;
+      await sendSystemEmail({
+        purpose: "PASSWORD_RESET",
+        toAddress: request.user.email,
+        subject: "Reset your Triviality CRM password",
+        bodyText:
+          `Hi ${request.user.name},\n\n` +
+          `An administrator generated a password reset link for your Triviality CRM account. This link expires in one hour and can only be used once:\n\n${resetLink}\n\n` +
+          "If you didn't expect this, contact your administrator.",
+        idempotencyKey: `password-reset:${createdToken.id}`,
+        createdById: null,
+      });
+    }
+  } catch {
+    // Best-effort — see doc comment above. The admin still has rawToken to
+    // relay manually regardless of whether the email send succeeds.
+  }
 
   return { ok: true, token: rawToken, expiresAt };
 }

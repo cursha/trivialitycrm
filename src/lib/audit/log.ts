@@ -3,7 +3,11 @@
 // AuditEvent doc comment for why). Every new Module 8A action calls this
 // instead of writing prisma.auditEvent.create inline, since call sites here
 // are more numerous and varied than Module Seven's.
-import "server-only";
+//
+// No `import "server-only"` — src/lib/research/run-search.ts (which runs in
+// the worker under plain tsx) needs this too, to audit a mid-run AI-budget
+// block (Module Nine). Same reasoning as src/lib/prisma.ts's identical
+// omission; confirmed no "use client" file imports this module.
 import crypto from "node:crypto";
 import { prisma } from "../prisma";
 import type { Prisma } from "../../generated/prisma/client";

@@ -79,6 +79,14 @@ export function zonedCalendarDate(instant: Date, timeZone: string = BUSINESS_TIM
   return { year, month, day };
 }
 
+/** The wall-clock hour (0-23, in `timeZone`) that `instant` falls on —
+ * Module Nine's quiet-hours check (src/lib/comms/send-email.ts) is the
+ * first caller; exposed here rather than duplicated since zonedParts()
+ * already computes it internally. */
+export function zonedHour(instant: Date = new Date(), timeZone: string = BUSINESS_TIMEZONE): number {
+  return zonedParts(instant, timeZone).hour;
+}
+
 export type DateRange = { start: Date; end: Date };
 
 /** [start, end) UTC instants for the calendar day (in `timeZone`) that

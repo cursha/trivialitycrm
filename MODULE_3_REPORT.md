@@ -128,6 +128,10 @@ No automated test makes a real Anthropic API call — `.env.test` still forces `
    | `IMPORT_BATCH_TTL_HOURS` | both | optional, defaults to 4 |
    | `SENTRY_DSN` | both | optional |
    | `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` | web | set only for the very first deploy (the Pre-Deploy Command's `migrate deploy` runs the seed step — confirm this against `prisma.config.ts`'s `migrations.seed` behavior before relying on it for a fresh database), then **unset both** so later redeploys don't attempt bootstrap-admin creation again. Choose the password yourself — this module generates nothing.
+   | `EMAIL_PROVIDER` | both | `"resend"` for live transactional email, `"mock"` to keep it disabled for now (Module Nine) |
+   | `RESEND_API_KEY` | both — see note | your Resend key. The actual send call only ever happens from `worker` (`sendSystemEmail`'s queued job), but `src/lib/env.ts` validates every `EMAIL_PROVIDER=resend`-dependent var together via one shared check that runs in both processes — `web` needs the value present too or its own env parsing throws on boot (it's only ever read there to answer "is this configured?" for the Integrations page, never sent anywhere) |
+   | `RESEND_FROM_ADDRESS` | both — same note as `RESEND_API_KEY` | the verified Resend sender address |
+   | `RESEND_WEBHOOK_SECRET` | both — same note; only actually **used** on `web` | verifies the delivery-events webhook's signature, received by the `web` service's `/api/transactional-email/webhooks/resend` route |
 
 6. **First deploy**: push to the branch Railway watches, or trigger a manual deploy on both services. Watch the `web` service's Pre-Deploy Command logs for `prisma migrate deploy` succeeding, then watch the `worker` service's logs for `"database schema is up to date."` / `"worker started, listening for jobs."`.
 7. **Verify**: hit `https://<web-domain>/api/health` — expect `{"status":"ok","database":"up"}`. Sign in with the seeded admin. Confirm the worker is reachable via Railway's private networking if you need to check its `/health` manually.

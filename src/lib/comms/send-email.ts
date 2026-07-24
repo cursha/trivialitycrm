@@ -12,6 +12,7 @@ import { resolveTemplatePlaceholders, hasUnsubscribePlaceholder } from "@/lib/co
 import { createUnsubscribeToken } from "@/lib/comms/unsubscribe-token";
 import { textToSafeHtml } from "@/lib/comms/sanitize-html";
 import { logEmailSent } from "@/lib/comms/activity-log";
+import { getQuietHoursWindow, isWithinQuietHours, quietHoursEndInstant } from "@/lib/comms/quiet-hours";
 
 export type SendEmailParams = {
   userId: string;
@@ -74,7 +75,7 @@ async function prepareSend(params: {
       select: { id: true, firstName: true, lastName: true, email: true, emailPermitted: true, doNotContact: true, status: true },
     }),
     prisma.user.findUniqueOrThrow({ where: { id: params.userId }, select: { name: true } }),
-    prisma.workspaceSettings.findUnique({ where: { id: 1 }, select: { mailingAddress: true } }),
+    prisma.workspaceSettings.findUnique({ where: { id: 1 }, select: { mailingAddress: true, quietHoursStartHour: true, quietHoursEndHour: true } }),
     prisma.providerConnection.findUnique({ where: { userId: params.userId } }),
   ]);
 
@@ -89,6 +90,19 @@ async function prepareSend(params: {
   }
   if (contact.doNotContact) {
     return { ok: false, error: "This contact has opted out of email." };
+  }
+  // Module Nine: business-wide quiet hours (CRM outreach only — see
+  // src/lib/comms/quiet-hours.ts's doc comment for why transactional/system
+  // email is exempt). An immediate send is refused outright here; a
+  // scheduled/sequence send never reaches this function at all during
+  // quiet hours — see processDueScheduledEmail/processDueSequenceStep,
+  // which defer instead, before ever calling prepareSend.
+  const quietHoursWindow =
+    workspaceSettings?.quietHoursStartHour != null && workspaceSettings?.quietHoursEndHour != null
+      ? { startHour: workspaceSettings.quietHoursStartHour, endHour: workspaceSettings.quietHoursEndHour }
+      : null;
+  if (isWithinQuietHours(quietHoursWindow)) {
+    return { ok: false, error: `Sending is currently outside business hours (quiet hours: ${quietHoursWindow!.startHour}:00–${quietHoursWindow!.endHour}:00). Schedule this send instead.` };
   }
   // No CASL/express-consent gate here by design — outreach targets new
   // leads who haven't (and won't have) granted prior permission. doNotContact
@@ -265,6 +279,17 @@ export async function processDueScheduledEmail(emailMessageId: string): Promise<
     // real expected path.
     await prisma.emailMessage.update({ where: { id: row.id }, data: { status: "FAILED", errorMessage: "Missing contact, creator, or company." } });
     return { ok: false, error: "Missing contact, creator, or company." };
+  }
+
+  // Module Nine: quiet hours defer rather than fail a scheduled send —
+  // pushes scheduledFor to the window's end and leaves status SCHEDULED, so
+  // the next send-scheduled-email-tick naturally re-offers it once quiet
+  // hours end. Checked before prepareSend so a deferral is never recorded
+  // as a delivery failure.
+  const quietHoursWindow = await getQuietHoursWindow();
+  if (isWithinQuietHours(quietHoursWindow)) {
+    await prisma.emailMessage.update({ where: { id: row.id }, data: { scheduledFor: quietHoursEndInstant(quietHoursWindow!) } });
+    return { ok: true, emailMessageId: row.id };
   }
 
   const result = await prepareSend({

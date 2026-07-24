@@ -101,6 +101,12 @@ const permissions: { key: string; label: string; category: string; description: 
   { key: "export_audit_log", label: "Export audit log", category: ADMINISTRATION_CATEGORY, description: "Export the audit log to a redacted CSV file." },
   { key: "view_system_health", label: "View system health", category: ADMINISTRATION_CATEGORY, description: "View web, database, worker, and queue health status." },
   { key: "manage_background_jobs", label: "Manage background jobs", category: ADMINISTRATION_CATEGORY, description: "Retry or cancel eligible background jobs." },
+  // Module Nine: Essential Version 1 Integrations
+  { key: "view_integrations", label: "View integrations", category: ADMINISTRATION_CATEGORY, description: "View the Integrations page — AI and email provider status, configuration, and usage." },
+  { key: "manage_ai_integration", label: "Manage AI integration", category: ADMINISTRATION_CATEGORY, description: "Enable or disable live AI research and run a safe AI provider connection test." },
+  { key: "manage_email_integration", label: "Manage email integration", category: ADMINISTRATION_CATEGORY, description: "Enable or disable live transactional email sending." },
+  { key: "send_test_email", label: "Send test email", category: ADMINISTRATION_CATEGORY, description: "Send one controlled transactional test email to an address you enter." },
+  { key: "view_provider_usage", label: "View provider usage", category: ADMINISTRATION_CATEGORY, description: "View AI and email provider usage totals and recent activity." },
 ];
 
 // Initial role -> permission grants. All grants are stored as editable
@@ -331,6 +337,19 @@ async function seedAiSettings() {
   console.log("Seeded default AI settings.");
 }
 
+// Module Nine: one default IntegrationSettings row — emailSendingEnabled
+// starts false regardless of whether RESEND_API_KEY happens to be set, same
+// "seeded default, admin-editable afterward" idiom as AiSettings/
+// OrganizationSettings.
+async function seedIntegrationSettings() {
+  await prisma.integrationSettings.upsert({
+    where: { id: 1 },
+    update: {},
+    create: { id: 1 },
+  });
+  console.log("Seeded default integration settings.");
+}
+
 async function seedBootstrapAdmin() {
   const email = process.env.SEED_ADMIN_EMAIL;
   const password = process.env.SEED_ADMIN_PASSWORD;
@@ -373,6 +392,7 @@ async function main() {
   await seedDataQualityRules();
   await seedOrganizationSettings();
   await seedAiSettings();
+  await seedIntegrationSettings();
 
   console.log(
     "Seed complete. No Lead Types, Competitors, or sample Companies were created — " +

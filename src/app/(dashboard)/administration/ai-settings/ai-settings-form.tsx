@@ -18,6 +18,7 @@ export type AiSettingsDefaults = {
   monthlyBudgetUsd: number | null;
   warningThresholdUsd: number | null;
   perUserDailySearchLimit: number | null;
+  maxCostPerSearchUsd: number | null;
 };
 
 export function AiSettingsForm({
@@ -86,6 +87,11 @@ export function AiSettingsForm({
             <Label>Per-user daily search limit (optional)</Label>
             <Input name="perUserDailySearchLimit" type="number" min={1} defaultValue={defaultValues.perUserDailySearchLimit ?? ""} className="mt-1" />
             <HelpText className="mt-1">Leave blank for unlimited.</HelpText>
+          </div>
+          <div>
+            <Label>Maximum cost per search (USD, optional)</Label>
+            <Input name="maxCostPerSearchUsd" type="number" min={0} step="0.01" defaultValue={defaultValues.maxCostPerSearchUsd ?? ""} className="mt-1" />
+            <HelpText className="mt-1">Rechecked between candidates while a search runs — stops the search immediately if crossed mid-run, not just at start. Leave blank for unlimited.</HelpText>
           </div>
           {state?.error && (
             <div className="sm:col-span-2">

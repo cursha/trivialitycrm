@@ -12,8 +12,10 @@ import {
   QUEUE_RUN_SEQUENCE_STEP,
   QUEUE_PROCESS_INBOUND_NOTIFICATION,
   QUEUE_DATA_QUALITY_SCAN,
+  QUEUE_SEND_SYSTEM_EMAIL,
 } from "../src/lib/jobs/boss-client";
 import { handleRunSearchJob } from "./handlers/run-search";
+import { handleSendSystemEmailJob } from "./handlers/send-system-email";
 import { sweepExpiredSessions, sweepExpiredImportBatches, sweepExpiredRateLimitBuckets } from "./handlers/cleanup";
 import { runReportsTick } from "./handlers/reports-tick";
 import { handleGenerateReportJob } from "./handlers/generate-report";
@@ -145,6 +147,7 @@ async function main(): Promise<void> {
   // Manual-trigger only (like run-search) — no recurring tick. A user with
   // run_duplicate_scan enqueues one via the /data-quality/scans action.
   await boss.work(QUEUE_DATA_QUALITY_SCAN, { localConcurrency: 1 }, handleDataQualityScanJob);
+  await boss.work(QUEUE_SEND_SYSTEM_EMAIL, { localConcurrency: 1 }, handleSendSystemEmailJob);
   await boss.work(QUEUE_CLEANUP_SESSIONS, async () => {
     await sweepExpiredSessions();
   });

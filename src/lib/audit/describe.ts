@@ -87,6 +87,26 @@ export function describeAuditEvent(event: AuditEventLike): string {
       return `${prefix}A background job was cancelled.`;
     case "audit_log.exported":
       return `${prefix}The audit log was exported.`;
+    case "ai_search.budget_blocked":
+      return `${prefix}A running AI search was stopped after crossing a budget limit mid-run.`;
+    case "ai_integration.enabled":
+      return `${prefix}Live AI research was enabled.`;
+    case "ai_integration.disabled":
+      return `${prefix}Live AI research was disabled.`;
+    case "ai_integration.test_connection_succeeded":
+      return `${prefix}An AI provider connection test succeeded.`;
+    case "ai_integration.test_connection_failed":
+      return `${prefix}An AI provider connection test failed.`;
+    case "email_integration.enabled":
+      return `${prefix}Live transactional email sending was enabled.`;
+    case "email_integration.disabled":
+      return `${prefix}Live transactional email sending was disabled.`;
+    case "email_integration.test_email_sent":
+      return `${prefix}An administrator sent a test email.`;
+    case "email_integration.test_email_failed":
+      return `${prefix}An administrator's test email attempt failed.`;
+    case "email_suppression.added":
+      return `${prefix}An email address was added to the suppression list.`;
     default:
       return `${prefix}${event.module}: ${event.action.replace(/_/g, " ")}.`;
   }

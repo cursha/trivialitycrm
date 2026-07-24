@@ -44,6 +44,14 @@ const TABLES_TO_RESET = [
   // Forgot-password: both reference User only, so must come before it.
   "PasswordResetToken",
   "PasswordResetRequest",
+  // Module Nine: Essential Version 1 Integrations. TransactionalEmailMessage/
+  // IntegrationSettings reference User; EmailSuppression/EmailDeliveryEvent
+  // have no FK at all (order among these four doesn't matter, only "before
+  // User").
+  "TransactionalEmailMessage",
+  "IntegrationSettings",
+  "EmailSuppression",
+  "EmailDeliveryEvent",
   "Contact",
   "CompanySource",
   "AiUsageRecord",

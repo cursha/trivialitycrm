@@ -67,6 +67,27 @@ const envSchema = z
     GOOGLE_CLIENT_SECRET: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
     SEED_ADMIN_EMAIL: z.preprocess(blankToUndefined, z.string().email("must be a valid email").optional()),
     SEED_ADMIN_PASSWORD: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
+    // Module Nine: the transactional/system-email provider (password reset,
+    // admin test-send) — deliberately separate from Module Six's
+    // MICROSOFT_CLIENT_ID/GOOGLE_CLIENT_ID (per-user OAuth mailbox sending
+    // for CRM outreach, unrelated and untouched by this setting). "mock" is
+    // the safe default; "resend" requires RESEND_API_KEY. Even when
+    // configured, actual sending stays off until an administrator flips
+    // IntegrationSettings.emailSendingEnabled — this env var only selects
+    // which provider *would* be used, matching PLACES_PROVIDER's own
+    // credential-selection-only role.
+    EMAIL_PROVIDER: z.preprocess(blankToUndefined, z.enum(["mock", "resend"]).default("mock")),
+    RESEND_API_KEY: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
+    // The verified Resend sender address system email is sent from (e.g.
+    // "Triviality CRM <noreply@yourdomain.com>") — must be on a domain
+    // verified in the Resend dashboard. Required only once EMAIL_PROVIDER=
+    // resend; the mock provider never reads it.
+    RESEND_FROM_ADDRESS: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
+    // Verifies the Resend delivery-events webhook's signature (Svix-based
+    // HMAC) — required only once RESEND_API_KEY is configured, since a
+    // webhook has nothing to verify against without a real Resend account
+    // sending it events in the first place.
+    RESEND_WEBHOOK_SECRET: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
   })
   .superRefine((value, ctx) => {
     if (value.AI_PROVIDER === "anthropic" && !value.AI_API_KEY) {
@@ -74,6 +95,15 @@ const envSchema = z
     }
     if (value.PLACES_PROVIDER === "google" && !value.GOOGLE_PLACES_API_KEY) {
       ctx.addIssue({ code: "custom", path: ["GOOGLE_PLACES_API_KEY"], message: "is required when PLACES_PROVIDER=google" });
+    }
+    if (value.EMAIL_PROVIDER === "resend" && !value.RESEND_API_KEY) {
+      ctx.addIssue({ code: "custom", path: ["RESEND_API_KEY"], message: "is required when EMAIL_PROVIDER=resend" });
+    }
+    if (value.EMAIL_PROVIDER === "resend" && !value.RESEND_WEBHOOK_SECRET) {
+      ctx.addIssue({ code: "custom", path: ["RESEND_WEBHOOK_SECRET"], message: "is required when EMAIL_PROVIDER=resend (verifies delivery-event webhook signatures)" });
+    }
+    if (value.EMAIL_PROVIDER === "resend" && !value.RESEND_FROM_ADDRESS) {
+      ctx.addIssue({ code: "custom", path: ["RESEND_FROM_ADDRESS"], message: "is required when EMAIL_PROVIDER=resend" });
     }
     if (Boolean(value.SEED_ADMIN_EMAIL) !== Boolean(value.SEED_ADMIN_PASSWORD)) {
       ctx.addIssue({

@@ -10,7 +10,18 @@ const PUBLIC_ROUTES = ["/login", "/forgot-password"];
 // exemption, an unauthenticated health check gets a 307 to /login instead
 // of the route's own 200, which is exactly the wrong signal for a
 // deployment platform deciding whether to keep an instance alive.
-const PUBLIC_PREFIXES = ["/api/health"];
+//
+// Module Nine: a manual HTTP smoke test of the new Resend webhook route
+// found this same gap already existed for Module Six's inbound comms
+// webhook — /api/comms/webhooks/[provider] was never added here, so a real
+// unauthenticated POST from Microsoft Graph (or now Resend) would have been
+// silently 307'd to /login instead of ever reaching the route handler, in
+// any deployed environment. Fixed for both here, not just the new one —
+// same middleware, same bug, and now a confirmed one rather than an
+// assumed-fine gap (MODULE_6_REPORT.md's own gap notes flagged that no real
+// Graph subscription had ever been exercised against a live tenant, which
+// is exactly why this was never caught).
+const PUBLIC_PREFIXES = ["/api/health", "/api/comms/webhooks", "/api/transactional-email/webhooks"];
 // /unsubscribe (Module Six Phase B) and /reset-password must stay reachable
 // with NO redirect in either direction: unlike /login, an *authenticated*
 // visitor (a salesperson previewing their own unsubscribe link, or someone

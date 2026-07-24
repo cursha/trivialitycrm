@@ -30,6 +30,7 @@ export default async function AdministrationPage() {
     { href: "/settings/users", label: "Users", description: "Create accounts, assign roles, unlock accounts, and transfer ownership.", permission: "manage_users" },
     { href: "/settings/roles", label: "Roles and Permissions", description: "Grouped permissions, effective-permissions preview, and role duplication.", permission: "manage_roles" },
     { href: "/administration/ai-settings", label: "AI Settings", description: "Provider mode, approved model, and budget controls.", permission: "manage_ai_settings" },
+    { href: "/administration/integrations", label: "Integrations", description: "AI and email provider status, usage, and safe controlled test actions.", permission: "view_integrations" },
     { href: "/administration/audit-log", label: "Audit Log", description: "A redacted, read-only record of administrative actions.", permission: "view_audit_log" },
     { href: "/administration/system-health", label: "System Health", description: "Web, database, worker, and queue status.", permission: "view_system_health" },
   ].filter((section) => hasPermission(user, section.permission));
@@ -59,6 +60,15 @@ export default async function AdministrationPage() {
           <span className="text-xs text-text-muted">
             Today: ${summary.todaySpendUsd.toFixed(2)} · This month: ${summary.monthSpendUsd.toFixed(2)}
           </span>
+        </Card>
+      </div>
+
+      <div>
+        <SectionHeading>Email integration</SectionHeading>
+        <Card className="mt-3 flex flex-wrap items-center gap-3">
+          <Badge tone={summary.emailProviderMode === "mock" ? "neutral" : "focus"}>{summary.emailProviderMode === "mock" ? "Mock — test data only" : "Resend — live"}</Badge>
+          <Badge tone={summary.emailConfigured ? "success" : "warning"}>{summary.emailConfigured ? "Configured" : "Not configured"}</Badge>
+          <Badge tone={summary.emailSendingEnabled ? "success" : "danger"}>{summary.emailSendingEnabled ? "Sending enabled" : "Sending disabled"}</Badge>
         </Card>
       </div>
 

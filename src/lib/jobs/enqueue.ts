@@ -12,6 +12,7 @@ import {
   QUEUE_RUN_SEQUENCE_STEP,
   QUEUE_PROCESS_INBOUND_NOTIFICATION,
   QUEUE_DATA_QUALITY_SCAN,
+  QUEUE_SEND_SYSTEM_EMAIL,
 } from "./boss-client";
 
 export type RunSearchJobData = { searchId: string };
@@ -20,6 +21,7 @@ export type SendScheduledEmailJobData = { emailMessageId: string };
 export type RunSequenceStepJobData = { enrollmentId: string; stepId: string };
 export type ProcessInboundNotificationJobData = { connectionId: string; providerMessageId: string };
 export type DataQualityScanJobData = { scanId: string };
+export type SendSystemEmailJobData = { transactionalEmailMessageId: string };
 
 /** Enqueues a durable run-search job and returns pg-boss's job id (stored on
  * LeadSearch.providerJobId for cancellation lookup / log correlation). The
@@ -118,4 +120,17 @@ export async function enqueueDataQualityScanJob(scanId: string): Promise<string>
 export async function cancelDataQualityScanJob(providerJobId: string): Promise<void> {
   const boss = await startBoss({ supervise: false });
   await boss.cancel(QUEUE_DATA_QUALITY_SCAN, providerJobId);
+}
+
+/** Enqueues one transactional/system email's actual send. singletonKey =
+ * the TransactionalEmailMessage id, so a retried enqueue for the same
+ * still-QUEUED row is a no-op — sendSystemEmail() (src/lib/transactional/
+ * send-system-email.ts) is the only caller. */
+export async function enqueueSendSystemEmailJob(transactionalEmailMessageId: string): Promise<string | null> {
+  const boss = await startBoss({ supervise: false });
+  return boss.send(
+    QUEUE_SEND_SYSTEM_EMAIL,
+    { transactionalEmailMessageId } satisfies SendSystemEmailJobData,
+    { singletonKey: transactionalEmailMessageId },
+  );
 }

@@ -10,6 +10,7 @@ export const QUEUE_SEND_SCHEDULED_EMAIL = "send-scheduled-email";
 export const QUEUE_RUN_SEQUENCE_STEP = "run-sequence-step";
 export const QUEUE_PROCESS_INBOUND_NOTIFICATION = "process-inbound-notification";
 export const QUEUE_DATA_QUALITY_SCAN = "data-quality-scan";
+export const QUEUE_SEND_SYSTEM_EMAIL = "send-system-email";
 
 /**
  * Retry/expiry defaults for the run-search queue. expireInSeconds is
@@ -125,6 +126,23 @@ const DATA_QUALITY_SCAN_QUEUE_OPTIONS = {
   retentionSeconds: 30 * 24 * 60 * 60,
 };
 
+/**
+ * Same singleton+singletonKey dedup idiom as SEND_SCHEDULED_EMAIL_QUEUE_
+ * OPTIONS, keyed per TransactionalEmailMessage id — sendSystemEmail()'s own
+ * idempotencyKey-unique row means a duplicate enqueue for an
+ * already-QUEUED-or-later message is caught before this even matters, but
+ * this is defense in depth on the queue side too. A short expiry — a
+ * transactional send is one provider HTTP call, never a long-running job.
+ */
+const SEND_SYSTEM_EMAIL_QUEUE_OPTIONS = {
+  policy: "singleton" as const,
+  retryLimit: 2,
+  retryBackoff: true,
+  retryDelayMax: 60,
+  expireInSeconds: 60,
+  retentionSeconds: 30 * 24 * 60 * 60,
+};
+
 let instance: PgBoss | null = null;
 
 /**
@@ -161,6 +179,7 @@ export async function startBoss(options: { supervise?: boolean } = {}): Promise<
   await boss.createQueue(QUEUE_RUN_SEQUENCE_STEP, RUN_SEQUENCE_STEP_QUEUE_OPTIONS);
   await boss.createQueue(QUEUE_PROCESS_INBOUND_NOTIFICATION, PROCESS_INBOUND_NOTIFICATION_QUEUE_OPTIONS);
   await boss.createQueue(QUEUE_DATA_QUALITY_SCAN, DATA_QUALITY_SCAN_QUEUE_OPTIONS);
+  await boss.createQueue(QUEUE_SEND_SYSTEM_EMAIL, SEND_SYSTEM_EMAIL_QUEUE_OPTIONS);
   return boss;
 }
 

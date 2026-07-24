@@ -7,7 +7,8 @@ import { getProviders } from "./providers/factory";
 import { filterByModeExclusivity, dedupeWithinRun } from "./exclusivity";
 import { computeNormalizedFields, findPriorRejectedMatches } from "../duplicates/match";
 import { normalizeCompanyName } from "../duplicates/normalize";
-import { getAiSettings } from "../ai/budget";
+import { getAiSettings, checkMidRunAiBudget } from "../ai/budget";
+import { writeAuditEvent } from "../audit/log";
 import type { DiscoverParams, ResearchCandidate } from "./providers/types";
 
 function candidateIdentity(candidate: { name: string; city: string }): string {
@@ -122,6 +123,28 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
 
     for (const candidateRow of candidateRows) {
       if (options.isCancelled && (await options.isCancelled())) return;
+
+      // Module Nine: rechecked between candidates, not just once before the
+      // search started — a search that crosses the daily/monthly budget or
+      // its own maxCostPerSearchUsd ceiling partway through stops here,
+      // before placing another paid verify/score call. GENERAL mode never
+      // places a paid call at all (see below), so this recheck is skipped
+      // for it — a pure DB-cost-avoidance short-circuit, not a safety gap.
+      if (search.mode !== "GENERAL") {
+        const midRunCheck = await checkMidRunAiBudget(search.id);
+        if (!midRunCheck.allowed) {
+          await writeAuditEvent({
+            actorId: search.createdById,
+            module: "ai-integration",
+            action: "ai_search.budget_blocked",
+            entityType: "LeadSearch",
+            entityId: search.id,
+            success: false,
+            metadata: { reason: midRunCheck.reason },
+          });
+          throw new Error(midRunCheck.reason ?? "AI budget limit reached mid-run.");
+        }
+      }
 
       const raw = candidateRow.rawCandidate as unknown as ResearchCandidate;
       let verified: ResearchCandidate;

@@ -251,6 +251,10 @@ model User {
   passwordResetTokens           PasswordResetToken[]   @relation("PasswordResetTokensForUser")
   passwordResetTokensCreated    PasswordResetToken[]   @relation("PasswordResetTokensCreatedBy")
 
+  // Module Nine: Essential Version 1 Integrations.
+  integrationSettingsEdits IntegrationSettings[]       @relation("IntegrationSettingsEditor")
+  transactionalEmailsSent  TransactionalEmailMessage[] @relation("TransactionalEmailSender")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -597,6 +601,14 @@ model WorkspaceSettings {
   // in every commercial email — resolved via the {{sender.mailingAddress}}
   // template placeholder rather than hardcoded per-template.
   mailingAddress String?
+
+  // Module Nine: one business-wide quiet-hours window (BUSINESS_TIMEZONE-
+  // relative, see src/lib/timezone.ts), applied to CRM-outreach sends only
+  // (prepareSend/processDueScheduledEmail/sequence steps) — transactional/
+  // system email (password reset, admin test-send) is exempt. Null on
+  // either field = disabled, the default.
+  quietHoursStartHour Int?
+  quietHoursEndHour   Int?
 }
 
 // A report's filter configuration lives entirely in the existing SavedView
@@ -1933,6 +1945,11 @@ model AiSettings {
   monthlyBudgetUsd        Decimal? @db.Decimal(10, 2)
   warningThresholdUsd     Decimal? @db.Decimal(10, 2)
   perUserDailySearchLimit Int?
+  // Module Nine: hard $ ceiling for a single search, rechecked mid-run
+  // (between candidates) — not just at start — so a search that crosses this
+  // partway through stops immediately rather than finishing at full cost.
+  // Null = unlimited (same convention as maxResultsPerSearch).
+  maxCostPerSearchUsd     Decimal? @db.Decimal(10, 2)
   updatedAt               DateTime @updatedAt
   updatedById             String?
   updatedBy               User?    @relation("AiSettingsEditor", fields: [updatedById], references: [id], onDelete: SetNull)
@@ -1960,13 +1977,14 @@ enum PasswordResetRequestResolution {
 /**
  * Self-service "forgot password" queue entry — created anonymously from
  * /forgot-password by email lookup only (never reveals whether the email
- * matched, and never itself carries a secret). This app has no
- * transactional email sender for internal users (src/lib/comms/send-email.ts
- * is CRM-outreach only — requires a Contact/Company and a salesperson's own
- * connected mailbox, wrong tool for this), so delivery is admin-mediated:
- * an administrator with manage_users sees pending requests on /settings/users
- * and either generates a one-time reset link to relay out of band, or
- * dismisses the request.
+ * matched, and never itself carries a secret). An administrator with
+ * manage_users sees pending requests on /settings/users and either generates
+ * a one-time reset link (see generatePasswordResetLink()) or dismisses the
+ * request. Module Nine added an optional transactional-email send of the
+ * generated link (TransactionalEmailMessage, IntegrationSettings.
+ * emailSendingEnabled) — but that's best-effort and off by default, so the
+ * admin-mediated relay path documented here remains the reliable fallback
+ * either way.
  */
 model PasswordResetRequest {
   id           String                          @id @default(cuid())
@@ -2002,4 +2020,104 @@ model PasswordResetToken {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+// Module Nine: Essential Version 1 Integrations.
+//
+// A new, narrowly-scoped transactional email provider (Resend) for
+// system/account email only — password-reset links and an admin "send test
+// email" action. This is deliberately separate from EmailMessage/
+// ProviderConnection (Module Six's per-user OAuth mailbox model for
+// CRM-outreach email, which is untouched by this module): a transactional
+// send has no Contact/Company to attach to, no per-user mailbox to send
+// through, and needs real delivery/bounce/complaint webhooks that a
+// delegated Graph/Gmail mailbox structurally cannot provide.
+model IntegrationSettings {
+  id                  Int      @id @default(1)
+  // Kill switch — false until an administrator explicitly enables it, even
+  // once RESEND_API_KEY is configured. Mock mode (EMAIL_PROVIDER=mock, the
+  // default) ignores this flag entirely so dev/tests never need it flipped.
+  emailSendingEnabled Boolean  @default(false)
+  updatedAt           DateTime @updatedAt
+  updatedById         String?
+  updatedBy           User?    @relation("IntegrationSettingsEditor", fields: [updatedById], references: [id], onDelete: SetNull)
+}
+
+enum TransactionalEmailPurpose {
+  PASSWORD_RESET
+  ADMIN_TEST
+}
+
+enum TransactionalEmailStatus {
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  BOUNCED
+  COMPLAINED
+  DEFERRED
+}
+
+/**
+ * One row per transactional-send attempt. idempotencyKey is enforced unique
+ * so a retried enqueue (see QUEUE_SEND_SYSTEM_EMAIL) can never double-send;
+ * providerMessageId is enforced unique so the Resend delivery-events webhook
+ * (EmailDeliveryEvent below) has a safe, collision-free lookup key.
+ */
+model TransactionalEmailMessage {
+  id                String                    @id @default(cuid())
+  purpose           TransactionalEmailPurpose
+  toAddress         String
+  subject           String
+  // Plain-text body — the sole source of truth persisted between enqueue
+  // (sendSystemEmail) and the worker actually calling the provider
+  // (processQueuedSystemEmail). Safe HTML is derived from this at send time
+  // via textToSafeHtml(), not stored separately.
+  body              String                    @db.Text
+  status            TransactionalEmailStatus  @default(QUEUED)
+  idempotencyKey    String                    @unique
+  providerMessageId String?                   @unique
+  errorMessage      String?
+  failureCategory   String?
+  sentAt            DateTime?
+  // Null for system-triggered sends (password reset has no acting admin);
+  // set for an admin's own test send.
+  createdById       String?
+  createdBy         User?                     @relation("TransactionalEmailSender", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt         DateTime                  @default(now())
+
+  @@index([createdAt])
+  @@index([toAddress])
+}
+
+/**
+ * Addresses suppressed by a hard bounce or spam complaint reported through
+ * the Resend delivery-events webhook (or a manual admin action). Checked by
+ * sendSystemEmail() before every transactional send. Deliberately separate
+ * from Contact.doNotContact — this suppresses the transactional/system-email
+ * channel only, not CRM outreach, and the two recipient universes (staff
+ * users vs. leads) are usually disjoint anyway.
+ */
+model EmailSuppression {
+  id        String   @id @default(cuid())
+  address   String   @unique
+  reason    String
+  source    String
+  createdAt DateTime @default(now())
+}
+
+/**
+ * Idempotency ledger for the Resend delivery-events webhook — same two-layer
+ * pattern as WebhookEvent (Module Six's inbound-mail webhook), kept as its
+ * own model rather than widening WebhookEvent's `provider: ProviderKind`
+ * enum, since that enum means "OAuth mailbox kind" (MICROSOFT|GOOGLE)
+ * elsewhere and Resend isn't one.
+ */
+model EmailDeliveryEvent {
+  id              String   @id @default(cuid())
+  provider        String
+  providerEventId String
+  receivedAt      DateTime @default(now())
+
+  @@unique([provider, providerEventId])
 }

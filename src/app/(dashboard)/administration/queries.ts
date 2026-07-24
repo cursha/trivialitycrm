@@ -4,6 +4,8 @@ import { getQueueSummary } from "@/lib/jobs/observability";
 import { getAiSettings, getCurrentAiSpend, isAiApiKeyConfigured } from "@/lib/ai/budget";
 import { getEnv } from "@/lib/env";
 import { describeAuditEvent } from "@/lib/audit/describe";
+import { getIntegrationSettings } from "@/lib/integrations/settings";
+import { isTransactionalEmailConfigured } from "@/lib/transactional/factory";
 
 export async function getAdministrationSummary() {
   const [activeUsers, inactiveUsers, roleCount, recentAuditEvents, queueSummary] = await Promise.all([
@@ -20,6 +22,7 @@ export async function getAdministrationSummary() {
   const env = getEnv();
   const aiSettings = await getAiSettings();
   const spend = await getCurrentAiSpend();
+  const integrationSettings = await getIntegrationSettings();
 
   let budgetStatus: "ok" | "near-threshold" | "over-budget" | "not-configured" = "not-configured";
   if (aiSettings.dailyBudgetUsd !== null || aiSettings.monthlyBudgetUsd !== null) {
@@ -50,5 +53,8 @@ export async function getAdministrationSummary() {
     budgetStatus,
     todaySpendUsd: spend.todayUsd,
     monthSpendUsd: spend.monthUsd,
+    emailProviderMode: env.EMAIL_PROVIDER,
+    emailConfigured: isTransactionalEmailConfigured(),
+    emailSendingEnabled: integrationSettings.emailSendingEnabled,
   };
 }

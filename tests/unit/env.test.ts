@@ -20,6 +20,10 @@ const REQUIRED_KEYS = [
   "MICROSOFT_CLIENT_SECRET",
   "GOOGLE_CLIENT_ID",
   "GOOGLE_CLIENT_SECRET",
+  "EMAIL_PROVIDER",
+  "RESEND_API_KEY",
+  "RESEND_FROM_ADDRESS",
+  "RESEND_WEBHOOK_SECRET",
 ] as const;
 
 function snapshotEnv(): Record<string, string | undefined> {
@@ -248,6 +252,46 @@ describe("getEnv", () => {
     process.env.GOOGLE_CLIENT_SECRET = "secret-only";
 
     expect(() => getEnv()).toThrow(/GOOGLE_CLIENT_ID/);
+  });
+
+  it("defaults EMAIL_PROVIDER to mock and does not require Resend vars", () => {
+    for (const key of REQUIRED_KEYS) delete process.env[key];
+    setNodeEnv("test");
+    process.env.DATABASE_URL = "postgresql://user:pass@localhost:5432/db";
+
+    const env = getEnv();
+    expect(env.EMAIL_PROVIDER).toBe("mock");
+  });
+
+  it("treats a blank EMAIL_PROVIDER as absent and falls back to mock rather than crashing (same class of bug as blank AI_PROVIDER)", () => {
+    for (const key of REQUIRED_KEYS) delete process.env[key];
+    setNodeEnv("test");
+    process.env.DATABASE_URL = "postgresql://user:pass@localhost:5432/db";
+    process.env.EMAIL_PROVIDER = "";
+
+    const env = getEnv();
+    expect(env.EMAIL_PROVIDER).toBe("mock");
+  });
+
+  it("requires RESEND_API_KEY, RESEND_FROM_ADDRESS, and RESEND_WEBHOOK_SECRET when EMAIL_PROVIDER is resend", () => {
+    for (const key of REQUIRED_KEYS) delete process.env[key];
+    setNodeEnv("test");
+    process.env.DATABASE_URL = "postgresql://user:pass@localhost:5432/db";
+    process.env.EMAIL_PROVIDER = "resend";
+
+    expect(() => getEnv()).toThrow(/RESEND_API_KEY/);
+  });
+
+  it("passes when EMAIL_PROVIDER is resend and all three Resend vars are set", () => {
+    for (const key of REQUIRED_KEYS) delete process.env[key];
+    setNodeEnv("test");
+    process.env.DATABASE_URL = "postgresql://user:pass@localhost:5432/db";
+    process.env.EMAIL_PROVIDER = "resend";
+    process.env.RESEND_API_KEY = "re_test_key";
+    process.env.RESEND_FROM_ADDRESS = "noreply@example.com";
+    process.env.RESEND_WEBHOOK_SECRET = "whsec_test";
+
+    expect(() => getEnv()).not.toThrow();
   });
 
   it("passes a full production-shaped environment", () => {

@@ -27,6 +27,7 @@ export const AiSettingsSchema = z.object({
   monthlyBudgetUsd: optionalPositiveMoney,
   warningThresholdUsd: optionalPositiveMoney,
   perUserDailySearchLimit: optionalPositiveInt,
+  maxCostPerSearchUsd: optionalPositiveMoney,
 });
 
 export type AiSettingsValues = z.infer<typeof AiSettingsSchema>;

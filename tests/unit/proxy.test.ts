@@ -49,4 +49,22 @@ describe("proxy", () => {
     const response = proxy(request);
     expect(response.headers.get("location")).toBeNull();
   });
+
+  // Regression: found by a manual smoke test during Module Nine — neither
+  // webhook prefix was ever added here, so a real unauthenticated POST from
+  // Microsoft Graph (or Resend) would have been silently 307'd to /login
+  // instead of ever reaching the route handler, in any deployed
+  // environment. Both call sites construct the request the same way a real
+  // provider webhook would: no session cookie at all.
+  it("lets an unauthenticated request through to the inbound comms webhook without redirecting", () => {
+    const request = new NextRequest("http://localhost/api/comms/webhooks/microsoft", { method: "POST" });
+    const response = proxy(request);
+    expect(response.headers.get("location")).toBeNull();
+  });
+
+  it("lets an unauthenticated request through to the transactional-email delivery-events webhook without redirecting", () => {
+    const request = new NextRequest("http://localhost/api/transactional-email/webhooks/resend", { method: "POST" });
+    const response = proxy(request);
+    expect(response.headers.get("location")).toBeNull();
+  });
 });

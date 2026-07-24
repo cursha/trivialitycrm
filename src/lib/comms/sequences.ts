@@ -4,6 +4,7 @@
 import { prisma } from "@/lib/prisma";
 import type { SequenceStepType } from "@/generated/prisma/client";
 import { sendEmail } from "@/lib/comms/send-email";
+import { getQuietHoursWindow, isWithinQuietHours } from "@/lib/comms/quiet-hours";
 
 export type StepLike = { id: string; stepOrder: number; type: SequenceStepType; waitDays: number | null };
 
@@ -169,6 +170,17 @@ export async function processDueSequenceStep(enrollmentId: string, stepId: strin
 
   const alreadyRun = await prisma.sequenceStepRun.findUnique({ where: { enrollmentId_stepId: { enrollmentId, stepId } } });
   if (alreadyRun) return;
+
+  // Module Nine: quiet hours defer an EMAIL step rather than fail it —
+  // returning here without creating a SequenceStepRun or advancing
+  // nextStepDueAt leaves the enrollment "due" (see sequence-tick.ts's
+  // `nextStepDueAt <= now` query), so the next tick (every 5 minutes)
+  // naturally re-offers this exact step once quiet hours end. This
+  // preserves the "a failed step doesn't stop the sequence" semantic
+  // below by never even reaching it — a deferral isn't a failure.
+  if (step.type === "EMAIL" && isWithinQuietHours(await getQuietHoursWindow())) {
+    return;
+  }
 
   let runStatus: "SUCCEEDED" | "FAILED" = "SUCCEEDED";
   let errorMessage: string | null = null;

@@ -30,6 +30,9 @@ export type AiSettingsValues = {
   monthlyBudgetUsd: number | null;
   warningThresholdUsd: number | null;
   perUserDailySearchLimit: number | null;
+  // Module Nine: hard $ ceiling for one search, rechecked mid-run — see
+  // checkMidRunAiBudget() below.
+  maxCostPerSearchUsd: number | null;
 };
 
 /**
@@ -52,6 +55,7 @@ export async function getAiSettings(): Promise<AiSettingsValues> {
       monthlyBudgetUsd: existing.monthlyBudgetUsd ? Number(existing.monthlyBudgetUsd) : null,
       warningThresholdUsd: existing.warningThresholdUsd ? Number(existing.warningThresholdUsd) : null,
       perUserDailySearchLimit: existing.perUserDailySearchLimit,
+      maxCostPerSearchUsd: existing.maxCostPerSearchUsd ? Number(existing.maxCostPerSearchUsd) : null,
     };
   }
 
@@ -73,6 +77,7 @@ export async function getAiSettings(): Promise<AiSettingsValues> {
     monthlyBudgetUsd: created.monthlyBudgetUsd ? Number(created.monthlyBudgetUsd) : null,
     warningThresholdUsd: created.warningThresholdUsd ? Number(created.warningThresholdUsd) : null,
     perUserDailySearchLimit: created.perUserDailySearchLimit,
+    maxCostPerSearchUsd: created.maxCostPerSearchUsd ? Number(created.maxCostPerSearchUsd) : null,
   };
 }
 
@@ -147,4 +152,41 @@ export async function checkAiBudget(): Promise<BudgetCheckResult> {
  * getEnv().AI_API_KEY directly. */
 export function isAiApiKeyConfigured(): boolean {
   return Boolean(getEnv().AI_API_KEY);
+}
+
+/**
+ * Module Nine: rechecked between candidates in run-search.ts's per-candidate
+ * loop — not just once before the search starts. A search that crosses the
+ * daily/monthly budget or its own maxCostPerSearchUsd ceiling partway
+ * through stops immediately, before placing another paid call, rather than
+ * finishing at full cost. Mock mode is always allowed (same rule as
+ * checkAiBudget()).
+ */
+export async function checkMidRunAiBudget(searchId: string): Promise<BudgetCheckResult> {
+  const env = getEnv();
+  if (env.AI_PROVIDER !== "anthropic") return { allowed: true };
+
+  const settings = await getAiSettings();
+  const spend = await getCurrentAiSpend();
+  const overall = evaluateAiBudget({
+    isAnthropicMode: true,
+    researchEnabled: settings.researchEnabled,
+    spend,
+    dailyBudgetUsd: settings.dailyBudgetUsd,
+    monthlyBudgetUsd: settings.monthlyBudgetUsd,
+  });
+  if (!overall.allowed) return overall;
+
+  if (settings.maxCostPerSearchUsd !== null) {
+    const searchSpend = await prisma.aiUsageRecord.aggregate({
+      where: { searchId },
+      _sum: { estimatedCostUsd: true },
+    });
+    const spentOnThisSearch = Number(searchSpend._sum.estimatedCostUsd ?? 0);
+    if (spentOnThisSearch >= settings.maxCostPerSearchUsd) {
+      return { allowed: false, reason: "This search has reached its maximum per-search AI budget." };
+    }
+  }
+
+  return { allowed: true };
 }

@@ -121,6 +121,17 @@ Module 8A adds only the administration essential for a safe V1 launch — not th
 
 Not in Module 8A (deferred to a future, fuller Module Eight): custom fields, a full notification centre, an advanced retention-policy editor, a large feature-flag system, calendar integrations, webhooks, accounting integrations, arbitrary provider integrations, and multi-tenancy.
 
+## Module Nine: Essential Version 1 Integrations
+
+Connects the two external services Version 1 actually needs — live AI lead research and transactional/system email — with real cost/usage tracking and safe admin visibility. See `MODULE_9_REPORT.md` for the full report.
+
+- **AI integration hardening**: the Anthropic research provider (`src/lib/research/providers/anthropic.ts`) already made real, structured-output API calls before this module — Module Nine adds a **mid-run budget recheck** (`checkMidRunAiBudget()`, `src/lib/ai/budget.ts`) so a search that crosses its daily/monthly/per-search budget partway through stops immediately, between candidates, not just at start; a new optional `maxCostPerSearchUsd` ceiling on AI Settings; a shared, safe error-category taxonomy (`src/lib/integrations/provider-errors.ts`) so provider failures never leak raw SDK text; and (`/administration/integrations`, `manage_ai_integration`/`view_provider_usage`) an enable/disable toggle reusing `AiSettings.researchEnabled`, a one-click real connection test, and a browsable `AiUsageRecord` table with daily/monthly totals.
+- **Transactional email (Resend)** — new, and deliberately narrow: system/account email only (password-reset links, an admin "send test email"). Module Six's per-user OAuth mailbox model for CRM outreach is completely untouched by this — that split was a deliberate scope decision, not an oversight, since Microsoft Graph/Gmail structurally cannot provide delivery/bounce/complaint webhooks for a delegated mailbox (see `MODULE_6_REPORT.md`'s Phase E gap notes), which real transactional email needs. `TransactionalEmailMessage` tracks every send attempt (status, provider message id, idempotency key); `EmailSuppression` blocks future sends to an address after a hard bounce or complaint; a signed (Svix HMAC) delivery-events webhook (`/api/transactional-email/webhooks/resend`) keeps status current. Sending stays off by default (`IntegrationSettings.emailSendingEnabled`) even once `RESEND_API_KEY` is configured — an administrator must explicitly enable it from `/administration/integrations` (`manage_email_integration`/`send_test_email`).
+- **Quiet hours** (new, `WorkspaceSettings.quietHoursStartHour`/`EndHour`, edited from `/settings` alongside the existing workspace thresholds): one business-wide window (`BUSINESS_TIMEZONE`-relative) that blocks an immediate CRM-outreach send and defers a scheduled/sequence one until the window ends. Transactional/system email is exempt — it's account mail, not outreach.
+- **Integrations admin page** (`/administration/integrations`, `view_integrations`): AI and email provider mode/configured/enabled status, budget and usage totals, last-successful-request timestamps, a redacted recent-failure summary, and the queue health for each — never an API key, secret, connection string, or raw payload.
+
+Deliberately out of scope: no bulk/marketing email, no generic webhook framework, no calendar/accounting/Zapier integrations, no email fan-out for the existing in-app notification centre (it already covers that need in-app).
+
 ## Installation
 
 1. Install [Node.js 20+](https://nodejs.org/), [Docker](https://www.docker.com/) (for local Postgres), and Git.
@@ -180,6 +191,8 @@ Module Seven adds `view_data_quality`, `review_data_quality`, `manage_data_quali
 
 Module 8A adds `view_administration`, `manage_organization_settings`, `manage_roles`, `manage_ai_settings`, `view_audit_log`, `export_audit_log`, `view_system_health`, and `manage_background_jobs` — see `MODULE_8A_REPORT.md` for the full matrix. Administrator gets all eight (plus the pre-existing `manage_users`); Manager and Salesperson get none of them by default. **`manage_roles` is a new, separate permission from `manage_users`** — the Roles & Permissions page (`/settings/roles`) now requires it specifically, rather than reusing `manage_users` as it did through Module Seven; a role that had `manage_users` alone no longer edits roles unless `manage_roles` is also granted.
 
+Module Nine adds `view_integrations`, `manage_ai_integration`, `manage_email_integration`, `send_test_email`, and `view_provider_usage` — see `MODULE_9_REPORT.md` for the full matrix. Administrator gets all five; Manager and Salesperson get none of them by default. These are deliberately separate from `manage_ai_settings` (budget/model configuration) — `manage_ai_integration` only covers the research enable/disable toggle and the connection-test action, so an Integrations admin doesn't need full AI Settings edit rights.
+
 ## AI research provider
 
 Set `AI_PROVIDER` in `.env`:
@@ -189,8 +202,19 @@ Set `AI_PROVIDER` in `.env`:
 
 **Module 8A**: the approved model, research enabled/disabled, per-search limits, and daily/monthly/warning budget thresholds are now Administrator-editable at `/administration/ai-settings` (`manage_ai_settings`) — no redeploy needed to change a budget. `AI_DAILY_BUDGET_USD`/`AI_MONTHLY_BUDGET_USD` in `.env` are used only to seed that setting's initial value the first time the app seeds; after that the database row is authoritative. Once a configured hard budget is reached, starting a new AI research search is refused with a clear message — mock mode is never blocked (it costs nothing and never calls a real provider).
 
+**Module Nine**: budget is now also rechecked *mid-run* (between candidates, not just once at start) — a search that crosses the daily/monthly budget or a new optional `maxCostPerSearchUsd` ceiling partway through stops immediately, before placing another paid call. `/administration/integrations` (`manage_ai_integration`) adds a one-click toggle for `researchEnabled` and a real connection test (one minimal live API call, never run automatically); `view_provider_usage` adds a browsable `AiUsageRecord` table with daily/monthly totals.
+
 ## Email provider (Module Six)
 
 Each user connects their own mailbox from `/settings/email-connections` (OAuth) — there is no global email-provider env var, since a user connects to whichever of Microsoft or Google their employer's tenant uses. Optional env vars (`.env.example`): `TOKEN_ENCRYPTION_KEY` (required in production once any mailbox is connected), `UNSUBSCRIBE_TOKEN_SECRET` (required in production once any template is sent — signs `{{unsubscribeLink}}` tokens), `MICROSOFT_CLIENT_ID`/`MICROSOFT_CLIENT_SECRET`, `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`. Under `NODE_ENV=test`, `MockEmailProvider` is used unconditionally regardless of which provider a connection specifies — no automated test ever sends real email or reaches a real OAuth endpoint. Keep any provider credentials only in environment variables; never commit them.
 
 Inbound sync (Phase D2, Microsoft only) additionally requires `APP_URL` — Microsoft Graph needs a real, publicly reachable HTTPS URL to POST webhook notifications to (`${APP_URL}/api/comms/webhooks/microsoft`), so the hourly `inbound-subscription-tick` worker job can't create a working subscription without it. No separate webhook-signing-secret env var is needed: each subscription's `clientState` is generated per-connection at subscribe time and stored on `ProviderConnection`, not configured globally.
+
+## Transactional email provider (Module Nine)
+
+Separate from the CRM-outreach provider above — system/account email only (password-reset links, an admin test send). Set `EMAIL_PROVIDER` in `.env`:
+
+- `"mock"` (default) — no network calls, no cost, deterministic. Used for local dev without an API key and unconditionally by every automated test.
+- `"resend"` — live transactional email via [Resend](https://resend.com). Requires `RESEND_API_KEY`, `RESEND_FROM_ADDRESS` (a verified sender), and `RESEND_WEBHOOK_SECRET` (verifies the delivery-events webhook's Svix signature). Even once configured, actual sending stays **off** until an administrator enables it at `/administration/integrations` (`manage_email_integration`) — `EMAIL_PROVIDER=resend` alone only selects which provider *would* be used.
+
+The delivery-events webhook (`/api/transactional-email/webhooks/resend`) reports delivered/bounced/complained/deferred status back onto `TransactionalEmailMessage`; a permanent bounce or a complaint adds the address to `EmailSuppression`, checked before every future transactional send. Keep all three env vars in environment variables only; never commit real values.
