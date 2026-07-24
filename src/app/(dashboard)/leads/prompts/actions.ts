@@ -8,6 +8,7 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { PromptTemplateSchema, PromptRefineSchema } from "@/lib/validation/prompt";
 import { formString } from "@/lib/form-data";
 import { getProviders } from "@/lib/research/providers/factory";
+import { classifyProviderError } from "@/lib/integrations/provider-errors";
 
 export type PromptFormState = { error?: string } | undefined;
 export type PromptRefineState = { error?: string; prompt?: string } | undefined;
@@ -102,10 +103,19 @@ export async function refinePrompt(_prevState: PromptRefineState, formData: Form
   // promptAssistant is used here, which is never mode-dependent, so the
   // mode argument is a placeholder (any value works identically).
   const { promptAssistant } = getProviders("GENERAL");
-  const { prompt } = await promptAssistant.refine({
-    description: parsed.data.description,
-    currentPrompt: parsed.data.currentPrompt,
-    userId: user.id,
-  });
-  return { prompt };
+  try {
+    const { prompt } = await promptAssistant.refine({
+      description: parsed.data.description,
+      currentPrompt: parsed.data.currentPrompt,
+      userId: user.id,
+    });
+    return { prompt };
+  } catch (error) {
+    // A live-provider failure (rate limit, billing, outage, etc.) must never
+    // crash the whole page — this previously had no try/catch at all, so any
+    // provider error propagated uncaught and Next.js showed its generic
+    // "This page couldn't load" 500 page instead of a normal inline error.
+    const classified = classifyProviderError(error);
+    return { error: classified.safeMessage };
+  }
 }
