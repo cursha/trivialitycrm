@@ -6,6 +6,7 @@ import { resetFakeCookies } from "../setup/mock-next";
 import { runReportsTick } from "../../worker/handlers/reports-tick";
 import { handleGenerateReportJob } from "../../worker/handlers/generate-report";
 import type { GenerateReportJobData } from "../../src/lib/jobs/enqueue";
+import { computeNextRunAt } from "../../src/lib/reports/schedule";
 import { createScheduledReport, setScheduledReportActive, deleteScheduledReport } from "../../src/app/(dashboard)/reports/scheduled/actions";
 import { markNotificationRead } from "../../src/app/(dashboard)/notifications-actions";
 import { GET as downloadGeneratedReport } from "../../src/app/api/reports/generated/[id]/download/route";
@@ -114,6 +115,51 @@ describe("handleGenerateReportJob", () => {
     await handleGenerateReportJob(fakeJob({ scheduledReportId: schedule.id, periodKey: nextRunAt.toISOString() }));
 
     expect(await testPrisma.generatedReport.count({ where: { scheduledReportId: schedule.id } })).toBe(0);
+  });
+
+  // Module Ten regression: a pg-boss redelivery of the exact same job (e.g.
+  // the worker crashing after the transaction committed but before the job
+  // was acked) previously duplicated the GeneratedReport row, duplicated
+  // the fan-out Notification, and double-advanced nextRunAt.
+  it("is idempotent — processing the identical job twice never duplicates the report, the notification, or the schedule advance", async () => {
+    const { user, leadType, stage } = await baseFixtures();
+    await createCompanyFixture({ leadTypeId: leadType.id, pipelineStageId: stage.id, assignedToId: user.id, createdById: user.id, source: "MANUAL" });
+
+    const nextRunAt = new Date("2026-07-20T04:00:00.000Z");
+    const schedule = await testPrisma.scheduledReport.create({
+      data: { name: "Daily sources", reportKey: "sources", cadence: "DAILY", recipientIds: [user.id], createdById: user.id, active: true, nextRunAt },
+    });
+
+    const job = fakeJob({ scheduledReportId: schedule.id, periodKey: nextRunAt.toISOString() });
+    await handleGenerateReportJob(job);
+    // Simulated redelivery: same job data, second independent invocation.
+    await handleGenerateReportJob(job);
+
+    expect(await testPrisma.generatedReport.count({ where: { scheduledReportId: schedule.id } })).toBe(1);
+    expect(await testPrisma.notification.count({ where: { type: "REPORT_GENERATED", userId: user.id } })).toBe(1);
+
+    const updatedSchedule = await testPrisma.scheduledReport.findUniqueOrThrow({ where: { id: schedule.id } });
+    // Advanced exactly one cadence step past the original period, not two —
+    // compare against the real computeNextRunAt() rather than a hand-rolled
+    // +24h approximation (DAILY resolves to a business-timezone day
+    // boundary, not a naive UTC offset).
+    expect(updatedSchedule.nextRunAt.getTime()).toBe(computeNextRunAt("DAILY", nextRunAt).getTime());
+  });
+
+  it("is idempotent on the permanent-failure path too", async () => {
+    const noReportsRole = await createRoleWithPermissions("NoReportsIdempotent", ["add_leads"]);
+    const creator = await createTestUser({ roleId: noReportsRole.id });
+    const nextRunAt = new Date("2026-07-20T04:00:00.000Z");
+    const schedule = await testPrisma.scheduledReport.create({
+      data: { name: "Orphaned schedule", reportKey: "sources", cadence: "DAILY", recipientIds: [creator.id], createdById: creator.id, active: true, nextRunAt },
+    });
+
+    const job = fakeJob({ scheduledReportId: schedule.id, periodKey: nextRunAt.toISOString() });
+    await handleGenerateReportJob(job);
+    await handleGenerateReportJob(job);
+
+    expect(await testPrisma.generatedReport.count({ where: { scheduledReportId: schedule.id } })).toBe(1);
+    expect(await testPrisma.notification.count({ where: { type: "REPORT_GENERATED", userId: creator.id } })).toBe(1);
   });
 });
 

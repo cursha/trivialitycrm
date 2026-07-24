@@ -255,8 +255,29 @@ model User {
   integrationSettingsEdits IntegrationSettings[]       @relation("IntegrationSettingsEditor")
   transactionalEmailsSent  TransactionalEmailMessage[] @relation("TransactionalEmailSender")
 
+  // Module Ten: first-login onboarding checklist.
+  onboardingSteps UserOnboardingStep[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/**
+ * One row per onboarding-checklist step a user has manually marked done
+ * (see src/lib/onboarding/steps.ts for the fixed step catalog). Absence of
+ * a row means "not done" — there is no separate "dismissed" state; the
+ * checklist itself is always reachable from the shell regardless of
+ * completion, so a step can be unchecked and rechecked freely.
+ */
+model UserOnboardingStep {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stepKey     String
+  completedAt DateTime @default(now())
+
+  @@unique([userId, stepKey])
+  @@index([userId])
 }
 
 model Session {
@@ -674,6 +695,13 @@ model GeneratedReport {
   errorMessage      String?
   createdAt         DateTime         @default(now())
 
+  // Module Ten: closes a real idempotency gap — generate-report.ts's worker
+  // handler had no guard against a pg-boss redelivery duplicating this row
+  // (and its fan-out Notifications) for the same schedule+period. Null
+  // scheduledReportId (ad-hoc/manual exports) is exempt from this
+  // constraint by ordinary SQL NULL semantics — multiple NULLs never
+  // collide — which is correct, since only scheduled runs need this guard.
+  @@unique([scheduledReportId, periodStart])
   @@index([scheduledReportId])
   @@index([createdAt])
 }
@@ -1969,6 +1997,20 @@ model WorkerHeartbeat {
   updatedAt DateTime @updatedAt
 }
 
+/**
+ * Module Ten: tracks whether a "worker heartbeat is stale" alert email has
+ * already been sent for the CURRENT stale episode — deliberately a separate
+ * singleton row from WorkerHeartbeat itself, never the same row. Updating
+ * WorkerHeartbeat directly would bump its @updatedAt on every write, which
+ * would make the heartbeat look freshly-ticked even though the worker never
+ * actually ticked, corrupting the exact signal System Health and this
+ * alert both depend on.
+ */
+model WorkerHeartbeatAlert {
+  id               Int       @id @default(1)
+  staleAlertSentAt DateTime?
+}
+
 enum PasswordResetRequestResolution {
   LINK_GENERATED
   DISMISSED
@@ -2046,6 +2088,7 @@ model IntegrationSettings {
 enum TransactionalEmailPurpose {
   PASSWORD_RESET
   ADMIN_TEST
+  SYSTEM_ALERT
 }
 
 enum TransactionalEmailStatus {

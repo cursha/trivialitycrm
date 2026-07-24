@@ -63,6 +63,7 @@ export default async function SearchResultsPage({
     disposition: result.disposition,
     competitorName: result.competitor?.name ?? null,
     rejectionReasonName: result.rejectionReason?.name ?? null,
+    researchedAt: result.researchedAt.toISOString(),
   }));
 
   return (
@@ -86,6 +87,7 @@ export default async function SearchResultsPage({
         pageSize={PAGE_SIZE}
         total={total}
         searchId={id}
+        minimumScore={search.minimumScore}
       />
     </div>
   );

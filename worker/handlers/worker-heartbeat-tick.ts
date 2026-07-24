@@ -8,13 +8,17 @@ import { prisma } from "../../src/lib/prisma";
  * codebase tracked worker liveness before Module 8A.
  */
 export async function runWorkerHeartbeatTick(): Promise<void> {
-  // Prisma sets @updatedAt on every update, even with an empty `data`
-  // object — this genuinely bumps the timestamp each tick, unlike
-  // run-search.ts's superficially-similar `update: {}` (there, deliberately
-  // a true no-op on an already-checkpointed row with no @updatedAt field).
+  // Module Ten: a genuinely empty `update: {}` does NOT bump @updatedAt —
+  // confirmed against this exact Prisma version; an update with no fields
+  // to set is optimized away entirely, so the row's `updatedAt` silently
+  // never advances past its first tick. (The previous comment here claimed
+  // otherwise and was simply wrong — caught by a regression test added
+  // alongside this fix.) Setting `updatedAt` explicitly is what actually
+  // works, matching run-search.ts's genuinely-different `update: {}` case
+  // only in that both use upsert, not in this specific behavior.
   await prisma.workerHeartbeat.upsert({
     where: { id: 1 },
     create: { id: 1 },
-    update: {},
+    update: { updatedAt: new Date() },
   });
 }

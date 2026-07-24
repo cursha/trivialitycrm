@@ -44,17 +44,36 @@ async function notifyRecipients(
  */
 async function recordPermanentFailure(
   schedule: { id: string; name: string; reportKey: string; cadence: ReportCadenceValue; nextRunAt: Date; recipientIds: string[] },
+  periodStart: Date,
   message: string,
 ): Promise<void> {
   logger.warn({ scheduledReportId: schedule.id }, `generate-report: ${message}`);
   await prisma.$transaction(async (tx) => {
+    // Module Ten idempotency guard: a pg-boss redelivery of this exact job
+    // (e.g. the worker crashing after this transaction committed but before
+    // the job was acked) must never duplicate the GeneratedReport row, the
+    // fan-out Notifications, or double-advance nextRunAt. Checked first,
+    // inside the same transaction, so the whole block becomes a no-op if
+    // this period was already recorded. periodStart is the enqueue-time
+    // periodKey (see handleGenerateReportJob), not a fresh read of
+    // schedule.nextRunAt — that pointer is mutated by this very function on
+    // success, so two invocations of what should be recognized as "the same
+    // due period" would otherwise compute different periodStart values and
+    // the guard above would never match (confirmed by an actual failing
+    // regression test before this fix — a second invocation advanced
+    // nextRunAt again and created a genuine duplicate row).
+    const existing = await tx.generatedReport.findUnique({
+      where: { scheduledReportId_periodStart: { scheduledReportId: schedule.id, periodStart } },
+    });
+    if (existing) return;
+
     const generated = await tx.generatedReport.create({
       data: {
         scheduledReportId: schedule.id,
         reportKey: schedule.reportKey,
         status: "FAILED",
-        periodStart: schedule.nextRunAt,
-        periodEnd: schedule.nextRunAt,
+        periodStart,
+        periodEnd: periodStart,
         payload: { columns: [], rows: [] },
         recipientIds: schedule.recipientIds,
         errorMessage: message,
@@ -70,7 +89,7 @@ async function recordPermanentFailure(
 
 export async function handleGenerateReportJob(jobs: Job<GenerateReportJobData>[]): Promise<void> {
   const [job] = jobs;
-  const { scheduledReportId } = job.data;
+  const { scheduledReportId, periodKey } = job.data;
 
   try {
     const schedule = await prisma.scheduledReport.findUnique({ where: { id: scheduledReportId } });
@@ -79,14 +98,23 @@ export async function handleGenerateReportJob(jobs: Job<GenerateReportJobData>[]
       return;
     }
 
+    // Module Ten: the failure path's idempotency key must be the
+    // enqueue-time due period (periodKey — set once by reports-tick.ts,
+    // stable across every redelivery of this exact job), not a fresh read
+    // of schedule.nextRunAt, which recordPermanentFailure itself advances
+    // on success. Falls back to schedule.nextRunAt only if periodKey is
+    // somehow missing/unparseable (defensive, not the expected path).
+    const parsedPeriodKey = periodKey ? new Date(periodKey) : null;
+    const failurePeriodStart = parsedPeriodKey && !Number.isNaN(parsedPeriodKey.getTime()) ? parsedPeriodKey : schedule.nextRunAt;
+
     if (!REPORT_KEYS.includes(schedule.reportKey as ReportKey)) {
-      await recordPermanentFailure(schedule, `Unrecognized report key "${schedule.reportKey}".`);
+      await recordPermanentFailure(schedule, failurePeriodStart, `Unrecognized report key "${schedule.reportKey}".`);
       return;
     }
 
     const creator = await getUserById(schedule.createdById);
     if (!creator || creator.disabled) {
-      await recordPermanentFailure(schedule, "The report creator's account is disabled or no longer exists.");
+      await recordPermanentFailure(schedule, failurePeriodStart, "The report creator's account is disabled or no longer exists.");
       return;
     }
 
@@ -100,13 +128,19 @@ export async function handleGenerateReportJob(jobs: Job<GenerateReportJobData>[]
 
     const result = await buildReportRows(schedule.reportKey as ReportKey, creator, filters);
     if (result.forbidden) {
-      await recordPermanentFailure(schedule, "The report creator no longer has permission to view this report.");
+      await recordPermanentFailure(schedule, failurePeriodStart, "The report creator no longer has permission to view this report.");
       return;
     }
 
     const period = resolveValidatedDateRange(filters);
 
     await prisma.$transaction(async (tx) => {
+      // Same idempotency guard as recordPermanentFailure() above.
+      const existing = await tx.generatedReport.findUnique({
+        where: { scheduledReportId_periodStart: { scheduledReportId: schedule.id, periodStart: period.start } },
+      });
+      if (existing) return;
+
       const generated = await tx.generatedReport.create({
         data: {
           scheduledReportId: schedule.id,

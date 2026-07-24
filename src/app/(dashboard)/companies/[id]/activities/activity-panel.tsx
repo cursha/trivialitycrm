@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CirclePlus, Phone, Mail, Users, FileText, Presentation, FlaskConical, StickyNote, GitBranch } from "lucide-react";
 import { createActivity } from "./actions";
+import { useQuickActions } from "../quick-action-context";
 import { Card } from "@/components/ui/card";
 import { Input, Select, Textarea } from "@/components/ui/field";
 
@@ -40,9 +41,21 @@ const TYPE_ICONS: Record<string, typeof Phone> = {
 
 export function ActivityPanel({ companyId, activities, canLog }: { companyId: string; activities: ActivityRow[]; canLog: boolean }) {
   const router = useRouter();
+  const { registerActivityHandler, requestFollowUp } = useQuickActions();
   const [logging, setLogging] = useState(false);
+  const [type, setType] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [justLogged, setJustLogged] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    if (!canLog) return;
+    return registerActivityHandler((requestedType) => {
+      setLogging(true);
+      setType(requestedType);
+      setJustLogged(false);
+    });
+  }, [canLog, registerActivityHandler]);
 
   function handleCreate(formData: FormData) {
     startTransition(async () => {
@@ -52,6 +65,7 @@ export function ActivityPanel({ companyId, activities, canLog }: { companyId: st
       } else {
         setError(null);
         setLogging(false);
+        setJustLogged(true);
         router.refresh();
       }
     });
@@ -64,7 +78,11 @@ export function ActivityPanel({ companyId, activities, canLog }: { companyId: st
         {canLog && !logging && (
           <button
             type="button"
-            onClick={() => setLogging(true)}
+            onClick={() => {
+              setLogging(true);
+              setType("");
+              setJustLogged(false);
+            }}
             className="flex items-center gap-1 text-sm font-bold text-secondary hover:underline"
           >
             <CirclePlus size={15} />
@@ -77,7 +95,7 @@ export function ActivityPanel({ companyId, activities, canLog }: { companyId: st
 
       {logging && (
         <form action={handleCreate} className="mt-3 space-y-2 rounded-lg border border-dashed border-border-strong bg-black/[0.02] p-3">
-          <Select name="type" required defaultValue="" className="py-1.5">
+          <Select name="type" required value={type} onChange={(e) => setType(e.target.value)} className="py-1.5">
             <option value="" disabled>
               Activity type
             </option>
@@ -104,6 +122,31 @@ export function ActivityPanel({ companyId, activities, canLog }: { companyId: st
             </button>
           </div>
         </form>
+      )}
+
+      {justLogged && canLog && (
+        <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-border-strong bg-black/[0.02] p-3 text-sm">
+          <p className="text-text">Activity logged. Schedule the next follow-up?</p>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setJustLogged(false);
+                requestFollowUp();
+              }}
+              className="rounded bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary-hover"
+            >
+              Schedule follow-up
+            </button>
+            <button
+              type="button"
+              onClick={() => setJustLogged(false)}
+              className="rounded border border-border-strong px-3 py-1.5 text-xs font-semibold text-text hover:bg-black/5"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
       )}
 
       {activities.length === 0 ? (

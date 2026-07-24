@@ -26,7 +26,7 @@ afterEach(() => {
   resetEnvCacheForTests();
 });
 
-async function baseFixtures(permissions: string[] = ["send_email", "schedule_email"]) {
+async function baseFixtures(permissions: string[] = ["send_email", "schedule_email", "view_assigned_leads"]) {
   const role = await createRoleWithPermissions("Sender", permissions);
   const user = await createTestUser({ roleId: role.id });
   const leadType = await createLeadTypeFixture();
@@ -197,7 +197,7 @@ describe("runSendScheduledEmailTick", () => {
 
 describe("composer scheduling action", () => {
   it("requires schedule_email to schedule (not just send_email)", async () => {
-    const { user, company } = await baseFixtures(["send_email"]);
+    const { user, company } = await baseFixtures(["send_email", "view_assigned_leads"]);
     await connectMailbox(user.id);
     const contact = await permittedContactFixture(company.id);
     await loginAs(user.id);
@@ -245,7 +245,11 @@ describe("composer scheduling action", () => {
     });
     if (!scheduled.ok) return;
 
-    const otherRole = await createRoleWithPermissions("OtherSender", ["schedule_email"]);
+    // view_all_leads (not just view_assigned_leads) so this user genuinely
+    // has scope over the company despite not being its assignee — the
+    // point of this test is the ownership check, not the scope check
+    // (that has its own dedicated regression test below).
+    const otherRole = await createRoleWithPermissions("OtherSender", ["schedule_email", "view_all_leads"]);
     const otherUser = await createTestUser({ roleId: otherRole.id });
     await loginAs(otherUser.id);
     const blocked = await cancelComposedScheduledEmail(company.id, scheduled.emailMessageId);

@@ -100,4 +100,21 @@ describe("import preview and commit", () => {
     expect((template.mapping as Record<string, string>).name).toBe("Name");
     expect(template.createdById).toBe(user.id);
   });
+
+  // Module Ten regression: commitImport (a per-row-writing bulk operation,
+  // up to 5000 rows/upload) had no rate limit at all.
+  it("is rate-limited", async () => {
+    const { user, leadType, stage } = await baseFixtures();
+    await loginAs(user.id);
+
+    const outcomes = [];
+    for (let i = 0; i < 6; i++) {
+      const sessionId = await putUpload(user.id, "leads.csv", {
+        headers: ["Name", "City", "Region", "Country"],
+        rows: [{ Name: `Rate Limit Bar ${i}`, City: "Ottawa", Region: "ON", Country: "Canada" }],
+      });
+      outcomes.push(await commitImport(sessionId, mapping, [0], leadType.id, stage.id, user.id));
+    }
+    expect(outcomes.some((o) => "error" in o && o.error.includes("Too many"))).toBe(true);
+  });
 });

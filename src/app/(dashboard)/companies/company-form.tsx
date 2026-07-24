@@ -6,6 +6,7 @@ import type { CompanyFormState } from "./actions";
 import { Label, Input, Select, Textarea, FieldError } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
+import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
 
 type Option = { id: string; name: string };
 type PipelineStageOption = Option & { outcomeType: string | null };
@@ -53,9 +54,11 @@ export function CompanyForm({
   const overrideRef = useRef<HTMLInputElement>(null);
   const [pipelineStageId, setPipelineStageId] = useState(defaultValues?.pipelineStageId ?? "");
   const selectedStageIsLost = pipelineStages.find((stage) => stage.id === pipelineStageId)?.outcomeType === "LOST";
+  const [dirty, setDirty] = useState(false);
+  useUnsavedChangesWarning(dirty);
 
   return (
-    <form action={formAction} className="space-y-6">
+    <form action={formAction} onChange={() => setDirty(true)} className="space-y-6">
       <input ref={overrideRef} type="hidden" name="overrideDuplicates" defaultValue="false" />
 
       <div className="grid gap-4 sm:grid-cols-2">

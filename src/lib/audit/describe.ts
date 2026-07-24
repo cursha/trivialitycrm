@@ -107,6 +107,8 @@ export function describeAuditEvent(event: AuditEventLike): string {
       return `${prefix}An administrator's test email attempt failed.`;
     case "email_suppression.added":
       return `${prefix}An email address was added to the suppression list.`;
+    case "company.restored":
+      return `${prefix}An archived company was restored.`;
     default:
       return `${prefix}${event.module}: ${event.action.replace(/_/g, " ")}.`;
   }

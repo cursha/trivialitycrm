@@ -3,12 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Building2, CalendarClock, Kanban, LayoutDashboard, Menu, Search, Settings, ShieldCheck, ShieldEllipsis, Trophy, Users2, X } from "lucide-react";
+import { BarChart3, Building2, CalendarClock, Kanban, LayoutDashboard, ListChecks, Menu, Search, Settings, ShieldCheck, ShieldEllipsis, Trophy, Users2, X } from "lucide-react";
 import type { NavItem, NavIconKey } from "@/lib/nav";
 import { logout } from "@/lib/auth/actions";
 import { Logo } from "@/components/ui/logo";
 import { Button } from "@/components/ui/button";
 import { NotificationBell, type Notification } from "@/components/notification-bell";
+import { GlobalSearch } from "@/components/global-search";
+import { QuickAdd } from "@/components/quick-add";
 
 const ICONS: Record<NavIconKey, typeof LayoutDashboard> = {
   dashboard: LayoutDashboard,
@@ -30,6 +32,9 @@ export function DashboardShell({
   userInitials,
   roleName,
   notifications,
+  canAddLeads,
+  canEditLeads,
+  onboardingRemaining,
   children,
 }: {
   navItems: NavItem[];
@@ -37,6 +42,9 @@ export function DashboardShell({
   userInitials: string;
   roleName: string;
   notifications: Notification[];
+  canAddLeads: boolean;
+  canEditLeads: boolean;
+  onboardingRemaining: number;
   children: React.ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -105,6 +113,20 @@ export function DashboardShell({
             <Logo size="compact" className="h-12 lg:hidden" />
           </div>
           <div className="flex items-center gap-4">
+            <QuickAdd canAddLeads={canAddLeads} canEditLeads={canEditLeads} />
+            <GlobalSearch />
+            <Link
+              href="/onboarding"
+              aria-label={onboardingRemaining > 0 ? `Getting started, ${onboardingRemaining} steps left` : "Getting started"}
+              className="relative rounded-lg p-2 text-text hover:bg-black/5"
+            >
+              <ListChecks size={20} />
+              {onboardingRemaining > 0 && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-white">
+                  {onboardingRemaining}
+                </span>
+              )}
+            </Link>
             <NotificationBell notifications={notifications} />
             <div className="hidden text-right sm:block">
               <p className="text-sm font-bold leading-tight">{userName}</p>

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
 import { buildCsv, buildXlsx, type ExportColumn } from "@/lib/export/serialize";
+import { checkRateLimit } from "@/lib/rate-limit/postgres-bucket";
 import type { SearchResultDisposition } from "@/generated/prisma/enums";
 
 const COLUMNS: ExportColumn[] = [
@@ -26,6 +27,13 @@ const COLUMNS: ExportColumn[] = [
 export async function GET(request: Request) {
   const user = await requireUser();
   requirePermission(user, "export_leads");
+
+  // Module Ten: export routes had no rate limit — an expensive,
+  // authorization-sensitive operation with zero throttling.
+  const rateLimit = await checkRateLimit(`export:${user.id}`, { windowMs: 60_000, limit: 10 });
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: "Too many exports — wait a moment and try again." }, { status: 429 });
+  }
 
   const { searchParams } = new URL(request.url);
   const searchId = searchParams.get("searchId");

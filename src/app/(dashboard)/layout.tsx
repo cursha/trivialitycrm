@@ -3,6 +3,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { prisma } from "@/lib/prisma";
 import { NAV_ITEMS } from "@/lib/nav";
 import { describeNotification } from "@/lib/notifications";
+import { visibleOnboardingSteps } from "@/lib/onboarding/steps";
 import { DashboardShell } from "@/components/dashboard-shell";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -15,11 +16,18 @@ export default async function DashboardLayout({ children }: { children: React.Re
     (item) => !item.requiresAnyPermission || item.requiresAnyPermission.some((key) => hasPermission(user, key)),
   );
 
-  const unreadNotifications = await prisma.notification.findMany({
-    where: { userId: user.id, readAt: null },
-    orderBy: { createdAt: "desc" },
-    take: 10,
-  });
+  const visibleOnboarding = visibleOnboardingSteps((key) => hasPermission(user, key));
+  const [unreadNotifications, completedOnboardingCount] = await Promise.all([
+    prisma.notification.findMany({
+      where: { userId: user.id, readAt: null },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    }),
+    prisma.userOnboardingStep.count({
+      where: { userId: user.id, stepKey: { in: visibleOnboarding.map((s) => s.key) } },
+    }),
+  ]);
+  const onboardingRemaining = visibleOnboarding.length - completedOnboardingCount;
   const notifications = unreadNotifications.map((n) => {
     const payload = n.payload as Record<string, unknown>;
     const downloadHref =
@@ -50,6 +58,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
       userInitials={initials}
       roleName={user.role.name}
       notifications={notifications}
+      canAddLeads={hasPermission(user, "add_leads")}
+      canEditLeads={hasPermission(user, "edit_leads")}
+      onboardingRemaining={onboardingRemaining}
     >
       {children}
     </DashboardShell>

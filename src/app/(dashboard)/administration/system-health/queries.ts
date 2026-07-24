@@ -3,9 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { getQueueSummary, getRecentFailedJobs } from "@/lib/jobs/observability";
 import { isAiApiKeyConfigured } from "@/lib/ai/budget";
 import { getEnv } from "@/lib/env";
+import { isHeartbeatStale } from "@/lib/ops/worker-heartbeat";
 import packageJson from "../../../../../package.json";
-
-const HEARTBEAT_FRESHNESS_MS = 3 * 2 * 60 * 1000; // 3x the 2-minute tick interval
 
 export type SystemHealth = {
   webStatus: "up";
@@ -35,7 +34,7 @@ export async function getSystemHealth(): Promise<SystemHealth> {
   const heartbeat = await prisma.workerHeartbeat.findUnique({ where: { id: 1 } });
   let workerStatus: SystemHealth["workerStatus"] = "unknown";
   if (heartbeat) {
-    workerStatus = Date.now() - heartbeat.updatedAt.getTime() <= HEARTBEAT_FRESHNESS_MS ? "healthy" : "stale";
+    workerStatus = isHeartbeatStale(heartbeat.updatedAt, new Date()) ? "stale" : "healthy";
   }
 
   // Any migration row with no finished_at is incomplete/failed — a real,

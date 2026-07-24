@@ -48,6 +48,23 @@ describe("GET /api/export/search-results", () => {
 
     await expect(exportSearchResults(new Request("http://localhost/api/export/search-results?searchId=x"))).rejects.toThrow(/Forbidden/);
   });
+
+  // Module Ten regression: export routes had no rate limit at all — an
+  // expensive, authorization-sensitive operation with zero throttling.
+  it("is rate-limited", async () => {
+    const role = await createRoleWithPermissions("RateLimitedExporter", ["export_leads"]);
+    const user = await createTestUser({ roleId: role.id });
+    await loginAs(user.id);
+    const leadType = await createLeadTypeFixture("Pub");
+    const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id });
+
+    const statuses: number[] = [];
+    for (let i = 0; i < 11; i++) {
+      const response = await exportSearchResults(new Request(`http://localhost/api/export/search-results?searchId=${search.id}&format=csv`));
+      statuses.push(response.status);
+    }
+    expect(statuses).toContain(429);
+  });
 });
 
 describe("GET /api/export/companies", () => {
