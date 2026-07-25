@@ -27,6 +27,7 @@ export async function updateAiSettings(_prevState: ActionResult, formData: FormD
     warningThresholdUsd: formString(formData, "warningThresholdUsd"),
     perUserDailySearchLimit: formString(formData, "perUserDailySearchLimit"),
     maxCostPerSearchUsd: formString(formData, "maxCostPerSearchUsd"),
+    maxSearchToolUsesPerCall: formString(formData, "maxSearchToolUsesPerCall"),
   });
 
   if (!parsed.success) {
@@ -46,6 +47,7 @@ export async function updateAiSettings(_prevState: ActionResult, formData: FormD
     warningThresholdUsd: parsed.data.warningThresholdUsd ?? null,
     perUserDailySearchLimit: parsed.data.perUserDailySearchLimit ?? null,
     maxCostPerSearchUsd: parsed.data.maxCostPerSearchUsd ?? null,
+    maxSearchToolUsesPerCall: parsed.data.maxSearchToolUsesPerCall,
     updatedById: user.id,
   };
 

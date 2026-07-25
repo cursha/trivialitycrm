@@ -350,10 +350,11 @@ it.
   updates to 6 existing test files (fixture/scope corrections) and
   `tests/helpers/db.ts` (new tables added to the reset list)
 
-## Post-merge production incident and fixes (2026-07-24, after this report was first written)
+## Post-merge production incident and fixes (2026-07-24/25, after this report was first written)
 
-Two real issues surfaced once this module was actually deployed, both fixed
-the same day:
+Five real issues surfaced once this module was actually deployed and
+exercised live for the first time — all found and fixed within the same
+incident, each with regression tests:
 
 1. **`refinePrompt` crashed the whole page on a live AI provider failure**
    (`src/app/(dashboard)/leads/prompts/actions.ts`) — it called the AI
@@ -381,6 +382,80 @@ the same day:
    selection needed. `RAILWAY.md` and the main `Dockerfile`'s header comment
    were both corrected to reflect this. Verified with the same build +
    container smoke test used for the original deployment gate.
+3. **Live AI research had never actually been exercised against the real
+   Anthropic API before this incident** — `AnthropicCandidateDiscoveryProvider`/
+   `AnthropicEvidenceVerificationProvider`'s own header comment admitted as
+   much ("hasn't been exercised against the live API in this environment").
+   This incident was, in effect, that first live smoke test, and it surfaced
+   two further real gaps:
+   - **The web_search/web_fetch tool budget (8 rounds per call) was
+     hardcoded**, with no way to trade thoroughness for speed without a code
+     change. Added `AiSettings.maxSearchToolUsesPerCall` (admin-configurable,
+     1–8, AI Settings page) — both `discover()` and `verify()` now read it
+     instead of two independently-hardcoded values (8 and 3 respectively).
+     Migration `20260725153823_module_ten_max_search_tool_uses`.
+   - **Candidates within one search were processed strictly one at a time**
+     — discover, then for every candidate: verify (up to 5 min), then score,
+     fully sequentially. For a mode using live Anthropic verification, this
+     meant total wall-clock time scaled linearly with candidate count, which
+     is what actually made searches feel unacceptably slow — a bigger
+     contributor than the per-call tool budget alone. Fixed in
+     `src/lib/research/run-search.ts`: candidates are now processed in
+     batches of `CANDIDATE_CONCURRENCY = 3` via `Promise.allSettled` (not
+     `Promise.all` — see below for why that distinction mattered), with each
+     candidate's own verify→score sequence still fully sequential internally,
+     but different candidates' sequences now overlapping within a batch.
+   - **A genuine race condition found during that refactor, before it ever
+     shipped**: an initial version used `Promise.all` for the batch, which
+     rejects as soon as *any* candidate in it fails — abandoning sibling
+     candidates that were still mid-flight as orphaned, un-awaited promises
+     whose database writes would then race unpredictably against the job's
+     own failure handling. Caught by `tests/integration/search-run-resume.test.ts`
+     (an existing test) failing on an exact intermediate-state assertion,
+     traced to the real underlying race, and fixed with `Promise.allSettled`
+     instead — every candidate in a batch is now guaranteed to fully settle,
+     success or failure, before the batch is judged. Two new tests added
+     (`tests/integration/search-run-batching.test.ts`) specifically exercise
+     the batch boundary (5 candidates spanning two batches of 3+2) and a
+     mid-second-batch failure leaving the first batch fully, unambiguously
+     `COMPLETED` — neither scenario the pre-existing single-batch tests could
+     have caught.
+   - **The mid-run AI budget recheck was initially moved to batch
+     granularity** (checked once per batch of up to 3, instead of once per
+     candidate) as part of the same refactor — caught immediately by
+     `tests/integration/ai-budget-midrun.test.ts` failing (a budget breach on
+     the second of two candidates in one batch was never caught, since the
+     check only ran once before that single batch). Fixed by moving the
+     budget check inside `processCandidate` itself, checked before every
+     individual candidate's own paid call regardless of which batch it's
+     in — restoring the original per-candidate granularity while still
+     keeping the concurrency benefit.
+4. **The worker Railway service had never been created at all** until this
+   incident — a separate, more fundamental gap than the Dockerfile one
+   above. Railway's free plan hit its service-provisioning limit, silently
+   leaving the app running with no background-job processor of any kind
+   (nothing tracked worker liveness or absence before Module Ten's own new
+   heartbeat-alert feature — which, notably, correctly reported "no data
+   yet" once checked, which is exactly what surfaced this). Resolved by the
+   account holder upgrading Railway's plan; not a code change.
+5. **Google Places API (New) was enabled with an API key created in a
+   Google Cloud project where the API itself had not been separately
+   enabled** — a Google Cloud account-setup gap, not a code issue. GENERAL-
+   mode search discovery correctly, safely fell back to mock candidate data
+   rather than crashing; the failure was visible and diagnosable from the
+   System Health failed-jobs list (Module 8A) with Google's own actionable
+   error message. Resolved on the Google Cloud side; no code change.
+
+None of items 3–5 were caused by code shipped in this module specifically —
+they were pre-existing gaps (or, for the AI provider work, never-before-run
+code) that this module's own new worker-heartbeat monitoring and stuck-search
+symptoms are what actually surfaced them. Item 3's `Promise.allSettled` fix
+is the one genuine, non-trivial design correction made live during this
+incident, and it went through the same rigor as the rest of this module:
+real root-cause tracing (not accepting the first plausible explanation),
+a regression test that failed for the right reason before the fix and
+passed for the right reason after, and a full clean test-suite run before
+being considered done.
 
 ## Known limitations
 

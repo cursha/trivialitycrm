@@ -33,6 +33,9 @@ export type AiSettingsValues = {
   // Module Nine: hard $ ceiling for one search, rechecked mid-run — see
   // checkMidRunAiBudget() below.
   maxCostPerSearchUsd: number | null;
+  // Module Ten: web_search/web_fetch max_uses per Anthropic discovery/
+  // verification call — see src/lib/research/providers/anthropic.ts.
+  maxSearchToolUsesPerCall: number;
 };
 
 /**
@@ -56,6 +59,7 @@ export async function getAiSettings(): Promise<AiSettingsValues> {
       warningThresholdUsd: existing.warningThresholdUsd ? Number(existing.warningThresholdUsd) : null,
       perUserDailySearchLimit: existing.perUserDailySearchLimit,
       maxCostPerSearchUsd: existing.maxCostPerSearchUsd ? Number(existing.maxCostPerSearchUsd) : null,
+      maxSearchToolUsesPerCall: existing.maxSearchToolUsesPerCall,
     };
   }
 
@@ -78,6 +82,7 @@ export async function getAiSettings(): Promise<AiSettingsValues> {
     warningThresholdUsd: created.warningThresholdUsd ? Number(created.warningThresholdUsd) : null,
     perUserDailySearchLimit: created.perUserDailySearchLimit,
     maxCostPerSearchUsd: created.maxCostPerSearchUsd ? Number(created.maxCostPerSearchUsd) : null,
+    maxSearchToolUsesPerCall: created.maxSearchToolUsesPerCall,
   };
 }
 

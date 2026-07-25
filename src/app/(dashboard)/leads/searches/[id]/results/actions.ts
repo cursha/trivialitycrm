@@ -9,6 +9,7 @@ import { checkRateLimit } from "@/lib/rate-limit/postgres-bucket";
 import { getProviders } from "@/lib/research/providers/factory";
 import type { DiscoverParams, ResearchCandidate } from "@/lib/research/providers/types";
 import { writeAuditEvent } from "@/lib/audit/log";
+import { classifyProviderError } from "@/lib/integrations/provider-errors";
 
 export type ResultActionResult = { error?: string } | undefined;
 
@@ -117,8 +118,19 @@ export async function researchResult(id: string): Promise<ResultActionResult> {
   };
 
   const providers = getProviders(result.search.mode);
-  const verified = await providers.verification.verify(candidate, params);
-  const scored = await providers.scoring.score(verified, params);
+  let verified: ResearchCandidate;
+  let scored: { score: number; explanation: string };
+  try {
+    verified = await providers.verification.verify(candidate, params);
+    scored = await providers.scoring.score(verified, params);
+  } catch (error) {
+    // A raw provider failure (rate limit, live overload, etc.) here would
+    // otherwise throw uncaught out of this Server Action — the same crash
+    // (Next.js's generic 500 page instead of an inline error) confirmed
+    // live for refinePrompt and run-search.ts's own provider calls; this is
+    // the third call site with the identical gap, fixed the same way.
+    return { error: classifyProviderError(error).safeMessage };
+  }
 
   // Only recompute disposition from a still-active state — never silently
   // un-reject or un-transfer a row the user (or the transfer flow) already

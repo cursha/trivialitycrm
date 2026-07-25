@@ -34,6 +34,10 @@ import type {
 // used only if that DB read somehow fails (matches WorkspaceSettings' own
 // defensive-fallback convention) — never silently used otherwise.
 const FALLBACK_MODEL = "claude-sonnet-5";
+// Module Ten: matches AiSettings.maxSearchToolUsesPerCall's own schema
+// default — only used if that DB read itself fails, same defensive-fallback
+// convention as FALLBACK_MODEL above.
+const FALLBACK_MAX_SEARCH_TOOL_USES = 8;
 
 async function resolveModel(): Promise<string> {
   try {
@@ -41,6 +45,18 @@ async function resolveModel(): Promise<string> {
     return settings.approvedModel;
   } catch {
     return FALLBACK_MODEL;
+  }
+}
+
+/** Like resolveModel(), but also returns the admin-configurable
+ * web_search/web_fetch max_uses budget — for discover()/verify() only,
+ * the two call sites that actually use search tools. */
+async function resolveResearchSettings(): Promise<{ model: string; maxSearchToolUses: number }> {
+  try {
+    const settings = await getAiSettings();
+    return { model: settings.approvedModel, maxSearchToolUses: settings.maxSearchToolUsesPerCall };
+  } catch {
+    return { model: FALLBACK_MODEL, maxSearchToolUses: FALLBACK_MAX_SEARCH_TOOL_USES };
   }
 }
 
@@ -236,15 +252,16 @@ export class AnthropicPromptAssistant implements PromptAssistant {
 
 export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryProvider {
   async discover(params: DiscoverParams): Promise<ResearchCandidate[]> {
-    const model = await resolveModel();
-    // Up to 8 web_search + 8 web_fetch tool round-trips for a broad query
-    // (e.g. no city filter, or "all pubs in a city") can genuinely take
-    // several minutes — the run-search job itself is designed for that
-    // (expireInSeconds: 3600 in boss-client.ts, with per-candidate
-    // checkpointing), but this call's own timeout was originally set well
-    // below that. Confirmed by an actual live run: a real search
-    // consistently hit the old 120s ceiling before Claude finished working
-    // through its tool calls.
+    const { model, maxSearchToolUses } = await resolveResearchSettings();
+    // Up to maxSearchToolUses web_search + maxSearchToolUses web_fetch tool
+    // round-trips for a broad query (e.g. no city filter, or "all pubs in a
+    // city") can genuinely take several minutes — the run-search job itself
+    // is designed for that (expireInSeconds: 3600 in boss-client.ts, with
+    // per-candidate checkpointing run in concurrent batches, see
+    // run-search.ts's CANDIDATE_CONCURRENCY), but this call's own timeout
+    // was originally set well below that. Confirmed by an actual live run: a
+    // real search consistently hit the old 120s ceiling before Claude
+    // finished working through its tool calls.
     return callProvider({ providerName: "anthropic-discovery", timeoutMs: 300_000 }, async (signal) => {
       const locationScope = params.cities.length > 0 ? params.cities.join(", ") : `all of ${params.region} (no city filter given)`;
 
@@ -259,8 +276,8 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
           // docs) while giving real headroom.
           max_tokens: 16000,
           tools: [
-            { type: "web_search_20260209", name: "web_search", max_uses: 8 },
-            { type: "web_fetch_20260209", name: "web_fetch", max_uses: 8 },
+            { type: "web_search_20260209", name: "web_search", max_uses: maxSearchToolUses },
+            { type: "web_fetch_20260209", name: "web_fetch", max_uses: maxSearchToolUses },
           ],
           output_config: { format: { type: "json_schema", schema: CANDIDATE_SCHEMA } },
           messages: [
@@ -290,21 +307,23 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
 
 export class AnthropicEvidenceVerificationProvider implements EvidenceVerificationProvider {
   async verify(candidate: ResearchCandidate, params: DiscoverParams): Promise<ResearchCandidate> {
-    const model = await resolveModel();
+    const { model, maxSearchToolUses } = await resolveResearchSettings();
     // Was scaled down from discover()'s 300s to 120s under the assumption
     // that a smaller tool budget (3+3 vs 8+8) means proportionally less
     // latency — confirmed wrong live: this call hit the 120s ceiling
     // repeatedly even after discover() was consistently succeeding at 300s,
     // so per-call fixed overhead (not tool count) dominates here. Matching
-    // discover()'s budget instead of guessing at a smaller number.
+    // discover()'s budget instead of guessing at a smaller number. Now uses
+    // the same admin-configurable maxSearchToolUsesPerCall as discover() —
+    // previously hardcoded to a smaller fixed 3, independently of it.
     return callProvider({ providerName: "anthropic-verification", timeoutMs: 300_000 }, async (signal) => {
       const response = await client().messages.create(
         {
           model,
           max_tokens: 2000,
           tools: [
-            { type: "web_search_20260209", name: "web_search", max_uses: 3 },
-            { type: "web_fetch_20260209", name: "web_fetch", max_uses: 3 },
+            { type: "web_search_20260209", name: "web_search", max_uses: maxSearchToolUses },
+            { type: "web_fetch_20260209", name: "web_fetch", max_uses: maxSearchToolUses },
           ],
           output_config: {
             format: {

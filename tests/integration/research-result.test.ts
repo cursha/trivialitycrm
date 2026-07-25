@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { resetDatabase, testPrisma } from "../helpers/db";
 import {
   createRoleWithPermissions,
@@ -12,6 +12,7 @@ import {
 import { resetFakeCookies } from "../setup/mock-next";
 import { researchResult } from "../../src/app/(dashboard)/leads/searches/[id]/results/actions";
 import { resetEnvCacheForTests } from "../../src/lib/env";
+import { MockEvidenceVerificationProvider } from "../../src/lib/research/providers/mock";
 
 const mutableEnv = process.env as Record<string, string | undefined>;
 const originalProvider = process.env.AI_PROVIDER;
@@ -143,6 +144,24 @@ describe("researchResult", () => {
       outcomes.push(await researchResult(result.id));
     }
     expect(outcomes.some((o) => o?.error?.includes("Too many"))).toBe(true);
+  });
+
+  it("returns a friendly error instead of throwing when the provider call itself fails", async () => {
+    // Regression test: researchResult() previously called
+    // providers.verification.verify()/scoring.score() with no try/catch at
+    // all, so a real provider failure (confirmed live: an Anthropic 529
+    // "overloaded" response) propagated as an uncaught exception, crashing
+    // the whole page with Next.js's generic 500 instead of the normal
+    // inline error every other AI-provider call site in the app produces.
+    const { user, search } = await baseFixtures();
+    await loginAs(user.id);
+    const result = await createSearchResultFixture({ searchId: search.id });
+
+    const verifySpy = vi.spyOn(MockEvidenceVerificationProvider.prototype, "verify").mockRejectedValueOnce(new Error("Simulated provider failure."));
+
+    await expect(researchResult(result.id)).resolves.toEqual(expect.objectContaining({ error: expect.any(String) }));
+
+    verifySpy.mockRestore();
   });
 
   it("blocks in anthropic mode once the daily AI budget is reached, same guard as starting a new search", async () => {

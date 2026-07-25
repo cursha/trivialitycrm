@@ -1978,6 +1978,12 @@ model AiSettings {
   // partway through stops immediately rather than finishing at full cost.
   // Null = unlimited (same convention as maxResultsPerSearch).
   maxCostPerSearchUsd     Decimal? @db.Decimal(10, 2)
+  // Module Ten: caps web_search/web_fetch max_uses per Anthropic discovery
+  // and verification call (src/lib/research/providers/anthropic.ts) —
+  // previously hardcoded to 8 for both tools. Lower = faster but thinner
+  // evidence per lead; higher = more thorough but slower. Admin-adjustable
+  // so this tradeoff doesn't require a code change.
+  maxSearchToolUsesPerCall Int     @default(8)
   updatedAt               DateTime @updatedAt
   updatedById             String?
   updatedBy               User?    @relation("AiSettingsEditor", fields: [updatedById], references: [id], onDelete: SetNull)

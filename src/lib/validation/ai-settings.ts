@@ -28,6 +28,7 @@ export const AiSettingsSchema = z.object({
   warningThresholdUsd: optionalPositiveMoney,
   perUserDailySearchLimit: optionalPositiveInt,
   maxCostPerSearchUsd: optionalPositiveMoney,
+  maxSearchToolUsesPerCall: z.coerce.number().int().min(1).max(8, { error: "Cannot exceed 8 — the app's own per-call ceiling." }),
 });
 
 export type AiSettingsValues = z.infer<typeof AiSettingsSchema>;

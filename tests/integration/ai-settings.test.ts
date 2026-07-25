@@ -31,6 +31,7 @@ function formData(overrides: Record<string, string> = {}) {
     approvedModel: "claude-sonnet-5",
     defaultMinimumScore: "80",
     maxCitiesPerSearch: "50",
+    maxSearchToolUsesPerCall: "8",
   };
   for (const [k, v] of Object.entries({ ...defaults, ...overrides })) fd.set(k, v);
   return fd;
@@ -61,6 +62,36 @@ describe("AI settings", () => {
 
     const result = await updateAiSettings(undefined, formData({ maxCitiesPerSearch: "100" }));
     expect(result?.error).toBeTruthy();
+  });
+
+  it("rejects a maxSearchToolUsesPerCall above the app's own 8-use ceiling", async () => {
+    const role = await createRoleWithPermissions("Administrator", ["manage_ai_settings"]);
+    const user = await createTestUser({ roleId: role.id });
+    await loginAs(user.id);
+
+    const result = await updateAiSettings(undefined, formData({ maxSearchToolUsesPerCall: "9" }));
+    expect(result?.error).toBeTruthy();
+  });
+
+  it("rejects a maxSearchToolUsesPerCall below 1", async () => {
+    const role = await createRoleWithPermissions("Administrator", ["manage_ai_settings"]);
+    const user = await createTestUser({ roleId: role.id });
+    await loginAs(user.id);
+
+    const result = await updateAiSettings(undefined, formData({ maxSearchToolUsesPerCall: "0" }));
+    expect(result?.error).toBeTruthy();
+  });
+
+  it("saves a valid, reduced maxSearchToolUsesPerCall", async () => {
+    const role = await createRoleWithPermissions("Administrator", ["manage_ai_settings"]);
+    const user = await createTestUser({ roleId: role.id });
+    await loginAs(user.id);
+
+    const result = await updateAiSettings(undefined, formData({ maxSearchToolUsesPerCall: "3" }));
+    expect(result?.error).toBeUndefined();
+
+    const settings = await getAiSettings();
+    expect(settings.maxSearchToolUsesPerCall).toBe(3);
   });
 
   it("saves valid settings and audits the change", async () => {

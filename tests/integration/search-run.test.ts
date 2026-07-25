@@ -1,7 +1,12 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { resetDatabase, testPrisma } from "../helpers/db";
 import { createRoleWithPermissions, createTestUser, createLeadTypeFixture, createCompetitorFixture, createLeadSearchFixture, createSearchResultFixture } from "../helpers/fixtures";
 import { runSearchJob } from "../../src/lib/research/run-search";
+import { MockCandidateDiscoveryProvider } from "../../src/lib/research/providers/mock";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 beforeEach(async () => {
   await resetDatabase();
@@ -135,5 +140,32 @@ describe("runSearchJob", () => {
     const updated = await testPrisma.leadSearch.findUniqueOrThrow({ where: { id: search.id } });
     expect(updated.status).toBe("FAILED");
     expect(updated.errorMessage).toBeTruthy();
+  });
+
+  it("sanitizes a raw provider failure into a safe message instead of storing it verbatim", async () => {
+    // Regression test: run-search.ts previously stored `error.message`
+    // directly from a failed discover()/verify()/score() call — a raw
+    // provider error (confirmed live: an Anthropic 529 "overloaded"
+    // response, and separately a "credit balance too low" 400) would show
+    // its full raw text on the search status page instead of the same
+    // classifyProviderError() safe message every other AI-provider call
+    // site produces.
+    const { user, leadType } = await baseFixtures();
+    // TRIVIA_GAP, not the createLeadSearchFixture default of GENERAL —
+    // GENERAL mode's discovery routes through MockPlacesProvider instead of
+    // MockCandidateDiscoveryProvider (see factory.ts), so this spy would
+    // never fire under the default mode.
+    const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, cities: ["Milton"], mode: "TRIVIA_GAP" });
+
+    const rawMessage = "529 {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}";
+    vi.spyOn(MockCandidateDiscoveryProvider.prototype, "discover").mockRejectedValueOnce(new Error(rawMessage));
+
+    await runSearchJob(search.id);
+
+    const updated = await testPrisma.leadSearch.findUniqueOrThrow({ where: { id: search.id } });
+    expect(updated.status).toBe("FAILED");
+    expect(updated.errorMessage).toBeTruthy();
+    expect(updated.errorMessage).not.toContain(rawMessage);
+    expect(updated.errorMessage).not.toContain("overloaded_error");
   });
 });

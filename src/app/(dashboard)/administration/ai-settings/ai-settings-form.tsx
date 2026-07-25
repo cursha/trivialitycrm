@@ -19,6 +19,7 @@ export type AiSettingsDefaults = {
   warningThresholdUsd: number | null;
   perUserDailySearchLimit: number | null;
   maxCostPerSearchUsd: number | null;
+  maxSearchToolUsesPerCall: number;
 };
 
 export function AiSettingsForm({
@@ -92,6 +93,15 @@ export function AiSettingsForm({
             <Label>Maximum cost per search (USD, optional)</Label>
             <Input name="maxCostPerSearchUsd" type="number" min={0} step="0.01" defaultValue={defaultValues.maxCostPerSearchUsd ?? ""} className="mt-1" />
             <HelpText className="mt-1">Rechecked between candidates while a search runs — stops the search immediately if crossed mid-run, not just at start. Leave blank for unlimited.</HelpText>
+          </div>
+          <div>
+            <Label>Web searches per business (1–8)</Label>
+            <Input name="maxSearchToolUsesPerCall" type="number" min={1} max={8} defaultValue={defaultValues.maxSearchToolUsesPerCall} required className="mt-1" />
+            <HelpText className="mt-1">
+              How many real web searches (and page fetches) the AI can use while researching or verifying one business. Lower is faster but finds less
+              evidence per lead; higher is slower but more thorough. This does not change how long an individual search is allowed to run for — it changes
+              how much work each step actually does.
+            </HelpText>
           </div>
           {state?.error && (
             <div className="sm:col-span-2">

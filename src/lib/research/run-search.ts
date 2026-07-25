@@ -9,10 +9,50 @@ import { computeNormalizedFields, findPriorRejectedMatches } from "../duplicates
 import { normalizeCompanyName } from "../duplicates/normalize";
 import { getAiSettings, checkMidRunAiBudget } from "../ai/budget";
 import { writeAuditEvent } from "../audit/log";
+import { classifyProviderError } from "../integrations/provider-errors";
 import type { DiscoverParams, ResearchCandidate } from "./providers/types";
+
+/**
+ * Wraps a single provider call (discover/verify/score) so any raw error it
+ * throws — a live Anthropic 5xx/overload, a rate limit, a timeout, etc. —
+ * is sanitized through the same classifyProviderError() every other
+ * AI/email call site in the app already uses, before it can reach
+ * LeadSearch.errorMessage (shown directly to the user on the search status
+ * page). Previously this file's outer catch stored `error.message` as-is,
+ * so a raw provider error (confirmed live: Anthropic's 529 "overloaded"
+ * response) would surface its full raw text to the user instead of a safe,
+ * generic message. Deliberately NOT applied to the whole function — the
+ * mid-run budget-block Error thrown below already carries its own safe,
+ * specific message and must reach the user unchanged, not get flattened
+ * into classifyProviderError's generic "unknown" fallback.
+ */
+async function callProviderSafely<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    throw new Error(classifyProviderError(error).safeMessage);
+  }
+}
 
 function candidateIdentity(candidate: { name: string; city: string }): string {
   return `${normalizeCompanyName(candidate.name)}|${candidate.city.trim().toLowerCase()}`;
+}
+
+// Module Ten: candidates within one search are now verified/scored in
+// batches of this size rather than strictly one-at-a-time — a real,
+// production-incident-driven fix (see MODULE_10_REPORT.md), not a cosmetic
+// one. Each candidate's own verify->score sequence is still fully
+// sequential (scoring needs that candidate's own verified evidence), but
+// different candidates' sequences now overlap. 3 is deliberately
+// conservative: comfortably inside callProvider()'s shared 30-calls/minute
+// rate limit per provider name, and small enough that a mid-batch budget
+// breach (see below) only ever overshoots by a bounded, small amount.
+const CANDIDATE_CONCURRENCY = 3;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) chunks.push(items.slice(i, i + size));
+  return chunks;
 }
 
 export type RunSearchJobOptions = {
@@ -82,7 +122,7 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
         data: { status: "RUNNING", startedAt: search.startedAt ?? new Date(), heartbeatAt: new Date() },
       });
 
-      const rawCandidates = await providers.discovery.discover(params);
+      const rawCandidates = await callProviderSafely(() => providers.discovery.discover(params));
       const deduped = dedupeWithinRun(filterByModeExclusivity(rawCandidates, search.mode));
 
       // Module 8A: an administrator-configured cap (AiSettings.
@@ -114,22 +154,29 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       });
     }
 
-    // --- Per-candidate loop, resumable at whichever stage wasn't
-    // checkpointed on a prior attempt --------------------------------------
+    // --- Per-candidate processing, resumable at whichever stage wasn't
+    // checkpointed on a prior attempt. Batched (see CANDIDATE_CONCURRENCY
+    // above), not a single sequential loop — different candidates' own
+    // verify->score sequences now run concurrently within each batch.
+    // -----------------------------------------------------------------
     const candidateRows = await prisma.searchCandidate.findMany({
       where: { searchId, status: { not: "COMPLETED" } },
       orderBy: { index: "asc" },
     });
 
-    for (const candidateRow of candidateRows) {
-      if (options.isCancelled && (await options.isCancelled())) return;
-
-      // Module Nine: rechecked between candidates, not just once before the
-      // search started — a search that crosses the daily/monthly budget or
-      // its own maxCostPerSearchUsd ceiling partway through stops here,
-      // before placing another paid verify/score call. GENERAL mode never
-      // places a paid call at all (see below), so this recheck is skipped
-      // for it — a pure DB-cost-avoidance short-circuit, not a safety gap.
+    async function processCandidate(candidateRow: (typeof candidateRows)[number]): Promise<void> {
+      // Module Nine: rechecked before every candidate's own paid call, not
+      // just once before the search started or once per batch — a search
+      // that crosses the daily/monthly budget or its own maxCostPerSearchUsd
+      // ceiling partway through stops here, before placing another paid
+      // verify/score call. Checked per-candidate (inside processCandidate,
+      // not once per batch) specifically so batching candidates for
+      // concurrency (see CANDIDATE_CONCURRENCY above) doesn't weaken this —
+      // a batch-level-only check would only fire once per up-to-3
+      // candidates, letting a breach mid-batch go uncaught until the next
+      // batch entirely. GENERAL mode never places a paid call at all (see
+      // below), so this recheck is skipped for it — a pure DB-cost-avoidance
+      // short-circuit, not a safety gap.
       if (search.mode !== "GENERAL") {
         const midRunCheck = await checkMidRunAiBudget(search.id);
         if (!midRunCheck.allowed) {
@@ -168,7 +215,7 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
         }
       } else {
         if (candidateRow.status === "PENDING") {
-          verified = await providers.verification.verify(raw, params);
+          verified = await callProviderSafely(() => providers.verification.verify(raw, params));
           await prisma.searchCandidate.update({
             where: { id: candidateRow.id },
             data: { status: "VERIFIED", verifiedData: verified as unknown as object },
@@ -178,7 +225,7 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
         }
 
         if (candidateRow.status === "PENDING" || candidateRow.status === "VERIFIED") {
-          const scored = await providers.scoring.score(verified, params);
+          const scored = await callProviderSafely(() => providers.scoring.score(verified, params));
           score = scored.score;
           explanation = scored.explanation;
           await prisma.searchCandidate.update({
@@ -265,6 +312,25 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
         where: { id: searchId },
         data: { candidatesFound, heartbeatAt: new Date() },
       });
+    }
+
+    for (const batch of chunk(candidateRows, CANDIDATE_CONCURRENCY)) {
+      if (options.isCancelled && (await options.isCancelled())) return;
+
+      // allSettled, not all — every candidate in this batch must be allowed
+      // to fully finish (reach COMPLETED, with its SearchResult written)
+      // even if a sibling candidate in the same batch fails. Promise.all
+      // would reject as soon as the FIRST candidate throws, abandoning the
+      // others mid-flight as orphaned, un-awaited promises — their DB
+      // writes would then race against this function's own catch block
+      // (and the worker potentially moving on to the next job) instead of
+      // being guaranteed to land. allSettled waits for the whole batch,
+      // so by the time a failure is thrown below, every other candidate in
+      // the batch is already fully checkpointed one way or the other —
+      // matching the resumability guarantee the sequential version had.
+      const outcomes = await Promise.allSettled(batch.map((candidateRow) => processCandidate(candidateRow)));
+      const firstFailure = outcomes.find((outcome): outcome is PromiseRejectedResult => outcome.status === "rejected");
+      if (firstFailure) throw firstFailure.reason;
     }
 
     await prisma.leadSearch.update({
