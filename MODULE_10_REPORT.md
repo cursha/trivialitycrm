@@ -350,6 +350,38 @@ it.
   updates to 6 existing test files (fixture/scope corrections) and
   `tests/helpers/db.ts` (new tables added to the reset list)
 
+## Post-merge production incident and fixes (2026-07-24, after this report was first written)
+
+Two real issues surfaced once this module was actually deployed, both fixed
+the same day:
+
+1. **`refinePrompt` crashed the whole page on a live AI provider failure**
+   (`src/app/(dashboard)/leads/prompts/actions.ts`) — it called the AI
+   provider with no `try`/`catch` at all, so a real production event (the
+   configured Anthropic account running out of credit) propagated as an
+   uncaught exception, and Next.js showed its generic 500 page instead of
+   the friendly inline error every other AI-provider call site in the app
+   already produces via `classifyProviderError()`. Fixed to match that
+   existing pattern. Not introduced by this module, but found and fixed
+   during it.
+2. **Railway cannot select a build target from a multi-stage Dockerfile** —
+   a gap in this project's deployment setup since Module Three, never
+   actually exercised until this module's changes made deploying a second
+   (`worker`) service necessary for the first time. `MODULE_3_REPORT.md`'s
+   original Railway checklist assumed a "Docker Build Target" setting that
+   does not exist in Railway's current build configuration or
+   config-as-code (confirmed directly against Railway's own current docs).
+   Without it, Docker builds a multi-stage file's *last* stage by default —
+   which is why the `web` service always worked (its last stage aliases
+   `web`) but a `worker` service pointed at the same file silently built the
+   web app again instead of the worker. Fixed with a new, standalone
+   `Dockerfile.worker` (near-identical to the main Dockerfile's `worker`
+   stage, minus the unneeded Next.js build step) that the `worker` Railway
+   service points its own "Dockerfile Path" setting at directly — no target
+   selection needed. `RAILWAY.md` and the main `Dockerfile`'s header comment
+   were both corrected to reflect this. Verified with the same build +
+   container smoke test used for the original deployment gate.
+
 ## Known limitations
 
 - **No browser-automation tool available in this session** (as with Module

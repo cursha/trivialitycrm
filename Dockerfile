@@ -1,7 +1,17 @@
 # Multi-stage build producing two runtime targets from one image build:
 # `web` (Next.js server) and `worker` (pg-boss job consumer, run via tsx).
-# Railway's web and worker services both build from this same Dockerfile,
-# selecting a target via `--target web` / `--target worker`.
+# `docker build --target web` / `--target worker` against this file both work
+# fine locally (and did, repeatedly, in this module's deployment-gate
+# testing) — but Railway itself has no equivalent of `--target` anywhere in
+# its build settings or config-as-code (confirmed directly against Railway's
+# own current docs during Module Ten, after this gap caused a real
+# production incident: a second Railway service pointed at this file built
+# `web` regardless, since Docker defaults to the file's LAST stage —
+# `final`, aliased to `web` below — whenever no target is specified). The
+# `worker` Railway service is built from the separate, single-purpose
+# `Dockerfile.worker` instead — see that file's header for the full
+# explanation. This file's own worker stage is kept only for local
+# `--target worker` testing/parity, not because Railway can reach it.
 #
 # node:22-slim (Debian, not alpine) — matches package.json's engines.node
 # (pg-boss requires >=22.12 for CommonJS require(esm)) and avoids the
@@ -105,5 +115,7 @@ EXPOSE 8080
 # shutting down gracefully..." — never ran; npm intercepted the signal and
 # killed the child instead of letting it propagate).
 CMD ["node_modules/.bin/tsx", "worker/index.ts"]
-# Use the website when no Docker target is selected.
+# Docker builds the LAST stage in the file when no --target is given — this
+# is what Railway's `web` service actually relies on, not an explicit
+# selection (see the file header). Keep this as the last stage.
 FROM web AS final

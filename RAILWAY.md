@@ -7,15 +7,29 @@ for historical build-testing notes (why the Dockerfile looks the way it does).
 
 ## Architecture
 
-Two Railway services build from the same `Dockerfile` via `--target web` /
-`--target worker`, plus a managed Postgres plugin:
+Two Railway services plus a managed Postgres plugin. **Important**: Railway
+has no way to select a build stage/target from a multi-stage Dockerfile —
+confirmed directly against Railway's current docs, after this gap caused a
+real production incident (a second service pointed at the multi-stage
+`Dockerfile` just built the `web` stage again, since Docker defaults to a
+file's last stage when no `--target` is given, and Railway's build settings
+and config-as-code have no `target` field at all). So the two services use
+**two separate Dockerfiles**, each Railway service pointed at its own via
+that service's Settings → Build → **Dockerfile Path**:
 
-- **`web`** — the Next.js app. Public-facing.
+- **`web`** — the Next.js app, built from `Dockerfile` (Dockerfile Path left
+  at the default). Public-facing.
 - **`worker`** — the pg-boss job consumer (durable AI research jobs, scheduled
-  email, reports, sequences, cleanup ticks, worker-heartbeat + alert ticks).
+  email, reports, sequences, cleanup ticks, worker-heartbeat + alert ticks),
+  built from `Dockerfile.worker` (Dockerfile Path set to `Dockerfile.worker`).
   No public networking needed — internal only.
 - **Postgres** — Railway's managed plugin. Both services connect to the same
   database via `DATABASE_URL`.
+
+`docker build --target web` / `--target worker` against the main `Dockerfile`
+still work fine for local testing (both are exercised in the deployment
+gate — see `MODULE_10_REPORT.md`) — it's specifically Railway's own build
+pipeline that can't use a target flag.
 
 **Migrations run in exactly one place**: the `web` service's Pre-Deploy
 Command (`npx prisma migrate deploy`). The `worker` service never runs
@@ -36,18 +50,26 @@ services to coordinate a migration race.
    plugin). Note its private `DATABASE_URL` reference variable — you'll wire
    it into both other services as a reference, not a copied literal.
 2. **Create the `web` service**, connected to the GitHub repo.
-   - Settings → Build: Builder = Dockerfile, Docker Build Target = `web`
+   - Settings → Build: Builder = Dockerfile (leave Dockerfile Path at its
+     default, `Dockerfile`)
    - Settings → Deploy: Start Command = leave as the image default
      (`node_modules/.bin/next start`); Pre-Deploy Command =
      `npx prisma migrate deploy`; Healthcheck Path = `/api/health`; Restart
      Policy = `ON_FAILURE` (or `ALWAYS` — operator preference)
    - Enable public networking; attach a custom domain once ready (see below)
 3. **Create the `worker` service** from the same repo.
-   - Docker Build Target = `worker`
+   - Settings → Build: Builder = Dockerfile, **Dockerfile Path =
+     `Dockerfile.worker`** — this is the step that's easy to miss and, if
+     skipped, silently builds the web app again instead (see Architecture
+     above)
    - **No Pre-Deploy Command** — do not add `migrate deploy` here. The
      worker's own migration-status gate is the safety net; a second
      `migrate deploy` here would be redundant and isn't needed.
    - Internal networking only (no public domain needed)
+   - Environment variables: easiest to copy every variable from the `web`
+     service (its Variables tab → Raw Editor → copy) and paste into the
+     worker service's own Variables tab (also via Raw Editor) — the worker
+     needs almost the identical set, for the reason in the next step
 4. **Environment variables**: see `ENVIRONMENT_VARIABLES.md` for the complete,
    accurate, grouped list of every variable this app reads, which service(s)
    need it set, and why. Read that file's "how validation works" section

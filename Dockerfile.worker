@@ -1,0 +1,53 @@
+# Standalone Dockerfile for the `worker` Railway service.
+#
+# Why this exists as a separate file rather than a --target on the main
+# Dockerfile: Railway has NO mechanism to select a build stage/target from a
+# multi-stage Dockerfile — confirmed directly against Railway's current
+# official docs (docs.railway.com/guides/dockerfiles and
+# docs.railway.com/reference/config-as-code both list every build-config
+# option, including `dockerfilePath`, and neither has a `target` field).
+# Without an explicit --target, `docker build` always builds the LAST stage
+# in the file — which is why the main Dockerfile's `web` service happened to
+# work (its last stage, `final`, aliases `web`), but a second Railway service
+# pointed at the same file could never reach `worker`. This file's own last
+# (and only meaningful) stage IS the worker, so pointing a service's
+# "Dockerfile Path" setting at `Dockerfile.worker` needs no target selection
+# at all. `docker build --target worker .` against the main Dockerfile still
+# works fine for local testing (see MODULE_10_REPORT.md's deployment gate) —
+# it's specifically Railway's own build pipeline that has no such flag.
+#
+# Kept as a near-exact copy of the main Dockerfile's base/deps/builder/worker
+# stages, minus the unneeded `npm run build` (the worker never needs Next's
+# production build output) and the web-only stage — see that file for the
+# reasoning behind each individual line (node:22-slim/openssl,
+# COPY --from=deps, prisma generate, the direct-binary CMD for signal
+# handling).
+FROM node:22-slim AS base
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
+FROM base AS deps
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+ENV DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder"
+RUN npx prisma generate
+
+FROM base AS worker
+WORKDIR /app
+ENV NODE_ENV=production
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/worker ./worker
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
+COPY --from=builder /app/package.json ./package.json
+USER nextjs
+EXPOSE 8080
+CMD ["node_modules/.bin/tsx", "worker/index.ts"]
