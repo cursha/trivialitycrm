@@ -224,6 +224,21 @@ function modeInstructions(mode: DiscoverParams["mode"], competitorName?: string)
   }
 }
 
+// A real production incident traced back to this: the assistant had no
+// instruction about output format, so it reasonably (but wrongly, for how
+// this app actually works) produced a fill-in-the-blank template with
+// bracket placeholders like "[LOCATION/REGION]" — which then got saved
+// and used verbatim as the real search prompt, giving the discovery AI
+// nothing concrete to act on. Location and lead type are ALWAYS appended
+// automatically at search time (see discover()'s "Location: .../Lead
+// type: ..." lines below) — the saved prompt itself must never reference
+// them, and must never contain a placeholder of any kind.
+const PROMPT_ASSIST_FORMAT_RULES =
+  "Output ONLY the finished prompt text itself — no headings, no meta-commentary, no \"Here's your prompt:\" preamble. " +
+  "It must be complete and ready to use as-is, never a fill-in-the-blank template — never bracket placeholders like [LOCATION] or [YOUR PRODUCT]. " +
+  "Do not mention a specific location, city, region, or lead type/business category by name or placeholder — those are supplied automatically, separately, every time this prompt is used, regardless of where or what it searches for. " +
+  "Focus only on the qualifying signals and criteria that distinguish a genuinely good match from a bad one.";
+
 export class AnthropicPromptAssistant implements PromptAssistant {
   async refine(input: { description: string; currentPrompt?: string; userId?: string }): Promise<{ prompt: string }> {
     const model = await resolveModel();
@@ -236,8 +251,8 @@ export class AnthropicPromptAssistant implements PromptAssistant {
             {
               role: "user",
               content: input.currentPrompt
-                ? `Improve this reusable business-research prompt for clarity and specificity, keeping its intent:\n\n${input.currentPrompt}\n\nAdditional guidance from the user: ${input.description}`
-                : `Write a reusable, specific business-research prompt for AI-assisted lead discovery based on this description:\n\n${input.description}`,
+                ? `Improve this reusable business-research prompt for clarity and specificity, keeping its intent:\n\n${input.currentPrompt}\n\nAdditional guidance from the user: ${input.description}\n\n${PROMPT_ASSIST_FORMAT_RULES}`
+                : `Write a reusable, specific business-research prompt for AI-assisted lead discovery based on this description:\n\n${input.description}\n\n${PROMPT_ASSIST_FORMAT_RULES}`,
             },
           ],
         },
