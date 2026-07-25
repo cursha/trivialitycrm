@@ -352,9 +352,10 @@ it.
 
 ## Post-merge production incident and fixes (2026-07-24/25, after this report was first written)
 
-Five real issues surfaced once this module was actually deployed and
+Eight real issues surfaced once this module was actually deployed and
 exercised live for the first time — all found and fixed within the same
-incident, each with regression tests:
+incident, each with regression tests (except item 6, a data-naming issue with
+no code to test):
 
 1. **`refinePrompt` crashed the whole page on a live AI provider failure**
    (`src/app/(dashboard)/leads/prompts/actions.ts`) — it called the AI
@@ -445,6 +446,51 @@ incident, each with regression tests:
    rather than crashing; the failure was visible and diagnosable from the
    System Health failed-jobs list (Module 8A) with Google's own actionable
    error message. Resolved on the Google Cloud side; no code change.
+
+6. **A seeded Lead Type literally named "Mayhem" was being used as an AI
+   search keyword**, since GENERAL/TRIVIA search prompts include the Lead
+   Type's own name as a qualifying term. Live results included businesses
+   like "Mayhem Trailers" and "Mayhem Junk Removal" — a correct search result
+   for the literal term, not a code bug. No fix was possible or needed in
+   code; resolved by renaming the Lead Type to "Pub Trivia" (an accurate,
+   non-generic-word name), which is itself the durable fix — any Lead Type
+   name doubling as a common English word will do the same thing.
+7. **The AI-assisted "Draft prompt" feature (`AnthropicPromptAssistant.refine()`,
+   `src/lib/research/providers/anthropic.ts`) returned generic fill-in-the-
+   blank templates** (`[LOCATION]`, `[YOUR PRODUCT OR SERVICE]`-style bracket
+   placeholders) instead of a ready-to-use prompt — confirmed live, twice,
+   because the first fix attempt was insufficient. The original instructions
+   asked the model to avoid placeholders but appended that guidance after
+   the rest of the prompt, where it was easy for the model to deprioritize;
+   the model also had no explicit instruction for the "improve an existing
+   template" branch, so it would preserve a prior bracket-filled structure
+   instead of rewriting it as concrete guidance. Fixed by rewriting
+   `PROMPT_ASSIST_FORMAT_RULES` as a strict, itemized format contract placed
+   **first** in the message (not appended last) in both the fresh-draft and
+   improve-existing branches, explicitly forbidding location/lead-type
+   placeholders (those are supplied automatically at search time) and
+   requiring concrete qualifying criteria instead. Confirmed live, by the
+   account holder, to now produce a genuinely usable, bracket-free prompt.
+8. **A Prisma bulk-transaction timeout during search-candidate checkpointing**
+   — `run-search.ts`'s discovery step checkpoints every discovered candidate
+   in one `prisma.$transaction([...])` (array form) before per-candidate
+   processing begins. Prisma's array-form `$transaction` defaults to a 5-
+   second timeout; once the prompt-assist fix (item 7) started producing
+   genuinely good, specific prompts, live searches began discovering enough
+   real candidates that this bulk upsert started genuinely exceeding 5
+   seconds. Found via the System Health failed-jobs list, showing Prisma's
+   own exact error: *"A commit cannot be executed on an expired transaction.
+   The timeout for this transaction was 5000 ms, however 5505 ms passed
+   since the start of the transaction."* Fixed with an explicit
+   `{ timeout: 30_000 }` second argument — comfortably above the app's own
+   upper bound on candidates per search (`maxResultsPerSearch` /
+   `maxCitiesPerSearch`), and appropriate for a bulk checkpoint step rather
+   than a fast interactive one. A `Grep` sweep of `src/` for the same
+   array-form-`$transaction`-with-`.map()` shape confirmed this was an
+   isolated instance, not a systemic pattern. Regression test added
+   (`tests/integration/search-run.test.ts`) asserting the checkpoint
+   transaction is always called with `{ timeout: 30_000 }`, since directly
+   reproducing a slow transaction in an automated test isn't practical.
 
 None of items 3–5 were caused by code shipped in this module specifically —
 they were pre-existing gaps (or, for the AI provider work, never-before-run

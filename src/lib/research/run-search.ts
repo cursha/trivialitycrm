@@ -146,6 +146,16 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
             update: {},
           }),
         ),
+        // Prisma's array-form $transaction defaults to a 5s timeout — fine
+        // for a handful of candidates, but a real live search with a good,
+        // specific prompt (unlike the earlier bracket-template one) can
+        // discover enough candidates that bulk-checkpointing them all here
+        // genuinely exceeds 5s. Confirmed live: "A commit cannot be
+        // executed on an expired transaction... 5505 ms passed since the
+        // start." 30s comfortably covers even the app's own upper bound
+        // (maxResultsPerSearch/maxCitiesPerSearch), and this is a bulk
+        // checkpoint step, not a fast interactive one.
+        { timeout: 30_000 },
       );
     } else {
       await prisma.leadSearch.update({

@@ -168,4 +168,24 @@ describe("runSearchJob", () => {
     expect(updated.errorMessage).not.toContain(rawMessage);
     expect(updated.errorMessage).not.toContain("overloaded_error");
   });
+
+  it("checkpoints discovered candidates with a generous transaction timeout, not Prisma's 5s default", async () => {
+    // Regression test: the discovery-checkpoint bulk upsert previously
+    // called prisma.$transaction([...]) with no explicit timeout, which
+    // defaults to 5s — confirmed live to fail once a real search discovered
+    // enough genuine candidates ("A commit cannot be executed on an expired
+    // transaction... 5505 ms passed since the start."). Locks in the fix
+    // (an explicit { timeout: 30_000 }) rather than only re-testing the
+    // symptom, since a slow-transaction repro isn't practical in tests.
+    const { user, leadType } = await baseFixtures();
+    const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, cities: ["Milton"], mode: "TRIVIA_GAP" });
+
+    const transactionSpy = vi.spyOn(testPrisma, "$transaction");
+
+    await runSearchJob(search.id);
+
+    const bulkUpsertCall = transactionSpy.mock.calls.find((call) => Array.isArray(call[0]));
+    expect(bulkUpsertCall).toBeDefined();
+    expect(bulkUpsertCall?.[1]).toEqual({ timeout: 30_000 });
+  });
 });
