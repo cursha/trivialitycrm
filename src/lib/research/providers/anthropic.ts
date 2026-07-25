@@ -233,11 +233,26 @@ function modeInstructions(mode: DiscoverParams["mode"], competitorName?: string)
 // automatically at search time (see discover()'s "Location: .../Lead
 // type: ..." lines below) — the saved prompt itself must never reference
 // them, and must never contain a placeholder of any kind.
+//
+// A first attempt at this instruction (appended after the task, not
+// repeated) was NOT enough for the "improve an existing prompt" path
+// specifically: telling the model to "keep its intent" while the existing
+// prompt's own intent/structure WAS a fill-in-the-blank template caused it
+// to keep the template shape anyway, format rules notwithstanding —
+// confirmed live, the exact same bracket-laden output came back even after
+// the first fix. This version puts the rules first (not last), states
+// explicitly that "keep its intent" means the research criteria only,
+// never the template structure, and repeats the core "no brackets, no
+// placeholders" instruction a second time at the end for emphasis.
 const PROMPT_ASSIST_FORMAT_RULES =
-  "Output ONLY the finished prompt text itself — no headings, no meta-commentary, no \"Here's your prompt:\" preamble. " +
-  "It must be complete and ready to use as-is, never a fill-in-the-blank template — never bracket placeholders like [LOCATION] or [YOUR PRODUCT]. " +
-  "Do not mention a specific location, city, region, or lead type/business category by name or placeholder — those are supplied automatically, separately, every time this prompt is used, regardless of where or what it searches for. " +
-  "Focus only on the qualifying signals and criteria that distinguish a genuinely good match from a bad one.";
+  "STRICT OUTPUT FORMAT — read this before doing anything else:\n" +
+  "- Output ONLY the finished prompt text itself. No headings, no title, no meta-commentary, no \"Here's your prompt:\" preamble, no markdown section dividers.\n" +
+  "- It must be complete and ready to use as-is, right now, with zero further editing required. It must NEVER be a fill-in-the-blank template.\n" +
+  "- NEVER include a bracket placeholder of any kind — no [LOCATION], no [YOUR PRODUCT OR SERVICE], no [e.g., ...], nothing in square brackets at all.\n" +
+  "- NEVER mention a specific location, city, region, or lead type/business category, or leave a placeholder for one — those are supplied automatically, separately, every single time this prompt is actually used, regardless of where or what it searches for.\n" +
+  "- Write only the qualifying signals and criteria that distinguish a genuinely good match from a bad one (e.g. \"prioritize independently-owned venues with an active events calendar and a public contact page\" — concrete guidance, not a category to fill in).\n" +
+  "- If asked to improve an existing prompt that is itself a bracket-filled template, do NOT preserve that template structure — \"keep its intent\" means keep the underlying research criteria/goal, never the placeholder format. Rewrite it as concrete, ready-to-use guidance.\n" +
+  "Reminder: your response must contain no square-bracket placeholders whatsoever.";
 
 export class AnthropicPromptAssistant implements PromptAssistant {
   async refine(input: { description: string; currentPrompt?: string; userId?: string }): Promise<{ prompt: string }> {
@@ -251,8 +266,8 @@ export class AnthropicPromptAssistant implements PromptAssistant {
             {
               role: "user",
               content: input.currentPrompt
-                ? `Improve this reusable business-research prompt for clarity and specificity, keeping its intent:\n\n${input.currentPrompt}\n\nAdditional guidance from the user: ${input.description}\n\n${PROMPT_ASSIST_FORMAT_RULES}`
-                : `Write a reusable, specific business-research prompt for AI-assisted lead discovery based on this description:\n\n${input.description}\n\n${PROMPT_ASSIST_FORMAT_RULES}`,
+                ? `${PROMPT_ASSIST_FORMAT_RULES}\n\nImprove this reusable business-research prompt for clarity and specificity, keeping its research intent (not its format, per the rules above):\n\n${input.currentPrompt}\n\nAdditional guidance from the user: ${input.description}`
+                : `${PROMPT_ASSIST_FORMAT_RULES}\n\nWrite a reusable, specific business-research prompt for AI-assisted lead discovery based on this description:\n\n${input.description}`,
             },
           ],
         },
