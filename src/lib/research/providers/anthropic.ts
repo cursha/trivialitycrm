@@ -523,13 +523,17 @@ export class AnthropicOpportunityAnalysisProvider implements OpportunityAnalysis
       const response = await client().messages.create(
         {
           model,
-          // Confirmed live: 4000 was too tight and got truncated (same
-          // failure discover() hit before its own max_tokens was raised
-          // 8000->16000 — see that comment above) — this response is a
-          // single company, but has six substantial free-text summary
-          // fields plus a whole evidence array on top of the 10 category
-          // scores, more prose than discover()'s per-candidate shape.
-          max_tokens: 8000,
+          // Raised twice now: 4000 -> 8000 (still truncated) -> 16000,
+          // matching discover()'s budget. Root cause of the second failure:
+          // this app's only approved model, claude-sonnet-5, runs adaptive
+          // thinking BY DEFAULT when `thinking` is omitted (unlike Sonnet
+          // 4.6, where omitting it meant no thinking) -- confirmed against
+          // Anthropic's current docs, not assumed. Thinking tokens share
+          // this same max_tokens budget with the visible/structured output,
+          // so 8000 was still too tight once thinking is factored in. This
+          // affects discover()/verify()/score() too (none of them set
+          // `thinking` either), but they already had more headroom.
+          max_tokens: 16000,
           tools: [
             { type: "web_search_20260209", name: "web_search", max_uses: maxSearchToolUses },
             { type: "web_fetch_20260209", name: "web_fetch", max_uses: maxSearchToolUses },

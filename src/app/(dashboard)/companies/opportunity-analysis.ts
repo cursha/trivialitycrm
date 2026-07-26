@@ -12,6 +12,7 @@ import type { OpportunityAnalysisInput, OpportunityAnalysisEvidence } from "@/li
 import { classifyProviderError } from "@/lib/integrations/provider-errors";
 import { gradeForScore, totalFromCategoryScores, validateCategoryScores } from "@/lib/eos/validation";
 import { writeAuditEvent } from "@/lib/audit/log";
+import { logger } from "@/lib/logger";
 import type { OpportunityGrade } from "@/generated/prisma/enums";
 
 export type AnalyzeOpportunityResult =
@@ -75,6 +76,11 @@ export async function analyzeCompanyOpportunity(companyId: string): Promise<Anal
   try {
     result = await getOpportunityAnalysisProvider().analyze(input);
   } catch (error) {
+    // The user only ever sees classifyProviderError()'s generic safe
+    // message (by design — never leak raw provider text) — log the real
+    // error here so a repeat failure is actually diagnosable from Railway's
+    // log stream instead of guessed at blind a second time.
+    logger.error({ err: error, companyId, companyName: company.name }, "opportunity analysis failed");
     return { error: classifyProviderError(error).safeMessage };
   }
 
