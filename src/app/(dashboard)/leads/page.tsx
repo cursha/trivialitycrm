@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Sparkles, ListChecks, Upload, FileText } from "lucide-react";
+import { Sparkles, ListChecks, Upload, FileText, Zap } from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
 import { PageHeader } from "@/components/ui/page-header";
@@ -15,6 +15,13 @@ export default async function LeadsHubPage() {
       label: "New Search",
       description: "Run an AI-assisted research search for a state/province and Lead Type.",
       icon: Sparkles,
+      show: hasPermission(user, "run_research"),
+    },
+    {
+      href: "/leads/searches/quick",
+      label: "Quick Search",
+      description: "Check off venue types and an area, get a plain directory listing — no prompt, no AI scoring.",
+      icon: Zap,
       show: hasPermission(user, "run_research"),
     },
     {

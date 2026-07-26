@@ -23,3 +23,17 @@ export const SearchSetupSchema = z
   });
 
 export type SearchSetupValues = z.infer<typeof SearchSetupSchema>;
+
+// Quick Search: no prompt, no mode/score choice — always a GENERAL-mode,
+// directory-only listing (see startQuickSearch). One or more Lead Types can
+// be checked at once; each becomes its own LeadSearch since a LeadSearch (and
+// the Company a result later transfers into) is always tied to exactly one
+// Lead Type.
+export const QuickSearchSetupSchema = z.object({
+  leadTypeIds: z.array(z.string().min(1)).min(1, { error: "Choose at least one Lead Type." }),
+  country: z.enum(CountryValues, { error: "Choose Canada or United States." }),
+  region: z.string().trim().min(1, { error: "Enter a state or province." }).max(120),
+  cities: z.array(z.string().trim().min(1)).max(50).default([]),
+});
+
+export type QuickSearchSetupValues = z.infer<typeof QuickSearchSetupSchema>;
