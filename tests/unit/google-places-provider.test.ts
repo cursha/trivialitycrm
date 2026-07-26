@@ -128,4 +128,43 @@ describe("GooglePlacesDiscoveryProvider", () => {
     const [, init] = fetchMock.mock.calls[0];
     expect(JSON.parse(init.body).textQuery).toBe("Pub in ON, ON, Canada");
   });
+
+  it("follows nextPageToken to collect more than 20 results for a dense city", async () => {
+    const place = (name: string) => ({ displayName: { text: name }, businessStatus: "OPERATIONAL" });
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ places: [place("Pub 1")], nextPageToken: "token-page-2" }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ places: [place("Pub 2")] }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const candidates = await new GooglePlacesDiscoveryProvider(0).discover(baseParams);
+
+    expect(candidates.map((c) => c.name)).toEqual(["Pub 1", "Pub 2"]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const secondRequestBody = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(secondRequestBody).toEqual({ textQuery: "Pub in Milton, ON, Canada", pageToken: "token-page-2" });
+  });
+
+  it("stops at Google's 3-page ceiling even if nextPageToken keeps coming back", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ places: [{ displayName: { text: "Pub" }, businessStatus: "OPERATIONAL" }], nextPageToken: "keeps-going" }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const candidates = await new GooglePlacesDiscoveryProvider(0).discover(baseParams);
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(candidates).toHaveLength(3);
+  });
+
+  it("requests nextPageToken in the field mask", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ places: [] }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new GooglePlacesDiscoveryProvider(0).discover(baseParams);
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.headers["X-Goog-FieldMask"]).toContain("nextPageToken");
+  });
 });
