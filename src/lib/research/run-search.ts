@@ -122,7 +122,26 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
         data: { status: "RUNNING", startedAt: search.startedAt ?? new Date(), heartbeatAt: new Date() },
       });
 
-      const rawCandidates = await callProviderSafely(() => providers.discovery.discover(params));
+      // Live "what's happening" text for the status page — otherwise a
+      // multi-city GENERAL search shows nothing at all until this whole
+      // discover() call returns, since candidatesFound doesn't update until
+      // the bulk checkpoint transaction below. Cheap, best-effort: never
+      // lets a progress-write failure fail the actual search.
+      const onDiscoveryProgress = async (update: { city: string; cityIndex: number; totalCities: number; foundSoFar: number }) => {
+        try {
+          await prisma.leadSearch.update({
+            where: { id: searchId },
+            data: {
+              progressMessage: `Searched ${update.city} (${update.cityIndex + 1}/${update.totalCities}) — ${update.foundSoFar} found so far.`,
+              heartbeatAt: new Date(),
+            },
+          });
+        } catch {
+          // Best-effort — never let a progress-write failure fail the search.
+        }
+      };
+
+      const rawCandidates = await callProviderSafely(() => providers.discovery.discover(params, onDiscoveryProgress));
       const deduped = dedupeWithinRun(filterByModeExclusivity(rawCandidates, search.mode));
 
       // Module 8A: an administrator-configured cap (AiSettings.

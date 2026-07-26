@@ -9,7 +9,7 @@
 // lands in Google's "Enterprise" SKU, ~$0.035/call, with a real monthly free
 // allowance that very likely covers this app's actual usage entirely.
 import { getEnv } from "../../env";
-import type { CandidateDiscoveryProvider, DiscoverParams, ResearchCandidate } from "./types";
+import type { CandidateDiscoveryProvider, DiscoverParams, DiscoveryProgressUpdate, ResearchCandidate } from "./types";
 
 const TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
 
@@ -76,7 +76,7 @@ export class GooglePlacesDiscoveryProvider implements CandidateDiscoveryProvider
    */
   constructor(private readonly pageDelayMs = 2000) {}
 
-  async discover(params: DiscoverParams): Promise<ResearchCandidate[]> {
+  async discover(params: DiscoverParams, onProgress?: (update: DiscoveryProgressUpdate) => Promise<void>): Promise<ResearchCandidate[]> {
     const { GOOGLE_PLACES_API_KEY } = getEnv();
     if (!GOOGLE_PLACES_API_KEY) {
       throw new Error("GOOGLE_PLACES_API_KEY is not set — required to use the Google Places discovery provider.");
@@ -85,7 +85,7 @@ export class GooglePlacesDiscoveryProvider implements CandidateDiscoveryProvider
     const cities = params.cities.length > 0 ? params.cities : [params.region];
     const results: ResearchCandidate[] = [];
 
-    for (const city of cities) {
+    for (const [cityIndex, city] of cities.entries()) {
       const query = `${params.leadTypeName} in ${city}, ${params.region}, ${params.country}`;
       let pageToken: string | undefined;
 
@@ -120,6 +120,8 @@ export class GooglePlacesDiscoveryProvider implements CandidateDiscoveryProvider
         pageToken = data.nextPageToken;
         if (page < MAX_PAGES_PER_CITY - 1 && this.pageDelayMs > 0) await sleep(this.pageDelayMs);
       }
+
+      await onProgress?.({ city, cityIndex, totalCities: cities.length, foundSoFar: results.length });
     }
 
     return results;

@@ -14,7 +14,7 @@ export default async function SearchStatusPage({ params }: { params: Promise<{ i
 
   const search = await prisma.leadSearch.findUnique({
     where: { id },
-    select: { id: true, status: true, candidatesFound: true, errorMessage: true, region: true, country: true, mode: true },
+    select: { id: true, status: true, candidatesFound: true, progressMessage: true, errorMessage: true, region: true, country: true, mode: true },
   });
   if (!search) notFound();
 
@@ -23,7 +23,12 @@ export default async function SearchStatusPage({ params }: { params: Promise<{ i
       <PageHeader title={`Search: ${search.region}, ${search.country}`} description={`Mode: ${search.mode}`} />
       <SearchStatus
         searchId={search.id}
-        initial={{ status: search.status, candidatesFound: search.candidatesFound, errorMessage: search.errorMessage }}
+        initial={{
+          status: search.status,
+          candidatesFound: search.candidatesFound,
+          progressMessage: search.progressMessage,
+          errorMessage: search.errorMessage,
+        }}
       />
     </div>
   );

@@ -928,6 +928,13 @@ model LeadSearch {
   heartbeatAt     DateTime?
   errorMessage    String?         @db.Text
   candidatesFound Int             @default(0)
+  // Live "what's happening right now" text for the status page, updated as
+  // discovery works through cities (see GooglePlacesDiscoveryProvider/
+  // MockPlacesProvider's onProgress calls in run-search.ts) — the only
+  // per-city checkpoint before this was the one bulk write at the very end
+  // of discover(), which left the status page showing nothing for the
+  // entire discovery phase of a multi-city search.
+  progressMessage String?         @db.Text
   providerJobId   String?
 
   createdAt DateTime @default(now())

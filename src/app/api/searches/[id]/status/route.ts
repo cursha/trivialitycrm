@@ -10,7 +10,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
   const search = await prisma.leadSearch.findUnique({
     where: { id },
-    select: { status: true, candidatesFound: true, errorMessage: true, startedAt: true, completedAt: true },
+    select: { status: true, candidatesFound: true, progressMessage: true, errorMessage: true, startedAt: true, completedAt: true },
   });
 
   if (!search) {

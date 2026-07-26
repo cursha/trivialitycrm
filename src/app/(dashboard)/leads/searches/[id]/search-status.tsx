@@ -13,6 +13,7 @@ import { SEARCH_STATUS_TONE, SEARCH_STATUS_LABEL } from "@/lib/ui/status-tones";
 type StatusPayload = {
   status: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED";
   candidatesFound: number;
+  progressMessage: string | null;
   errorMessage: string | null;
 };
 
@@ -62,6 +63,9 @@ export function SearchStatus({ searchId, initial }: { searchId: string; initial:
         </Badge>
       </div>
       <p className="mt-2 text-text-muted">{status.candidatesFound} candidate(s) found so far.</p>
+      {status.status === "RUNNING" && status.progressMessage && (
+        <p className="mt-1 text-sm font-medium text-secondary">{status.progressMessage}</p>
+      )}
 
       {status.status === "FAILED" && status.errorMessage && (
         <Alert tone="danger" className="mt-3">

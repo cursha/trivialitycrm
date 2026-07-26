@@ -5,6 +5,7 @@
 import type {
   CandidateDiscoveryProvider,
   DiscoverParams,
+  DiscoveryProgressUpdate,
   EvidenceVerificationProvider,
   OpportunityAnalysisInput,
   OpportunityAnalysisProvider,
@@ -62,14 +63,15 @@ export class MockCandidateDiscoveryProvider implements CandidateDiscoveryProvide
  * see factory.ts). Every AI-only field is left honestly empty/UNCERTAIN,
  * same as the real provider — a directory has no way to know them. */
 export class MockPlacesProvider implements CandidateDiscoveryProvider {
-  async discover(params: DiscoverParams): Promise<ResearchCandidate[]> {
+  async discover(params: DiscoverParams, onProgress?: (update: DiscoveryProgressUpdate) => Promise<void>): Promise<ResearchCandidate[]> {
     const cities = params.cities.length > 0 ? params.cities : [params.region];
+    const results: ResearchCandidate[] = [];
 
-    return cities.map((city, index) => {
-      const name = `Mock Directory ${params.leadTypeName} ${slugCity(city, index)}`;
-      return {
+    for (const [cityIndex, city] of cities.entries()) {
+      const name = `Mock Directory ${params.leadTypeName} ${slugCity(city, cityIndex)}`;
+      results.push({
         name,
-        address1: `${200 + index} Directory Ave`,
+        address1: `${200 + cityIndex} Directory Ave`,
         city,
         region: params.region,
         postalCode: null,
@@ -82,8 +84,11 @@ export class MockPlacesProvider implements CandidateDiscoveryProvider {
         competitorName: null,
         evidence: [],
         sources: [],
-      };
-    });
+      });
+      await onProgress?.({ city, cityIndex, totalCities: cities.length, foundSoFar: results.length });
+    }
+
+    return results;
   }
 }
 

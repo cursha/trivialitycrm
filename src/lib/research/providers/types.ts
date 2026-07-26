@@ -68,9 +68,15 @@ export interface PromptAssistant {
   refine(input: { description: string; currentPrompt?: string; userId?: string }): Promise<{ prompt: string }>;
 }
 
-/** Finds raw business candidates matching the structured search criteria. */
+export type DiscoveryProgressUpdate = { city: string; cityIndex: number; totalCities: number; foundSoFar: number };
+
+/** Finds raw business candidates matching the structured search criteria.
+ * `onProgress`, when given, is called once per city as it finishes — only
+ * the directory providers (GooglePlacesDiscoveryProvider/MockPlacesProvider,
+ * which genuinely process one city at a time) call it; the AI providers,
+ * which discover across every city in a single call, simply ignore it. */
 export interface CandidateDiscoveryProvider {
-  discover(params: DiscoverParams): Promise<ResearchCandidate[]>;
+  discover(params: DiscoverParams, onProgress?: (update: DiscoveryProgressUpdate) => Promise<void>): Promise<ResearchCandidate[]>;
 }
 
 /** Verifies a raw candidate's trivia/competitor status and evidence against live sources. */
