@@ -152,9 +152,18 @@ const SCORING_CATEGORY_VALUES = [
 const OPPORTUNITY_ANALYSIS_SCHEMA = {
   type: "object",
   properties: {
+    // "minimum"/"maximum" are NOT supported on an "integer" property by
+    // Anthropic's structured-output JSON Schema (confirmed live: 400
+    // "output_config.format.schema: For 'integer' type, properties maximum,
+    // minimum are not supported") — every prior "truncation" theory for
+    // this failure was wrong; it was this schema, from the very first
+    // call. Each category's max is stated in the prompt rubric instead
+    // (opportunityCategoryRubric()) and enforced server-side afterward by
+    // validateCategoryScores() (src/lib/eos/validation.ts), same as the
+    // human-entry form.
     categoryScores: {
       type: "object",
-      properties: Object.fromEntries(EOS_CATEGORY_KEYS.map((key) => [key, { type: "integer", minimum: 0, maximum: EOS_CATEGORY_MAXIMA[key] }])),
+      properties: Object.fromEntries(EOS_CATEGORY_KEYS.map((key) => [key, { type: "integer", description: `0-${EOS_CATEGORY_MAXIMA[key]}` }])),
       required: EOS_CATEGORY_KEYS,
       additionalProperties: false,
     },
