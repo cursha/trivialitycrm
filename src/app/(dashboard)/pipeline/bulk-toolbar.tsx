@@ -17,12 +17,14 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Label, Select, Input, Textarea } from "@/components/ui/field";
 import type { StageOption } from "./company-card";
+import { OpportunityAnalysisPanel } from "@/app/(dashboard)/companies/opportunity-analysis-panel";
 
 type Option = { id: string; name: string };
-type BulkActionKind = "stage" | "assign" | "territory" | "followup" | "note" | "archive" | "restore";
+type BulkActionKind = "stage" | "assign" | "territory" | "followup" | "note" | "archive" | "restore" | "analyze";
 
 export function BulkToolbar({
   selectedIds,
+  selectedCompanies,
   stages,
   salespeople,
   territories,
@@ -30,6 +32,7 @@ export function BulkToolbar({
   onClear,
 }: {
   selectedIds: string[];
+  selectedCompanies: Option[];
   stages: StageOption[];
   salespeople: Option[];
   territories: Option[];
@@ -73,6 +76,9 @@ export function BulkToolbar({
           </Button>
           <Button type="button" variant="ghost" onClick={() => setActive("note")}>
             Add note
+          </Button>
+          <Button type="button" variant="ghost" onClick={() => setActive("analyze")}>
+            Analyze for opportunities
           </Button>
           <a
             href={exportUrl}
@@ -251,6 +257,8 @@ export function BulkToolbar({
           </Button>
         </div>
       )}
+
+      {active === "analyze" && <OpportunityAnalysisPanel companies={selectedCompanies} onClose={() => setActive(null)} />}
     </Card>
   );
 }

@@ -21,6 +21,7 @@ export type CompanyRow = {
   triviaStatus: string;
   opportunityGrade: string | null;
   nextFollowUpAt: Date | null;
+  needsReview: boolean;
 };
 
 export function CompaniesTable({
@@ -56,6 +57,7 @@ export function CompaniesTable({
       {canBulk && (
         <BulkToolbar
           selectedIds={Array.from(selected)}
+          selectedCompanies={companies.filter((c) => selected.has(c.id)).map((c) => ({ id: c.id, name: c.name }))}
           stages={stages}
           salespeople={salespeople}
           territories={territories}
@@ -113,11 +115,14 @@ export function CompaniesTable({
                   </td>
                   <td className="px-5 py-4">{TRIVIA_STATUS_LABEL[company.triviaStatus]}</td>
                   <td className="px-5 py-4">
-                    {company.opportunityGrade ? (
-                      <Badge tone={GRADE_TONE[company.opportunityGrade]}>{GRADE_LABEL[company.opportunityGrade]}</Badge>
-                    ) : (
-                      <span className="text-text-muted">—</span>
-                    )}
+                    <div className="flex flex-wrap items-center gap-1">
+                      {company.opportunityGrade ? (
+                        <Badge tone={GRADE_TONE[company.opportunityGrade]}>{GRADE_LABEL[company.opportunityGrade]}</Badge>
+                      ) : (
+                        <span className="text-text-muted">—</span>
+                      )}
+                      {company.needsReview && <Badge tone="warning">Needs review</Badge>}
+                    </div>
                   </td>
                   <td className="px-5 py-4">
                     {company.nextFollowUpAt ? (
@@ -179,8 +184,9 @@ export function CompaniesTable({
                     </div>
                     <div>
                       <dt className="text-text-muted">EOS grade</dt>
-                      <dd className="font-medium text-text">
+                      <dd className="flex flex-wrap items-center gap-1 font-medium text-text">
                         {company.opportunityGrade ? GRADE_LABEL[company.opportunityGrade] : "—"}
+                        {company.needsReview && <Badge tone="warning">Needs review</Badge>}
                       </dd>
                     </div>
                     <div className="col-span-2">

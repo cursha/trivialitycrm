@@ -1,11 +1,12 @@
 import type { LeadSearchMode } from "../../../generated/prisma/enums";
-import type { ResearchProviders } from "./types";
-import { MockPromptAssistant, MockCandidateDiscoveryProvider, MockEvidenceVerificationProvider, MockScoringProvider, MockPlacesProvider } from "./mock";
+import type { OpportunityAnalysisProvider, ResearchProviders } from "./types";
+import { MockPromptAssistant, MockCandidateDiscoveryProvider, MockEvidenceVerificationProvider, MockScoringProvider, MockPlacesProvider, MockOpportunityAnalysisProvider } from "./mock";
 import {
   AnthropicPromptAssistant,
   AnthropicCandidateDiscoveryProvider,
   AnthropicEvidenceVerificationProvider,
   AnthropicScoringProvider,
+  AnthropicOpportunityAnalysisProvider,
 } from "./anthropic";
 import { GooglePlacesDiscoveryProvider } from "./google-places";
 
@@ -62,4 +63,22 @@ export function getProviders(mode: LeadSearchMode): ResearchProviders {
   }
 
   return { promptAssistant, discovery, verification, scoring };
+}
+
+/**
+ * Selects the opportunity-analysis provider from AI_PROVIDER — no
+ * LeadSearchMode involved here, unlike getProviders() above, since this
+ * analyzes an already-existing Company directly rather than discovering
+ * candidates against a LeadSearch.
+ */
+export function getOpportunityAnalysisProvider(): OpportunityAnalysisProvider {
+  const aiProvider = (process.env.AI_PROVIDER || "mock").toLowerCase();
+  switch (aiProvider) {
+    case "mock":
+      return new MockOpportunityAnalysisProvider();
+    case "anthropic":
+      return new AnthropicOpportunityAnalysisProvider();
+    default:
+      throw new Error(`Unknown AI_PROVIDER "${aiProvider}" — expected "mock" or "anthropic".`);
+  }
 }

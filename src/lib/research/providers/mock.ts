@@ -6,10 +6,14 @@ import type {
   CandidateDiscoveryProvider,
   DiscoverParams,
   EvidenceVerificationProvider,
+  OpportunityAnalysisInput,
+  OpportunityAnalysisProvider,
+  OpportunityAnalysisResult,
   PromptAssistant,
   ResearchCandidate,
   ScoringProvider,
 } from "./types";
+import { EOS_CATEGORY_MAXIMA, EOS_CATEGORY_SCORING_CATEGORY } from "../../eos/constants";
 
 function slugCity(city: string, index: number) {
   return `${city.replace(/[^a-zA-Z0-9]/g, "")}${index}`;
@@ -108,5 +112,47 @@ export class MockScoringProvider implements ScoringProvider {
     const triviaBonus = candidate.triviaStatus === "UNCERTAIN" ? 0 : 5;
     const score = Math.min(base + evidenceBonus + triviaBonus, 100);
     return { score, explanation: `[Mock score] base ${base} + evidence ${evidenceBonus} + trivia signal ${triviaBonus}.` };
+  }
+}
+
+/**
+ * Deterministic stand-in for AnthropicOpportunityAnalysisProvider — no
+ * network, fixed category scores (60% of each category's max) so tests are
+ * stable. A test can force the conflict-flagging path deterministically by
+ * putting the literal marker "MOCK_CONFLICT" anywhere in Company.notes,
+ * since there's no real AI judgment here to trigger it organically.
+ */
+export class MockOpportunityAnalysisProvider implements OpportunityAnalysisProvider {
+  async analyze(input: OpportunityAnalysisInput): Promise<OpportunityAnalysisResult> {
+    const categoryScores = Object.fromEntries(
+      (Object.keys(EOS_CATEGORY_MAXIMA) as (keyof typeof EOS_CATEGORY_MAXIMA)[]).map((key) => [key, Math.round(EOS_CATEGORY_MAXIMA[key] * 0.6)]),
+    ) as OpportunityAnalysisResult["categoryScores"];
+
+    const forcedConflict = input.notes?.includes("MOCK_CONFLICT") ?? false;
+
+    return {
+      categoryScores,
+      confidenceLevel: "MEDIUM",
+      primaryClassification: "NEEDS_QUALIFICATION",
+      secondaryTags: [],
+      salesPriorityScore: 60,
+      scoreExplanation: `[Mock opportunity analysis] ${input.name} scored at 60% of every category pending real research.`,
+      verifiedEvidenceSummary: `[Mock] ${input.name}'s public website/listing was checked for basic signals.`,
+      inferredEvidenceSummary: `[Mock] No strong inferred signals for ${input.name}.`,
+      missingInformation: input.email ? "None flagged." : "No public email address found.",
+      recommendedSalesApproach: "[Mock] Lead with the weeknight-revenue angle.",
+      recommendedNextAction: "[Mock] Call to confirm decision-maker availability.",
+      evidence: [
+        {
+          category: EOS_CATEGORY_SCORING_CATEGORY.foodBeverageFocus,
+          sourceUrl: input.websiteUrl,
+          evidenceSummary: `[Mock evidence] ${input.name}'s public menu/listing was reviewed.`,
+          verificationStatus: "UNVERIFIED",
+          reliability: "MEDIUM",
+        },
+      ],
+      foundEmail: input.email ? null : `contact@${input.name.toLowerCase().replace(/[^a-z0-9]/g, "")}.example.test`,
+      conflict: forcedConflict ? { found: true, reason: "[Mock] Business appears permanently closed at this address." } : { found: false, reason: null },
+    };
   }
 }

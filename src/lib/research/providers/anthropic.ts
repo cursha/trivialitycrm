@@ -9,10 +9,14 @@ import { callProvider } from "./http";
 import { estimateCostUsd } from "./pricing";
 import { prisma } from "../../prisma";
 import { getAiSettings } from "../../ai/budget";
+import { EOS_CATEGORY_MAXIMA, EOS_CATEGORY_LABELS } from "../../eos/constants";
 import type {
   CandidateDiscoveryProvider,
   DiscoverParams,
   EvidenceVerificationProvider,
+  OpportunityAnalysisInput,
+  OpportunityAnalysisProvider,
+  OpportunityAnalysisResult,
   PromptAssistant,
   ResearchCandidate,
   ScoringProvider,
@@ -126,6 +130,90 @@ const CANDIDATE_SCHEMA = {
   additionalProperties: false,
 } as const;
 
+const EOS_CATEGORY_KEYS = Object.keys(EOS_CATEGORY_MAXIMA) as (keyof typeof EOS_CATEGORY_MAXIMA)[];
+
+const SCORING_CATEGORY_VALUES = [
+  "FOOD_BEVERAGE_FOCUS",
+  "WEEKNIGHT_REVENUE_OPPORTUNITY",
+  "COMMUNITY_ENGAGEMENT",
+  "EXISTING_EVENT_CULTURE",
+  "GROUP_SEATING_LAYOUT",
+  "CAPACITY_OPERATIONAL_SUITABILITY",
+  "DECISION_MAKER_ACCESSIBILITY",
+  "MARKETING_ACTIVITY_VISIBILITY",
+  "TURNKEY_IMPLEMENTATION_READINESS",
+  "COMPETITIVE_OPPORTUNITY",
+] as const;
+
+// Mirrors the 10 fixed EOS-1.0 categories (src/lib/eos/constants.ts) exactly
+// — this is the same rubric a human fills in by hand via recordHistoricalScore()
+// (src/app/(dashboard)/companies/[id]/eos/actions.ts), so the two can never
+// silently drift apart.
+const OPPORTUNITY_ANALYSIS_SCHEMA = {
+  type: "object",
+  properties: {
+    categoryScores: {
+      type: "object",
+      properties: Object.fromEntries(EOS_CATEGORY_KEYS.map((key) => [key, { type: "integer", minimum: 0, maximum: EOS_CATEGORY_MAXIMA[key] }])),
+      required: EOS_CATEGORY_KEYS,
+      additionalProperties: false,
+    },
+    confidenceLevel: { type: "string", enum: ["HIGH", "MEDIUM", "LOW"] },
+    primaryClassification: { type: "string", enum: ["ENTERTAINMENT_READY", "GREENFIELD", "REPLACEMENT", "NEEDS_QUALIFICATION", "EXISTING_CUSTOMER"] },
+    secondaryTags: { type: "array", items: { type: "string", enum: ["EASY_WIN", "REVENUE_READY", "NO_HOST_READY"] } },
+    salesPriorityScore: { type: ["integer", "null"] },
+    scoreExplanation: { type: "string" },
+    verifiedEvidenceSummary: { type: "string" },
+    inferredEvidenceSummary: { type: "string" },
+    missingInformation: { type: "string" },
+    recommendedSalesApproach: { type: "string" },
+    recommendedNextAction: { type: "string" },
+    evidence: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          category: { type: "string", enum: SCORING_CATEGORY_VALUES },
+          sourceUrl: { type: ["string", "null"] },
+          evidenceSummary: { type: "string" },
+          verificationStatus: { type: "string", enum: ["VERIFIED", "INFERRED", "UNVERIFIED", "OUTDATED", "CONTRADICTORY"] },
+          reliability: { type: "string", enum: ["HIGH", "MEDIUM", "LOW"] },
+        },
+        required: ["category", "sourceUrl", "evidenceSummary", "verificationStatus", "reliability"],
+        additionalProperties: false,
+      },
+    },
+    foundEmail: { type: ["string", "null"] },
+    conflict: {
+      type: "object",
+      properties: { found: { type: "boolean" }, reason: { type: ["string", "null"] } },
+      required: ["found", "reason"],
+      additionalProperties: false,
+    },
+  },
+  required: [
+    "categoryScores",
+    "confidenceLevel",
+    "primaryClassification",
+    "secondaryTags",
+    "salesPriorityScore",
+    "scoreExplanation",
+    "verifiedEvidenceSummary",
+    "inferredEvidenceSummary",
+    "missingInformation",
+    "recommendedSalesApproach",
+    "recommendedNextAction",
+    "evidence",
+    "foundEmail",
+    "conflict",
+  ],
+  additionalProperties: false,
+} as const;
+
+function opportunityCategoryRubric(): string {
+  return EOS_CATEGORY_KEYS.map((key) => `- ${key} (max ${EOS_CATEGORY_MAXIMA[key]} points): ${EOS_CATEGORY_LABELS[key]}`).join("\n");
+}
+
 function client(): Anthropic {
   const apiKey = process.env.AI_API_KEY;
   if (!apiKey) {
@@ -156,7 +244,7 @@ type ProviderUsage = {
  * the derived cost estimate (see ./pricing.ts). Best-effort: a failure to
  * write the usage row must never fail the research call itself. */
 async function recordUsage(params: {
-  operation: "discover" | "verify" | "score" | "promptAssist";
+  operation: "discover" | "verify" | "score" | "promptAssist" | "analyzeOpportunity";
   model: string;
   usage: ProviderUsage;
   searchId?: string;
@@ -415,6 +503,56 @@ export class AnthropicScoringProvider implements ScoringProvider {
       const jsonBlock = response.content.find((block) => block.type === "text");
       if (!jsonBlock || !("text" in jsonBlock)) return { score: 0, explanation: "Scoring provider returned no output." };
       return JSON.parse(jsonBlock.text) as { score: number; explanation: string };
+    });
+  }
+}
+
+/**
+ * The EOS-1.0 "opportunity analysis" engine: fills in the same 10 fixed
+ * categories a human enters by hand via recordHistoricalScore() (src/app/
+ * (dashboard)/companies/[id]/eos/actions.ts), for an already-existing CRM
+ * Company rather than a lead-search candidate. Distinct from
+ * AnthropicScoringProvider above (which ranks candidates against a search
+ * prompt, not CRM companies) and takes no DiscoverParams — there's no
+ * LeadSearch/mode/promptText for a bare Company.
+ */
+export class AnthropicOpportunityAnalysisProvider implements OpportunityAnalysisProvider {
+  async analyze(input: OpportunityAnalysisInput): Promise<OpportunityAnalysisResult> {
+    const { model, maxSearchToolUses } = await resolveResearchSettings();
+    return callProvider({ providerName: "anthropic-opportunity-analysis", timeoutMs: 300_000 }, async (signal) => {
+      const response = await client().messages.create(
+        {
+          model,
+          max_tokens: 4000,
+          tools: [
+            { type: "web_search_20260209", name: "web_search", max_uses: maxSearchToolUses },
+            { type: "web_fetch_20260209", name: "web_fetch", max_uses: maxSearchToolUses },
+          ],
+          output_config: { format: { type: "json_schema", schema: OPPORTUNITY_ANALYSIS_SCHEMA } },
+          messages: [
+            {
+              role: "user",
+              content:
+                `Score this business as a sales opportunity for "${input.leadTypeName}" against these 10 fixed categories — each has its own maximum point value, do not exceed it:\n${opportunityCategoryRubric()}\n\n` +
+                "Trusted facts — already verified, do NOT re-check or dispute these; research everything else about the business instead:\n" +
+                `Name: ${input.name}\nAddress: ${input.address1 ?? "(none on file)"}, ${input.city}, ${input.region} ${input.postalCode ?? ""}, ${input.country}\n` +
+                `Phone: ${input.phone ?? "(none on file)"}\nWebsite: ${input.websiteUrl ?? "(none on file)"}\n\n` +
+                `Currently on file: email ${input.email ?? "(none — research and report any public email you find as foundEmail)"}. Existing notes: ${input.notes ?? "(none)"}.\n\n` +
+                "Use web_search/web_fetch to research what's missing (public contact info, decision-maker accessibility, marketing presence, community engagement, etc.) and to find supporting evidence for each category score. " +
+                "Every evidence entry must cite a sourceUrl you actually found or fetched, and its category must be one of the 10 category keys above, in SCREAMING_SNAKE_CASE. " +
+                "Only set conflict.found to true if you discover a genuine contradiction of one of the trusted facts above (e.g. the business appears permanently closed, or the name at this address doesn't match) — never as a way to change the trusted facts themselves; otherwise leave conflict.found false.",
+            },
+          ],
+        },
+        { signal },
+      );
+      await recordUsage({ operation: "analyzeOpportunity", model, usage: response.usage, userId: input.userId });
+      assertNotTruncated(response.stop_reason, "anthropic-opportunity-analysis");
+      const jsonBlock = response.content.find((block) => block.type === "text");
+      if (!jsonBlock || !("text" in jsonBlock)) {
+        throw new Error("Opportunity analysis provider returned no output.");
+      }
+      return JSON.parse(jsonBlock.text) as OpportunityAnalysisResult;
     });
   }
 }

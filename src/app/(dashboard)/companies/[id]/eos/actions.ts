@@ -172,3 +172,22 @@ export async function addEvidence(companyId: string, _prevState: EosActionResult
 
   revalidatePath(`/companies/${companyId}`);
 }
+
+/**
+ * Clears the "Needs review" flag an AI opportunity analysis (src/app/
+ * (dashboard)/companies/opportunity-analysis.ts) sets when it finds a
+ * conflict with trusted CRM data. Only ever cleared here, by a human —
+ * the analysis action itself only ever sets it to true.
+ */
+export async function clearNeedsReview(companyId: string): Promise<EosActionResult> {
+  await requireCompanyAccess(companyId);
+
+  await prisma.company.update({
+    where: { id: companyId },
+    data: { needsReview: false, needsReviewReason: null },
+  });
+
+  revalidatePath(`/companies/${companyId}`);
+  revalidatePath("/companies");
+  return undefined;
+}

@@ -4,9 +4,10 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CirclePlus } from "lucide-react";
 import { EOS_CATEGORY_MAXIMA, EOS_CATEGORY_LABELS } from "@/lib/eos/constants";
-import { recordHistoricalScore } from "./actions";
+import { recordHistoricalScore, clearNeedsReview } from "./actions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Alert } from "@/components/ui/alert";
 import { Input, Select, Textarea } from "@/components/ui/field";
 import { GRADE_TONE, GRADE_LABEL, CLASSIFICATION_TONE } from "@/lib/ui/status-tones";
 
@@ -36,6 +37,8 @@ export type CompanySummary = {
   isQualified: boolean;
   doNotContact: boolean;
   exclusionReason: string | null;
+  needsReview: boolean;
+  needsReviewReason: string | null;
 };
 
 export type ScoreHistoryRow = {
@@ -73,6 +76,7 @@ export function ScorePanel({
   const [recording, setRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [isClearingReview, startClearReview] = useTransition();
   const [categoryValues, setCategoryValues] = useState<Record<string, number>>(
     Object.fromEntries(CATEGORY_KEYS.map((key) => [key, 0])),
   );
@@ -103,6 +107,32 @@ export function ScorePanel({
           </button>
         )}
       </div>
+
+      {summary.needsReview && (
+        <Alert tone="warning" className="mt-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span>
+              <span className="font-bold">Needs review</span>
+              {summary.needsReviewReason ? ` — ${summary.needsReviewReason}` : ""}
+            </span>
+            {canEdit && (
+              <button
+                type="button"
+                disabled={isClearingReview}
+                onClick={() =>
+                  startClearReview(async () => {
+                    await clearNeedsReview(companyId);
+                    router.refresh();
+                  })
+                }
+                className="font-bold text-secondary hover:underline disabled:pointer-events-none disabled:opacity-50"
+              >
+                Mark reviewed
+              </button>
+            )}
+          </div>
+        </Alert>
+      )}
 
       {summary.eosScore === null ? (
         <p className="mt-3 text-sm text-text-muted">No score recorded yet.</p>

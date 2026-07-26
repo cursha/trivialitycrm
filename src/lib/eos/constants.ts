@@ -1,6 +1,8 @@
 // EOS-1.0 category maxima. Module One prepares this structure and its
 // validation rules for the future scoring engine — no score generation
 // happens here.
+import type { ScoringCategory } from "@/generated/prisma/enums";
+
 export const EOS_CATEGORY_MAXIMA = {
   foodBeverageFocus: 15,
   weeknightRevenueOpportunity: 15,
@@ -30,3 +32,19 @@ export const EOS_CATEGORY_LABELS: Record<keyof typeof EOS_CATEGORY_MAXIMA, strin
 export const EOS_TOTAL_MAX = Object.values(EOS_CATEGORY_MAXIMA).reduce((sum, max) => sum + max, 0);
 
 export type EosCategoryScores = { [K in keyof typeof EOS_CATEGORY_MAXIMA]: number };
+
+// Maps each category key here to its EvidenceRecord.category enum value —
+// used by the opportunity-analysis providers (src/lib/research/providers)
+// so an evidence entry can be filed against the right category.
+export const EOS_CATEGORY_SCORING_CATEGORY: Record<keyof typeof EOS_CATEGORY_MAXIMA, ScoringCategory> = {
+  foodBeverageFocus: "FOOD_BEVERAGE_FOCUS",
+  weeknightRevenueOpportunity: "WEEKNIGHT_REVENUE_OPPORTUNITY",
+  communityEngagement: "COMMUNITY_ENGAGEMENT",
+  existingEventCulture: "EXISTING_EVENT_CULTURE",
+  groupSeatingLayout: "GROUP_SEATING_LAYOUT",
+  capacityOperationalSuitability: "CAPACITY_OPERATIONAL_SUITABILITY",
+  decisionMakerAccessibility: "DECISION_MAKER_ACCESSIBILITY",
+  marketingActivityVisibility: "MARKETING_ACTIVITY_VISIBILITY",
+  turnkeyImplementationReadiness: "TURNKEY_IMPLEMENTATION_READINESS",
+  competitiveOpportunity: "COMPETITIVE_OPPORTUNITY",
+};

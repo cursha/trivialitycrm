@@ -57,6 +57,7 @@ export function ListView({
     <div className="space-y-3">
       <BulkToolbar
         selectedIds={Array.from(selected)}
+        selectedCompanies={cards.filter((c) => selected.has(c.id)).map((c) => ({ id: c.id, name: c.name }))}
         stages={stages}
         salespeople={salespeople}
         territories={territories}

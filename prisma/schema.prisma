@@ -482,6 +482,15 @@ model Company {
   exclusionReason          String?
   doNotContact             Boolean                @default(false)
 
+  // Set only when an AI opportunity analysis (src/app/(dashboard)/companies/
+  // opportunity-analysis.ts) finds something that contradicts existing,
+  // trusted CRM data (e.g. the business appears closed, name doesn't
+  // match) — it never silently overwrites the trusted field itself. Only
+  // ever set to true by that path; only ever cleared by a human via
+  // clearNeedsReview.
+  needsReview       Boolean @default(false)
+  needsReviewReason String? @db.Text
+
   // Pointer to the single HistoricalScoreRecord considered "current" for
   // this company. @unique makes this a true one-to-one, so at most one
   // company can ever treat a given history row as current — this is the
