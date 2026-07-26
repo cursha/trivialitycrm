@@ -8,6 +8,7 @@ import type {
   DiscoveryProgressUpdate,
   EvidenceVerificationProvider,
   OpportunityAnalysisInput,
+  OpportunityAnalysisProgressEvent,
   OpportunityAnalysisProvider,
   OpportunityAnalysisResult,
   PromptAssistant,
@@ -128,7 +129,13 @@ export class MockScoringProvider implements ScoringProvider {
  * since there's no real AI judgment here to trigger it organically.
  */
 export class MockOpportunityAnalysisProvider implements OpportunityAnalysisProvider {
-  async analyze(input: OpportunityAnalysisInput): Promise<OpportunityAnalysisResult> {
+  async analyze(
+    input: OpportunityAnalysisInput,
+    onProgress?: (event: OpportunityAnalysisProgressEvent) => void,
+  ): Promise<OpportunityAnalysisResult> {
+    onProgress?.({ message: `[Mock] Searching the web for ${input.name}...` });
+    onProgress?.({ message: `[Mock] Reviewing category evidence for ${input.name}...` });
+
     const categoryScores = Object.fromEntries(
       (Object.keys(EOS_CATEGORY_MAXIMA) as (keyof typeof EOS_CATEGORY_MAXIMA)[]).map((key) => [key, Math.round(EOS_CATEGORY_MAXIMA[key] * 0.6)]),
     ) as OpportunityAnalysisResult["categoryScores"];

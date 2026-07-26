@@ -2,29 +2,76 @@
 
 import { useState, useTransition } from "react";
 import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
-import { analyzeCompanyOpportunity, type AnalyzeOpportunityResult } from "./opportunity-analysis";
+import type { AnalyzeOpportunityResult } from "@/lib/companies/analyze-opportunity";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { GRADE_TONE, GRADE_LABEL } from "@/lib/ui/status-tones";
 
+type Success = Exclude<AnalyzeOpportunityResult, { error: string }>;
+
 type Row = {
   id: string;
   name: string;
   status: "pending" | "running" | "done" | "error";
-  result?: Exclude<AnalyzeOpportunityResult, { error: string }>;
+  currentActivity?: string;
+  result?: Success;
   error?: string;
 };
 
+type StreamEvent = { type: "status"; message: string } | { type: "done"; result: Success } | { type: "error"; message: string };
+
 /**
- * Runs a deep AI opportunity analysis (src/app/(dashboard)/companies/
- * opportunity-analysis.ts) one company at a time across the current
- * selection, rendering each company's evidence as soon as its own call
- * resolves — a sequential for...of inside one startTransition, not
- * Promise.all, so progress is genuinely visible company-by-company (and so
- * checkAiBudget()'s mid-batch stop stays meaningful). No job queue/worker:
- * the whole run lives inside this one client-triggered request lifecycle,
- * same as the single-result "Research this business" action elsewhere.
+ * Calls the streaming Route Handler (src/app/api/companies/[id]/
+ * analyze-opportunity/route.ts) instead of a Server Action — a plain Server
+ * Action held one HTTP request open with zero bytes transferred for the
+ * whole call, which live got killed by Railway's proxy at its 5-minute
+ * no-data idle timeout. Each line of the response is a real progress event
+ * (an actual web_search/web_fetch call the model made, not a synthetic
+ * timer) that both proves the request is alive and keeps bytes flowing so
+ * Railway never treats the connection as idle.
+ */
+async function runStreamingAnalysis(companyId: string, onActivity: (message: string) => void): Promise<AnalyzeOpportunityResult> {
+  const response = await fetch(`/api/companies/${companyId}/analyze-opportunity`, { method: "POST" });
+  if (!response.ok || !response.body) {
+    return { error: "The request failed before analysis could start." };
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let outcome: AnalyzeOpportunityResult = { error: "The connection ended before the analysis finished." };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const event = JSON.parse(line) as StreamEvent;
+      if (event.type === "status") {
+        onActivity(event.message);
+      } else if (event.type === "done") {
+        outcome = event.result;
+      } else if (event.type === "error") {
+        outcome = { error: event.message };
+      }
+    }
+  }
+
+  return outcome;
+}
+
+/**
+ * Runs a deep AI opportunity analysis one company at a time across the
+ * current selection, rendering each company's live activity and evidence as
+ * soon as its own call resolves — a sequential for...of inside one
+ * startTransition, not Promise.all, so progress is genuinely visible
+ * company-by-company (and so checkAiBudget()'s mid-batch stop stays
+ * meaningful).
  */
 export function OpportunityAnalysisPanel({ companies, onClose }: { companies: { id: string; name: string }[]; onClose: () => void }) {
   const [rows, setRows] = useState<Row[]>(companies.map((c) => ({ id: c.id, name: c.name, status: "pending" })));
@@ -42,8 +89,8 @@ export function OpportunityAnalysisPanel({ companies, onClose }: { companies: { 
     setFinished(false);
     startTransition(async () => {
       for (const row of rows) {
-        updateRow(row.id, { status: "running", error: undefined });
-        const outcome = await analyzeCompanyOpportunity(row.id);
+        updateRow(row.id, { status: "running", error: undefined, currentActivity: "Starting analysis..." });
+        const outcome = await runStreamingAnalysis(row.id, (message) => updateRow(row.id, { currentActivity: message }));
         if ("error" in outcome) {
           updateRow(row.id, { status: "error", error: outcome.error });
         } else {
@@ -100,11 +147,6 @@ export function OpportunityAnalysisPanel({ companies, onClose }: { companies: { 
                   </button>
                   <div className="flex items-center gap-2 text-xs">
                     {row.status === "pending" && <span className="text-text-muted">Waiting…</span>}
-                    {row.status === "running" && (
-                      <span className="flex items-center gap-1 text-text-muted">
-                        <Loader2 size={14} className="animate-spin" /> Reviewing…
-                      </span>
-                    )}
                     {row.status === "error" && <Badge tone="danger">Failed</Badge>}
                     {row.status === "done" && row.result && (
                       <>
@@ -115,6 +157,12 @@ export function OpportunityAnalysisPanel({ companies, onClose }: { companies: { 
                     )}
                   </div>
                 </div>
+                {row.status === "running" && (
+                  <p className="mt-1 flex items-center gap-1.5 text-xs text-secondary">
+                    <Loader2 size={14} className="shrink-0 animate-spin" />
+                    {row.currentActivity ?? "Working…"}
+                  </p>
+                )}
                 {row.status === "error" && row.error && <p className="mt-1 text-xs text-danger">{row.error}</p>}
                 {row.status === "done" && row.result && expanded === row.id && (
                   <div className="mt-2 space-y-1 text-xs text-text-muted">

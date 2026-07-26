@@ -525,23 +525,48 @@ export class AnthropicScoringProvider implements ScoringProvider {
  * prompt, not CRM companies) and takes no DiscoverParams — there's no
  * LeadSearch/mode/promptText for a bare Company.
  */
+function serverToolProgressMessage(name: string, toolInput: unknown): string {
+  const asRecord = toolInput && typeof toolInput === "object" ? (toolInput as Record<string, unknown>) : {};
+  if (name === "web_search") {
+    const query = typeof asRecord.query === "string" ? asRecord.query : null;
+    return query ? `Searching the web for "${query}"...` : "Searching the web...";
+  }
+  if (name === "web_fetch") {
+    const url = typeof asRecord.url === "string" ? asRecord.url : null;
+    return url ? `Reading ${url}...` : "Fetching a page...";
+  }
+  return `Using ${name}...`;
+}
+
 export class AnthropicOpportunityAnalysisProvider implements OpportunityAnalysisProvider {
-  async analyze(input: OpportunityAnalysisInput): Promise<OpportunityAnalysisResult> {
+  async analyze(
+    input: OpportunityAnalysisInput,
+    onProgress?: (event: { message: string }) => void,
+  ): Promise<OpportunityAnalysisResult> {
     const { model, maxSearchToolUses } = await resolveResearchSettings();
     return callProvider({ providerName: "anthropic-opportunity-analysis", timeoutMs: 300_000 }, async (signal) => {
-      const response = await client().messages.create(
+      // Streamed, not a single blocking create() call: this request can
+      // legitimately run close to (or past) 5 minutes doing real web
+      // research, and Railway's edge proxy closes any HTTP request with no
+      // data transferred for 5 minutes straight (confirmed against
+      // Railway's own current docs) — a blocking create() call sends
+      // nothing back until it's fully done, so it was getting killed by
+      // the proxy before the response ever returned. Streaming keeps bytes
+      // flowing continuously (Railway allows up to 15 minutes as long as
+      // data keeps transferring), and as a direct benefit, each
+      // "contentBlock" the model actually produces (a real web_search/
+      // web_fetch call) becomes a genuine, verifiable progress update for
+      // the caller — not a synthetic timer.
+      const stream = client().messages.stream(
         {
           model,
-          // Raised twice now: 4000 -> 8000 (still truncated) -> 16000,
-          // matching discover()'s budget. Root cause of the second failure:
-          // this app's only approved model, claude-sonnet-5, runs adaptive
-          // thinking BY DEFAULT when `thinking` is omitted (unlike Sonnet
-          // 4.6, where omitting it meant no thinking) -- confirmed against
-          // Anthropic's current docs, not assumed. Thinking tokens share
-          // this same max_tokens budget with the visible/structured output,
-          // so 8000 was still too tight once thinking is factored in. This
-          // affects discover()/verify()/score() too (none of them set
-          // `thinking` either), but they already had more headroom.
+          // Raised twice: 4000 -> 8000 (still truncated) -> 16000, matching
+          // discover()'s budget. Root cause of the truncation: this app's
+          // only approved model, claude-sonnet-5, runs adaptive thinking BY
+          // DEFAULT when `thinking` is omitted (unlike Sonnet 4.6, where
+          // omitting it meant no thinking) -- confirmed against Anthropic's
+          // current docs, not assumed. Thinking tokens share this same
+          // max_tokens budget with the visible/structured output.
           max_tokens: 16000,
           tools: [
             { type: "web_search_20260209", name: "web_search", max_uses: maxSearchToolUses },
@@ -565,9 +590,19 @@ export class AnthropicOpportunityAnalysisProvider implements OpportunityAnalysis
         },
         { signal },
       );
-      await recordUsage({ operation: "analyzeOpportunity", model, usage: response.usage, userId: input.userId });
-      assertNotTruncated(response.stop_reason, "anthropic-opportunity-analysis");
-      const jsonBlock = response.content.find((block) => block.type === "text");
+
+      stream.on("contentBlock", (block) => {
+        if (block.type === "server_tool_use") {
+          onProgress?.({ message: serverToolProgressMessage(block.name, block.input) });
+        } else if (block.type === "thinking") {
+          onProgress?.({ message: "Reasoning through the evidence gathered so far..." });
+        }
+      });
+
+      const finalMessage = await stream.finalMessage();
+      await recordUsage({ operation: "analyzeOpportunity", model, usage: finalMessage.usage, userId: input.userId });
+      assertNotTruncated(finalMessage.stop_reason, "anthropic-opportunity-analysis");
+      const jsonBlock = finalMessage.content.find((block) => block.type === "text");
       if (!jsonBlock || !("text" in jsonBlock)) {
         throw new Error("Opportunity analysis provider returned no output.");
       }

@@ -117,9 +117,19 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
     const existingCandidateCount = await prisma.searchCandidate.count({ where: { searchId } });
 
     if (existingCandidateCount === 0) {
+      const cityCount = Math.max(cities.length, 1);
       await prisma.leadSearch.update({
         where: { id: searchId },
-        data: { status: "RUNNING", startedAt: search.startedAt ?? new Date(), heartbeatAt: new Date() },
+        data: {
+          status: "RUNNING",
+          startedAt: search.startedAt ?? new Date(),
+          heartbeatAt: new Date(),
+          // Otherwise the status page shows nothing at all until the FIRST
+          // city finishes (which, for a single-city or slow-paginating
+          // search, could be the entire run) — this gives it something to
+          // show from the very first poll.
+          progressMessage: `Starting search across ${cityCount} ${cityCount === 1 ? "city" : "cities"}...`,
+        },
       });
 
       // Live "what's happening" text for the status page — otherwise a

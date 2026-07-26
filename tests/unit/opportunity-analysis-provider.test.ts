@@ -53,4 +53,16 @@ describe("MockOpportunityAnalysisProvider", () => {
     expect(Object.values(EOS_CATEGORY_MAXIMA).length).toBeGreaterThan(0);
     expect(result.evidence[0].category).toBe("FOOD_BEVERAGE_FOCUS");
   });
+
+  it("reports progress events when a callback is given, matching the streaming Route Handler's contract", async () => {
+    const messages: string[] = [];
+    await new MockOpportunityAnalysisProvider().analyze(baseInput, (event) => messages.push(event.message));
+
+    expect(messages.length).toBeGreaterThanOrEqual(2);
+    expect(messages.some((m) => m.includes("Searching the web"))).toBe(true);
+  });
+
+  it("works fine with no onProgress callback given", async () => {
+    await expect(new MockOpportunityAnalysisProvider().analyze(baseInput)).resolves.toBeTruthy();
+  });
 });

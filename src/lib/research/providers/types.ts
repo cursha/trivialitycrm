@@ -154,10 +154,17 @@ export type OpportunityAnalysisResult = {
   conflict: { found: boolean; reason: string | null };
 };
 
+/** A real, verifiable sign of activity during a long analyze() call — e.g. a
+ * web_search/web_fetch tool actually being invoked — not a synthetic timer.
+ * Streamed to the browser as it happens so the connection keeps actively
+ * transferring data (see AnthropicOpportunityAnalysisProvider's own comment
+ * on why that matters for Railway's proxy specifically). */
+export type OpportunityAnalysisProgressEvent = { message: string };
+
 /** Runs a deep, per-Company AI research pass that fills in the same 10 EOS-1.0
  * categories a human would via recordHistoricalScore() (src/app/(dashboard)/
  * companies/[id]/eos/actions.ts) — distinct from ScoringProvider above, which
  * ranks lead-search candidates against a search prompt, not CRM companies. */
 export interface OpportunityAnalysisProvider {
-  analyze(input: OpportunityAnalysisInput): Promise<OpportunityAnalysisResult>;
+  analyze(input: OpportunityAnalysisInput, onProgress?: (event: OpportunityAnalysisProgressEvent) => void): Promise<OpportunityAnalysisResult>;
 }
