@@ -47,7 +47,6 @@ describe("Company.source attribution", () => {
       contactEmail: undefined,
       contactTitle: undefined,
       contactNote: undefined,
-      overrideDuplicate: false,
     };
 
     await transferSearchResults({ assignedToId: user.id, pipelineStageId: stage.id, rows: [row] });

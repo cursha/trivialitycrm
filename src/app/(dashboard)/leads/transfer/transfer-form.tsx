@@ -51,6 +51,14 @@ const CONTACT_FIELD_LABELS: [keyof TransferRowValues, string][] = [
   ["contactTitle", "Title"],
 ];
 
+type DuplicateResolution = { action: "replace" | "merge" | "ignore"; targetCompanyId?: string };
+
+const ACTION_LABEL: Record<DuplicateResolution["action"], string> = {
+  replace: "Replace",
+  merge: "Merge",
+  ignore: "Ignore",
+};
+
 export function TransferForm({
   rows: initialRows,
   pipelineStages,
@@ -69,13 +77,17 @@ export function TransferForm({
   const [assignedToId, setAssignedToId] = useState(salespeople[0]?.id ?? "");
   const [pipelineStageId, setPipelineStageId] = useState(defaultPipelineStageId);
   const [duplicates, setDuplicates] = useState<Record<string, DuplicateMatch[]>>({});
-  const [overrides, setOverrides] = useState<Record<string, boolean>>({});
+  const [resolutions, setResolutions] = useState<Record<string, DuplicateResolution>>({});
   const [error, setError] = useState<string | undefined>();
-  const [successCount, setSuccessCount] = useState<number | undefined>();
+  const [successCounts, setSuccessCounts] = useState<{ transferredCount: number; ignoredCount: number } | undefined>();
   const [isPending, startTransition] = useTransition();
 
   function updateField(resultId: string, field: keyof TransferRowValues, value: string) {
     setRows((prev) => prev.map((row) => (row.resultId === resultId ? { ...row, [field]: value } : row)));
+  }
+
+  function setResolution(resultId: string, action: DuplicateResolution["action"], targetCompanyId?: string) {
+    setResolutions((prev) => ({ ...prev, [resultId]: { action, targetCompanyId } }));
   }
 
   function handleSubmit() {
@@ -84,7 +96,12 @@ export function TransferForm({
       const result: TransferResult = await transferSearchResults({
         assignedToId,
         pipelineStageId,
-        rows: rows.map((row) => ({ ...row, contactNote: undefined, overrideDuplicate: overrides[row.resultId] ?? false })),
+        rows: rows.map((row) => ({
+          ...row,
+          contactNote: undefined,
+          duplicateAction: resolutions[row.resultId]?.action,
+          duplicateTargetCompanyId: resolutions[row.resultId]?.targetCompanyId,
+        })),
       });
 
       if ("error" in result) {
@@ -93,16 +110,17 @@ export function TransferForm({
         setDuplicates(result.duplicates);
       } else {
         setDuplicates({});
-        setSuccessCount(result.transferredCount);
+        setSuccessCounts(result);
         router.refresh();
       }
     });
   }
 
-  if (successCount !== undefined) {
+  if (successCounts !== undefined) {
     return (
       <Alert tone="success" className="block p-6 text-base">
-        Transferred {successCount} lead(s) to the CRM.
+        Transferred {successCounts.transferredCount} lead(s) to the CRM.
+        {successCounts.ignoredCount > 0 ? ` ${successCounts.ignoredCount} ignored.` : ""}
       </Alert>
     );
   }
@@ -179,16 +197,50 @@ export function TransferForm({
                 ))}
               </ul>
               {isAdmin ? (
-                <label className="mt-2 flex items-center gap-2 text-xs font-semibold">
-                  <input
-                    type="checkbox"
-                    checked={overrides[row.resultId] ?? false}
-                    onChange={(e) => setOverrides((prev) => ({ ...prev, [row.resultId]: e.target.checked }))}
-                  />
-                  Transfer anyway (Administrator override)
-                </label>
+                <div className="mt-2 space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    {(["replace", "merge", "ignore"] as const).map((action) => {
+                      const matches = duplicates[row.resultId];
+                      const defaultTarget = matches.length === 1 ? matches[0].id : undefined;
+                      const selected = resolutions[row.resultId]?.action === action;
+                      return (
+                        <button
+                          key={action}
+                          type="button"
+                          onClick={() => setResolution(row.resultId, action, action === "ignore" ? undefined : defaultTarget)}
+                          className={`rounded-full px-3 py-1.5 text-xs font-semibold ${selected ? "bg-primary text-white" : "bg-black/5 text-text-muted"}`}
+                        >
+                          {ACTION_LABEL[action]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {(resolutions[row.resultId]?.action === "replace" || resolutions[row.resultId]?.action === "merge") && duplicates[row.resultId].length > 1 && (
+                    <div>
+                      <Label className="mb-1 block text-xs">Which existing company?</Label>
+                      <Select
+                        value={resolutions[row.resultId]?.targetCompanyId ?? ""}
+                        onChange={(e) => setResolution(row.resultId, resolutions[row.resultId]!.action, e.target.value)}
+                        className="w-auto py-1.5"
+                      >
+                        <option value="" disabled>
+                          Choose one...
+                        </option>
+                        {duplicates[row.resultId].map((match) => (
+                          <option key={match.id} value={match.id}>
+                            {match.name} ({match.city}, {match.region})
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                  )}
+                  <p className="text-xs font-normal text-text-muted">
+                    Replace overwrites the existing company&apos;s fields with this data. Merge only fills in fields it&apos;s currently
+                    missing. Ignore skips this lead.
+                  </p>
+                </div>
               ) : (
-                <p className="mt-2 text-xs font-normal">Only an Administrator can transfer despite a possible duplicate match.</p>
+                <p className="mt-2 text-xs font-normal">Only an Administrator can resolve a possible duplicate match.</p>
               )}
             </Alert>
           )}

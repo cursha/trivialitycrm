@@ -35,7 +35,22 @@ export const TransferRowSchema = z.object({
     .transform((value) => (value ? value : undefined)),
   contactTitle: optionalText(100),
   contactNote: optionalText(2000),
-  overrideDuplicate: z.boolean().default(false),
+  // Administrator-only resolution for a detected duplicate (see
+  // findPotentialDuplicates()). Undefined means "not decided yet" — the
+  // action first returns the duplicate list so the UI can ask; the retry
+  // submission carries the user's choice back here.
+  // - "replace": overwrite the existing company's core fields with this
+  //   row's fresh data.
+  // - "merge": only fill fields the existing company doesn't already have
+  //   — never overwrites data already on file.
+  // - "ignore": skip this row for this transfer; nothing is created or
+  //   changed, the SearchResult's disposition is left as-is.
+  duplicateAction: z.enum(["replace", "merge", "ignore"]).optional(),
+  // Which matched company to act on, when findPotentialDuplicates() returns
+  // more than one candidate for this row. Required (checked at the action
+  // layer, not here) whenever duplicateAction is "replace" or "merge" and
+  // there was more than one match.
+  duplicateTargetCompanyId: z.string().optional(),
 });
 
 export const TransferPayloadSchema = z.object({

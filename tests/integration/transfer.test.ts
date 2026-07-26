@@ -46,7 +46,6 @@ function baseRow(resultId: string, overrides: Partial<TransferRow> = {}): Transf
     contactEmail: undefined,
     contactTitle: undefined,
     contactNote: undefined,
-    overrideDuplicate: false,
     ...overrides,
   };
 }
@@ -63,7 +62,7 @@ describe("transferSearchResults", () => {
       rows: [baseRow(result.id, { contactFirstName: "Jane", contactLastName: "Doe" })],
     });
 
-    expect(outcome).toEqual({ transferredCount: 1 });
+    expect(outcome).toEqual({ transferredCount: 1, ignoredCount: 0 });
 
     const company = await testPrisma.company.findFirstOrThrow({ where: { name: "The Copper Kettle" } });
     expect(company.leadTypeId).toBe(search.leadTypeId);
@@ -106,7 +105,95 @@ describe("transferSearchResults", () => {
     expect(companiesAfter).toBe(1); // only the pre-existing one
   });
 
-  it("allows an Administrator to override a duplicate warning", async () => {
+  it("rejects a non-admin's duplicateAction even if they somehow set one", async () => {
+    const { stage, search, leadType } = await baseFixtures();
+    const salesRole = await createRoleWithPermissions("Salesperson", ["transfer_leads", "add_leads"]);
+    const salesperson = await createTestUser({ name: "Sales", roleId: salesRole.id });
+    await loginAs(salesperson.id);
+
+    await createCompanyFixture({
+      name: "The Copper Kettle",
+      leadTypeId: leadType.id,
+      pipelineStageId: stage.id,
+      assignedToId: salesperson.id,
+      createdById: salesperson.id,
+    });
+    const result = await createSearchResultFixture({ searchId: search.id, name: "The Copper Kettle" });
+
+    const outcome = await transferSearchResults({
+      assignedToId: salesperson.id,
+      pipelineStageId: stage.id,
+      rows: [baseRow(result.id, { duplicateAction: "ignore" })],
+    });
+
+    expect(outcome).toEqual({ error: "Only an Administrator can resolve a possible duplicate match." });
+  });
+
+  it('"replace" overwrites the existing company\'s fields with the fresh data, without creating a new company', async () => {
+    const { user, stage, search, leadType } = await baseFixtures();
+    await loginAs(user.id);
+
+    const existing = await createCompanyFixture({
+      name: "The Copper Kettle",
+      leadTypeId: leadType.id,
+      pipelineStageId: stage.id,
+      assignedToId: user.id,
+      createdById: user.id,
+    });
+    await testPrisma.company.update({ where: { id: existing.id }, data: { phone: "555-0000", email: "old@example.test" } });
+
+    const result = await createSearchResultFixture({ searchId: search.id, name: "The Copper Kettle" });
+
+    const outcome = await transferSearchResults({
+      assignedToId: user.id,
+      pipelineStageId: stage.id,
+      rows: [baseRow(result.id, { phone: "555-9999", email: "fresh@example.test", duplicateAction: "replace", duplicateTargetCompanyId: existing.id })],
+    });
+
+    expect(outcome).toEqual({ transferredCount: 1, ignoredCount: 0 });
+    expect(await testPrisma.company.count()).toBe(1); // no new company created
+
+    const updated = await testPrisma.company.findUniqueOrThrow({ where: { id: existing.id } });
+    expect(updated.phone).toBe("555-9999");
+    expect(updated.email).toBe("fresh@example.test");
+    // Replace does not touch pipeline/assignment state.
+    expect(updated.pipelineStageId).toBe(stage.id);
+
+    const updatedResult = await testPrisma.searchResult.findUniqueOrThrow({ where: { id: result.id } });
+    expect(updatedResult.disposition).toBe("TRANSFERRED");
+    expect(updatedResult.companyId).toBe(existing.id);
+  });
+
+  it('"merge" only fills fields the existing company doesn\'t already have, never overwriting data on file', async () => {
+    const { user, stage, search, leadType } = await baseFixtures();
+    await loginAs(user.id);
+
+    const existing = await createCompanyFixture({
+      name: "The Copper Kettle",
+      leadTypeId: leadType.id,
+      pipelineStageId: stage.id,
+      assignedToId: user.id,
+      createdById: user.id,
+    });
+    await testPrisma.company.update({ where: { id: existing.id }, data: { phone: "555-0000", email: null } });
+
+    const result = await createSearchResultFixture({ searchId: search.id, name: "The Copper Kettle" });
+
+    const outcome = await transferSearchResults({
+      assignedToId: user.id,
+      pipelineStageId: stage.id,
+      rows: [baseRow(result.id, { phone: "555-9999", email: "fresh@example.test", duplicateAction: "merge", duplicateTargetCompanyId: existing.id })],
+    });
+
+    expect(outcome).toEqual({ transferredCount: 1, ignoredCount: 0 });
+    expect(await testPrisma.company.count()).toBe(1);
+
+    const updated = await testPrisma.company.findUniqueOrThrow({ where: { id: existing.id } });
+    expect(updated.phone).toBe("555-0000"); // already had a value — kept as-is
+    expect(updated.email).toBe("fresh@example.test"); // was blank — filled in
+  });
+
+  it('"ignore" skips the row entirely — no company change, disposition untouched', async () => {
     const { user, stage, search, leadType } = await baseFixtures();
     await loginAs(user.id);
 
@@ -122,11 +209,15 @@ describe("transferSearchResults", () => {
     const outcome = await transferSearchResults({
       assignedToId: user.id,
       pipelineStageId: stage.id,
-      rows: [baseRow(result.id, { overrideDuplicate: true })],
+      rows: [baseRow(result.id, { duplicateAction: "ignore" })],
     });
 
-    expect(outcome).toEqual({ transferredCount: 1 });
-    expect(await testPrisma.company.count()).toBe(2);
+    expect(outcome).toEqual({ transferredCount: 0, ignoredCount: 1 });
+    expect(await testPrisma.company.count()).toBe(1);
+
+    const untouchedResult = await testPrisma.searchResult.findUniqueOrThrow({ where: { id: result.id } });
+    expect(untouchedResult.disposition).not.toBe("TRANSFERRED");
+    expect(untouchedResult.companyId).toBeNull();
   });
 
   it("rolls back the whole batch — no companies, contacts, activities, or disposition changes — when the transaction fails", async () => {
