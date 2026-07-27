@@ -10,8 +10,10 @@ import {
   movePipelineStage,
   deletePipelineStage,
   setDefaultPipelineStage,
+  setPipelineStageOutcome,
 } from "./actions";
 import { PageHeader } from "@/components/ui/page-header";
+import { Label, Select, HelpText } from "@/components/ui/field";
 
 export const metadata = { title: "Pipeline Stages — Triviality CRM" };
 
@@ -25,7 +27,7 @@ export default async function PipelineStagesPage() {
     <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader
         title="Pipeline Stages"
-        description="Add, rename, reorder, and activate or deactivate stages. Exactly one stage is marked as the default for new companies. A stage in use by existing companies can be deactivated but not deleted."
+        description="Add, rename, reorder, and activate or deactivate stages. Exactly one stage is marked as the default for new companies. A stage in use by existing companies can be deactivated but not deleted. Outcome marks a stage as Won or Lost — a Lost stage is excluded from active-pipeline reports and stops generating follow-up nudges; leave it Open for anything still in progress."
       />
 
       <LookupTable
@@ -35,9 +37,24 @@ export default async function PipelineStagesPage() {
         move={movePipelineStage}
         remove={deletePipelineStage}
         setDefault={setDefaultPipelineStage}
+        setOutcome={setPipelineStageOutcome}
       />
 
-      <AddLookupForm create={createPipelineStage} placeholder="New pipeline stage name" />
+      <AddLookupForm
+        create={createPipelineStage}
+        placeholder="New pipeline stage name"
+        extraFields={
+          <div>
+            <Label>Outcome</Label>
+            <Select name="outcomeType" defaultValue="" className="mt-1">
+              <option value="">Open</option>
+              <option value="WON">Won</option>
+              <option value="LOST">Lost</option>
+            </Select>
+            <HelpText className="mt-1">Lost stages are excluded from active-pipeline reports and follow-up nudges. Can be changed later.</HelpText>
+          </div>
+        }
+      />
     </div>
   );
 }

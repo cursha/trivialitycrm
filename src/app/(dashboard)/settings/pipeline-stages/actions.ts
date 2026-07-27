@@ -6,6 +6,16 @@ import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
 import { LookupNameSchema } from "@/lib/validation/lookup";
 import { formString } from "@/lib/form-data";
+import { PipelineStageOutcome } from "@/generated/prisma/enums";
+
+/** Form value is "" (open, the default) | "WON" | "LOST" — anything else is
+ * a malformed request, not a real user choice, so it's rejected rather than
+ * silently coerced to open. */
+function parseOutcomeType(value: string): { ok: true; value: PipelineStageOutcome | null } | { ok: false } {
+  if (value === "") return { ok: true, value: null };
+  if (value === PipelineStageOutcome.WON || value === PipelineStageOutcome.LOST) return { ok: true, value };
+  return { ok: false };
+}
 
 export type ActionResult = { error?: string } | undefined;
 
@@ -25,6 +35,11 @@ export async function createPipelineStage(_prevState: ActionResult, formData: Fo
     return { error: parsed.error.issues[0]?.message ?? "Enter a name." };
   }
 
+  const outcome = parseOutcomeType(formString(formData, "outcomeType"));
+  if (!outcome.ok) {
+    return { error: "Choose a valid outcome." };
+  }
+
   const highest = await prisma.pipelineStage.aggregate({ _max: { sortOrder: true } });
   const isFirstStage = (await prisma.pipelineStage.count()) === 0;
 
@@ -36,6 +51,7 @@ export async function createPipelineStage(_prevState: ActionResult, formData: Fo
         // The very first stage ever created has to be the default, since
         // exactly one stage must always be marked default.
         isDefault: isFirstStage,
+        outcomeType: outcome.value,
       },
     });
   } catch {
@@ -72,6 +88,20 @@ export async function setPipelineStageActive(id: string, active: boolean): Promi
   if (!active && stage.isDefault) return;
 
   await prisma.pipelineStage.update({ where: { id }, data: { active } });
+  revalidatePath(PATH);
+}
+
+/**
+ * Marks a stage as Won, Lost, or open (null) — drives next-best-action,
+ * priority scoring, and pipeline/trend reporting (see PipelineStageOutcome
+ * usages across src/lib/workspace and src/app/(dashboard)/reports), all of
+ * which previously had no admin-facing way to configure this at all: every
+ * stage was permanently outcomeType: null from creation onward.
+ */
+export async function setPipelineStageOutcome(id: string, outcomeType: PipelineStageOutcome | null): Promise<void> {
+  await requireSettingsManager();
+
+  await prisma.pipelineStage.update({ where: { id }, data: { outcomeType } });
   revalidatePath(PATH);
 }
 

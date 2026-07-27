@@ -7,11 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/field";
 import { ACTIVE_TONE } from "@/lib/ui/status-tones";
 
+export type LookupOutcome = "WON" | "LOST" | null;
+
 export type LookupItem = {
   id: string;
   name: string;
   active: boolean;
   isDefault?: boolean;
+  outcomeType?: LookupOutcome;
 };
 
 type ActionResult = { error?: string } | undefined;
@@ -24,6 +27,8 @@ export function LookupTable({
   remove,
   setDefault,
   defaultLabel = "Default",
+  setOutcome,
+  outcomeLabel = "Outcome",
 }: {
   items: LookupItem[];
   rename: (id: string, formData: FormData) => Promise<ActionResult>;
@@ -32,6 +37,11 @@ export function LookupTable({
   remove: (id: string) => Promise<ActionResult>;
   setDefault?: (id: string) => Promise<void>;
   defaultLabel?: string;
+  /** Only pipeline stages pass this — everything else (lead types,
+   * rejection reasons, roles, users) has no won/lost concept, so the
+   * column is entirely absent for them. */
+  setOutcome?: (id: string, outcomeType: LookupOutcome) => Promise<void>;
+  outcomeLabel?: string;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
@@ -78,6 +88,7 @@ export function LookupTable({
             <th className="px-5 py-3">Name</th>
             <th className="px-5 py-3">Status</th>
             {setDefault && <th className="px-5 py-3">{defaultLabel}</th>}
+            {setOutcome && <th className="px-5 py-3">{outcomeLabel}</th>}
             <th className="px-5 py-3 text-right">Actions</th>
           </tr>
         </thead>
@@ -165,6 +176,21 @@ export function LookupTable({
                   </button>
                 </td>
               )}
+              {setOutcome && (
+                <td className="px-5 py-4">
+                  <select
+                    value={item.outcomeType ?? ""}
+                    disabled={isPending}
+                    onChange={(event) => startTransition(() => setOutcome(item.id, event.target.value === "" ? null : (event.target.value as "WON" | "LOST")))}
+                    className="rounded border border-border-strong bg-transparent px-2 py-1 text-xs font-semibold text-text"
+                    aria-label={`${item.name} outcome`}
+                  >
+                    <option value="">Open</option>
+                    <option value="WON">Won</option>
+                    <option value="LOST">Lost</option>
+                  </select>
+                </td>
+              )}
               <td className="px-5 py-4 text-right">
                 <button
                   type="button"
@@ -180,7 +206,7 @@ export function LookupTable({
           ))}
           {items.length === 0 && (
             <tr>
-              <td colSpan={setDefault ? 5 : 4} className="px-5 py-8 text-center text-text-muted">
+              <td colSpan={4 + (setDefault ? 1 : 0) + (setOutcome ? 1 : 0)} className="px-5 py-8 text-center text-text-muted">
                 Nothing here yet — add the first one below.
               </td>
             </tr>

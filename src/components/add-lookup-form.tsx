@@ -10,16 +10,22 @@ type ActionResult = { error?: string } | undefined;
 export function AddLookupForm({
   create,
   placeholder,
+  extraFields,
 }: {
   create: (prevState: ActionResult, formData: FormData) => Promise<ActionResult>;
   placeholder: string;
+  /** Pre-rendered form fields (e.g. a <Select>), not a render callback —
+   * only already-built ReactNode can cross the Server->Client boundary from
+   * a page.tsx into this client component; a plain function prop can't. */
+  extraFields?: React.ReactNode;
 }) {
   const [state, action, pending] = useActionState(create, undefined);
 
   return (
     <form action={action} className="flex items-start gap-3 rounded-2xl border border-dashed border-border-strong bg-black/[0.02] p-4">
-      <div className="flex-1">
+      <div className="flex-1 space-y-2">
         <Input name="name" placeholder={placeholder} required />
+        {extraFields}
         {state?.error && <p className="mt-1 text-xs font-semibold text-danger">{state.error}</p>}
       </div>
       <Button type="submit" disabled={pending} variant="primary">
