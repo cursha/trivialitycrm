@@ -235,8 +235,9 @@ export function TransferForm({
                     </div>
                   )}
                   <p className="text-xs font-normal text-text-muted">
-                    Replace overwrites the existing company&apos;s fields with this data. Merge only fills in fields it&apos;s currently
-                    missing. Ignore skips this lead.
+                    Replace overwrites every field with this fresh data. Merge uses the fresh data wherever it has a value, and only
+                    keeps the existing company&apos;s value for anything the fresh data left blank. Ignore skips this lead and marks it
+                    as a duplicate so it won&apos;t be offered for transfer again.
                   </p>
                 </div>
               ) : (

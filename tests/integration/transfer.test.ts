@@ -164,7 +164,7 @@ describe("transferSearchResults", () => {
     expect(updatedResult.companyId).toBe(existing.id);
   });
 
-  it('"merge" only fills fields the existing company doesn\'t already have, never overwriting data on file', async () => {
+  it('"merge" takes the fresh value wherever it has one, and only falls back to the existing value where the fresh data is blank', async () => {
     const { user, stage, search, leadType } = await baseFixtures();
     await loginAs(user.id);
 
@@ -175,25 +175,37 @@ describe("transferSearchResults", () => {
       assignedToId: user.id,
       createdById: user.id,
     });
-    await testPrisma.company.update({ where: { id: existing.id }, data: { phone: "555-0000", email: null } });
+    await testPrisma.company.update({
+      where: { id: existing.id },
+      data: { phone: "555-0000", email: null, websiteUrl: "https://old.example.test" },
+    });
 
     const result = await createSearchResultFixture({ searchId: search.id, name: "The Copper Kettle" });
 
     const outcome = await transferSearchResults({
       assignedToId: user.id,
       pipelineStageId: stage.id,
-      rows: [baseRow(result.id, { phone: "555-9999", email: "fresh@example.test", duplicateAction: "merge", duplicateTargetCompanyId: existing.id })],
+      rows: [
+        baseRow(result.id, {
+          phone: "555-9999", // fresh has a value, existing has a (different) value
+          email: "fresh@example.test", // fresh has a value, existing is blank
+          websiteUrl: undefined, // fresh is blank, existing has a value
+          duplicateAction: "merge",
+          duplicateTargetCompanyId: existing.id,
+        }),
+      ],
     });
 
     expect(outcome).toEqual({ transferredCount: 1, ignoredCount: 0 });
     expect(await testPrisma.company.count()).toBe(1);
 
     const updated = await testPrisma.company.findUniqueOrThrow({ where: { id: existing.id } });
-    expect(updated.phone).toBe("555-0000"); // already had a value — kept as-is
+    expect(updated.phone).toBe("555-9999"); // fresh wins — most recent data
     expect(updated.email).toBe("fresh@example.test"); // was blank — filled in
+    expect(updated.websiteUrl).toBe("https://old.example.test"); // fresh left it blank — existing preserved
   });
 
-  it('"ignore" skips the row entirely — no company change, disposition untouched', async () => {
+  it('"ignore" skips the row — no company change, but marks the SearchResult DUPLICATE so it never re-prompts', async () => {
     const { user, stage, search, leadType } = await baseFixtures();
     await loginAs(user.id);
 
@@ -215,9 +227,9 @@ describe("transferSearchResults", () => {
     expect(outcome).toEqual({ transferredCount: 0, ignoredCount: 1 });
     expect(await testPrisma.company.count()).toBe(1);
 
-    const untouchedResult = await testPrisma.searchResult.findUniqueOrThrow({ where: { id: result.id } });
-    expect(untouchedResult.disposition).not.toBe("TRANSFERRED");
-    expect(untouchedResult.companyId).toBeNull();
+    const ignoredResult = await testPrisma.searchResult.findUniqueOrThrow({ where: { id: result.id } });
+    expect(ignoredResult.disposition).toBe("DUPLICATE");
+    expect(ignoredResult.companyId).toBeNull();
   });
 
   it("rolls back the whole batch — no companies, contacts, activities, or disposition changes — when the transaction fails", async () => {

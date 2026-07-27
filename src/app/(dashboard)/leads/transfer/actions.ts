@@ -113,6 +113,13 @@ export async function transferSearchResults(rawPayload: TransferPayload): Promis
       const plan = plans.get(row.resultId)!;
 
       if (plan.action === "ignore") {
+        // Must actually write something, not just skip in memory — a
+        // no-op here would leave the result NEW/REVIEWED, so it would hit
+        // this exact same duplicate prompt again on a future transfer
+        // attempt instead of the decision being genuinely recorded.
+        // DUPLICATE is an existing disposition (already wired into the
+        // results-table UI) that had never been written by any code path.
+        await tx.searchResult.update({ where: { id: row.resultId }, data: { disposition: "DUPLICATE" } });
         ignoredCount++;
         continue;
       }
@@ -208,10 +215,13 @@ type ResolvedContactFields = {
 };
 
 /**
- * "replace": every mergeable field takes the fresh row's value.
- * "merge": a field only changes if the existing company's value is
- * currently blank — never overwrites data already on file, matching the
- * same "trust existing data" rule used by the Opportunity Analysis feature.
+ * "replace": every mergeable field takes the fresh row's value,
+ * unconditionally — including nulling out a field the fresh data doesn't
+ * have, even if the existing company had a value there.
+ * "merge": the fresh (most recent) value wins wherever it has one; a field
+ * only falls back to the existing company's value when the fresh data left
+ * it blank — so merge can never destroy data the fresh pass didn't cover,
+ * but does take the newer value whenever both sides have one.
  */
 function resolveReplaceOrMergeFields(action: "replace" | "merge", row: TransferRow, existing: Company): ResolvedContactFields {
   const fresh: ResolvedContactFields = {
@@ -228,12 +238,19 @@ function resolveReplaceOrMergeFields(action: "replace" | "merge", row: TransferR
 
   if (action === "replace") return fresh;
 
-  const resolved = { ...fresh };
+  // Loosely typed as a plain string|null record for the loop — name/city/
+  // region/country are typed as required `string` on ResolvedContactFields,
+  // but Zod (TransferRowSchema) already guarantees those are never blank,
+  // so freshIsBlank is never true for them in practice; this cast just lets
+  // the one generic loop handle every mergeable field instead of writing it
+  // out nine times.
+  const resolved = { ...fresh } as Record<keyof ResolvedContactFields, string | null>;
   for (const field of MERGEABLE_CONTACT_FIELDS) {
-    const existingValue = existing[field] as string | null;
-    if (existingValue && existingValue.trim() !== "") {
-      resolved[field] = existingValue;
+    const freshValue = fresh[field];
+    const freshIsBlank = freshValue === null || freshValue.trim() === "";
+    if (freshIsBlank) {
+      resolved[field] = (existing[field] as string | null) ?? null;
     }
   }
-  return resolved;
+  return resolved as ResolvedContactFields;
 }
