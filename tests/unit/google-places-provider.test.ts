@@ -33,7 +33,12 @@ describe("GooglePlacesDiscoveryProvider", () => {
         places: [
           {
             displayName: { text: "The Milton Arms" },
-            formattedAddress: "123 Main St, Milton, ON",
+            formattedAddress: "123 Main St, Milton, ON L9T 1A1",
+            addressComponents: [
+              { longText: "123", shortText: "123", types: ["street_number"] },
+              { longText: "Main St", shortText: "Main St", types: ["route"] },
+              { longText: "L9T 1A1", shortText: "L9T 1A1", types: ["postal_code"] },
+            ],
             nationalPhoneNumber: "(905) 555-0100",
             websiteUri: "https://miltonarms.example.test",
             businessStatus: "OPERATIONAL",
@@ -49,10 +54,11 @@ describe("GooglePlacesDiscoveryProvider", () => {
     expect(candidates).toHaveLength(1);
     expect(candidates[0]).toMatchObject({
       name: "The Milton Arms",
-      address1: "123 Main St, Milton, ON",
+      address1: "123 Main St, Milton, ON L9T 1A1",
       city: "Milton",
       region: "ON",
       country: "Canada",
+      postalCode: "L9T 1A1",
       phone: "(905) 555-0100",
       websiteUrl: "https://miltonarms.example.test",
       triviaStatus: "UNCERTAIN",
@@ -61,6 +67,19 @@ describe("GooglePlacesDiscoveryProvider", () => {
       evidence: [],
       sources: [],
     });
+  });
+
+  it("leaves postalCode null when the response has no postal_code address component", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        places: [{ displayName: { text: "The Milton Arms" }, addressComponents: [{ longText: "Main St", types: ["route"] }] }],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const candidates = await new GooglePlacesDiscoveryProvider().discover(baseParams);
+    expect(candidates[0].postalCode).toBeNull();
   });
 
   it("sends the field mask and API key as headers, and the city+leadType+region+country as the text query", async () => {
@@ -74,6 +93,7 @@ describe("GooglePlacesDiscoveryProvider", () => {
     expect(url).toBe("https://places.googleapis.com/v1/places:searchText");
     expect(init.headers["X-Goog-Api-Key"]).toBe("test-places-key");
     expect(init.headers["X-Goog-FieldMask"]).toContain("places.nationalPhoneNumber");
+    expect(init.headers["X-Goog-FieldMask"]).toContain("places.addressComponents");
     expect(JSON.parse(init.body).textQuery).toBe("Pub in Milton, ON, Canada");
   });
 

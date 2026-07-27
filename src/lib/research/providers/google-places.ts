@@ -17,9 +17,14 @@ const TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
 // Atmosphere tier (rating, reviews, price level) would push every call into
 // a more expensive SKU for data nothing here displays. nextPageToken must be
 // explicitly requested too, same as any other field, or Google omits it.
+// addressComponents is itself a cheaper "Pro" tier field, but the call
+// already requests nationalPhoneNumber/websiteUri (both "Enterprise" tier)
+// — Google bills the whole call at the highest tier requested regardless,
+// so adding it costs nothing on top of what this call already pays for.
 const FIELD_MASK = [
   "places.displayName",
   "places.formattedAddress",
+  "places.addressComponents",
   "places.nationalPhoneNumber",
   "places.websiteUri",
   "places.businessStatus",
@@ -30,10 +35,13 @@ const FIELD_MASK = [
 // across pages for Text Search (New).
 const MAX_PAGES_PER_CITY = 3;
 
+type PlaceAddressComponent = { longText?: string; shortText?: string; types?: string[] };
+
 type PlacesTextSearchResult = {
   places?: {
     displayName?: { text?: string };
     formattedAddress?: string;
+    addressComponents?: PlaceAddressComponent[];
     nationalPhoneNumber?: string;
     websiteUri?: string;
     businessStatus?: "OPERATIONAL" | "CLOSED_TEMPORARILY" | "CLOSED_PERMANENTLY";
@@ -45,13 +53,18 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function extractPostalCode(addressComponents: PlaceAddressComponent[] | undefined): string | null {
+  const component = addressComponents?.find((c) => c.types?.includes("postal_code"));
+  return component?.longText ?? component?.shortText ?? null;
+}
+
 function candidateFromPlace(place: NonNullable<PlacesTextSearchResult["places"]>[number], params: DiscoverParams, city: string): ResearchCandidate {
   return {
     name: place.displayName?.text ?? "Unknown business",
     address1: place.formattedAddress ?? null,
     city,
     region: params.region,
-    postalCode: null,
+    postalCode: extractPostalCode(place.addressComponents),
     country: params.country,
     phone: place.nationalPhoneNumber ?? null,
     email: null,
