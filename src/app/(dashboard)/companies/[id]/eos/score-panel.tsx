@@ -51,13 +51,31 @@ export type ScoreHistoryRow = {
   scoringVersion: string;
   scoredAt: Date;
   scoredBy: { name: string } | null;
-};
+} & Record<keyof typeof EOS_CATEGORY_MAXIMA, number>;
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
       <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">{label}</p>
       <p className="mt-0.5 text-sm text-text">{value || <span className="text-text-muted">—</span>}</p>
+    </div>
+  );
+}
+
+/** The per-category breakdown behind a total — every category the AI (or a
+ * human) actually scored, not just the summed result, so it's clear which
+ * signals drove the number up or down. */
+function CategoryBreakdown({ scores }: { scores: Record<keyof typeof EOS_CATEGORY_MAXIMA, number> }) {
+  return (
+    <div className="grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
+      {CATEGORY_KEYS.map((key) => (
+        <div key={key} className="flex items-center justify-between gap-2 text-sm">
+          <span className="text-text-muted">{EOS_CATEGORY_LABELS[key]}</span>
+          <span className="font-semibold text-text">
+            {scores[key]} / {EOS_CATEGORY_MAXIMA[key]}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -202,6 +220,16 @@ export function ScorePanel({
           {summary.scoreExplanation && <Field label="Explanation" value={summary.scoreExplanation} />}
           {summary.recommendedSalesApproach && <Field label="Recommended approach" value={summary.recommendedSalesApproach} />}
           {summary.recommendedNextAction && <Field label="Recommended next action" value={summary.recommendedNextAction} />}
+
+          {history.length > 0 && (
+            <div className="sm:col-span-2">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">
+                Category breakdown (the {summary.eosScore} total above, broken down)
+              </p>
+              {/* history is ordered scoredAt desc (see listCompanyScoreHistory) — [0] is the same record summary's denormalized fields came from. */}
+              <CategoryBreakdown scores={history[0]} />
+            </div>
+          )}
         </div>
       )}
 
@@ -323,6 +351,12 @@ export function ScorePanel({
                 <p className="mt-1 text-xs text-text-muted">
                   {new Date(record.scoredAt).toLocaleString()} · {record.scoredBy?.name ?? "Unknown"} · v{record.scoringVersion}
                 </p>
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-xs font-semibold text-secondary">Category breakdown</summary>
+                  <div className="mt-2">
+                    <CategoryBreakdown scores={record} />
+                  </div>
+                </details>
               </li>
             ))}
           </ul>
