@@ -18,7 +18,22 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
   const stream = new ReadableStream({
     async start(controller) {
       function send(event: object) {
-        controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+        // Confirmed live: a client disconnecting mid-analysis (tab closed,
+        // navigated away, network drop) leaves this controller closed/
+        // errored, and enqueue() on it throws. onProgress keeps firing from
+        // deep inside the (still-running, real, billed) Anthropic call
+        // regardless of whether anyone's listening, so that throw is not
+        // hypothetical — it happens on every disconnect mid-run. Left
+        // unguarded, it escaped this try/catch entirely (the catch block's
+        // own send() call threw the same way), which crashed the whole
+        // server process for every other user, not just the one who
+        // disconnected. There's nobody left to receive the event anyway,
+        // so swallowing this is correct, not just defensive.
+        try {
+          controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+        } catch {
+          /* client disconnected — nothing to do */
+        }
       }
 
       send({ type: "status", message: "Starting analysis..." });
@@ -37,7 +52,13 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
         // letting an unhandled rejection just close the stream silently.
         send({ type: "error", message: "You do not have permission to do this." });
       } finally {
-        controller.close();
+        // Same disconnected-client case as send() above — close() on an
+        // already-closed/errored controller also throws.
+        try {
+          controller.close();
+        } catch {
+          /* already closed/errored — nothing to do */
+        }
       }
     },
   });
