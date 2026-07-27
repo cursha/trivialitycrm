@@ -191,3 +191,26 @@ export async function clearNeedsReview(companyId: string): Promise<EosActionResu
   revalidatePath("/companies");
   return undefined;
 }
+
+/**
+ * Direct human override for the black-and-white "has TVs/screens" gate
+ * (Company.hasTvs — see its schema.prisma comment). Same edit_leads gate as
+ * every other EOS-panel action. Unlike the AI analysis path, a human can set
+ * this back to `null` ("unknown" — e.g. a wrong earlier entry that needs
+ * re-checking) as well as true/false; the AI's own analyze-opportunity.ts
+ * merge logic never does that (an inconclusive AI pass never erases a
+ * confirmed finding), but a human explicitly choosing "Unknown" here is a
+ * deliberate reset, not an accidental erosion.
+ */
+export async function setHasTvs(companyId: string, value: boolean | null): Promise<EosActionResult> {
+  await requireCompanyAccess(companyId);
+
+  await prisma.company.update({
+    where: { id: companyId },
+    data: { hasTvs: value },
+  });
+
+  revalidatePath(`/companies/${companyId}`);
+  revalidatePath("/companies");
+  return undefined;
+}

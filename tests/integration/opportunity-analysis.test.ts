@@ -104,6 +104,55 @@ describe("analyzeCompanyOpportunity", () => {
     expect(conflictedAfter.needsReviewReason).toBeTruthy();
   });
 
+  it("keeps Company.hasTvs at its true default when the analysis can't confirm either way", async () => {
+    const { admin, company } = await baseFixtures();
+    await loginAs(admin.id);
+    expect(company.hasTvs).toBe(true);
+
+    await analyzeCompanyOpportunity(company.id);
+    const updated = await testPrisma.company.findUniqueOrThrow({ where: { id: company.id } });
+    expect(updated.hasTvs).toBe(true);
+  });
+
+  it("deterministically zeroes turnkeyImplementationReadiness and salesPriorityScore when hasTvs is confirmed false, regardless of the provider's own salesPriorityScore", async () => {
+    const adminFixture = await createAdminFixture();
+    await loginAs(adminFixture.admin.id);
+
+    const company = await createCompanyForAdmin(adminFixture, { notes: "MOCK_NO_TVS" });
+    const outcome = await analyzeCompanyOpportunity(company.id);
+    expect("error" in outcome).toBe(false);
+    if (!("error" in outcome)) {
+      expect(outcome.hasTvs).toBe(false);
+      expect(outcome.salesPriorityScore).toBe(0);
+    }
+
+    const updated = await testPrisma.company.findUniqueOrThrow({ where: { id: company.id } });
+    expect(updated.hasTvs).toBe(false);
+    expect(updated.salesPriorityScore).toBe(0);
+
+    const history = await testPrisma.historicalScoreRecord.findFirst({ where: { companyId: company.id } });
+    expect(history?.turnkeyImplementationReadiness).toBe(0);
+    expect(history?.salesPriorityScore).toBe(0);
+  });
+
+  it("never lets a later inconclusive pass erase a previously confirmed hasTvs finding", async () => {
+    const adminFixture = await createAdminFixture();
+    await loginAs(adminFixture.admin.id);
+
+    const company = await createCompanyForAdmin(adminFixture, { notes: "MOCK_NO_TVS" });
+    await analyzeCompanyOpportunity(company.id);
+    const confirmed = await testPrisma.company.findUniqueOrThrow({ where: { id: company.id } });
+    expect(confirmed.hasTvs).toBe(false);
+
+    // Re-run without the marker — the mock now reports an inconclusive
+    // (null) finding, same as a real re-check that couldn't confirm either
+    // way. The previously confirmed false must survive, not be erased.
+    await testPrisma.company.update({ where: { id: company.id }, data: { notes: null } });
+    await analyzeCompanyOpportunity(company.id);
+    const afterReanalysis = await testPrisma.company.findUniqueOrThrow({ where: { id: company.id } });
+    expect(afterReanalysis.hasTvs).toBe(false);
+  });
+
   it("requires edit_leads, run_research, and bulk_update_leads", async () => {
     const role = await createRoleWithPermissions("Limited", ["view_all_leads"]);
     const user = await createTestUser({ roleId: role.id });

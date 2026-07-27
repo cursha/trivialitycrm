@@ -165,6 +165,9 @@ export class MockOpportunityAnalysisProvider implements OpportunityAnalysisProvi
       ],
       foundEmail: input.email ? null : `contact@${input.name.toLowerCase().replace(/[^a-z0-9]/g, "")}.example.test`,
       conflict: forcedConflict ? { found: true, reason: "[Mock] Business appears permanently closed at this address." } : { found: false, reason: null },
+      // Same "MOCK_" marker idiom as forcedConflict above — lets a test force
+      // the hard-disqualifier path deterministically without real AI judgment.
+      hasTvs: input.notes?.includes("MOCK_NO_TVS") ? false : null,
     };
   }
 }

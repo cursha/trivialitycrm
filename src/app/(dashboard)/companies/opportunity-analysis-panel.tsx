@@ -101,9 +101,16 @@ export function OpportunityAnalysisPanel({ companies, onClose }: { companies: { 
     });
   }
 
+  // Ranked by salesPriorityScore first, not eosTotal — that's the AI's own
+  // holistic judgment (see AnalyzeOpportunityResult's doc comment), which is
+  // what actually reflects a hard disqualifier (e.g. confirmed no TVs/
+  // screens) even when unrelated category scores still look fine on their
+  // own. Falls back to eosTotal only when a row has no priority score, and
+  // uses eosTotal as a tiebreaker when priority scores are equal.
+  const rankValue = (row: Row & { result: NonNullable<Row["result"]> }) => row.result.salesPriorityScore ?? row.result.eosTotal;
   const ranked = [...rows]
     .filter((row): row is Row & { status: "done"; result: NonNullable<Row["result"]> } => row.status === "done" && !!row.result)
-    .sort((a, b) => b.result.eosTotal - a.result.eosTotal);
+    .sort((a, b) => rankValue(b) - rankValue(a) || b.result.eosTotal - a.result.eosTotal);
 
   return (
     <div className="space-y-3 border-t border-border pt-3">
@@ -152,6 +159,7 @@ export function OpportunityAnalysisPanel({ companies, onClose }: { companies: { 
                       <>
                         <Badge tone={GRADE_TONE[row.result.opportunityGrade]}>{GRADE_LABEL[row.result.opportunityGrade]}</Badge>
                         <span className="font-bold text-text">{row.result.eosTotal}</span>
+                        {row.result.hasTvs === false && <Badge tone="danger">No TVs</Badge>}
                         {row.result.needsReview && <Badge tone="warning">Needs review</Badge>}
                       </>
                     )}
@@ -199,7 +207,9 @@ export function OpportunityAnalysisPanel({ companies, onClose }: { companies: { 
                       <span className="w-5 text-text-muted">{index + 1}.</span>
                       <span className="font-semibold text-text">{row.name}</span>
                       <Badge tone={GRADE_TONE[row.result.opportunityGrade]}>{GRADE_LABEL[row.result.opportunityGrade]}</Badge>
-                      <span className="text-text-muted">{row.result.eosTotal}</span>
+                      <span className="text-text-muted">EOS {row.result.eosTotal}</span>
+                      {row.result.salesPriorityScore !== null && <span className="text-text-muted">· Priority {row.result.salesPriorityScore}</span>}
+                      {row.result.hasTvs === false && <Badge tone="danger">No TVs</Badge>}
                       {row.result.needsReview && <Badge tone="warning">Needs review</Badge>}
                     </li>
                   ))}

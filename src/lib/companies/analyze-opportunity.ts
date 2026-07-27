@@ -20,9 +20,18 @@ export type AnalyzeOpportunityResult =
       name: string;
       eosTotal: number;
       opportunityGrade: OpportunityGrade;
+      // AI's own holistic priority judgment — distinct from eosTotal (the
+      // raw category-score sum). Surfaced to the client specifically so a
+      // hard disqualifier (e.g. confirmed no TVs/screens — see the
+      // provider's prompt) can sink a company to the bottom of the
+      // opportunity-analysis-panel's ranked list even when its unrelated
+      // category scores (food/beverage, weeknight revenue, etc.) still look
+      // fine on their own.
+      salesPriorityScore: number | null;
       recommendedNextAction: string;
       needsReview: boolean;
       evidence: OpportunityAnalysisEvidence[];
+      hasTvs: boolean | null;
     };
 
 /**
@@ -102,7 +111,22 @@ export async function runOpportunityAnalysis(
     return { error: `Opportunity analysis returned invalid scores: ${categoryErrors[0]}` };
   }
 
-  const eosTotal = totalFromCategoryScores(result.categoryScores);
+  // Tri-state: an inconclusive (null) pass never overwrites a previously
+  // confirmed true/false finding — see Company.hasTvs's schema.prisma
+  // comment for why (a later "couldn't confirm either way" run shouldn't
+  // erase an earlier, genuine finding).
+  const hasTvs = result.hasTvs ?? company.hasTvs;
+
+  // Black-and-white hard requirement, enforced HERE in code rather than
+  // trusted to the model having correctly applied its own prompt
+  // instructions on every call — a confirmed absence of TVs/screens
+  // deterministically overrides both the turnkeyImplementationReadiness
+  // category score and the AI's own salesPriorityScore judgment, regardless
+  // of what it actually returned for either.
+  const categoryScores = hasTvs === false ? { ...result.categoryScores, turnkeyImplementationReadiness: 0 } : result.categoryScores;
+  const salesPriorityScore = hasTvs === false ? 0 : result.salesPriorityScore;
+
+  const eosTotal = totalFromCategoryScores(categoryScores);
   const opportunityGrade = gradeForScore(eosTotal);
   const needsReview = result.conflict.found || company.needsReview;
 
@@ -111,12 +135,12 @@ export async function runOpportunityAnalysis(
       data: {
         companyId,
         eosTotal,
-        ...result.categoryScores,
+        ...categoryScores,
         opportunityGrade,
         confidenceLevel: result.confidenceLevel,
         primaryClassification: result.primaryClassification,
         secondaryTags: result.secondaryTags,
-        salesPriorityScore: result.salesPriorityScore,
+        salesPriorityScore,
         scoreExplanation: result.scoreExplanation,
         recommendedSalesApproach: result.recommendedSalesApproach,
         recommendedNextAction: result.recommendedNextAction,
@@ -148,7 +172,7 @@ export async function runOpportunityAnalysis(
         confidenceLevel: result.confidenceLevel,
         primaryClassification: result.primaryClassification,
         secondaryTags: result.secondaryTags,
-        salesPriorityScore: result.salesPriorityScore,
+        salesPriorityScore,
         scoreExplanation: result.scoreExplanation,
         verifiedEvidenceSummary: result.verifiedEvidenceSummary,
         inferredEvidenceSummary: result.inferredEvidenceSummary,
@@ -158,6 +182,7 @@ export async function runOpportunityAnalysis(
         lastScoredAt: new Date(),
         scoringVersion: "ai-v1",
         currentHistoricalScoreId: created.id,
+        hasTvs,
         // Fill-blank-only: never overwrite an existing email with an
         // AI-found one — the user's rule is "trust what's already there."
         email: company.email ?? result.foundEmail,
@@ -187,8 +212,10 @@ export async function runOpportunityAnalysis(
     name: company.name,
     eosTotal,
     opportunityGrade,
+    salesPriorityScore,
     recommendedNextAction: result.recommendedNextAction,
     needsReview,
     evidence: result.evidence,
+    hasTvs,
   };
 }

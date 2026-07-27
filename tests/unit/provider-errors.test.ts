@@ -36,6 +36,22 @@ describe("classifyProviderError", () => {
     expect(classifyProviderError(error).category).toBe("invalid_response");
   });
 
+  it("classifies a BadRequestError caused by an exhausted account balance as budget_exceeded, not invalid_response", () => {
+    // Confirmed live against the real API: an out-of-credit account returns
+    // a plain 400 BadRequestError structurally identical to a malformed-
+    // schema 400 — "Your credit balance is too low to access the Anthropic
+    // API. Please go to Plans & Billing to upgrade or purchase credits."
+    // Without this check it was misclassified as invalid_response, telling
+    // whoever's debugging it to look at the request shape instead of billing.
+    const error = new BadRequestError(
+      400,
+      { type: "invalid_request_error", message: "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits." },
+      "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits.",
+      new Headers(),
+    );
+    expect(classifyProviderError(error).category).toBe("budget_exceeded");
+  });
+
   it("classifies Anthropic SDK APIConnectionTimeoutError as timeout", () => {
     const error = new APIConnectionTimeoutError();
     expect(classifyProviderError(error).category).toBe("timeout");

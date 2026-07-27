@@ -20,6 +20,7 @@ export type AiSettingsDefaults = {
   perUserDailySearchLimit: number | null;
   maxCostPerSearchUsd: number | null;
   maxSearchToolUsesPerCall: number;
+  maxSearchToolUsesPerOpportunityAnalysis: number;
 };
 
 export function AiSettingsForm({
@@ -98,9 +99,26 @@ export function AiSettingsForm({
             <Label>Web searches per business (1–8)</Label>
             <Input name="maxSearchToolUsesPerCall" type="number" min={1} max={8} defaultValue={defaultValues.maxSearchToolUsesPerCall} required className="mt-1" />
             <HelpText className="mt-1">
-              How many real web searches (and page fetches) the AI can use while researching or verifying one business. Lower is faster but finds less
-              evidence per lead; higher is slower but more thorough. This does not change how long an individual search is allowed to run for — it changes
-              how much work each step actually does.
+              How many real web searches (and page fetches) the AI can use while researching or verifying one business during lead discovery. Lower is
+              faster but finds less evidence per lead; higher is slower but more thorough. This does not change how long an individual search is allowed to
+              run for — it changes how much work each step actually does.
+            </HelpText>
+          </div>
+          <div>
+            <Label>Web searches per opportunity analysis (1–8)</Label>
+            <Input
+              name="maxSearchToolUsesPerOpportunityAnalysis"
+              type="number"
+              min={1}
+              max={8}
+              defaultValue={defaultValues.maxSearchToolUsesPerOpportunityAnalysis}
+              required
+              className="mt-1"
+            />
+            <HelpText className="mt-1">
+              Same idea, but for the &quot;Analyze for opportunities&quot; bulk action on the Companies list, which researches one already-known company at
+              a time. Set separately from the search above — a company with little to no web presence can otherwise burn many rounds (and real cost) for
+              no useful result before eventually timing out. Lower this to fail those cases fast and cheap instead.
             </HelpText>
           </div>
           {state?.error && (

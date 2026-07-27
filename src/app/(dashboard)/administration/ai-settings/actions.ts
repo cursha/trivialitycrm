@@ -28,6 +28,7 @@ export async function updateAiSettings(_prevState: ActionResult, formData: FormD
     perUserDailySearchLimit: formString(formData, "perUserDailySearchLimit"),
     maxCostPerSearchUsd: formString(formData, "maxCostPerSearchUsd"),
     maxSearchToolUsesPerCall: formString(formData, "maxSearchToolUsesPerCall"),
+    maxSearchToolUsesPerOpportunityAnalysis: formString(formData, "maxSearchToolUsesPerOpportunityAnalysis"),
   });
 
   if (!parsed.success) {
@@ -48,6 +49,7 @@ export async function updateAiSettings(_prevState: ActionResult, formData: FormD
     perUserDailySearchLimit: parsed.data.perUserDailySearchLimit ?? null,
     maxCostPerSearchUsd: parsed.data.maxCostPerSearchUsd ?? null,
     maxSearchToolUsesPerCall: parsed.data.maxSearchToolUsesPerCall,
+    maxSearchToolUsesPerOpportunityAnalysis: parsed.data.maxSearchToolUsesPerOpportunityAnalysis,
     updatedById: user.id,
   };
 

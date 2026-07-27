@@ -47,6 +47,16 @@ describe("MockOpportunityAnalysisProvider", () => {
     expect(result.conflict.reason).toBeTruthy();
   });
 
+  it("leaves hasTvs null (unconfirmed) by default", async () => {
+    const result = await new MockOpportunityAnalysisProvider().analyze(baseInput);
+    expect(result.hasTvs).toBeNull();
+  });
+
+  it("deterministically reports hasTvs false when notes contain the MOCK_NO_TVS marker", async () => {
+    const result = await new MockOpportunityAnalysisProvider().analyze({ ...baseInput, notes: "Some notes. MOCK_NO_TVS" });
+    expect(result.hasTvs).toBe(false);
+  });
+
   it("produces at least one evidence entry with a category from the fixed rubric", async () => {
     const result = await new MockOpportunityAnalysisProvider().analyze(baseInput);
     expect(result.evidence.length).toBeGreaterThan(0);

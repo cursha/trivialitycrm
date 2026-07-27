@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CirclePlus } from "lucide-react";
 import { EOS_CATEGORY_MAXIMA, EOS_CATEGORY_LABELS } from "@/lib/eos/constants";
-import { recordHistoricalScore, clearNeedsReview } from "./actions";
+import { recordHistoricalScore, clearNeedsReview, setHasTvs } from "./actions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/alert";
@@ -39,6 +39,7 @@ export type CompanySummary = {
   exclusionReason: string | null;
   needsReview: boolean;
   needsReviewReason: string | null;
+  hasTvs: boolean | null;
 };
 
 export type ScoreHistoryRow = {
@@ -77,6 +78,7 @@ export function ScorePanel({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isClearingReview, startClearReview] = useTransition();
+  const [isSettingHasTvs, startSetHasTvs] = useTransition();
   const [categoryValues, setCategoryValues] = useState<Record<string, number>>(
     Object.fromEntries(CATEGORY_KEYS.map((key) => [key, 0])),
   );
@@ -96,6 +98,13 @@ export function ScorePanel({
     });
   }
 
+  function handleSetHasTvs(value: boolean | null) {
+    startSetHasTvs(async () => {
+      await setHasTvs(companyId, value);
+      router.refresh();
+    });
+  }
+
   return (
     <Card>
       <div className="flex items-center justify-between">
@@ -105,6 +114,35 @@ export function ScorePanel({
             <CirclePlus size={15} />
             Record a score
           </button>
+        )}
+      </div>
+
+      <div className="mt-3 flex items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">Has TVs</span>
+        {canEdit ? (
+          <div className="flex gap-1">
+            {(
+              [
+                { label: "Yes", value: true },
+                { label: "No", value: false },
+                { label: "Unknown", value: null },
+              ] as const
+            ).map((option) => (
+              <button
+                key={option.label}
+                type="button"
+                disabled={isSettingHasTvs}
+                onClick={() => handleSetHasTvs(option.value)}
+                className={`rounded px-2 py-1 text-xs font-semibold disabled:pointer-events-none disabled:opacity-50 ${
+                  summary.hasTvs === option.value ? "bg-primary text-white" : "border border-border-strong text-text hover:bg-black/5"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <Badge tone={summary.hasTvs === false ? "danger" : "neutral"}>{summary.hasTvs === null ? "Unknown" : summary.hasTvs ? "Yes" : "No"}</Badge>
         )}
       </div>
 

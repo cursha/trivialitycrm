@@ -42,6 +42,10 @@ const FALLBACK_MODEL = "claude-sonnet-5";
 // default — only used if that DB read itself fails, same defensive-fallback
 // convention as FALLBACK_MODEL above.
 const FALLBACK_MAX_SEARCH_TOOL_USES = 8;
+// Matches AiSettings.maxSearchToolUsesPerOpportunityAnalysis's own schema
+// default — see that field's schema.prisma comment for why it's lower than
+// FALLBACK_MAX_SEARCH_TOOL_USES above.
+const FALLBACK_MAX_SEARCH_TOOL_USES_OPPORTUNITY_ANALYSIS = 4;
 
 async function resolveModel(): Promise<string> {
   try {
@@ -61,6 +65,24 @@ async function resolveResearchSettings(): Promise<{ model: string; maxSearchTool
     return { model: settings.approvedModel, maxSearchToolUses: settings.maxSearchToolUsesPerCall };
   } catch {
     return { model: FALLBACK_MODEL, maxSearchToolUses: FALLBACK_MAX_SEARCH_TOOL_USES };
+  }
+}
+
+/**
+ * Split from resolveResearchSettings() — opportunity analysis
+ * (AnthropicOpportunityAnalysisProvider below) runs against one
+ * already-known Company at a time, not a fresh discovery search, and has
+ * different cost/time characteristics: confirmed live, a business with thin
+ * web presence can otherwise burn many search/fetch rounds for no useful
+ * result before eventually hitting the timeout. Its own admin setting
+ * defaults lower so that case fails fast and cheap instead.
+ */
+async function resolveOpportunityAnalysisSettings(): Promise<{ model: string; maxSearchToolUses: number }> {
+  try {
+    const settings = await getAiSettings();
+    return { model: settings.approvedModel, maxSearchToolUses: settings.maxSearchToolUsesPerOpportunityAnalysis };
+  } catch {
+    return { model: FALLBACK_MODEL, maxSearchToolUses: FALLBACK_MAX_SEARCH_TOOL_USES_OPPORTUNITY_ANALYSIS };
   }
 }
 
@@ -199,6 +221,13 @@ const OPPORTUNITY_ANALYSIS_SCHEMA = {
       required: ["found", "reason"],
       additionalProperties: false,
     },
+    // Tri-state, deliberately its own top-level field rather than folded
+    // into categoryScores/salesPriorityScore — a black-and-white hard
+    // requirement the app enforces deterministically afterward (see
+    // analyze-opportunity.ts), not a soft signal left to the model's own
+    // score-adjustment discretion. null = genuinely unconfirmed; true/false
+    // only from an explicit finding, never inferred from silence.
+    hasTvs: { type: ["boolean", "null"] },
   },
   required: [
     "categoryScores",
@@ -215,6 +244,7 @@ const OPPORTUNITY_ANALYSIS_SCHEMA = {
     "evidence",
     "foundEmail",
     "conflict",
+    "hasTvs",
   ],
   additionalProperties: false,
 } as const;
@@ -543,8 +573,17 @@ export class AnthropicOpportunityAnalysisProvider implements OpportunityAnalysis
     input: OpportunityAnalysisInput,
     onProgress?: (event: { message: string }) => void,
   ): Promise<OpportunityAnalysisResult> {
-    const { model, maxSearchToolUses } = await resolveResearchSettings();
-    return callProvider({ providerName: "anthropic-opportunity-analysis", timeoutMs: 300_000 }, async (signal) => {
+    const { model, maxSearchToolUses } = await resolveOpportunityAnalysisSettings();
+    // 840s (14min), not the other providers' 300s: confirmed live, a
+    // sparse-web-presence subject (e.g. small-town pubs) makes the model
+    // burn many search/fetch rounds finding little, genuinely running past
+    // 5 minutes. Streaming (below) is what makes that survivable at all on
+    // Railway (up to 15min as long as bytes keep flowing) — but this
+    // AbortController timeout is a separate, app-level ceiling that was
+    // still left at 300_000, silently defeating the point of streaming for
+    // exactly the slow cases it was built to tolerate. 840s leaves a safety
+    // margin under Railway's 15min proxy ceiling.
+    return callProvider({ providerName: "anthropic-opportunity-analysis", timeoutMs: 840_000 }, async (signal) => {
       // Streamed, not a single blocking create() call: this request can
       // legitimately run close to (or past) 5 minutes doing real web
       // research, and Railway's edge proxy closes any HTTP request with no
@@ -561,18 +600,27 @@ export class AnthropicOpportunityAnalysisProvider implements OpportunityAnalysis
         {
           model,
           // Raised twice: 4000 -> 8000 (still truncated) -> 16000, matching
-          // discover()'s budget. Root cause of the truncation: this app's
-          // only approved model, claude-sonnet-5, runs adaptive thinking BY
-          // DEFAULT when `thinking` is omitted (unlike Sonnet 4.6, where
-          // omitting it meant no thinking) -- confirmed against Anthropic's
-          // current docs, not assumed. Thinking tokens share this same
-          // max_tokens budget with the visible/structured output.
+          // discover()'s budget. The earlier fix only ever addressed the
+          // ceiling, not the actual driver: confirmed against Anthropic's
+          // current docs, output_config.effort defaults to "high" whenever
+          // it's omitted (exactly this call, until now) — and effort
+          // governs ALL tokens in the response, thinking AND tool calls
+          // included, all sharing this same max_tokens budget with the
+          // final structured output. That's the real reason this call both
+          // grinds long (confirmed live: still timing out at 14min even
+          // after capping maxSearchToolUses down to 4) and still
+          // occasionally truncates at 16000 despite the cap. "medium" is
+          // Anthropic's own documented recommendation for Sonnet 5 as a
+          // cost/speed step-down "comparable to Sonnet 4.6 at high effort"
+          // — appropriate here since this is a bounded, rubric-driven
+          // scoring task (10 fixed categories, cite evidence), not
+          // open-ended exploratory research.
           max_tokens: 16000,
           tools: [
             { type: "web_search_20260209", name: "web_search", max_uses: maxSearchToolUses },
             { type: "web_fetch_20260209", name: "web_fetch", max_uses: maxSearchToolUses },
           ],
-          output_config: { format: { type: "json_schema", schema: OPPORTUNITY_ANALYSIS_SCHEMA } },
+          output_config: { effort: "medium", format: { type: "json_schema", schema: OPPORTUNITY_ANALYSIS_SCHEMA } },
           messages: [
             {
               role: "user",
@@ -584,6 +632,7 @@ export class AnthropicOpportunityAnalysisProvider implements OpportunityAnalysis
                 `Currently on file: email ${input.email ?? "(none — research and report any public email you find as foundEmail)"}. Existing notes: ${input.notes ?? "(none)"}.\n\n` +
                 "Use web_search/web_fetch to research what's missing (public contact info, decision-maker accessibility, marketing presence, community engagement, etc.) and to find supporting evidence for each category score. " +
                 "Every evidence entry must cite a sourceUrl you actually found or fetched, and its category must be one of the 10 category keys above, in SCREAMING_SNAKE_CASE. " +
+                "Specifically check whether the venue has TVs/screens — trivia hosting requires a screen to display questions, so this is reported as its own field (hasTvs), separate from the category scores. Real signals: menus, \"watch the game\"/sports-bar branding, review mentions, or an explicit no-TV/conversation-focused policy. Set hasTvs true or false ONLY on a genuine explicit finding either way; a plain absence of any mention is NOT evidence of no TVs — leave hasTvs null when unconfirmed, and do not let this uncertainty lower turnkeyImplementationReadiness or salesPriorityScore on its own. " +
                 "Only set conflict.found to true if you discover a genuine contradiction of one of the trusted facts above (e.g. the business appears permanently closed, or the name at this address doesn't match) — never as a way to change the trusted facts themselves; otherwise leave conflict.found false.",
             },
           ],
@@ -599,7 +648,26 @@ export class AnthropicOpportunityAnalysisProvider implements OpportunityAnalysis
         }
       });
 
-      const finalMessage = await stream.finalMessage();
+      let finalMessage;
+      try {
+        finalMessage = await stream.finalMessage();
+      } catch (error) {
+        // A timed-out/aborted call still gets billed by Anthropic for every
+        // token it generated before the abort — confirmed live, a call that
+        // ground for the full 14 minutes before timing out never showed up
+        // in AiUsageRecord at all, because recordUsage() below only ran on
+        // the success path. That leaves both the cost dashboard and
+        // checkAiBudget()'s enforcement blind to exactly the calls that cost
+        // the most. currentMessage is the SDK's running-accumulated Message
+        // as events arrive, including the latest usage snapshot from
+        // message_delta events — a best-effort record of real spend, not a
+        // decorative fallback.
+        const partialUsage = stream.currentMessage?.usage;
+        if (partialUsage) {
+          await recordUsage({ operation: "analyzeOpportunity", model, usage: partialUsage, userId: input.userId });
+        }
+        throw error;
+      }
       await recordUsage({ operation: "analyzeOpportunity", model, usage: finalMessage.usage, userId: input.userId });
       assertNotTruncated(finalMessage.stop_reason, "anthropic-opportunity-analysis");
       const jsonBlock = finalMessage.content.find((block) => block.type === "text");

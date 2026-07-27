@@ -152,6 +152,15 @@ export type OpportunityAnalysisResult = {
   // this address doesn't match) — never a mechanism for changing the
   // trusted fields themselves.
   conflict: { found: boolean; reason: string | null };
+  // Tri-state, deliberately separate from categoryScores/salesPriorityScore
+  // above — a black-and-white hard requirement (trivia hosting needs a
+  // screen), not a soft signal folded into a weighted score. null means
+  // genuinely unconfirmed either way; true/false must only ever come from
+  // an explicit finding (mention of TVs/sports-bar branding, or an explicit
+  // no-TV/conversation-focused policy) — never inferred from silence. See
+  // Company.hasTvs's schema.prisma comment for how this gets enforced
+  // deterministically once it reaches analyze-opportunity.ts.
+  hasTvs: boolean | null;
 };
 
 /** A real, verifiable sign of activity during a long analyze() call — e.g. a

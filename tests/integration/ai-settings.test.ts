@@ -32,6 +32,7 @@ function formData(overrides: Record<string, string> = {}) {
     defaultMinimumScore: "80",
     maxCitiesPerSearch: "50",
     maxSearchToolUsesPerCall: "8",
+    maxSearchToolUsesPerOpportunityAnalysis: "4",
   };
   for (const [k, v] of Object.entries({ ...defaults, ...overrides })) fd.set(k, v);
   return fd;
@@ -92,6 +93,28 @@ describe("AI settings", () => {
 
     const settings = await getAiSettings();
     expect(settings.maxSearchToolUsesPerCall).toBe(3);
+  });
+
+  it("rejects a maxSearchToolUsesPerOpportunityAnalysis above the app's own 8-use ceiling", async () => {
+    const role = await createRoleWithPermissions("Administrator", ["manage_ai_settings"]);
+    const user = await createTestUser({ roleId: role.id });
+    await loginAs(user.id);
+
+    const result = await updateAiSettings(undefined, formData({ maxSearchToolUsesPerOpportunityAnalysis: "9" }));
+    expect(result?.error).toBeTruthy();
+  });
+
+  it("saves maxSearchToolUsesPerCall and maxSearchToolUsesPerOpportunityAnalysis independently of each other", async () => {
+    const role = await createRoleWithPermissions("Administrator", ["manage_ai_settings"]);
+    const user = await createTestUser({ roleId: role.id });
+    await loginAs(user.id);
+
+    const result = await updateAiSettings(undefined, formData({ maxSearchToolUsesPerCall: "8", maxSearchToolUsesPerOpportunityAnalysis: "2" }));
+    expect(result?.error).toBeUndefined();
+
+    const settings = await getAiSettings();
+    expect(settings.maxSearchToolUsesPerCall).toBe(8);
+    expect(settings.maxSearchToolUsesPerOpportunityAnalysis).toBe(2);
   });
 
   it("saves valid settings and audits the change", async () => {

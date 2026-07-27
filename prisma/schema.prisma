@@ -482,6 +482,25 @@ model Company {
   exclusionReason          String?
   doNotContact             Boolean                @default(false)
 
+  // Tri-state, deliberately separate from the 10 EOS category scores — a
+  // black-and-white hard requirement (trivia hosting needs a screen to
+  // display questions), not a soft signal to weigh alongside everything
+  // else. Defaults true — most venues have TVs, so a never-checked company
+  // should read as "presumably fine" rather than a blocking "unknown";
+  // false only ever comes from a genuine explicit finding (an AI analysis
+  // that confirms the absence, or a human editing it directly on the EOS
+  // panel — see setHasTvs() in companies/[id]/eos/actions.ts) — plain
+  // absence of evidence must never set this false. Never fill-blank-only
+  // like Company.email: a later analysis's explicit true/false finding
+  // always overwrites (venues do install/remove TVs, and an earlier
+  // finding may simply have been wrong), but an inconclusive (null)
+  // AI re-check never overwrites a previously confirmed true/false — see
+  // analyze-opportunity.ts's merge logic. Read deterministically there to
+  // force salesPriorityScore to 0 on a confirmed-false finding — the
+  // application enforces the disqualification in code, not by trusting the
+  // model to have applied its own prompt instructions correctly every time.
+  hasTvs                   Boolean?               @default(true)
+
   // Set only when an AI opportunity analysis (src/app/(dashboard)/companies/
   // opportunity-analysis.ts) finds something that contradicts existing,
   // trusted CRM data (e.g. the business appears closed, name doesn't
@@ -2000,6 +2019,18 @@ model AiSettings {
   // evidence per lead; higher = more thorough but slower. Admin-adjustable
   // so this tradeoff doesn't require a code change.
   maxSearchToolUsesPerCall Int     @default(8)
+  // Split out from maxSearchToolUsesPerCall above — opportunity analysis
+  // (src/lib/companies/analyze-opportunity.ts) runs against a single
+  // already-known Company, not a fresh discovery search, and confirmed live
+  // to grind for many search/fetch rounds (burning both time and real
+  // Anthropic spend) on a business with little to no web presence, with
+  // nothing to show for it but a timeout. Defaulted lower than the shared
+  // setting's 8 so a thin-evidence business fails fast and cheap instead of
+  // grinding for the full ~14min timeout — admin-adjustable independently of
+  // discover()/verify()'s thoroughness tradeoff, which has different cost/
+  // time characteristics (running across a whole search's worth of
+  // candidates, not one already-selected company at a time).
+  maxSearchToolUsesPerOpportunityAnalysis Int @default(4)
   updatedAt               DateTime @updatedAt
   updatedById             String?
   updatedBy               User?    @relation("AiSettingsEditor", fields: [updatedById], references: [id], onDelete: SetNull)

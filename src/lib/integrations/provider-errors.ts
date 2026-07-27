@@ -114,6 +114,16 @@ export function classifyProviderError(error: unknown): ClassifiedProviderError {
     return classified("rate_limited");
   }
   if (error instanceof BadRequestError || error instanceof UnprocessableEntityError) {
+    // Confirmed live: an exhausted Anthropic account balance comes back as
+    // a plain BadRequestError ("Your credit balance is too low...") —
+    // structurally identical to a genuine malformed-schema 400, but a
+    // completely different problem for an admin to act on. Without this
+    // check it fell into "invalid_response" ("The provider returned a
+    // response we couldn't understand"), which sends whoever's debugging
+    // it looking at the request shape instead of the account's billing.
+    if (error instanceof Error && /credit balance/i.test(error.message)) {
+      return classified("budget_exceeded");
+    }
     return classified("invalid_response");
   }
   if (error instanceof InternalServerError) {
