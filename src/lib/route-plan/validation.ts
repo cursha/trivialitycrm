@@ -33,15 +33,44 @@ function normalizeAddressLineBreaks(value: string): string {
   return value.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * True when address1 already has city AND region baked into it as whole
+ * words (e.g. a spreadsheet import that mapped a single combined "Address"
+ * column while City/Region were also separately populated — see
+ * scripts/clean-imported-addresses.ts, which cleans this at the source for
+ * already-imported rows). Confirmed live: joining address1 with the
+ * separate city/region/postalCode columns in that case doubles up the
+ * location in the displayed and exported address (e.g. "...Ottawa, ON K1K
+ * 4E6, Canada, ottawa, on, K1K 4E6"). Word-boundary matched, same as the
+ * cleanup script, so "ON" doesn't false-positive inside "Iron Street".
+ */
+function addressAlreadyContainsLocation(address1: string, city: string, region: string): boolean {
+  if (!city.trim() || !region.trim()) return false;
+  const cityPattern = new RegExp(`\\b${escapeRegExp(city.trim())}\\b`, "i");
+  const regionPattern = new RegExp(`\\b${escapeRegExp(region.trim())}\\b`, "i");
+  return cityPattern.test(address1) && regionPattern.test(address1);
+}
+
 /**
  * Street, city, province/state, postal/ZIP — country deliberately excluded
  * (the spec requires every route to be single-country, so it adds no
  * information to the exported address). Empty components are omitted
  * rather than producing repeated/leading/trailing commas; never emits the
- * literal strings "null" or "undefined" for a missing field.
+ * literal strings "null" or "undefined" for a missing field. When address1
+ * already contains the city/region (see addressAlreadyContainsLocation),
+ * only address1 is used — appending the separate columns on top would
+ * duplicate the location in the output.
  */
 export function formatRouteAddress(company: RouteAddressInput): string {
-  const parts = [company.address1, company.city, company.region, company.postalCode]
+  const address1 = company.address1 ? normalizeAddressLineBreaks(company.address1) : null;
+  if (address1 && addressAlreadyContainsLocation(address1, company.city, company.region)) {
+    return address1;
+  }
+  const parts = [address1, company.city, company.region, company.postalCode]
     .map((part) => (part ? normalizeAddressLineBreaks(part) : part))
     .filter((part): part is string => Boolean(part && part.length > 0));
   return parts.join(", ");

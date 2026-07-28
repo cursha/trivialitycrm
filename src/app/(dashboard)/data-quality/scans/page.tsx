@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
+import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -55,8 +56,30 @@ export default async function ScansPage() {
                       <Badge tone={toneFor(SEARCH_STATUS_TONE, scan.status)}>{SEARCH_STATUS_LABEL[scan.status] ?? scan.status}</Badge>
                     </td>
                     <td className="py-2 pr-3">{scan.recordsScanned}</td>
-                    <td className="py-2 pr-3">{scan.issuesFound}</td>
-                    <td className="py-2 pr-3">{scan.duplicatesFound}</td>
+                    <td className="py-2 pr-3">
+                      {scan.issuesFound > 0 ? (
+                        <Link
+                          className="text-brand hover:underline"
+                          href={scan.entityType ? `/data-quality/issues?entityType=${scan.entityType}` : "/data-quality/issues"}
+                        >
+                          {scan.issuesFound}
+                        </Link>
+                      ) : (
+                        scan.issuesFound
+                      )}
+                    </td>
+                    <td className="py-2 pr-3">
+                      {scan.duplicatesFound > 0 ? (
+                        <Link
+                          className="text-brand hover:underline"
+                          href={scan.entityType ? `/data-quality/duplicates?entityType=${scan.entityType}` : "/data-quality/duplicates"}
+                        >
+                          {scan.duplicatesFound}
+                        </Link>
+                      ) : (
+                        scan.duplicatesFound
+                      )}
+                    </td>
                     <td className="py-2 pr-3">{scan.triggeredBy?.name ?? "—"}</td>
                     <td className="py-2 pr-3 text-text-muted">{scan.startedAt ? scan.startedAt.toLocaleString() : "—"}</td>
                     <td className="py-2 pr-3">{(scan.status === "PENDING" || scan.status === "RUNNING") && <CancelScanButton scanId={scan.id} />}</td>

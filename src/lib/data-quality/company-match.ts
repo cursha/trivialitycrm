@@ -107,7 +107,11 @@ export function scoreCompanyMatch(a: CompanyMatchInput, b: CompanyMatchInput, mi
     hasStrongSignal = true;
   }
 
-  if (a.normalizedCity && b.normalizedCity && a.normalizedCity === b.normalizedCity && a.normalizedRegion === b.normalizedRegion) {
+  // Corroborating signal only -- sharing a city/region is common and must
+  // never by itself be enough to flag a pair (two unrelated companies both
+  // in Toronto is not evidence of a duplicate). Only counted when some
+  // other identity signal above already matched.
+  if (matchedFields.length > 0 && a.normalizedCity && b.normalizedCity && a.normalizedCity === b.normalizedCity && a.normalizedRegion === b.normalizedRegion) {
     score += 8;
     reasons.push("Same city and region.");
     matchedFields.push("city");

@@ -37,4 +37,41 @@ describe("scoreContactMatch", () => {
     const result = scoreContactMatch(a, b);
     expect(result.conflictingFields).toContain("email");
   });
+
+  it("scores two unrelated contacts at the same company at 0", () => {
+    const a = contact({
+      id: "1",
+      companyId: "company-1",
+      firstName: "Jane",
+      lastName: "Doe",
+      normalizedFirstName: "jane",
+      normalizedLastName: "doe",
+      email: "jane@example-real.com",
+      normalizedEmail: "jane@example-real.com",
+      phone: "9055550134",
+      normalizedPhone: "9055550134",
+    });
+    const b = contact({
+      id: "2",
+      companyId: "company-1",
+      firstName: "Bob",
+      lastName: "Smith",
+      normalizedFirstName: "bob",
+      normalizedLastName: "smith",
+      email: "bob@example-real.com",
+      normalizedEmail: "bob@example-real.com",
+      phone: "9055559999",
+      normalizedPhone: "9055559999",
+    });
+    const result = scoreContactMatch(a, b);
+    expect(result.score).toBe(0);
+    expect(result.matchedFields).not.toContain("companyId");
+  });
+
+  it("still counts same-company as corroboration once a real identity signal matched", () => {
+    const a = contact({ id: "1", companyId: "company-1" });
+    const b = contact({ id: "2", companyId: "company-1" });
+    const result = scoreContactMatch(a, b);
+    expect(result.matchedFields).toContain("companyId");
+  });
 });

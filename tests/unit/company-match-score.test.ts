@@ -119,4 +119,51 @@ describe("scoreCompanyMatch", () => {
     expect(result.score).toBe(0);
     expect(result.confidence).toBe("LOW");
   });
+
+  it("scores two unrelated companies that merely share a city/region at 0", () => {
+    const a = company({
+      id: "1",
+      name: "Alpha Diner",
+      normalizedName: "alpha diner",
+      phone: "1111111111",
+      normalizedPhone: "1111111111",
+      email: "a@alpha.com",
+      normalizedEmail: "a@alpha.com",
+      websiteDomain: "alpha.com",
+      address1: "1 Alpha Way",
+      postalCode: "A1A 1A1",
+      normalizedPostalCode: "A1A 1A1",
+      city: "Toronto",
+      normalizedCity: "toronto",
+      region: "Ontario",
+      normalizedRegion: "ON",
+    });
+    const b = company({
+      id: "2",
+      name: "Zeta Bistro",
+      normalizedName: "zeta bistro",
+      phone: "2222222222",
+      normalizedPhone: "2222222222",
+      email: "z@zeta.com",
+      normalizedEmail: "z@zeta.com",
+      websiteDomain: "zeta.com",
+      address1: "2 Zeta Blvd",
+      postalCode: "Z9Z 9Z9",
+      normalizedPostalCode: "Z9Z 9Z9",
+      city: "Toronto",
+      normalizedCity: "toronto",
+      region: "Ontario",
+      normalizedRegion: "ON",
+    });
+    const result = scoreCompanyMatch(a, b);
+    expect(result.score).toBe(0);
+    expect(result.matchedFields).not.toContain("city");
+  });
+
+  it("still counts city/region as corroboration once a real identity signal matched", () => {
+    const a = company({ id: "1", city: "Toronto", normalizedCity: "toronto", region: "Ontario", normalizedRegion: "ON" });
+    const b = company({ id: "2", city: "Toronto", normalizedCity: "toronto", region: "Ontario", normalizedRegion: "ON" });
+    const result = scoreCompanyMatch(a, b);
+    expect(result.matchedFields).toContain("city");
+  });
 });

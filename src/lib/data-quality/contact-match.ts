@@ -73,7 +73,10 @@ export function scoreContactMatch(a: ContactMatchInput, b: ContactMatchInput, mi
     }
   }
 
-  if (a.companyId === b.companyId) {
+  // Corroborating signal only -- two unrelated contacts at the same company
+  // (e.g. two different employees) is normal, not evidence of a duplicate.
+  // Only counted when some other identity signal above already matched.
+  if (matchedFields.length > 0 && a.companyId === b.companyId) {
     score += 10;
     reasons.push("Same company.");
     matchedFields.push("companyId");

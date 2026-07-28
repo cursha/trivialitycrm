@@ -43,6 +43,24 @@ describe("formatRouteAddress", () => {
     expect(result).not.toContain("null");
     expect(result).not.toContain("undefined");
   });
+
+  it("uses address1 alone when it already contains the city and region, instead of doubling them up", () => {
+    expect(
+      formatRouteAddress({ address1: "1 Donald St, Ottawa, ON K1K 4E6, Canada", city: "ottawa", region: "on", postalCode: "K1K 4E6" }),
+    ).toBe("1 Donald St, Ottawa, ON K1K 4E6, Canada");
+  });
+
+  it("still appends city/region/postal when address1 is just a street (no redundancy)", () => {
+    expect(formatRouteAddress({ address1: "1 Donald St", city: "Ottawa", region: "ON", postalCode: "K1K 4E6" })).toBe(
+      "1 Donald St, Ottawa, ON, K1K 4E6",
+    );
+  });
+
+  it("does not treat a coincidental substring match as redundancy (word-boundary only)", () => {
+    expect(formatRouteAddress({ address1: "5 On The Park Drive", city: "Milton", region: "ON", postalCode: "L9T 1N7" })).toBe(
+      "5 On The Park Drive, Milton, ON, L9T 1N7",
+    );
+  });
 });
 
 describe("missingRouteAddressFields / isRouteAddressComplete", () => {
