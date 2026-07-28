@@ -61,15 +61,23 @@ async function main() {
   const batchArg = process.argv.find((a) => a.startsWith("--batch="));
   const importBatchId = batchArg?.split("=")[1];
 
+  // Company.source is nullable and only populated going forward from when
+  // that attribution field was added -- confirmed live that filtering on
+  // source: "IMPORT" matched zero rows even though the affected companies
+  // definitely exist, meaning they predate it and are just null. Scoping
+  // by --batch=<importBatchId> still works (that FK is older/always set on
+  // import), but the default now scans every company with an address1 --
+  // safe regardless, since the real safety net is the conservative
+  // city+region whole-word match below, not this filter.
   const companies = await prisma.company.findMany({
     where: {
       address1: { not: null },
-      ...(importBatchId ? { importBatchId } : { source: "IMPORT" }),
+      ...(importBatchId ? { importBatchId } : {}),
     },
     select: { id: true, name: true, address1: true, city: true, region: true },
   });
 
-  console.log(`Checked ${companies.length} imported compan${companies.length === 1 ? "y" : "ies"} with an address1 set.`);
+  console.log(`Checked ${companies.length} compan${companies.length === 1 ? "y" : "ies"} with an address1 set.`);
 
   let changed = 0;
   for (const company of companies) {
