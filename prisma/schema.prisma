@@ -258,6 +258,13 @@ model User {
   // Module Ten: first-login onboarding checklist.
   onboardingSteps UserOnboardingStep[]
 
+  // Route Plan: the one private active route this user owns, plus the
+  // audit trail of which entries they personally added (a route can only
+  // ever have one owner, but companies within it were each added by
+  // whoever clicked "Add to Route" at the time).
+  routePlan               RoutePlan?
+  routePlanCompaniesAdded RoutePlanCompany[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -338,6 +345,16 @@ model LeadType {
   searches       LeadSearch[]
   emailTemplates EmailTemplate[]
   orgDefaultFor  OrganizationSettings[]
+
+  // Route Plan: an admin-controlled allowlist, not inferred from name —
+  // "Do not depend on fragile capitalization or newly invent duplicate lead
+  // types" per the Route Plan spec. routePlanSlug is set explicitly (never
+  // auto-derived from `name` at export time) specifically so a later rename
+  // of the lead type doesn't retroactively change every future exported
+  // filename's slug — set once, stable for the life of the record.
+  routePlanEnabled Boolean     @default(false)
+  routePlanSlug    String?     @unique
+  routePlans       RoutePlan[]
 }
 
 model PipelineStage {
@@ -499,7 +516,7 @@ model Company {
   // force salesPriorityScore to 0 on a confirmed-false finding — the
   // application enforces the disqualification in code, not by trusting the
   // model to have applied its own prompt instructions correctly every time.
-  hasTvs                   Boolean?               @default(true)
+  hasTvs Boolean? @default(true)
 
   // Set only when an AI opportunity analysis (src/app/(dashboard)/companies/
   // opportunity-analysis.ts) finds something that contradicts existing,
@@ -529,6 +546,7 @@ model Company {
   emailMessages       EmailMessage[]
   sequenceEnrollments SequenceEnrollment[]
   appointments        Appointment[]
+  routePlanEntries    RoutePlanCompany[]
 
   // Module Seven: Data Quality, Duplicate Management, Record Merging, and
   // Enrichment History.
@@ -635,6 +653,46 @@ model SavedView {
   scheduledReports ScheduledReport[]
 
   @@index([ownerId])
+}
+
+// Route Plan: a private, per-user, single-active list of companies the user
+// intends to visit in person, exported as an EZRoutePlanner-compatible CSV
+// (Name,Address). userId is @unique — "one active Route Plan per user" is
+// enforced at the schema level, not just in application code. No
+// organizationId: this app has no multi-tenant Organization model (only
+// Team/Role/assignment-based scoping via companyScope()), so per-user
+// isolation via userId is the entire privacy boundary — confirmed with the
+// account holder before building this.
+model RoutePlan {
+  id         String             @id @default(cuid())
+  userId     String             @unique
+  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Both null while the route is empty — the first company added
+  // establishes both, per spec. Never inferred from display text: compared
+  // by ID (leadTypeId) and a normalized country string, never by name.
+  leadTypeId String?
+  leadType   LeadType?          @relation(fields: [leadTypeId], references: [id])
+  country    String?
+  companies  RoutePlanCompany[]
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+}
+
+model RoutePlanCompany {
+  id          String    @id @default(cuid())
+  routePlanId String
+  routePlan   RoutePlan @relation(fields: [routePlanId], references: [id], onDelete: Cascade)
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  addedAt     DateTime  @default(now())
+  addedById   String
+  addedBy     User      @relation(fields: [addedById], references: [id])
+
+  // Prevents a duplicate add at the database level, not just in application
+  // logic — a second "Add to Route" on the same company is a no-op, not a
+  // second row.
+  @@unique([routePlanId, companyId])
+  @@index([companyId])
 }
 
 // Single-row table (id fixed at 1) for the two configurable Sales Workspace
@@ -1998,27 +2056,27 @@ model OrganizationSettings {
  * can price) — a real, enforced setting, not a decorative one.
  */
 model AiSettings {
-  id                      Int      @id @default(1)
-  researchEnabled         Boolean  @default(true)
-  approvedModel           String   @default("claude-sonnet-5")
-  defaultMinimumScore     Int      @default(80)
-  maxCitiesPerSearch      Int      @default(50)
-  maxResultsPerSearch     Int?
-  dailyBudgetUsd          Decimal? @db.Decimal(10, 2)
-  monthlyBudgetUsd        Decimal? @db.Decimal(10, 2)
-  warningThresholdUsd     Decimal? @db.Decimal(10, 2)
-  perUserDailySearchLimit Int?
+  id                                      Int      @id @default(1)
+  researchEnabled                         Boolean  @default(true)
+  approvedModel                           String   @default("claude-sonnet-5")
+  defaultMinimumScore                     Int      @default(80)
+  maxCitiesPerSearch                      Int      @default(50)
+  maxResultsPerSearch                     Int?
+  dailyBudgetUsd                          Decimal? @db.Decimal(10, 2)
+  monthlyBudgetUsd                        Decimal? @db.Decimal(10, 2)
+  warningThresholdUsd                     Decimal? @db.Decimal(10, 2)
+  perUserDailySearchLimit                 Int?
   // Module Nine: hard $ ceiling for a single search, rechecked mid-run
   // (between candidates) — not just at start — so a search that crosses this
   // partway through stops immediately rather than finishing at full cost.
   // Null = unlimited (same convention as maxResultsPerSearch).
-  maxCostPerSearchUsd     Decimal? @db.Decimal(10, 2)
+  maxCostPerSearchUsd                     Decimal? @db.Decimal(10, 2)
   // Module Ten: caps web_search/web_fetch max_uses per Anthropic discovery
   // and verification call (src/lib/research/providers/anthropic.ts) —
   // previously hardcoded to 8 for both tools. Lower = faster but thinner
   // evidence per lead; higher = more thorough but slower. Admin-adjustable
   // so this tradeoff doesn't require a code change.
-  maxSearchToolUsesPerCall Int     @default(8)
+  maxSearchToolUsesPerCall                Int      @default(8)
   // Split out from maxSearchToolUsesPerCall above — opportunity analysis
   // (src/lib/companies/analyze-opportunity.ts) runs against a single
   // already-known Company, not a fresh discovery search, and confirmed live
@@ -2030,10 +2088,10 @@ model AiSettings {
   // discover()/verify()'s thoroughness tradeoff, which has different cost/
   // time characteristics (running across a whole search's worth of
   // candidates, not one already-selected company at a time).
-  maxSearchToolUsesPerOpportunityAnalysis Int @default(4)
-  updatedAt               DateTime @updatedAt
-  updatedById             String?
-  updatedBy               User?    @relation("AiSettingsEditor", fields: [updatedById], references: [id], onDelete: SetNull)
+  maxSearchToolUsesPerOpportunityAnalysis Int      @default(4)
+  updatedAt                               DateTime @updatedAt
+  updatedById                             String?
+  updatedBy                               User?    @relation("AiSettingsEditor", fields: [updatedById], references: [id], onDelete: SetNull)
 }
 
 /**

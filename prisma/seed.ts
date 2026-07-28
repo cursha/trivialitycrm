@@ -36,6 +36,7 @@ const REPORTING_CATEGORY = "Reporting";
 const COMMUNICATIONS_CATEGORY = "Communications";
 const DATA_QUALITY_CATEGORY = "Data Quality";
 const ADMINISTRATION_CATEGORY = "Administration";
+const ROUTE_PLANNING_CATEGORY = "Route Planning";
 
 const permissions: { key: string; label: string; category: string; description: string }[] = [
   { key: "view_all_leads", label: "View all leads", category: LEADS_CATEGORY, description: "View every company and contact in the CRM, regardless of assignment or team." },
@@ -107,6 +108,15 @@ const permissions: { key: string; label: string; category: string; description: 
   { key: "manage_email_integration", label: "Manage email integration", category: ADMINISTRATION_CATEGORY, description: "Enable or disable live transactional email sending." },
   { key: "send_test_email", label: "Send test email", category: ADMINISTRATION_CATEGORY, description: "Send one controlled transactional test email to an address you enter." },
   { key: "view_provider_usage", label: "View provider usage", category: ADMINISTRATION_CATEGORY, description: "View AI and email provider usage totals and recent activity." },
+  // Route Plan: private per-user door-to-door visit lists, exported as an
+  // EZRoutePlanner-compatible CSV. configure_route_plan_lead_types is
+  // separate from manage_route_plan (and Administrator-only by default,
+  // same as manage_settings) — deciding which lead types are eligible is a
+  // workspace-wide configuration choice, not a personal route action.
+  { key: "view_route_plan", label: "View Route Plan", category: ROUTE_PLANNING_CATEGORY, description: "See the Route Plan header count and open your own Route Plan page." },
+  { key: "manage_route_plan", label: "Manage Route Plan", category: ROUTE_PLANNING_CATEGORY, description: "Add, remove, and clear companies in your own Route Plan." },
+  { key: "export_route_plan", label: "Export Route Plan", category: ROUTE_PLANNING_CATEGORY, description: "Download your Route Plan as a CSV file." },
+  { key: "configure_route_plan_lead_types", label: "Configure Route Plan lead types", category: ROUTE_PLANNING_CATEGORY, description: "Choose which lead types are eligible for Route Planning." },
 ];
 
 // Initial role -> permission grants. All grants are stored as editable
@@ -134,11 +144,17 @@ const roleGrants: Record<(typeof roles)[number], string[]> = {
     "enroll_in_sequences",
     "view_team_communications",
     "manage_calendar_connections",
+    "view_route_plan",
+    "manage_route_plan",
+    "export_route_plan",
   ],
   Salesperson: [
     "view_assigned_leads",
     "add_leads",
     "edit_leads",
+    "view_route_plan",
+    "manage_route_plan",
+    "export_route_plan",
     "view_own_reports",
     "connect_mailbox",
     "send_email",
