@@ -13,6 +13,8 @@ import {
   Workflow,
   Inbox,
   ListChecks,
+  Tag,
+  CalendarClock,
 } from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -67,6 +69,20 @@ export default async function SettingsPage() {
       description: "Reusable email content with placeholders, personal or shared with the team.",
       icon: FileText,
       visible: hasPermission(user, "manage_personal_templates"),
+    },
+    {
+      href: "/settings/email-template-categories",
+      label: "Email Template Categories",
+      description: "Group email templates for the template chooser.",
+      icon: Tag,
+      visible: hasPermission(user, "manage_shared_templates"),
+    },
+    {
+      href: "/settings/scheduled-emails",
+      label: "Scheduled Emails",
+      description: "Emails scheduled for later — edit or cancel before they send.",
+      icon: CalendarClock,
+      visible: hasPermission(user, "schedule_email"),
     },
     {
       href: "/settings/sequences",

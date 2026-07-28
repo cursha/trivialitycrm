@@ -2,6 +2,7 @@
 // same reasoning as token-crypto.ts: nothing here stops it running inside
 // the worker once Phase C's sequence-step runner needs to resolve a
 // template's placeholders too.
+import { escapeHtml } from "./sanitize-html";
 
 /** Data a template's placeholders may reference. Every field is optional
  * because a contact (and its name/email) may not exist for a company-only
@@ -70,10 +71,21 @@ export function hasUnsubscribePlaceholder(text: string): boolean {
  * place — untouched, not blanked out — and reported in `unresolved`, so a
  * caller can block sending rather than silently deliver a literal
  * `{{contact.firstName}}` to a lead.
+ *
+ * `context` controls how a *substituted value* is escaped — never how the
+ * surrounding `text` itself is treated. `"text"` (the default, used for the
+ * subject line, which is always plain text) substitutes the value as-is.
+ * `"html"` (used for the body, which is real HTML from the rich-text
+ * editor — see src/components/ui/rich-text-editor.tsx) HTML-escapes the
+ * value before splicing it in, so a contact/company name containing `<` or
+ * `&` can never break the surrounding markup or inject new tags — the
+ * template's own HTML markup around the token is left untouched either
+ * way, only the token's replacement value is escaped.
  */
 export function resolveTemplatePlaceholders(
   text: string,
   data: TemplatePlaceholderData,
+  context: "text" | "html" = "text",
 ): { resolved: string; unresolved: string[] } {
   const unresolved: string[] = [];
 
@@ -83,7 +95,7 @@ export function resolveTemplatePlaceholders(
       if (!unresolved.includes(token)) unresolved.push(token);
       return match;
     }
-    return value;
+    return context === "html" ? escapeHtml(value) : value;
   });
 
   return { resolved, unresolved };

@@ -62,6 +62,10 @@ export async function createLeadTypeFixture(
   });
 }
 
+export async function createEmailTemplateCategoryFixture(createdById: string, name = `Category ${crypto.randomUUID().slice(0, 8)}`) {
+  return testPrisma.emailTemplateCategory.create({ data: { name, createdById } });
+}
+
 export async function createPipelineStageFixture(
   name = `Stage ${crypto.randomUUID().slice(0, 8)}`,
   opts: { isDefault?: boolean; sortOrder?: number; outcomeType?: "WON" | "LOST" | null; active?: boolean } = {},

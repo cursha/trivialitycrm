@@ -38,6 +38,11 @@ export function describeNotification(type: string, payload: Record<string, unkno
       const subject = typeof payload.subject === "string" ? `: "${payload.subject}"` : "";
       return `Email bounced${target}${subject}.`;
     }
+    case "SCHEDULED_EMAIL_STAGE_SUGGESTED": {
+      const company = typeof payload.companyName === "string" ? payload.companyName : "a company";
+      const stage = typeof payload.suggestedStageName === "string" ? payload.suggestedStageName : "a new stage";
+      return `Your scheduled email to ${company} just sent — its template suggests moving to "${stage}".`;
+    }
     case "REPORT_GENERATED": {
       const name = typeof payload.name === "string" ? payload.name : "A scheduled report";
       return payload.status === "FAILED" ? `${name} failed to generate.` : `${name} is ready.`;

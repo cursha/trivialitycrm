@@ -10,7 +10,7 @@ import { providerSlugFromKind } from "@/lib/comms/provider-kind";
 import { validateOutgoingEmail } from "@/lib/comms/validate";
 import { resolveTemplatePlaceholders, hasUnsubscribePlaceholder } from "@/lib/comms/templates";
 import { createUnsubscribeToken } from "@/lib/comms/unsubscribe-token";
-import { textToSafeHtml } from "@/lib/comms/sanitize-html";
+import { sanitizeEmailHtml } from "@/lib/comms/sanitize-html";
 import { logEmailSent } from "@/lib/comms/activity-log";
 import { getQuietHoursWindow, isWithinQuietHours, quietHoursEndInstant } from "@/lib/comms/quiet-hours";
 
@@ -27,6 +27,12 @@ export type SendEmailParams = {
   bcc?: string[];
   subject: string;
   body: string;
+  /** Snapshot of standard/added links (see EmailTemplateLink and the
+   * email-system delta plan's link-based-attachments design) to store on
+   * the EmailMessage row as-is — not part of placeholder resolution or the
+   * consent/quiet-hours gate, just accompanying metadata rendered
+   * alongside the message. */
+  links?: { label: string; url: string }[];
   /** Defaults true. A sequence step passes false — it records its own
    * single, unified failure notification covering both a prepareSend gate
    * rejection and a delivery failure, so sendEmail()'s own
@@ -42,6 +48,12 @@ type PreparedSend = {
   resolvedBody: string;
   connection: { id: string; provider: "MICROSOFT" | "GOOGLE" };
   companyName: string;
+  /** Snapshot of the template's own EmailTemplate.pipelineStageId, if a
+   * template was used and it has one — null otherwise. Computed fresh here
+   * (never trusted from an earlier check) for the same reason subject/body
+   * placeholder resolution is: the template can be edited between when a
+   * send is scheduled and when it's actually due. */
+  suggestedPipelineStageId: string | null;
 };
 
 /**
@@ -63,12 +75,13 @@ async function prepareSend(params: {
   userId: string;
   companyId: string;
   contactId: string;
+  templateId?: string | null;
   cc?: string[];
   bcc?: string[];
   subject: string;
   body: string;
 }): Promise<{ ok: true; prepared: PreparedSend } | { ok: false; error: string }> {
-  const [company, contact, sender, workspaceSettings, connection] = await Promise.all([
+  const [company, contact, sender, workspaceSettings, connection, template] = await Promise.all([
     prisma.company.findUniqueOrThrow({ where: { id: params.companyId }, select: { name: true, doNotContact: true } }),
     prisma.contact.findUnique({
       where: { id: params.contactId },
@@ -77,6 +90,7 @@ async function prepareSend(params: {
     prisma.user.findUniqueOrThrow({ where: { id: params.userId }, select: { name: true } }),
     prisma.workspaceSettings.findUnique({ where: { id: 1 }, select: { mailingAddress: true, quietHoursStartHour: true, quietHoursEndHour: true } }),
     prisma.providerConnection.findUnique({ where: { userId: params.userId } }),
+    params.templateId ? prisma.emailTemplate.findUnique({ where: { id: params.templateId }, select: { pipelineStageId: true } }) : null,
   ]);
 
   if (company.doNotContact) {
@@ -123,8 +137,8 @@ async function prepareSend(params: {
     sender: { name: sender.name, mailingAddress: workspaceSettings?.mailingAddress ?? null },
     unsubscribeLink,
   };
-  const subjectResolution = resolveTemplatePlaceholders(params.subject, placeholderData);
-  const bodyResolution = resolveTemplatePlaceholders(params.body, placeholderData);
+  const subjectResolution = resolveTemplatePlaceholders(params.subject, placeholderData, "text");
+  const bodyResolution = resolveTemplatePlaceholders(params.body, placeholderData, "html");
   const unresolved = [...new Set([...subjectResolution.unresolved, ...bodyResolution.unresolved])];
   if (unresolved.length > 0) {
     return { ok: false, error: `Unresolved placeholder(s): ${unresolved.map((t) => `{{${t}}}`).join(", ")}` };
@@ -143,6 +157,7 @@ async function prepareSend(params: {
       resolvedBody: bodyResolution.resolved,
       connection: { id: connection.id, provider: connection.provider },
       companyName: company.name,
+      suggestedPipelineStageId: template?.pipelineStageId ?? null,
     },
   };
 }
@@ -158,6 +173,13 @@ async function attemptDelivery(
   params: { userId: string; companyId: string; cc?: string[]; bcc?: string[] },
   prepared: PreparedSend,
   notificationType: NotificationType | null,
+  /** True only for a scheduled/sequence send (processDueScheduledEmail) —
+   * an immediate send's own composer is right there to show the confirm
+   * prompt inline once this call returns, so it needs no notification; a
+   * background send does, since nobody is watching (spec section 13: "for
+   * a scheduled message, do not change the stage silently after background
+   * sending — create an in-app notification asking the sender to confirm"). */
+  notifyStageSuggestion = false,
 ): Promise<SendEmailOutcome> {
   try {
     const account = await getUsableAccessToken(params.userId);
@@ -167,7 +189,7 @@ async function attemptDelivery(
       cc: params.cc,
       bcc: params.bcc,
       subject: prepared.resolvedSubject,
-      bodyHtml: textToSafeHtml(prepared.resolvedBody),
+      bodyHtml: sanitizeEmailHtml(prepared.resolvedBody),
     });
 
     await prisma.$transaction(async (tx) => {
@@ -176,6 +198,17 @@ async function attemptDelivery(
         data: { status: "SENT", sentAt: new Date(), providerMessageId: result.providerMessageId, providerThreadId: result.providerThreadId },
       });
       await logEmailSent(tx, { companyId: params.companyId, userId: params.userId, subject: prepared.resolvedSubject, toAddresses: prepared.to });
+
+      if (notifyStageSuggestion && prepared.suggestedPipelineStageId) {
+        const stage = await tx.pipelineStage.findUnique({ where: { id: prepared.suggestedPipelineStageId }, select: { name: true } });
+        await tx.notification.create({
+          data: {
+            userId: params.userId,
+            type: "SCHEDULED_EMAIL_STAGE_SUGGESTED",
+            payload: { emailMessageId, companyId: params.companyId, companyName: prepared.companyName, suggestedStageName: stage?.name ?? null },
+          },
+        });
+      }
     });
 
     return { ok: true, emailMessageId };
@@ -216,6 +249,8 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailOutco
       subject: prepared.resolvedSubject,
       body: prepared.resolvedBody,
       templateId: params.templateId ?? null,
+      links: params.links && params.links.length > 0 ? params.links : undefined,
+      suggestedPipelineStageId: prepared.suggestedPipelineStageId,
       status: "QUEUED",
       createdById: params.userId,
     },
@@ -249,6 +284,7 @@ export async function scheduleEmail(params: ScheduleEmailParams): Promise<Schedu
       subject: params.subject,
       body: params.body,
       templateId: params.templateId ?? null,
+      links: params.links && params.links.length > 0 ? params.links : undefined,
       status: "SCHEDULED",
       scheduledFor: params.scheduledFor,
       createdById: params.userId,
@@ -296,6 +332,7 @@ export async function processDueScheduledEmail(emailMessageId: string): Promise<
     userId: row.createdById,
     companyId: row.companyId,
     contactId: row.contactId,
+    templateId: row.templateId,
     cc: row.ccAddresses,
     bcc: row.bccAddresses,
     subject: row.subject,
@@ -318,7 +355,12 @@ export async function processDueScheduledEmail(emailMessageId: string): Promise<
 
   await prisma.emailMessage.update({
     where: { id: row.id },
-    data: { providerConnectionId: result.prepared.connection.id, subject: result.prepared.resolvedSubject, body: result.prepared.resolvedBody },
+    data: {
+      providerConnectionId: result.prepared.connection.id,
+      subject: result.prepared.resolvedSubject,
+      body: result.prepared.resolvedBody,
+      suggestedPipelineStageId: result.prepared.suggestedPipelineStageId,
+    },
   });
 
   return attemptDelivery(
@@ -326,6 +368,7 @@ export async function processDueScheduledEmail(emailMessageId: string): Promise<
     { userId: row.createdById, companyId: row.companyId, cc: row.ccAddresses, bcc: row.bccAddresses },
     result.prepared,
     "SCHEDULED_EMAIL_FAILED",
+    true,
   );
 }
 

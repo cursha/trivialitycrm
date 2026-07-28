@@ -16,7 +16,7 @@ type Visibility = (typeof VISIBILITY_VALUES)[number];
 
 function validateFields(formData: FormData): { error: string } | {
   name: string;
-  category: string | null;
+  categoryId: string | null;
   subject: string;
   body: string;
   visibility: Visibility;
@@ -26,7 +26,7 @@ function validateFields(formData: FormData): { error: string } | {
   active: boolean;
 } {
   const name = formString(formData, "name").trim();
-  const category = formString(formData, "category").trim();
+  const categoryId = formString(formData, "categoryId").trim();
   const subject = formString(formData, "subject").trim();
   const body = formString(formData, "body").trim();
   const visibility = formString(formData, "visibility");
@@ -53,7 +53,7 @@ function validateFields(formData: FormData): { error: string } | {
 
   return {
     name,
-    category: category || null,
+    categoryId: categoryId || null,
     subject,
     body,
     visibility: visibility as Visibility,
@@ -97,7 +97,7 @@ export async function createEmailTemplate(_prevState: ActionResult, formData: Fo
   await prisma.emailTemplate.create({
     data: {
       name: parsed.name,
-      category: parsed.category,
+      categoryId: parsed.categoryId,
       subject: parsed.subject,
       body: parsed.body,
       visibility: parsed.visibility,
@@ -122,7 +122,7 @@ export async function updateEmailTemplate(id: string, _prevState: ActionResult, 
     where: { id },
     data: {
       name: parsed.name,
-      category: parsed.category,
+      categoryId: parsed.categoryId,
       subject: parsed.subject,
       body: parsed.body,
       leadTypeId: parsed.leadTypeId,
@@ -146,4 +146,42 @@ export async function deleteEmailTemplate(id: string): Promise<void> {
   await requireEditAccess(id);
   await prisma.emailTemplate.delete({ where: { id } });
   revalidatePath(PATH);
+}
+
+/**
+ * Standard template "attachments" — a label + an external URL (Google
+ * Drive/OneDrive/Sync/etc.), not a real uploaded file; see
+ * EmailTemplateLink's own doc comment for why. Same edit-access gate as
+ * every other template mutation.
+ */
+export async function addEmailTemplateLink(templateId: string, _prevState: ActionResult, formData: FormData): Promise<ActionResult> {
+  await requireEditAccess(templateId);
+
+  const label = formString(formData, "label").trim();
+  const url = formString(formData, "url").trim();
+  if (!label) return { error: "Enter a label for this link." };
+  if (!url) return { error: "Enter a URL for this link." };
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { error: "Enter a valid URL (including https://)." };
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return { error: "Only http:// and https:// links are supported." };
+  }
+
+  const highest = await prisma.emailTemplateLink.aggregate({ where: { emailTemplateId: templateId }, _max: { sortOrder: true } });
+  await prisma.emailTemplateLink.create({
+    data: { emailTemplateId: templateId, label, url, sortOrder: (highest._max.sortOrder ?? -1) + 1 },
+  });
+
+  revalidatePath(`${PATH}/${templateId}/edit`);
+}
+
+export async function removeEmailTemplateLink(templateId: string, linkId: string): Promise<void> {
+  await requireEditAccess(templateId);
+  await prisma.emailTemplateLink.deleteMany({ where: { id: linkId, emailTemplateId: templateId } });
+  revalidatePath(`${PATH}/${templateId}/edit`);
 }

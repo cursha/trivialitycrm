@@ -93,6 +93,26 @@ export async function updateContact(companyId: string, contactId: string, formDa
   revalidatePath(`/companies/${companyId}`);
 }
 
+/**
+ * Sets or clears the company's default-recipient contact for the email
+ * composer (src/lib/comms/recipient.ts's resolveCompanyPageDefault).
+ * `contactId: null` clears it. Validates the contact actually belongs to
+ * this company -- the FK alone doesn't enforce that cross-row invariant.
+ */
+export async function setPrimaryContact(companyId: string, contactId: string | null): Promise<ContactActionResult> {
+  await requireCompanyAccess(companyId);
+
+  if (contactId !== null) {
+    const contact = await prisma.contact.findFirst({ where: { id: contactId, companyId, status: "ACTIVE" } });
+    if (!contact) {
+      return { error: "Contact not found." };
+    }
+  }
+
+  await prisma.company.update({ where: { id: companyId }, data: { primaryContactId: contactId } });
+  revalidatePath(`/companies/${companyId}`);
+}
+
 export async function deleteContact(companyId: string, contactId: string): Promise<ContactActionResult> {
   await requireCompanyAccess(companyId);
 

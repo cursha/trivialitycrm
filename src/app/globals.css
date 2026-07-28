@@ -75,3 +75,37 @@ button {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
+
+/* Rich-text editor content (src/components/ui/rich-text-editor.tsx) — no
+ * @tailwindcss/typography plugin is installed, so this restores the
+ * paragraph spacing/list markers Tailwind's preflight strips, scoped to
+ * just this editor rather than pulling in a whole typography plugin for
+ * one restrained editor. */
+.rich-text-content p {
+  margin: 0 0 0.5em;
+}
+.rich-text-content p:last-child {
+  margin-bottom: 0;
+}
+.rich-text-content ul,
+.rich-text-content ol {
+  margin: 0 0 0.5em;
+  padding-left: 1.5em;
+}
+.rich-text-content ul {
+  list-style: disc;
+}
+.rich-text-content ol {
+  list-style: decimal;
+}
+.rich-text-content a {
+  color: var(--color-secondary);
+  text-decoration: underline;
+}
+.rich-text-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}

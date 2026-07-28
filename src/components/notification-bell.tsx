@@ -5,10 +5,13 @@ import Link from "next/link";
 import { Bell } from "lucide-react";
 import { markNotificationRead, markAllNotificationsRead } from "@/app/(dashboard)/notifications-actions";
 
-/** downloadHref is set only for a REPORT_GENERATED notification whose
- * report succeeded — everything else renders as a plain dismissible item.
- * See src/app/(dashboard)/layout.tsx for how this is computed. */
-export type Notification = { id: string; message: string; createdAt: string; downloadHref?: string };
+/** actionHref/actionLabel are set for a REPORT_GENERATED notification whose
+ * report succeeded ("Download") and a SCHEDULED_EMAIL_STAGE_SUGGESTED one
+ * ("Review", linking to the company's email panel where the suggested
+ * pipeline-stage change can be confirmed) — everything else renders as a
+ * plain dismissible item. See src/app/(dashboard)/layout.tsx for how this
+ * is computed. */
+export type Notification = { id: string; message: string; createdAt: string; actionHref?: string; actionLabel?: string };
 
 /** Bespoke small dropdown (not the generic Menu primitive — that one only
  * renders a flat list of clickable actions, not rich per-item content like
@@ -84,13 +87,13 @@ export function NotificationBell({ notifications }: { notifications: Notificatio
               <li key={n.id} className="px-3 py-1.5 text-sm">
                 <div className="flex items-start justify-between gap-2">
                   <span className="text-text">{n.message}</span>
-                  {n.downloadHref ? (
+                  {n.actionHref ? (
                     <Link
-                      href={n.downloadHref}
+                      href={n.actionHref}
                       onClick={() => startTransition(() => markNotificationRead(n.id))}
                       className="shrink-0 text-xs text-secondary hover:underline"
                     >
-                      Download
+                      {n.actionLabel ?? "View"}
                     </Link>
                   ) : (
                     <button

@@ -3,8 +3,9 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Pencil, Trash2, CirclePlus } from "lucide-react";
-import { createContact, updateContact, deleteContact } from "./actions";
+import { Pencil, Trash2, CirclePlus, Star, Send } from "lucide-react";
+import { createContact, updateContact, deleteContact, setPrimaryContact } from "./actions";
+import { useQuickActions } from "../quick-action-context";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
@@ -29,19 +30,36 @@ function consentBadge(contact: ContactRow) {
 export function ContactsPanel({
   companyId,
   contacts,
+  primaryContactId,
   canEdit,
   canManageCompliance,
+  canSendEmail,
 }: {
   companyId: string;
   contacts: ContactRow[];
+  primaryContactId: string | null;
   canEdit: boolean;
   canManageCompliance: boolean;
+  canSendEmail: boolean;
 }) {
   const router = useRouter();
+  const { requestEmail } = useQuickActions();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  function handleSetPrimary(contactId: string, alreadyPrimary: boolean) {
+    startTransition(async () => {
+      const result = await setPrimaryContact(companyId, alreadyPrimary ? null : contactId);
+      if (result?.error) {
+        setError(result.error);
+      } else {
+        setError(null);
+        router.refresh();
+      }
+    });
+  }
 
   function handleCreate(formData: FormData) {
     startTransition(async () => {
@@ -131,6 +149,11 @@ export function ContactsPanel({
                 <p className="font-semibold text-text">
                   {contact.firstName} {contact.lastName}
                   {contact.title && <span className="ml-2 font-normal text-text-muted">{contact.title}</span>}
+                  {primaryContactId === contact.id && (
+                    <Badge tone="focus" className="ml-2">
+                      Primary
+                    </Badge>
+                  )}
                 </p>
                 <p className="text-text-muted">{[contact.phone, contact.email].filter(Boolean).join(" · ")}</p>
                 <div className="mt-1 flex items-center gap-2">
@@ -145,27 +168,54 @@ export function ContactsPanel({
                   )}
                 </div>
               </div>
-              {canEdit && (
-                <div className="flex gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setEditingId(contact.id)}
-                    className="rounded p-1.5 text-text-muted hover:bg-black/5 hover:text-text"
-                    aria-label={`Edit ${contact.firstName} ${contact.lastName}`}
-                  >
-                    <Pencil size={14} />
-                  </button>
+              <div className="flex gap-1">
+                {canEdit && (
                   <button
                     type="button"
                     disabled={isPending}
-                    onClick={() => handleDelete(contact.id, `${contact.firstName} ${contact.lastName}`)}
-                    className="rounded p-1.5 text-text-muted hover:bg-danger/10 hover:text-danger"
-                    aria-label={`Remove ${contact.firstName} ${contact.lastName}`}
+                    onClick={() => handleSetPrimary(contact.id, primaryContactId === contact.id)}
+                    className={`rounded-full p-1.5 ${primaryContactId === contact.id ? "text-amber-500" : "text-border-strong hover:text-text-muted"}`}
+                    aria-label={
+                      primaryContactId === contact.id
+                        ? `${contact.firstName} ${contact.lastName} is the primary contact`
+                        : `Make ${contact.firstName} ${contact.lastName} the primary contact`
+                    }
                   >
-                    <Trash2 size={14} />
+                    <Star size={14} fill={primaryContactId === contact.id ? "currentColor" : "none"} />
                   </button>
-                </div>
-              )}
+                )}
+                {canSendEmail && contact.email && (
+                  <button
+                    type="button"
+                    onClick={() => requestEmail(contact.id)}
+                    className="rounded p-1.5 text-text-muted hover:bg-black/5 hover:text-text"
+                    aria-label={`Send email to ${contact.firstName} ${contact.lastName}`}
+                  >
+                    <Send size={14} />
+                  </button>
+                )}
+                {canEdit && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setEditingId(contact.id)}
+                      className="rounded p-1.5 text-text-muted hover:bg-black/5 hover:text-text"
+                      aria-label={`Edit ${contact.firstName} ${contact.lastName}`}
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => handleDelete(contact.id, `${contact.firstName} ${contact.lastName}`)}
+                      className="rounded p-1.5 text-text-muted hover:bg-danger/10 hover:text-danger"
+                      aria-label={`Remove ${contact.firstName} ${contact.lastName}`}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </>
+                )}
+              </div>
             </li>
           ),
         )}

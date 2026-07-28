@@ -10,7 +10,7 @@ import {
   loginAs,
 } from "../helpers/fixtures";
 import { resetFakeCookies } from "../setup/mock-next";
-import { createContact, updateContact, deleteContact } from "../../src/app/(dashboard)/companies/[id]/contacts/actions";
+import { createContact, updateContact, deleteContact, setPrimaryContact } from "../../src/app/(dashboard)/companies/[id]/contacts/actions";
 
 beforeEach(async () => {
   await resetDatabase();
@@ -102,6 +102,68 @@ describe("multiple contacts per company", () => {
     fd.set("lastName", "Denied");
 
     await expect(createContact(company.id, undefined, fd)).rejects.toThrow(/Forbidden/);
+  });
+});
+
+describe("setPrimaryContact", () => {
+  it("sets the primary contact and can clear it again", async () => {
+    const { admin, leadType, stage } = await baseFixtures();
+    await loginAs(admin.id);
+
+    const company = await createCompanyFixture({
+      leadTypeId: leadType.id,
+      pipelineStageId: stage.id,
+      assignedToId: admin.id,
+      createdById: admin.id,
+    });
+    const contact = await testPrisma.contact.create({ data: { companyId: company.id, firstName: "A", lastName: "One" } });
+
+    await setPrimaryContact(company.id, contact.id);
+    expect((await testPrisma.company.findUniqueOrThrow({ where: { id: company.id } })).primaryContactId).toBe(contact.id);
+
+    await setPrimaryContact(company.id, null);
+    expect((await testPrisma.company.findUniqueOrThrow({ where: { id: company.id } })).primaryContactId).toBeNull();
+  });
+
+  it("rejects a contact that belongs to a different company", async () => {
+    const { admin, leadType, stage } = await baseFixtures();
+    await loginAs(admin.id);
+
+    const companyA = await createCompanyFixture({
+      leadTypeId: leadType.id,
+      pipelineStageId: stage.id,
+      assignedToId: admin.id,
+      createdById: admin.id,
+    });
+    const companyB = await createCompanyFixture({
+      leadTypeId: leadType.id,
+      pipelineStageId: stage.id,
+      assignedToId: admin.id,
+      createdById: admin.id,
+    });
+    const contactOnB = await testPrisma.contact.create({ data: { companyId: companyB.id, firstName: "B", lastName: "Two" } });
+
+    const result = await setPrimaryContact(companyA.id, contactOnB.id);
+    expect(result?.error).toMatch(/not found/i);
+    expect((await testPrisma.company.findUniqueOrThrow({ where: { id: companyA.id } })).primaryContactId).toBeNull();
+  });
+
+  it("clears the primary contact automatically when that contact is deleted", async () => {
+    const { admin, leadType, stage } = await baseFixtures();
+    await loginAs(admin.id);
+
+    const company = await createCompanyFixture({
+      leadTypeId: leadType.id,
+      pipelineStageId: stage.id,
+      assignedToId: admin.id,
+      createdById: admin.id,
+    });
+    const contact = await testPrisma.contact.create({ data: { companyId: company.id, firstName: "A", lastName: "One" } });
+    await setPrimaryContact(company.id, contact.id);
+
+    await deleteContact(company.id, contact.id);
+
+    expect((await testPrisma.company.findUniqueOrThrow({ where: { id: company.id } })).primaryContactId).toBeNull();
   });
 });
 

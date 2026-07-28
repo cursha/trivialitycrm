@@ -60,20 +60,21 @@ export default async function EmailTemplatesPage() {
   requirePermission(user, "manage_personal_templates");
   const canManageShared = hasPermission(user, "manage_shared_templates");
 
-  const [templates, leadTypes, pipelineStages] = await Promise.all([
+  const [templates, leadTypes, pipelineStages, categories] = await Promise.all([
     prisma.emailTemplate.findMany({
       where: { OR: [{ visibility: "SHARED" }, { ownerId: user.id }] },
       orderBy: { name: "asc" },
-      include: { leadType: { select: { name: true } }, pipelineStage: { select: { name: true } } },
+      include: { leadType: { select: { name: true } }, pipelineStage: { select: { name: true } }, category: { select: { name: true } } },
     }),
     prisma.leadType.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
     prisma.pipelineStage.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
+    prisma.emailTemplateCategory.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
   ]);
 
   const toRowData = (template: (typeof templates)[number]): TemplateRowData => ({
     id: template.id,
     name: template.name,
-    category: template.category,
+    category: template.category?.name ?? null,
     subject: template.subject,
     language: template.language,
     leadTypeName: template.leadType?.name ?? null,
@@ -99,6 +100,7 @@ export default async function EmailTemplatesPage() {
             action={createEmailTemplate}
             leadTypes={leadTypes}
             pipelineStages={pipelineStages}
+            categories={categories}
             canManageShared={canManageShared}
             submitLabel="Create template"
           />

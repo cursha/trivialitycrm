@@ -143,3 +143,53 @@ describe("company email actions — scope enforcement", () => {
     expect(stillScheduled.status).toBe("SCHEDULED");
   });
 });
+
+describe("company email actions — link attachments", () => {
+  async function baseFixtures() {
+    const role = await createRoleWithPermissions("Sender", ["view_assigned_leads", "send_email"]);
+    const user = await createTestUser({ roleId: role.id });
+    await connectMailbox(user.id);
+    const leadType = await createLeadTypeFixture();
+    const stage = await createPipelineStageFixture("New", { isDefault: true });
+    const company = await createCompanyFixture({ leadTypeId: leadType.id, pipelineStageId: stage.id, assignedToId: user.id, createdById: user.id });
+    const contact = await testPrisma.contact.create({
+      data: { companyId: company.id, firstName: "Jamie", lastName: "Lead", email: "jamie@example.com", emailPermitted: true },
+    });
+    return { user, company, contact };
+  }
+
+  it("stores valid links as a snapshot on the sent EmailMessage", async () => {
+    const { user, company, contact } = await baseFixtures();
+    await loginAs(user.id);
+
+    const links = [{ label: "Menu", url: "https://drive.google.com/menu" }, { label: "Photos", url: "https://example.com/photos" }];
+    const result = await sendComposedEmail(company.id, undefined, emailFormData({ contactId: contact.id, links: JSON.stringify(links) }));
+    expect(result?.error).toBeUndefined();
+
+    const message = await testPrisma.emailMessage.findFirstOrThrow({ where: { companyId: company.id } });
+    expect(message.links).toEqual(links);
+  });
+
+  it("drops a link with a non-http(s) URL rather than storing it or failing the send", async () => {
+    const { user, company, contact } = await baseFixtures();
+    await loginAs(user.id);
+
+    const links = [{ label: "Bad", url: "javascript:alert(1)" }, { label: "Good", url: "https://example.com/ok" }];
+    const result = await sendComposedEmail(company.id, undefined, emailFormData({ contactId: contact.id, links: JSON.stringify(links) }));
+    expect(result?.error).toBeUndefined();
+
+    const message = await testPrisma.emailMessage.findFirstOrThrow({ where: { companyId: company.id } });
+    expect(message.links).toEqual([{ label: "Good", url: "https://example.com/ok" }]);
+  });
+
+  it("leaves links null when none were provided", async () => {
+    const { user, company, contact } = await baseFixtures();
+    await loginAs(user.id);
+
+    const result = await sendComposedEmail(company.id, undefined, emailFormData({ contactId: contact.id }));
+    expect(result?.error).toBeUndefined();
+
+    const message = await testPrisma.emailMessage.findFirstOrThrow({ where: { companyId: company.id } });
+    expect(message.links).toBeNull();
+  });
+});

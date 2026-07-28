@@ -180,51 +180,54 @@ enum ImportBatchStatus {
 }
 
 model User {
-  id                       String                  @id @default(cuid())
-  name                     String
-  email                    String                  @unique
-  passwordHash             String
-  mustChangePassword       Boolean                 @default(false)
-  disabled                 Boolean                 @default(false)
-  failedLoginAttempts      Int                     @default(0)
-  lockedUntil              DateTime?
+  id                             String                  @id @default(cuid())
+  name                           String
+  email                          String                  @unique
+  passwordHash                   String
+  mustChangePassword             Boolean                 @default(false)
+  disabled                       Boolean                 @default(false)
+  failedLoginAttempts            Int                     @default(0)
+  lockedUntil                    DateTime?
   // Module 8A: set by recordSuccessfulLogin() (src/lib/auth/rate-limit.ts) —
   // never a security control by itself (lockout/failedLoginAttempts already
   // cover that), just a visibility field for admin account review.
-  lastLoginAt              DateTime?
-  roleId                   String
-  teamId                   String?
-  role                     Role                    @relation(fields: [roleId], references: [id])
-  team                     Team?                   @relation(fields: [teamId], references: [id])
-  sessions                 Session[]
-  assignedCompanies        Company[]               @relation("AssignedSalesperson")
-  createdCompanies         Company[]               @relation("CompanyCreator")
-  updatedCompanies         Company[]               @relation("CompanyUpdater")
-  archivedCompanies        Company[]               @relation("CompanyArchiver")
-  activities               Activity[]
-  tasks                    Task[]                  @relation("TaskAssignee")
-  prompts                  PromptTemplate[]
-  searches                 LeadSearch[]
-  importTemplates          ImportTemplate[]
-  createdEvidence          EvidenceRecord[]        @relation("EvidenceCreator")
-  scoredHistoricalRecords  HistoricalScoreRecord[] @relation("ScoreAuthor")
-  importBatches            ImportBatch[]
-  aiUsageRecords           AiUsageRecord[]
-  territories              Territory[]             @relation("TerritoryAssignee")
-  savedViews               SavedView[]
-  stageHistoryChanges      PipelineStageHistory[]
-  scheduledReports         ScheduledReport[]
-  providerConnection       ProviderConnection?
-  emailTemplatesOwned      EmailTemplate[]         @relation("EmailTemplateOwner")
-  emailTemplatesCreated    EmailTemplate[]         @relation("EmailTemplateCreator")
-  emailTemplatesUpdated    EmailTemplate[]         @relation("EmailTemplateUpdater")
-  emailMessagesCreated     EmailMessage[]          @relation("EmailMessageCreator")
-  emailMessagesReviewed    EmailMessage[]          @relation("EmailMessageReviewer")
-  notifications            Notification[]
-  consentRecordsRecorded   ConsentRecord[]
-  followUpSequencesCreated FollowUpSequence[]
-  sequenceEnrollmentsMade  SequenceEnrollment[]
-  appointmentsCreated      Appointment[]
+  lastLoginAt                    DateTime?
+  roleId                         String
+  teamId                         String?
+  role                           Role                    @relation(fields: [roleId], references: [id])
+  team                           Team?                   @relation(fields: [teamId], references: [id])
+  sessions                       Session[]
+  assignedCompanies              Company[]               @relation("AssignedSalesperson")
+  createdCompanies               Company[]               @relation("CompanyCreator")
+  updatedCompanies               Company[]               @relation("CompanyUpdater")
+  archivedCompanies              Company[]               @relation("CompanyArchiver")
+  activities                     Activity[]
+  tasks                          Task[]                  @relation("TaskAssignee")
+  prompts                        PromptTemplate[]
+  searches                       LeadSearch[]
+  importTemplates                ImportTemplate[]
+  createdEvidence                EvidenceRecord[]        @relation("EvidenceCreator")
+  scoredHistoricalRecords        HistoricalScoreRecord[] @relation("ScoreAuthor")
+  importBatches                  ImportBatch[]
+  aiUsageRecords                 AiUsageRecord[]
+  territories                    Territory[]             @relation("TerritoryAssignee")
+  savedViews                     SavedView[]
+  stageHistoryChanges            PipelineStageHistory[]
+  scheduledReports               ScheduledReport[]
+  providerConnection             ProviderConnection?
+  emailTemplatesOwned            EmailTemplate[]         @relation("EmailTemplateOwner")
+  emailTemplatesCreated          EmailTemplate[]         @relation("EmailTemplateCreator")
+  emailTemplatesUpdated          EmailTemplate[]         @relation("EmailTemplateUpdater")
+  emailTemplateCategoriesCreated EmailTemplateCategory[] @relation("EmailTemplateCategoryCreator")
+  emailTemplateCategoriesUpdated EmailTemplateCategory[] @relation("EmailTemplateCategoryUpdater")
+  emailMessagesCreated           EmailMessage[]          @relation("EmailMessageCreator")
+  emailMessagesReviewed          EmailMessage[]          @relation("EmailMessageReviewer")
+  emailMessagesStageApplied      EmailMessage[]          @relation("EmailMessagePipelineStageApplier")
+  notifications                  Notification[]
+  consentRecordsRecorded         ConsentRecord[]
+  followUpSequencesCreated       FollowUpSequence[]
+  sequenceEnrollmentsMade        SequenceEnrollment[]
+  appointmentsCreated            Appointment[]
 
   // Module Seven: Data Quality, Duplicate Management, Record Merging, and
   // Enrichment History.
@@ -371,6 +374,7 @@ model PipelineStage {
   emailTemplates    EmailTemplate[]
   followUpSequences FollowUpSequence[]
   orgDefaultFor     OrganizationSettings[]
+  suggestedByEmails EmailMessage[]         @relation("EmailMessageSuggestedStage")
 }
 
 model RejectionReason {
@@ -536,6 +540,16 @@ model Company {
   currentHistoricalScore   HistoricalScoreRecord?  @relation("CurrentScore", fields: [currentHistoricalScoreId], references: [id], onDelete: SetNull)
   historicalScores         HistoricalScoreRecord[] @relation("CompanyScoreHistory")
   evidenceRecords          EvidenceRecord[]
+
+  // Default recipient for the company-page/contact-row email composer (the
+  // "designated primary company contact"). Must belong to this company —
+  // enforced at the app layer (src/lib/comms/recipient.ts), not by the FK
+  // alone. @unique so the reverse side on Contact is a clean single
+  // pointer rather than a list, even though in practice a contact can only
+  // ever be primary for the one company its own companyId already ties it
+  // to.
+  primaryContactId String?  @unique
+  primaryContact   Contact? @relation("CompanyPrimaryContact", fields: [primaryContactId], references: [id], onDelete: SetNull)
 
   contacts            Contact[]
   activities          Activity[]
@@ -829,6 +843,7 @@ model Contact {
 
   sequenceEnrollments SequenceEnrollment[]
   appointments        Appointment[]
+  primaryForCompany   Company?             @relation("CompanyPrimaryContact")
 
   // Module Seven: matching normalization (see Company.normalizedRegion's
   // doc comment — same "populated going forward + self-healed by scan"
@@ -1264,7 +1279,8 @@ enum EmailTemplateVisibility {
 model EmailTemplate {
   id              String                  @id @default(cuid())
   name            String
-  category        String?
+  categoryId      String?
+  category        EmailTemplateCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   subject         String
   body            String                  @db.Text
   active          Boolean                 @default(true)
@@ -1285,9 +1301,60 @@ model EmailTemplate {
 
   emailMessages EmailMessage[]
   sequenceSteps SequenceStep[]
+  links         EmailTemplateLink[]
 
   @@index([visibility, active])
   @@index([ownerId])
+  @@index([categoryId])
+}
+
+/**
+ * Admin-managed lookup for EmailTemplate.categoryId — replaces the
+ * original free-text EmailTemplate.category string (see the email-system
+ * plan's item 4). name uniqueness matches the plain case-sensitive
+ * @unique convention already used by every other small admin lookup in
+ * this schema (LeadType, PipelineStage, RejectionReason, Competitor) —
+ * no case-insensitive/citext handling exists anywhere else for these, so
+ * this doesn't invent one either.
+ */
+model EmailTemplateCategory {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  sortOrder   Int      @default(0)
+  active      Boolean  @default(true)
+  createdById String
+  createdBy   User     @relation("EmailTemplateCategoryCreator", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?    @relation("EmailTemplateCategoryUpdater", fields: [updatedById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  templates EmailTemplate[]
+
+  @@index([active, sortOrder])
+}
+
+/**
+ * Standard "attachment" for a template — a label + external URL (Google
+ * Drive/OneDrive/Sync/etc.), not a real uploaded file: this app has no
+ * durable file storage (see the email-system plan's Conflict B), so
+ * attachments are links to files already hosted elsewhere rather than new
+ * paid storage infrastructure. Snapshotted into EmailMessage.links at send
+ * time so editing or removing a link here can never change what an
+ * already-sent or already-scheduled message shows — same "immutable
+ * snapshot" rule the subject/body themselves already follow.
+ */
+model EmailTemplateLink {
+  id              String        @id @default(cuid())
+  emailTemplateId String
+  emailTemplate   EmailTemplate @relation(fields: [emailTemplateId], references: [id], onDelete: Cascade)
+  label           String
+  url             String
+  sortOrder       Int           @default(0)
+  createdAt       DateTime      @default(now())
+
+  @@index([emailTemplateId])
 }
 
 enum EmailDirection {
@@ -1345,6 +1412,11 @@ model EmailMessage {
   bccAddresses         String[]            @default([])
   subject              String
   body                 String              @db.Text
+  // Snapshot of the template's standard links (see EmailTemplateLink) plus
+  // any the user added/removed in the composer, captured at send time as
+  // {label, url}[] — never re-read from the template afterward. Null/empty
+  // means no links on this message.
+  links                Json?
   templateId           String?
   template             EmailTemplate?      @relation(fields: [templateId], references: [id], onDelete: SetNull)
   status               EmailMessageStatus  @default(DRAFT)
@@ -1360,6 +1432,21 @@ model EmailMessage {
   createdBy            User?               @relation("EmailMessageCreator", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt            DateTime            @default(now())
 
+  // Snapshotted from EmailTemplate.pipelineStageId at send time — never
+  // read live from the template afterward, same immutable-snapshot rule as
+  // subject/body/links. Null if the template had none, or no template was
+  // used. Confirmation is always explicit (never applied automatically):
+  // for an immediate send, the composer asks right after a confirmed
+  // success; for a scheduled send, the worker creates a Notification
+  // asking the sender to confirm once it actually sends. pipelineStageAppliedAt/
+  // AppliedById are set only when the user actually confirms — an
+  // unconfirmed suggestion just stays unapplied, it is never auto-cleared.
+  suggestedPipelineStageId String?
+  suggestedPipelineStage   PipelineStage? @relation("EmailMessageSuggestedStage", fields: [suggestedPipelineStageId], references: [id], onDelete: SetNull)
+  pipelineStageAppliedAt   DateTime?
+  pipelineStageAppliedById String?
+  pipelineStageAppliedBy   User?          @relation("EmailMessagePipelineStageApplier", fields: [pipelineStageAppliedById], references: [id], onDelete: SetNull)
+
   sequenceStepRun SequenceStepRun?
 
   @@unique([providerConnectionId, providerMessageId])
@@ -1367,6 +1454,7 @@ model EmailMessage {
   @@index([contactId])
   @@index([status, scheduledFor])
   @@index([direction, reviewedAt])
+  @@index([suggestedPipelineStageId])
 }
 
 /**
@@ -1638,6 +1726,12 @@ enum NotificationType {
   // notification-bell's read-tracking mechanism for report generation —
   // see GeneratedReport's doc comment for the unification this completes.
   REPORT_GENERATED
+  // Email system delta: a scheduled email whose template had a suggested
+  // pipeline stage just sent via the worker (not interactively) — the
+  // confirm-before-applying step (spec section 13) can't happen inline the
+  // way it does for an immediate send, so this asks the original sender to
+  // confirm it after the fact instead. Never auto-applied.
+  SCHEDULED_EMAIL_STAGE_SUGGESTED
 }
 
 /**

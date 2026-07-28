@@ -22,6 +22,8 @@ import { AppointmentPanel } from "./appointments/appointment-panel";
 import { AddToRouteToggle } from "./route-plan-toggle";
 import { getRouteCompanyIds } from "@/lib/route-plan/service";
 import { previewSteps } from "@/lib/comms/sequences";
+import { resolveCompanyPageDefault } from "@/lib/comms/recipient";
+import { parseStoredLinks } from "@/lib/comms/links";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TRIVIA_STATUS_LABEL } from "@/lib/ui/status-tones";
@@ -78,12 +80,33 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
       prisma.emailMessage.findMany({
         where: { companyId: id },
         orderBy: { createdAt: "desc" },
-        select: { id: true, subject: true, toAddresses: true, status: true, sentAt: true, scheduledFor: true, errorMessage: true, createdAt: true },
+        select: {
+          id: true,
+          subject: true,
+          toAddresses: true,
+          ccAddresses: true,
+          bccAddresses: true,
+          links: true,
+          status: true,
+          sentAt: true,
+          scheduledFor: true,
+          errorMessage: true,
+          suggestedPipelineStageId: true,
+          suggestedPipelineStage: { select: { name: true } },
+          pipelineStageAppliedAt: true,
+          createdAt: true,
+        },
       }),
       prisma.emailTemplate.findMany({
         where: { active: true, OR: [{ visibility: "SHARED" }, { ownerId: user.id }] },
         orderBy: { name: "asc" },
-        select: { id: true, name: true, subject: true, body: true },
+        select: {
+          id: true,
+          name: true,
+          subject: true,
+          body: true,
+          links: { orderBy: { sortOrder: "asc" }, select: { label: true, url: true } },
+        },
       }),
       prisma.followUpSequence.findMany({
         where: { active: true },
@@ -221,8 +244,10 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             <ContactsPanel
               companyId={company.id}
               contacts={company.contacts}
+              primaryContactId={company.primaryContactId}
               canEdit={canEdit}
               canManageCompliance={hasPermission(user, "manage_communication_compliance")}
+              canSendEmail={hasPermission(user, "send_email")}
             />
           </div>
 
@@ -234,25 +259,37 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             <ActivityPanel companyId={company.id} activities={activities} canLog={canEdit} />
           </div>
 
-          <EmailPanel
-            companyId={company.id}
-            messages={emailMessages.map((m) => ({
-              id: m.id,
-              subject: m.subject,
-              toAddresses: m.toAddresses,
-              status: m.status,
-              sentAt: m.sentAt?.toISOString() ?? null,
-              scheduledFor: m.scheduledFor?.toISOString() ?? null,
-              errorMessage: m.errorMessage,
-              createdAt: m.createdAt.toISOString(),
-            }))}
-            templates={emailTemplates}
-            contacts={company.contacts
-              .filter((c) => c.email)
-              .map((c) => ({ id: c.id, name: `${c.firstName} ${c.lastName}`, email: c.email as string }))}
-            canSend={hasPermission(user, "send_email")}
-            canSchedule={hasPermission(user, "schedule_email")}
-          />
+          <div id="email-panel">
+            <EmailPanel
+              companyId={company.id}
+              messages={emailMessages.map((m) => ({
+                id: m.id,
+                subject: m.subject,
+                toAddresses: m.toAddresses,
+                ccAddresses: m.ccAddresses,
+                bccAddresses: m.bccAddresses,
+                links: parseStoredLinks(m.links),
+                status: m.status,
+                sentAt: m.sentAt?.toISOString() ?? null,
+                scheduledFor: m.scheduledFor?.toISOString() ?? null,
+                errorMessage: m.errorMessage,
+                createdAt: m.createdAt.toISOString(),
+                suggestedPipelineStageId: m.suggestedPipelineStageId,
+                suggestedPipelineStageName: m.suggestedPipelineStage?.name ?? null,
+                pipelineStageAppliedAt: m.pipelineStageAppliedAt?.toISOString() ?? null,
+              }))}
+              templates={emailTemplates}
+              contacts={company.contacts
+                .filter((c) => c.email)
+                .map((c) => ({ id: c.id, name: `${c.firstName} ${c.lastName}`, email: c.email as string }))}
+              defaultContactId={resolveCompanyPageDefault(
+                company.contacts.find((c) => c.id === company.primaryContactId) ?? null,
+              )}
+              canSend={hasPermission(user, "send_email")}
+              canSchedule={hasPermission(user, "schedule_email")}
+              canEdit={canEdit}
+            />
+          </div>
 
           <SequenceEnrollmentPanel
             companyId={company.id}

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { Card, SectionHeading } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
 import { TemplateForm } from "../../template-form";
+import { LinksPanel } from "../links-panel";
 import { requireEditAccess, updateEmailTemplate } from "../../actions";
 
 export const metadata = { title: "Edit Email Template — Triviality CRM" };
@@ -15,10 +16,12 @@ export default async function EditEmailTemplatePage({ params }: { params: Promis
     notFound();
   }
 
-  const [template, leadTypes, pipelineStages] = await Promise.all([
+  const [template, leadTypes, pipelineStages, categories, links] = await Promise.all([
     prisma.emailTemplate.findUnique({ where: { id } }),
     prisma.leadType.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
     prisma.pipelineStage.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
+    prisma.emailTemplateCategory.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
+    prisma.emailTemplateLink.findMany({ where: { emailTemplateId: id }, orderBy: { sortOrder: "asc" } }),
   ]);
   if (!template) notFound();
 
@@ -33,11 +36,12 @@ export default async function EditEmailTemplatePage({ params }: { params: Promis
             action={updateEmailTemplate.bind(null, id)}
             leadTypes={leadTypes}
             pipelineStages={pipelineStages}
+            categories={categories}
             canManageShared={template.visibility === "SHARED"}
             submitLabel="Save changes"
             defaultValues={{
               name: template.name,
-              category: template.category,
+              categoryId: template.categoryId,
               subject: template.subject,
               body: template.body,
               visibility: template.visibility,
@@ -49,6 +53,8 @@ export default async function EditEmailTemplatePage({ params }: { params: Promis
           />
         </div>
       </Card>
+
+      <LinksPanel templateId={id} links={links} canEdit />
     </div>
   );
 }

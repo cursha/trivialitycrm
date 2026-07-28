@@ -21,4 +21,16 @@ describe("describeNotification", () => {
   it("returns a generic message for an unrecognized type", () => {
     expect(describeNotification("SOMETHING_NEW", {})).toBe("You have a new notification.");
   });
+
+  it("includes the company and suggested stage for SCHEDULED_EMAIL_STAGE_SUGGESTED", () => {
+    expect(describeNotification("SCHEDULED_EMAIL_STAGE_SUGGESTED", { companyName: "Acme Trivia", suggestedStageName: "Interested" })).toBe(
+      'Your scheduled email to Acme Trivia just sent — its template suggests moving to "Interested".',
+    );
+  });
+
+  it("degrades gracefully when SCHEDULED_EMAIL_STAGE_SUGGESTED payload fields are missing", () => {
+    expect(describeNotification("SCHEDULED_EMAIL_STAGE_SUGGESTED", {})).toBe(
+      'Your scheduled email to a company just sent — its template suggests moving to "a new stage".',
+    );
+  });
 });

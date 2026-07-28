@@ -7,6 +7,8 @@ import { companyScope } from "@/lib/companies/scope";
 import { prisma } from "@/lib/prisma";
 import { formString } from "@/lib/form-data";
 import { sendEmail, scheduleEmail, cancelScheduledEmail } from "@/lib/comms/send-email";
+import { parseLinksInput } from "@/lib/comms/links";
+import { changeCompanyStage } from "@/app/(dashboard)/companies/actions";
 import type { AuthenticatedUser } from "@/lib/auth/current-user";
 
 export type ActionResult = { error?: string } | undefined;
@@ -56,6 +58,7 @@ export async function sendComposedEmail(companyId: string, _prevState: ActionRes
   const bcc = parseAddressList(formString(formData, "bcc"));
   const subject = formString(formData, "subject");
   const body = formString(formData, "body");
+  const links = parseLinksInput(formString(formData, "links"));
   const sendAtRaw = formString(formData, "sendAt").trim();
 
   if (sendAtRaw) {
@@ -65,14 +68,14 @@ export async function sendComposedEmail(companyId: string, _prevState: ActionRes
       return { error: "Choose a future date and time to schedule this email." };
     }
 
-    const result = await scheduleEmail({ userId: user.id, companyId, contactId, templateId, cc, bcc, subject, body, scheduledFor });
+    const result = await scheduleEmail({ userId: user.id, companyId, contactId, templateId, cc, bcc, subject, body, links, scheduledFor });
     if (!result.ok) return { error: result.error };
     revalidatePath(`/companies/${companyId}`);
     return;
   }
 
   requirePermission(user, "send_email");
-  const result = await sendEmail({ userId: user.id, companyId, contactId, templateId, cc, bcc, subject, body });
+  const result = await sendEmail({ userId: user.id, companyId, contactId, templateId, cc, bcc, subject, body, links });
   if (!result.ok) return { error: result.error };
 
   revalidatePath(`/companies/${companyId}`);
@@ -96,5 +99,43 @@ export async function cancelComposedScheduledEmail(companyId: string, emailMessa
   }
 
   await cancelScheduledEmail(emailMessageId);
+  revalidatePath(`/companies/${companyId}`);
+}
+
+/**
+ * Applies an email's template-suggested pipeline stage — only ever on
+ * explicit user confirmation (spec section 13), never automatically.
+ * Re-reads the suggestion from the EmailMessage row itself (never trusts a
+ * client-supplied stage id) and delegates the actual move to
+ * changeCompanyStage(), the same "pipeline service" every other stage
+ * change in the app goes through (permission check, scope check,
+ * PipelineStageHistory + Activity audit trail) — this only adds the
+ * who/when bookkeeping on the email record afterward.
+ */
+export async function applySuggestedPipelineStage(companyId: string, emailMessageId: string): Promise<ActionResult> {
+  const user = await requireUser();
+  await requireCompanyInScope(companyId, user);
+
+  const message = await prisma.emailMessage.findUnique({
+    where: { id: emailMessageId },
+    select: { companyId: true, suggestedPipelineStageId: true, pipelineStageAppliedAt: true },
+  });
+  if (!message || message.companyId !== companyId) {
+    return { error: "Email not found." };
+  }
+  if (!message.suggestedPipelineStageId) {
+    return { error: "This email has no suggested pipeline stage." };
+  }
+  if (message.pipelineStageAppliedAt) {
+    return { error: "This suggestion has already been applied." };
+  }
+
+  const result = await changeCompanyStage(companyId, message.suggestedPipelineStageId);
+  if ("error" in result) return result;
+
+  await prisma.emailMessage.update({
+    where: { id: emailMessageId },
+    data: { pipelineStageAppliedAt: new Date(), pipelineStageAppliedById: user.id },
+  });
   revalidatePath(`/companies/${companyId}`);
 }

@@ -5,8 +5,10 @@ import { createContext, useCallback, useContext, useRef } from "react";
 type QuickActionContextValue = {
   registerActivityHandler: (fn: (type: string) => void) => () => void;
   registerFollowUpHandler: (fn: () => void) => () => void;
+  registerEmailHandler: (fn: (contactId: string) => void) => () => void;
   requestActivity: (type: string) => void;
   requestFollowUp: () => void;
+  requestEmail: (contactId: string) => void;
 };
 
 const QuickActionContext = createContext<QuickActionContextValue | null>(null);
@@ -24,6 +26,7 @@ function scrollToPanel(id: string) {
 export function QuickActionProvider({ children }: { children: React.ReactNode }) {
   const activityHandlerRef = useRef<((type: string) => void) | null>(null);
   const followUpHandlerRef = useRef<(() => void) | null>(null);
+  const emailHandlerRef = useRef<((contactId: string) => void) | null>(null);
 
   const registerActivityHandler = useCallback((fn: (type: string) => void) => {
     activityHandlerRef.current = fn;
@@ -49,9 +52,28 @@ export function QuickActionProvider({ children }: { children: React.ReactNode })
     scrollToPanel("tasks-panel");
   }, []);
 
+  const registerEmailHandler = useCallback((fn: (contactId: string) => void) => {
+    emailHandlerRef.current = fn;
+    return () => {
+      if (emailHandlerRef.current === fn) emailHandlerRef.current = null;
+    };
+  }, []);
+
+  const requestEmail = useCallback((contactId: string) => {
+    emailHandlerRef.current?.(contactId);
+    scrollToPanel("email-panel");
+  }, []);
+
   return (
     <QuickActionContext.Provider
-      value={{ registerActivityHandler, registerFollowUpHandler, requestActivity, requestFollowUp }}
+      value={{
+        registerActivityHandler,
+        registerFollowUpHandler,
+        registerEmailHandler,
+        requestActivity,
+        requestFollowUp,
+        requestEmail,
+      }}
     >
       {children}
     </QuickActionContext.Provider>

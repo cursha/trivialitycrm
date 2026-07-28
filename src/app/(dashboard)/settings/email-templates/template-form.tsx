@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
-import { Label, Input, Select, Textarea, FieldError, HelpText } from "@/components/ui/field";
+import { useActionState, useState } from "react";
+import { Label, Input, Select, FieldError, HelpText } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import { KNOWN_PLACEHOLDERS } from "@/lib/comms/templates";
 import type { ActionResult } from "./actions";
 
@@ -12,6 +13,7 @@ export function TemplateForm({
   action,
   leadTypes,
   pipelineStages,
+  categories,
   canManageShared,
   defaultValues,
   submitLabel,
@@ -19,10 +21,11 @@ export function TemplateForm({
   action: (state: ActionResult, formData: FormData) => Promise<ActionResult>;
   leadTypes: Option[];
   pipelineStages: Option[];
+  categories: Option[];
   canManageShared: boolean;
   defaultValues?: {
     name: string;
-    category: string | null;
+    categoryId: string | null;
     subject: string;
     body: string;
     visibility: "PERSONAL" | "SHARED";
@@ -34,6 +37,7 @@ export function TemplateForm({
   submitLabel: string;
 }) {
   const [state, formAction, pending] = useActionState(action, undefined);
+  const [body, setBody] = useState(defaultValues?.body ?? "<p></p><p>Unsubscribe: {{unsubscribeLink}}</p>");
 
   return (
     <form action={formAction} className="grid gap-4 sm:grid-cols-2">
@@ -43,7 +47,19 @@ export function TemplateForm({
       </div>
       <div>
         <Label>Category</Label>
-        <Input name="category" className="mt-1" defaultValue={defaultValues?.category ?? ""} placeholder="Optional" />
+        <Select name="categoryId" className="mt-1" defaultValue={defaultValues?.categoryId ?? ""}>
+          <option value="">None</option>
+          {categories.map((option) => (
+            <option key={option.id} value={option.id}>
+              {option.name}
+            </option>
+          ))}
+        </Select>
+        {categories.length === 0 && (
+          <HelpText className="mt-1">
+            No categories yet — add one under Settings &gt; Email Template Categories.
+          </HelpText>
+        )}
       </div>
 
       {!defaultValues && (
@@ -89,13 +105,9 @@ export function TemplateForm({
       </div>
       <div className="sm:col-span-2">
         <Label>Body</Label>
-        <Textarea
-          name="body"
-          required
-          rows={8}
-          className="mt-1"
-          defaultValue={defaultValues?.body ?? "\n\nUnsubscribe: {{unsubscribeLink}}"}
-        />
+        <div className="mt-1">
+          <RichTextEditor name="body" value={body} onChange={setBody} placeholder="Write the template body..." />
+        </div>
         <HelpText className="mt-1">
           Placeholders: {KNOWN_PLACEHOLDERS.map((token) => `{{${token}}}`).join(", ")}. An unresolved placeholder blocks sending
           rather than going out blank. {"{{unsubscribeLink}}"} is required in every template.

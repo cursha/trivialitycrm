@@ -49,6 +49,20 @@ describe("resolveTemplatePlaceholders", () => {
     expect(resolved).toBe("Plain text, no tokens.");
     expect(unresolved).toEqual([]);
   });
+
+  it("substitutes a value as-is in the default/text context", () => {
+    const { resolved } = resolveTemplatePlaceholders("Hi {{contact.firstName}}", { contact: { firstName: "A & <B>" } });
+    expect(resolved).toBe("Hi A & <B>");
+  });
+
+  it("HTML-escapes a substituted value in html context without touching surrounding markup", () => {
+    const { resolved } = resolveTemplatePlaceholders(
+      "<p>Hi <strong>{{contact.firstName}}</strong>, welcome to {{company.name}}.</p>",
+      { contact: { firstName: "A & <B>" }, company: { name: `O'Brien's "Pub"` } },
+      "html",
+    );
+    expect(resolved).toBe(`<p>Hi <strong>A &amp; &lt;B&gt;</strong>, welcome to O&#39;Brien&#39;s &quot;Pub&quot;.</p>`);
+  });
 });
 
 describe("extractPlaceholderTokens / unknownPlaceholderTokens", () => {

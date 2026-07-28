@@ -36,15 +36,21 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const onboardingRemaining = visibleOnboarding.length - completedOnboardingCount;
   const notifications = unreadNotifications.map((n) => {
     const payload = n.payload as Record<string, unknown>;
-    const downloadHref =
-      n.type === "REPORT_GENERATED" && payload.status === "SUCCEEDED" && typeof payload.generatedReportId === "string"
-        ? `/api/reports/generated/${payload.generatedReportId}/download?format=csv`
-        : undefined;
+    let actionHref: string | undefined;
+    let actionLabel: string | undefined;
+    if (n.type === "REPORT_GENERATED" && payload.status === "SUCCEEDED" && typeof payload.generatedReportId === "string") {
+      actionHref = `/api/reports/generated/${payload.generatedReportId}/download?format=csv`;
+      actionLabel = "Download";
+    } else if (n.type === "SCHEDULED_EMAIL_STAGE_SUGGESTED" && typeof payload.companyId === "string") {
+      actionHref = `/companies/${payload.companyId}#email-panel`;
+      actionLabel = "Review";
+    }
     return {
       id: n.id,
       message: describeNotification(n.type, payload),
       createdAt: n.createdAt.toISOString(),
-      downloadHref,
+      actionHref,
+      actionLabel,
     };
   });
 
