@@ -15,6 +15,7 @@ export function ListView({
   stages,
   canEdit,
   canBulk,
+  canRoutePlan,
   salespeople,
   territories,
   page,
@@ -24,6 +25,7 @@ export function ListView({
   stages: StageOption[];
   canEdit: boolean;
   canBulk: boolean;
+  canRoutePlan: boolean;
   salespeople: Option[];
   territories: Option[];
   page?: number;
@@ -62,6 +64,7 @@ export function ListView({
         salespeople={salespeople}
         territories={territories}
         canBulk={canBulk}
+        canRoutePlan={canRoutePlan}
         onClear={() => setSelected(new Set())}
       />
 

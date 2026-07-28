@@ -58,6 +58,7 @@ export default async function PipelinePage({
 
   const canEdit = hasPermission(user, "edit_leads");
   const canBulk = hasPermission(user, "bulk_update_leads");
+  const canRoutePlan = hasPermission(user, "manage_route_plan");
 
   const filters = {
     leadTypeId: toSingle(params.leadTypeId),
@@ -106,6 +107,7 @@ export default async function PipelinePage({
           filters={filters}
           canEdit={canEdit}
           canBulk={canBulk}
+          canRoutePlan={canRoutePlan}
           salespeople={salespeople}
           territoryOptions={territoryOptions}
           thresholdDays={workspaceSettings?.noActivityThresholdDays ?? 14}
@@ -118,6 +120,7 @@ export default async function PipelinePage({
           page={page}
           canEdit={canEdit}
           canBulk={canBulk}
+          canRoutePlan={canRoutePlan}
           salespeople={salespeople}
           territoryOptions={territoryOptions}
         />
@@ -147,6 +150,7 @@ async function ListSection({
   page,
   canEdit,
   canBulk,
+  canRoutePlan,
   salespeople,
   territoryOptions,
 }: {
@@ -156,6 +160,7 @@ async function ListSection({
   page: number;
   canEdit: boolean;
   canBulk: boolean;
+  canRoutePlan: boolean;
   salespeople: { id: string; name: string }[];
   territoryOptions: { id: string; name: string }[];
 }) {
@@ -171,6 +176,7 @@ async function ListSection({
       stages={stageOptions.map((s) => ({ id: s.id, name: s.name, active: s.active }))}
       canEdit={canEdit}
       canBulk={canBulk}
+      canRoutePlan={canRoutePlan}
       salespeople={salespeople}
       territories={territoryOptions}
       page={data.page}
@@ -184,6 +190,7 @@ async function StaleSection({
   filters,
   canEdit,
   canBulk,
+  canRoutePlan,
   salespeople,
   territoryOptions,
   thresholdDays,
@@ -192,6 +199,7 @@ async function StaleSection({
   filters: { leadTypeId?: string; assignedToId?: string; competitorId?: string; territoryId?: string };
   canEdit: boolean;
   canBulk: boolean;
+  canRoutePlan: boolean;
   salespeople: { id: string; name: string }[];
   territoryOptions: { id: string; name: string }[];
   thresholdDays: number;
@@ -207,6 +215,7 @@ async function StaleSection({
       stages={stageOptions.map((s) => ({ id: s.id, name: s.name, active: s.active }))}
       canEdit={canEdit}
       canBulk={canBulk}
+      canRoutePlan={canRoutePlan}
       salespeople={salespeople}
       territories={territoryOptions}
     />

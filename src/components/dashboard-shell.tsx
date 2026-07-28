@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, Building2, CalendarClock, Kanban, LayoutDashboard, ListChecks, Menu, Search, Settings, ShieldCheck, ShieldEllipsis, Trophy, Users2, X } from "lucide-react";
+import { BarChart3, Building2, CalendarClock, Kanban, LayoutDashboard, ListChecks, Map, Menu, Search, Settings, ShieldCheck, ShieldEllipsis, Trophy, Users2, X } from "lucide-react";
 import type { NavItem, NavIconKey } from "@/lib/nav";
 import { logout } from "@/lib/auth/actions";
 import { Logo } from "@/components/ui/logo";
@@ -35,6 +35,7 @@ export function DashboardShell({
   canAddLeads,
   canEditLeads,
   onboardingRemaining,
+  routePlanCount,
   children,
 }: {
   navItems: NavItem[];
@@ -45,6 +46,10 @@ export function DashboardShell({
   canAddLeads: boolean;
   canEditLeads: boolean;
   onboardingRemaining: number;
+  /** null = hide entirely (no view_route_plan permission) — a permission
+   * gate on visibility only, never the actual security boundary; every
+   * Route Plan action/query enforces it server-side independently. */
+  routePlanCount: number | null;
   children: React.ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -115,6 +120,16 @@ export function DashboardShell({
           <div className="flex items-center gap-4">
             <QuickAdd canAddLeads={canAddLeads} canEditLeads={canEditLeads} />
             <GlobalSearch />
+            {routePlanCount !== null && (
+              <Link
+                href="/route-plan"
+                aria-label={`Route Plan, ${routePlanCount} compan${routePlanCount === 1 ? "y" : "ies"}`}
+                className="flex items-center gap-1.5 rounded-lg px-2 py-2 text-sm font-semibold text-text hover:bg-black/5"
+              >
+                <Map size={20} />
+                <span className="hidden sm:inline">Route Plan ({routePlanCount})</span>
+              </Link>
+            )}
             <Link
               href="/onboarding"
               aria-label={onboardingRemaining > 0 ? `Getting started, ${onboardingRemaining} steps left` : "Getting started"}

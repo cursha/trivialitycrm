@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { NAV_ITEMS } from "@/lib/nav";
 import { describeNotification } from "@/lib/notifications";
 import { visibleOnboardingSteps } from "@/lib/onboarding/steps";
+import { getRouteSummary } from "@/lib/route-plan/service";
 import { DashboardShell } from "@/components/dashboard-shell";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -17,7 +18,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   );
 
   const visibleOnboarding = visibleOnboardingSteps((key) => hasPermission(user, key));
-  const [unreadNotifications, completedOnboardingCount] = await Promise.all([
+  const canViewRoutePlan = hasPermission(user, "view_route_plan");
+  const [unreadNotifications, completedOnboardingCount, routeSummary] = await Promise.all([
     prisma.notification.findMany({
       where: { userId: user.id, readAt: null },
       orderBy: { createdAt: "desc" },
@@ -26,6 +28,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     prisma.userOnboardingStep.count({
       where: { userId: user.id, stepKey: { in: visibleOnboarding.map((s) => s.key) } },
     }),
+    // Server enforcement remains mandatory regardless (route-plan/service.ts
+    // and every action still requirePermission independently) — this is
+    // only what decides whether the header badge itself is fetched/shown.
+    canViewRoutePlan ? getRouteSummary(user.id) : Promise.resolve(null),
   ]);
   const onboardingRemaining = visibleOnboarding.length - completedOnboardingCount;
   const notifications = unreadNotifications.map((n) => {
@@ -61,6 +67,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       canAddLeads={hasPermission(user, "add_leads")}
       canEditLeads={hasPermission(user, "edit_leads")}
       onboardingRemaining={onboardingRemaining}
+      routePlanCount={canViewRoutePlan ? (routeSummary?.count ?? 0) : null}
     >
       {children}
     </DashboardShell>

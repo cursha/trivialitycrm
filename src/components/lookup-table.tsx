@@ -29,6 +29,7 @@ export function LookupTable({
   defaultLabel = "Default",
   setOutcome,
   outcomeLabel = "Outcome",
+  extraColumn,
 }: {
   items: LookupItem[];
   rename: (id: string, formData: FormData) => Promise<ActionResult>;
@@ -42,6 +43,15 @@ export function LookupTable({
    * column is entirely absent for them. */
   setOutcome?: (id: string, outcomeType: LookupOutcome) => Promise<void>;
   outcomeLabel?: string;
+  /** Generic escape hatch for a per-row control too specific to build into
+   * this shared table directly (e.g. Lead Types' Route Plan eligibility
+   * toggle + slug field). `cells` are PRE-RENDERED ReactNode, keyed by item
+   * id — never a render callback: a plain function can't cross the
+   * Server-to-Client component boundary the way an already-built element
+   * (even one wrapping its own further client component) can, since this
+   * table is itself "use client" and its caller is typically a Server
+   * Component page. */
+  extraColumn?: { label: string; cells: Record<string, React.ReactNode> };
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
@@ -89,6 +99,7 @@ export function LookupTable({
             <th className="px-5 py-3">Status</th>
             {setDefault && <th className="px-5 py-3">{defaultLabel}</th>}
             {setOutcome && <th className="px-5 py-3">{outcomeLabel}</th>}
+            {extraColumn && <th className="px-5 py-3">{extraColumn.label}</th>}
             <th className="px-5 py-3 text-right">Actions</th>
           </tr>
         </thead>
@@ -191,6 +202,7 @@ export function LookupTable({
                   </select>
                 </td>
               )}
+              {extraColumn && <td className="px-5 py-4">{extraColumn.cells[item.id]}</td>}
               <td className="px-5 py-4 text-right">
                 <button
                   type="button"
@@ -206,7 +218,10 @@ export function LookupTable({
           ))}
           {items.length === 0 && (
             <tr>
-              <td colSpan={4 + (setDefault ? 1 : 0) + (setOutcome ? 1 : 0)} className="px-5 py-8 text-center text-text-muted">
+              <td
+                colSpan={4 + (setDefault ? 1 : 0) + (setOutcome ? 1 : 0) + (extraColumn ? 1 : 0)}
+                className="px-5 py-8 text-center text-text-muted"
+              >
                 Nothing here yet — add the first one below.
               </td>
             </tr>

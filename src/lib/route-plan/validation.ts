@@ -25,6 +25,14 @@ export function normalizeCountry(country: string): string {
   return country.trim().toLowerCase();
 }
 
+/** Collapses an embedded line break (a company's address1 is free text — a
+ * pasted multi-line address is real, observed input) into a single space,
+ * so one route stop never spans multiple visual lines in the review table
+ * or the exported CSV cell. */
+function normalizeAddressLineBreaks(value: string): string {
+  return value.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+}
+
 /**
  * Street, city, province/state, postal/ZIP — country deliberately excluded
  * (the spec requires every route to be single-country, so it adds no
@@ -34,7 +42,7 @@ export function normalizeCountry(country: string): string {
  */
 export function formatRouteAddress(company: RouteAddressInput): string {
   const parts = [company.address1, company.city, company.region, company.postalCode]
-    .map((part) => part?.trim())
+    .map((part) => (part ? normalizeAddressLineBreaks(part) : part))
     .filter((part): part is string => Boolean(part && part.length > 0));
   return parts.join(", ");
 }

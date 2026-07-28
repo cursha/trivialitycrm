@@ -19,6 +19,8 @@ import { EvidencePanel } from "./eos/evidence-panel";
 import { EmailPanel } from "./email/email-panel";
 import { SequenceEnrollmentPanel } from "./sequences/sequence-enrollment-panel";
 import { AppointmentPanel } from "./appointments/appointment-panel";
+import { AddToRouteToggle } from "./route-plan-toggle";
+import { getRouteCompanyIds } from "@/lib/route-plan/service";
 import { previewSteps } from "@/lib/comms/sequences";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +67,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     appointments,
     workspaceSettings,
     pendingDuplicateCount,
+    routeCompanyIds,
   ] = await Promise.all([
       listCompanyActivities(user, id),
       listCompanyTasks(user, id),
@@ -105,8 +108,10 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
       prisma.potentialDuplicate.count({
         where: { status: "PENDING", OR: [{ companyAId: id }, { companyBId: id }] },
       }),
+      hasPermission(user, "manage_route_plan") ? getRouteCompanyIds(user.id) : Promise.resolve(new Set<string>()),
     ]);
   const canEdit = hasPermission(user, "edit_leads");
+  const canRoutePlan = hasPermission(user, "manage_route_plan");
 
   const nextBestActions = computeNextBestActions({
     now: new Date(),
@@ -160,6 +165,8 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         stages={pipelineStages.map((s) => ({ id: s.id, name: s.name, active: s.active }))}
         canEdit={canEdit}
       />
+
+      {canRoutePlan && <AddToRouteToggle companyId={company.id} initiallyInRoute={routeCompanyIds.has(company.id)} canManage={canRoutePlan} />}
 
       <NextBestActionPanel items={nextBestActions} canEdit={canEdit} />
 

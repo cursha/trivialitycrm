@@ -30,14 +30,23 @@ export function CompaniesTable({
   salespeople,
   territories,
   canBulk,
+  canRoutePlan,
+  routeCompanyIds,
 }: {
   companies: CompanyRow[];
   stages: StageOption[];
   salespeople: Option[];
   territories: Option[];
   canBulk: boolean;
+  canRoutePlan: boolean;
+  /** Companies already in the signed-in user's active Route Plan — a
+   * persisted-state badge, deliberately separate from `selected` below (a
+   * bulk-action page-selection checkbox never means, and must never be
+   * confused with, "already in route"). */
+  routeCompanyIds: string[];
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const inRoute = new Set(routeCompanyIds);
   const allSelected = companies.length > 0 && companies.every((c) => selected.has(c.id));
 
   function toggleAll() {
@@ -62,6 +71,7 @@ export function CompaniesTable({
           salespeople={salespeople}
           territories={territories}
           canBulk={canBulk}
+          canRoutePlan={canRoutePlan}
           onClear={() => setSelected(new Set())}
         />
       )}
@@ -99,9 +109,12 @@ export function CompaniesTable({
                     </td>
                   )}
                   <td className="px-5 py-4">
-                    <Link href={`/companies/${company.id}`} className="font-bold text-secondary hover:underline">
-                      {company.name}
-                    </Link>
+                    <div className="flex items-center gap-1.5">
+                      <Link href={`/companies/${company.id}`} className="font-bold text-secondary hover:underline">
+                        {company.name}
+                      </Link>
+                      {inRoute.has(company.id) && <Badge tone="focus">In Route</Badge>}
+                    </div>
                     <div className="text-xs text-text-muted">
                       {company.city}, {company.region}
                     </div>
@@ -159,9 +172,12 @@ export function CompaniesTable({
                 )}
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-2">
-                    <Link href={`/companies/${company.id}`} className="font-bold text-secondary hover:underline">
-                      {company.name}
-                    </Link>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Link href={`/companies/${company.id}`} className="font-bold text-secondary hover:underline">
+                        {company.name}
+                      </Link>
+                      {inRoute.has(company.id) && <Badge tone="focus">In Route</Badge>}
+                    </div>
                     <Badge tone="secondary" className="shrink-0">
                       {company.pipelineStage.name}
                     </Badge>

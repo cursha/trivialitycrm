@@ -6,6 +6,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { listCompanies, PAGE_SIZE } from "./queries";
 import { CompaniesFilters } from "./companies-filters";
 import { CompaniesTable } from "./companies-table";
+import { getRouteCompanyIds } from "@/lib/route-plan/service";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
 
@@ -27,7 +28,9 @@ export default async function CompaniesPage({
 
   const statusParam = toSingle(params.status) === "ARCHIVED" ? "ARCHIVED" : "ACTIVE";
 
-  const [{ companies, total, pageCount }, leadTypes, pipelineStages, allPipelineStages, competitors, salespeople, territories] =
+  const canRoutePlan = hasPermission(user, "manage_route_plan");
+
+  const [{ companies, total, pageCount }, leadTypes, pipelineStages, allPipelineStages, competitors, salespeople, territories, routeCompanyIds] =
     await Promise.all([
       listCompanies(user, {
         q: toSingle(params.q),
@@ -54,6 +57,7 @@ export default async function CompaniesPage({
       prisma.competitor.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
       prisma.user.findMany({ where: { disabled: false }, orderBy: { name: "asc" } }),
       prisma.territory.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
+      canRoutePlan ? getRouteCompanyIds(user.id) : Promise.resolve(new Set<string>()),
     ]);
 
   const canAdd = hasPermission(user, "add_leads");
@@ -114,6 +118,8 @@ export default async function CompaniesPage({
         salespeople={salespeople}
         territories={territories.map((t) => ({ id: t.id, name: t.name ?? [t.city, t.region, t.country].filter(Boolean).join(", ") }))}
         canBulk={canBulk}
+        canRoutePlan={canRoutePlan}
+        routeCompanyIds={Array.from(routeCompanyIds)}
       />
 
       <Pagination page={page} pageCount={pageCount} pageSize={PAGE_SIZE} hrefFor={pageHref} />

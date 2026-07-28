@@ -30,6 +30,13 @@ describe("formatRouteAddress", () => {
     expect(formatRouteAddress({ address1: null, city: "Milton", region: "ON", postalCode: "L9T 1N7" })).toBe("Milton, ON, L9T 1N7");
   });
 
+  it("normalizes an embedded line break in a component to a single space", () => {
+    expect(formatRouteAddress({ address1: "201 Main St\nSuite 4", city: "Milton", region: "ON", postalCode: "L9T 1N7" })).toBe(
+      "201 Main St Suite 4, Milton, ON, L9T 1N7",
+    );
+    expect(formatRouteAddress({ address1: "201 Main St\r\n\r\nSuite 4", city: "Milton", region: "ON", postalCode: null })).toBe("201 Main St Suite 4, Milton, ON");
+  });
+
   it("trims whitespace on every component and never emits null/undefined text", () => {
     expect(formatRouteAddress({ address1: "  201 Main St  ", city: " Milton ", region: " ON ", postalCode: "  " })).toBe("201 Main St, Milton, ON");
     const result = formatRouteAddress({ address1: null, city: "Milton", region: "ON", postalCode: null });

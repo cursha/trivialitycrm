@@ -12,6 +12,10 @@ import {
   bulkRestore,
   type BulkActionOutcome,
 } from "@/app/(dashboard)/companies/bulk-actions";
+import { bulkAddToRoute, clearRouteAction } from "@/app/(dashboard)/route-plan/actions";
+import { downloadRoutePlanCsv } from "@/lib/route-plan/download-client";
+import { routeConflictMessage } from "@/lib/route-plan/conflict-message";
+import type { BulkAddResult, RouteConflictDetail } from "@/lib/route-plan/service";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -20,7 +24,7 @@ import type { StageOption } from "./company-card";
 import { OpportunityAnalysisPanel } from "@/app/(dashboard)/companies/opportunity-analysis-panel";
 
 type Option = { id: string; name: string };
-type BulkActionKind = "stage" | "assign" | "territory" | "followup" | "note" | "archive" | "restore" | "analyze";
+type BulkActionKind = "stage" | "assign" | "territory" | "followup" | "note" | "archive" | "restore" | "analyze" | "route";
 
 export function BulkToolbar({
   selectedIds,
@@ -29,6 +33,7 @@ export function BulkToolbar({
   salespeople,
   territories,
   canBulk,
+  canRoutePlan,
   onClear,
 }: {
   selectedIds: string[];
@@ -37,14 +42,55 @@ export function BulkToolbar({
   salespeople: Option[];
   territories: Option[];
   canBulk: boolean;
+  canRoutePlan: boolean;
   onClear: () => void;
 }) {
   const router = useRouter();
   const [active, setActive] = useState<BulkActionKind | null>(null);
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<BulkActionOutcome | null>(null);
+  const [routeResult, setRouteResult] = useState<BulkAddResult | null>(null);
+  const [routeConflict, setRouteConflict] = useState<RouteConflictDetail | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   if (!canBulk || selectedIds.length === 0) return null;
+
+  async function attemptAddToRoute() {
+    setExportError(null);
+    const outcome = await bulkAddToRoute(selectedIds);
+    if (!outcome.ok && "conflict" in outcome) {
+      setRouteConflict(outcome.conflict);
+      setRouteResult(null);
+    } else {
+      setRouteConflict(null);
+      setRouteResult(outcome);
+      if (outcome.ok) router.refresh();
+    }
+  }
+
+  function handleExportCurrentRouteFirst() {
+    startTransition(async () => {
+      const download = await downloadRoutePlanCsv();
+      if (!download.ok) {
+        setExportError(download.error);
+        return;
+      }
+      // Only after the server confirmed success does clearing the old
+      // route and adding the pending selection happen — never automatic,
+      // per spec 9 ("do not clear automatically") and 5.2 ("clear the
+      // route and add the pending company only after explicit
+      // confirmation" once export succeeds).
+      await clearRouteAction();
+      await attemptAddToRoute();
+    });
+  }
+
+  function handleClearAndStartNew() {
+    startTransition(async () => {
+      await clearRouteAction();
+      await attemptAddToRoute();
+    });
+  }
 
   function handleOutcome(outcome: BulkActionOutcome) {
     setResult(outcome);
@@ -80,6 +126,21 @@ export function BulkToolbar({
           <Button type="button" variant="ghost" onClick={() => setActive("analyze")}>
             Analyze for opportunities
           </Button>
+          {canRoutePlan && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setActive("route");
+                setRouteResult(null);
+                setRouteConflict(null);
+                setExportError(null);
+                startTransition(attemptAddToRoute);
+              }}
+            >
+              Add Selected to Route
+            </Button>
+          )}
           <a
             href={exportUrl}
             className="inline-flex items-center justify-center rounded-lg border border-border-strong px-4 py-2.5 text-sm font-bold text-text hover:bg-black/5"
@@ -259,6 +320,51 @@ export function BulkToolbar({
       )}
 
       {active === "analyze" && <OpportunityAnalysisPanel companies={selectedCompanies} onClose={() => setActive(null)} />}
+
+      {active === "route" && (
+        <div className="space-y-2 border-t border-border pt-3">
+          {exportError && <Alert tone="danger">{exportError}</Alert>}
+
+          {routeConflict ? (
+            <div className="space-y-2">
+              <Alert tone="warning">{routeConflictMessage(routeConflict)}</Alert>
+              {routeConflict.type === "ineligible" ? (
+                // Eligibility is checked first and is never a route-level
+                // conflict to resolve (spec 5.4) — no export/clear choice,
+                // just an explanation and a way out.
+                <Button type="button" variant="ghost" onClick={() => setActive(null)}>
+                  Close
+                </Button>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" disabled={isPending} variant="primary" onClick={handleExportCurrentRouteFirst}>
+                    Export current route first
+                  </Button>
+                  <Button type="button" disabled={isPending} variant="destructive" onClick={handleClearAndStartNew}>
+                    Clear current route and start new
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => setActive(null)}>
+                    Cancel
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : routeResult ? (
+            "ok" in routeResult && routeResult.ok ? (
+              <Alert tone="success">
+                Added {routeResult.addedCount} compan{routeResult.addedCount === 1 ? "y" : "ies"} to your Route Plan
+                {routeResult.alreadyInRouteCount > 0 ? ` (${routeResult.alreadyInRouteCount} already there)` : ""}.
+              </Alert>
+            ) : (
+              "perCompanyErrors" in routeResult && (
+                <Alert tone="warning">{Object.values(routeResult.perCompanyErrors).length} compan{Object.values(routeResult.perCompanyErrors).length === 1 ? "y" : "ies"} couldn&apos;t be added — you may not have access to {Object.values(routeResult.perCompanyErrors).length === 1 ? "it" : "them"}.</Alert>
+              )
+            )
+          ) : (
+            <p className="text-sm text-text-muted">Adding to your Route Plan…</p>
+          )}
+        </div>
+      )}
     </Card>
   );
 }

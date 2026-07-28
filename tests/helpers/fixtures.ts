@@ -53,8 +53,13 @@ export async function createTestUser(opts: {
   });
 }
 
-export async function createLeadTypeFixture(name = `Lead Type ${crypto.randomUUID().slice(0, 8)}`) {
-  return testPrisma.leadType.create({ data: { name } });
+export async function createLeadTypeFixture(
+  name = `Lead Type ${crypto.randomUUID().slice(0, 8)}`,
+  opts: { routePlanEnabled?: boolean; routePlanSlug?: string | null } = {},
+) {
+  return testPrisma.leadType.create({
+    data: { name, routePlanEnabled: opts.routePlanEnabled ?? false, routePlanSlug: opts.routePlanSlug ?? null },
+  });
 }
 
 export async function createPipelineStageFixture(

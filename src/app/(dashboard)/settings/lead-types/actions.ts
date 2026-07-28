@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
 import { LookupNameSchema } from "@/lib/validation/lookup";
 import { formString } from "@/lib/form-data";
+import { sanitizeRoutePlanSlug } from "@/lib/route-plan/validation";
 
 export type ActionResult = { error?: string } | undefined;
 
@@ -15,6 +16,36 @@ async function requireSettingsManager() {
   const user = await requireUser();
   requirePermission(user, "manage_settings");
   return user;
+}
+
+/**
+ * Deliberately gated by configure_route_plan_lead_types, not
+ * manage_settings — deciding Route Plan eligibility is its own permission
+ * (spec: "Administrators control which roles have Route Plan permission" /
+ * "Administrators mark which lead types are eligible"), granted
+ * Administrator-only by default but independently admin-adjustable like
+ * every other permission, not hardwired to the general settings-manager
+ * permission this file's other actions use.
+ */
+export async function setLeadTypeRoutePlanSettings(id: string, formData: FormData): Promise<ActionResult> {
+  const user = await requireUser();
+  requirePermission(user, "configure_route_plan_lead_types");
+
+  const enabled = formData.get("routePlanEnabled") === "on";
+  const rawSlug = formString(formData, "routePlanSlug");
+  const slug = enabled ? sanitizeRoutePlanSlug(rawSlug) : null;
+
+  if (enabled && !slug) {
+    return { error: "Enter a filename slug (letters, numbers, and hyphens) to enable Route Planning for this lead type." };
+  }
+
+  try {
+    await prisma.leadType.update({ where: { id }, data: { routePlanEnabled: enabled, routePlanSlug: slug } });
+  } catch {
+    return { error: "That filename slug is already used by another lead type." };
+  }
+
+  revalidatePath(PATH);
 }
 
 export async function createLeadType(_prevState: ActionResult, formData: FormData): Promise<ActionResult> {
