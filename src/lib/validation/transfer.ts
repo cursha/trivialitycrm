@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { titleCaseCity } from "@/lib/text-case";
 
 const optionalText = (max: number) =>
   z
@@ -13,7 +14,12 @@ export const TransferRowSchema = z.object({
   resultId: z.string().min(1),
   name: z.string().trim().min(1, { error: "Enter a company name." }).max(200),
   address1: optionalText(200),
-  city: z.string().trim().min(1, { error: "Enter a city." }).max(120),
+  city: z
+    .string()
+    .trim()
+    .min(1, { error: "Enter a city." })
+    .max(120)
+    .transform(titleCaseCity),
   region: z.string().trim().min(1, { error: "Enter a state/province." }).max(120),
   postalCode: optionalText(20),
   country: z.string().trim().min(1, { error: "Enter a country." }).max(120),

@@ -58,10 +58,30 @@ function extractPostalCode(addressComponents: PlaceAddressComponent[] | undefine
   return component?.longText ?? component?.shortText ?? null;
 }
 
+function componentText(component: PlaceAddressComponent | undefined): string | undefined {
+  return component?.longText ?? component?.shortText ?? undefined;
+}
+
+// formattedAddress is the whole "123 Main St, Springfield, IL 62704, USA"
+// string — city/region/postalCode/country are already their own
+// ResearchCandidate fields, so address1 must hold only the street portion.
+// Built from addressComponents (already requested for extractPostalCode)
+// rather than string-splitting formattedAddress, which is locale-dependent.
+// Falls back to formattedAddress on the rare place with no street_number/
+// route components (e.g. a location known only by name) rather than null.
+function extractStreetAddress(addressComponents: PlaceAddressComponent[] | undefined, fallback: string | null): string | null {
+  const streetNumber = componentText(addressComponents?.find((c) => c.types?.includes("street_number")));
+  const route = componentText(addressComponents?.find((c) => c.types?.includes("route")));
+  const street = [streetNumber, route].filter(Boolean).join(" ");
+  if (!street) return fallback;
+  const subpremise = componentText(addressComponents?.find((c) => c.types?.includes("subpremise")));
+  return subpremise ? `${street} ${subpremise}` : street;
+}
+
 function candidateFromPlace(place: NonNullable<PlacesTextSearchResult["places"]>[number], params: DiscoverParams, city: string): ResearchCandidate {
   return {
     name: place.displayName?.text ?? "Unknown business",
-    address1: place.formattedAddress ?? null,
+    address1: extractStreetAddress(place.addressComponents, place.formattedAddress ?? null),
     city,
     region: params.region,
     postalCode: extractPostalCode(place.addressComponents),

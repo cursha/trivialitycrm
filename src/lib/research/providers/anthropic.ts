@@ -488,7 +488,7 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
                 `${modeInstructions(params.mode, params.competitorName)}\n\n` +
                 `Business criteria: ${params.promptText}\n\n` +
                 `Location: ${locationScope}, ${params.country}. Lead type: ${params.leadTypeName}.\n\n` +
-                "Only report facts you can support with a web_search or web_fetch result. Do not invent addresses, phone numbers, or emails — leave a field null rather than guessing. Every evidence entry must cite a sourceUrl you actually fetched or found in search results.",
+                "Only report facts you can support with a web_search or web_fetch result. Do not invent addresses, phone numbers, or emails — leave a field null rather than guessing. Every evidence entry must cite a sourceUrl you actually fetched or found in search results. address1 must be the street address ONLY (e.g. \"123 Main St\") — never append city, region, postal code, or country, since those are already separate fields.",
             },
           ],
         },

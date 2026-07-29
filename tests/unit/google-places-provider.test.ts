@@ -54,7 +54,7 @@ describe("GooglePlacesDiscoveryProvider", () => {
     expect(candidates).toHaveLength(1);
     expect(candidates[0]).toMatchObject({
       name: "The Milton Arms",
-      address1: "123 Main St, Milton, ON L9T 1A1",
+      address1: "123 Main St",
       city: "Milton",
       region: "ON",
       country: "Canada",
@@ -80,6 +80,41 @@ describe("GooglePlacesDiscoveryProvider", () => {
 
     const candidates = await new GooglePlacesDiscoveryProvider().discover(baseParams);
     expect(candidates[0].postalCode).toBeNull();
+  });
+
+  it("appends the subpremise (e.g. suite number) to the street address when present", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        places: [
+          {
+            displayName: { text: "The Milton Arms" },
+            addressComponents: [
+              { longText: "123", types: ["street_number"] },
+              { longText: "Main St", types: ["route"] },
+              { longText: "Suite 200", types: ["subpremise"] },
+            ],
+          },
+        ],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const candidates = await new GooglePlacesDiscoveryProvider().discover(baseParams);
+    expect(candidates[0].address1).toBe("123 Main St Suite 200");
+  });
+
+  it("falls back to formattedAddress when the response has no street_number/route address components", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        places: [{ displayName: { text: "The Milton Arms" }, formattedAddress: "123 Main St, Milton, ON L9T 1A1", addressComponents: [] }],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const candidates = await new GooglePlacesDiscoveryProvider().discover(baseParams);
+    expect(candidates[0].address1).toBe("123 Main St, Milton, ON L9T 1A1");
   });
 
   it("sends the field mask and API key as headers, and the city+leadType+region+country as the text query", async () => {
