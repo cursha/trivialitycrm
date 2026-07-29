@@ -702,6 +702,25 @@ export class AnthropicOpportunityAnalysisProvider implements OpportunityAnalysis
         }
       });
 
+      // contentBlock above fires once per block, but a single thinking block
+      // can itself run for a long stretch (many seconds) with no further
+      // events — confirmed the source of real-world complaints that a
+      // multi-minute analysis "doesn't look like it's doing anything" for
+      // long gaps. thinking_delta deltas arrive continuously while the model
+      // is actually generating reasoning tokens, so throttling a repeat of
+      // the same message off of them is still a real, verifiable activity
+      // signal (tokens are actually being produced right now), not a
+      // synthetic timer — it just surfaces an existing signal more often
+      // instead of only at each block's start.
+      let lastThinkingHeartbeat = 0;
+      stream.on("streamEvent", (event) => {
+        if (event.type !== "content_block_delta" || event.delta.type !== "thinking_delta") return;
+        const now = Date.now();
+        if (now - lastThinkingHeartbeat < 5000) return;
+        lastThinkingHeartbeat = now;
+        onProgress?.({ message: "Reasoning through the evidence gathered so far..." });
+      });
+
       let finalMessage;
       try {
         finalMessage = await stream.finalMessage();

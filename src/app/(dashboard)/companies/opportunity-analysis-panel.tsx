@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import type { AnalyzeOpportunityResult } from "@/lib/companies/analyze-opportunity";
 import { Alert } from "@/components/ui/alert";
@@ -15,11 +15,25 @@ type Row = {
   name: string;
   status: "pending" | "running" | "done" | "error";
   currentActivity?: string;
+  // Set when the row starts running; paired with the panel's 1s ticker
+  // (see `now` below) to show a live elapsed-time readout. stepCount is a
+  // running tally of every progress event received so far — together
+  // they're the "is this actually still working" signal a static single
+  // activity line can't give during a long stretch between messages.
+  startedAt?: number;
+  stepCount: number;
   result?: Success;
   error?: string;
 };
 
 type StreamEvent = { type: "status"; message: string } | { type: "done"; result: Success } | { type: "error"; message: string };
+
+function formatElapsed(ms: number): string {
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+}
 
 /** One glanceable "is this venue already spoken for" signal — the whole
  * point of surfacing competitorFound as its own field instead of leaving it
@@ -88,14 +102,25 @@ async function runStreamingAnalysis(companyId: string, onActivity: (message: str
  * meaningful).
  */
 export function OpportunityAnalysisPanel({ companies, onClose }: { companies: { id: string; name: string }[]; onClose: () => void }) {
-  const [rows, setRows] = useState<Row[]>(companies.map((c) => ({ id: c.id, name: c.name, status: "pending" })));
+  const [rows, setRows] = useState<Row[]>(companies.map((c) => ({ id: c.id, name: c.name, status: "pending", stepCount: 0 })));
   const [expanded, setExpanded] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [started, setStarted] = useState(false);
   const [finished, setFinished] = useState(false);
+  // Ticks once a second while anything is running, purely to force the
+  // elapsed-time readout below to re-render — it's not itself a progress
+  // signal (that still only ever comes from real onActivity messages), just
+  // the clock those messages get measured against.
+  const [now, setNow] = useState(() => Date.now());
 
-  function updateRow(id: string, patch: Partial<Row>) {
-    setRows((prev) => prev.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+  useEffect(() => {
+    if (!started || finished) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [started, finished]);
+
+  function updateRow(id: string, patch: Partial<Row> | ((prev: Row) => Partial<Row>)) {
+    setRows((prev) => prev.map((row) => (row.id === id ? { ...row, ...(typeof patch === "function" ? patch(row) : patch) } : row)));
   }
 
   function runAnalysis() {
@@ -103,8 +128,10 @@ export function OpportunityAnalysisPanel({ companies, onClose }: { companies: { 
     setFinished(false);
     startTransition(async () => {
       for (const row of rows) {
-        updateRow(row.id, { status: "running", error: undefined, currentActivity: "Starting analysis..." });
-        const outcome = await runStreamingAnalysis(row.id, (message) => updateRow(row.id, { currentActivity: message }));
+        updateRow(row.id, { status: "running", error: undefined, currentActivity: "Starting analysis...", startedAt: Date.now(), stepCount: 0 });
+        const outcome = await runStreamingAnalysis(row.id, (message) =>
+          updateRow(row.id, (prev) => ({ currentActivity: message, stepCount: prev.stepCount + 1 })),
+        );
         if ("error" in outcome) {
           updateRow(row.id, { status: "error", error: outcome.error });
         } else {
@@ -181,10 +208,15 @@ export function OpportunityAnalysisPanel({ companies, onClose }: { companies: { 
                   </div>
                 </div>
                 {row.status === "running" && (
-                  <p className="mt-1 flex items-center gap-1.5 text-xs text-secondary">
-                    <Loader2 size={14} className="shrink-0 animate-spin" />
-                    {row.currentActivity ?? "Working…"}
-                  </p>
+                  <div className="mt-1 text-xs">
+                    <p className="flex items-center gap-1.5 text-secondary">
+                      <Loader2 size={14} className="shrink-0 animate-spin" />
+                      {row.currentActivity ?? "Working…"}
+                    </p>
+                    <p className="mt-0.5 pl-[20px] text-text-muted">
+                      {formatElapsed(now - (row.startedAt ?? now))} elapsed · {row.stepCount} step{row.stepCount === 1 ? "" : "s"} so far
+                    </p>
+                  </div>
                 )}
                 {row.status === "error" && row.error && <p className="mt-1 text-xs text-danger">{row.error}</p>}
                 {row.status === "done" && row.result && expanded === row.id && (
