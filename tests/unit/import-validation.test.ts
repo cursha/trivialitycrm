@@ -33,4 +33,15 @@ describe("mapAndValidateRow", () => {
     expect(result.errors).toHaveLength(0);
     expect(result.values.phone).toBe("");
   });
+
+  it("rejects a full state/province name instead of a 2-letter code", () => {
+    const result = mapAndValidateRow({ "Business Name": "Bar", City: "Milton", Prov: "Ontario", Nation: "Canada" }, mapping);
+    expect(result.errors).toContain("Region must be a 2-letter state/province code (e.g. ON, CO) — not the full name.");
+  });
+
+  it("title-cases city and uppercases region on import", () => {
+    const result = mapAndValidateRow({ "Business Name": "Bar", City: "milton", Prov: "on", Nation: "Canada" }, mapping);
+    expect(result.values.city).toBe("Milton");
+    expect(result.values.region).toBe("ON");
+  });
 });

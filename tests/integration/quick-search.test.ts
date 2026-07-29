@@ -12,7 +12,7 @@ beforeEach(async () => {
 function quickSearchFormData(leadTypeIds: string[], overrides: Record<string, string> = {}) {
   const fd = new FormData();
   for (const id of leadTypeIds) fd.append("leadTypeIds", id);
-  const defaults: Record<string, string> = { country: "Canada", region: "Ontario" };
+  const defaults: Record<string, string> = { country: "Canada", region: "ON" };
   for (const [k, v] of Object.entries({ ...defaults, ...overrides })) fd.set(k, v);
   return fd;
 }

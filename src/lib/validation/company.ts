@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { titleCaseCity } from "@/lib/text-case";
+import { RegionCodeSchema } from "@/lib/validation/region";
 
 const optionalText = (max: number) =>
   z
@@ -14,8 +16,8 @@ export const TriviaStatusValues = ["CURRENT_TRIVIA", "NO_CURRENT_TRIVIA", "UNCER
 export const CompanySchema = z.object({
   name: z.string().trim().min(1, { error: "Enter a company name." }).max(200),
   address1: optionalText(200),
-  city: z.string().trim().min(1, { error: "Enter a city." }).max(120),
-  region: z.string().trim().min(1, { error: "Enter a state/province." }).max(120),
+  city: z.string().trim().min(1, { error: "Enter a city." }).max(120).transform(titleCaseCity),
+  region: RegionCodeSchema,
   postalCode: optionalText(20),
   country: z.string().trim().min(1, { error: "Enter a country." }).max(120),
   phone: optionalText(40),

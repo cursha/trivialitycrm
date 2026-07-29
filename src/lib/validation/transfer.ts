@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { titleCaseCity } from "@/lib/text-case";
+import { RegionCodeSchema } from "@/lib/validation/region";
 
 const optionalText = (max: number) =>
   z
@@ -20,7 +21,7 @@ export const TransferRowSchema = z.object({
     .min(1, { error: "Enter a city." })
     .max(120)
     .transform(titleCaseCity),
-  region: z.string().trim().min(1, { error: "Enter a state/province." }).max(120),
+  region: RegionCodeSchema,
   postalCode: optionalText(20),
   country: z.string().trim().min(1, { error: "Enter a country." }).max(120),
   phone: optionalText(40),

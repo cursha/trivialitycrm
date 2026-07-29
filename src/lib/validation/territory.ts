@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { OptionalRegionCodeSchema } from "./region";
 
 const optionalText = (max: number) =>
   z
@@ -13,7 +14,7 @@ export const TerritorySchema = z
   .object({
     name: optionalText(120),
     country: z.string().trim().min(1, { error: "Enter a country." }).max(120),
-    region: optionalText(120),
+    region: OptionalRegionCodeSchema,
     city: optionalText(120),
     assignedToId: optionalText(100),
   })

@@ -29,7 +29,7 @@ async function baseFixtures() {
 
 function searchFormData(overrides: Record<string, string> = {}) {
   const fd = new FormData();
-  const defaults: Record<string, string> = { country: "Canada", region: "Ontario", mode: "GENERAL" };
+  const defaults: Record<string, string> = { country: "Canada", region: "ON", mode: "GENERAL" };
   for (const [k, v] of Object.entries({ ...defaults, ...overrides })) fd.set(k, v);
   return fd;
 }

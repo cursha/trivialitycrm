@@ -1,4 +1,11 @@
 import { z } from "zod";
+import { titleCaseCity } from "../text-case";
+import { RegionCodeSchema } from "./region";
+
+const CitiesSchema = z
+  .array(z.string().trim().min(1).transform(titleCaseCity))
+  .max(50)
+  .default([]);
 
 export const CountryValues = ["Canada", "United States"] as const;
 export const LeadSearchModeValues = ["TRIVIA_GAP", "TRIVIA_CONFIRMED", "COMPETITOR", "GENERAL"] as const;
@@ -7,8 +14,8 @@ export const SearchSetupSchema = z
   .object({
     promptId: z.string().min(1, { error: "Choose a research prompt." }),
     country: z.enum(CountryValues, { error: "Choose Canada or United States." }),
-    region: z.string().trim().min(1, { error: "Enter a state or province." }).max(120),
-    cities: z.array(z.string().trim().min(1)).max(50).default([]),
+    region: RegionCodeSchema,
+    cities: CitiesSchema,
     leadTypeId: z.string().min(1, { error: "Choose a Lead Type." }),
     minimumScore: z.coerce.number().int().min(0).max(100).default(80),
     mode: z.enum(LeadSearchModeValues, { error: "Choose a research mode." }),
@@ -32,8 +39,8 @@ export type SearchSetupValues = z.infer<typeof SearchSetupSchema>;
 export const QuickSearchSetupSchema = z.object({
   leadTypeIds: z.array(z.string().min(1)).min(1, { error: "Choose at least one Lead Type." }),
   country: z.enum(CountryValues, { error: "Choose Canada or United States." }),
-  region: z.string().trim().min(1, { error: "Enter a state or province." }).max(120),
-  cities: z.array(z.string().trim().min(1)).max(50).default([]),
+  region: RegionCodeSchema,
+  cities: CitiesSchema,
 });
 
 export type QuickSearchSetupValues = z.infer<typeof QuickSearchSetupSchema>;
