@@ -58,6 +58,18 @@ function extractPostalCode(addressComponents: PlaceAddressComponent[] | undefine
   return component?.longText ?? component?.shortText ?? null;
 }
 
+// queryCity is what this app searched FOR (a real city entry, or — for a
+// "no city filter, search the whole region" run — the region code itself
+// used as the query's geographic scope, e.g. "Pub in ON, ON, Canada"). It is
+// NOT necessarily where a given result actually is. Google's own locality
+// component is the place's real city; only fall back to queryCity (which,
+// for a whole-region run, is really the region code, not a city — a known,
+// accepted imprecision) when Google didn't return one.
+function extractCity(addressComponents: PlaceAddressComponent[] | undefined, queryCity: string): string {
+  const component = addressComponents?.find((c) => c.types?.includes("locality"));
+  return component?.longText ?? component?.shortText ?? queryCity;
+}
+
 function componentText(component: PlaceAddressComponent | undefined): string | undefined {
   return component?.longText ?? component?.shortText ?? undefined;
 }
@@ -78,11 +90,11 @@ function extractStreetAddress(addressComponents: PlaceAddressComponent[] | undef
   return subpremise ? `${street} ${subpremise}` : street;
 }
 
-function candidateFromPlace(place: NonNullable<PlacesTextSearchResult["places"]>[number], params: DiscoverParams, city: string): ResearchCandidate {
+function candidateFromPlace(place: NonNullable<PlacesTextSearchResult["places"]>[number], params: DiscoverParams, queryCity: string): ResearchCandidate {
   return {
     name: place.displayName?.text ?? "Unknown business",
     address1: extractStreetAddress(place.addressComponents, place.formattedAddress ?? null),
-    city,
+    city: extractCity(place.addressComponents, queryCity),
     region: params.region,
     postalCode: extractPostalCode(place.addressComponents),
     country: params.country,

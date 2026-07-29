@@ -104,6 +104,38 @@ describe("GooglePlacesDiscoveryProvider", () => {
     expect(candidates[0].address1).toBe("123 Main St Suite 200");
   });
 
+  it("uses Google's own locality component for city, not the query city — e.g. a whole-region search must not stamp the region code as the city", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        places: [
+          {
+            displayName: { text: "The Milton Arms" },
+            addressComponents: [{ longText: "Milton", shortText: "Milton", types: ["locality"] }],
+          },
+        ],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    // No cities given -> discover() falls back to querying the region code
+    // itself ("ON") as the search scope, but the result's actual city must
+    // still come from Google's locality component, not that region code.
+    const candidates = await new GooglePlacesDiscoveryProvider().discover({ ...baseParams, cities: [] });
+    expect(candidates[0].city).toBe("Milton");
+  });
+
+  it("falls back to the query city when Google returns no locality component", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ places: [{ displayName: { text: "The Milton Arms" }, addressComponents: [] }] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const candidates = await new GooglePlacesDiscoveryProvider().discover(baseParams);
+    expect(candidates[0].city).toBe("Milton");
+  });
+
   it("falls back to formattedAddress when the response has no street_number/route address components", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
