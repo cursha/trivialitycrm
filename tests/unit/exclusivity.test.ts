@@ -57,8 +57,30 @@ describe("filterByModeExclusivity", () => {
 });
 
 describe("dedupeWithinRun", () => {
-  it("removes repeats of the same normalized name + city", () => {
+  it("removes repeats of the same normalized name + city when address1 is unknown", () => {
     const candidates = [candidate(), candidate({ name: "the copper kettle " }), candidate({ name: "Different Bar" })];
+    const result = dedupeWithinRun(candidates);
+    expect(result).toHaveLength(2);
+  });
+
+  it("dedupes the same business found via two different city queries, keyed on address1 rather than city", () => {
+    // Google Places splits a metro area into per-neighborhood queries to get
+    // past its 60-results-per-query ceiling (see google-places.ts) — each
+    // query stamps its own city onto every result, so the same real business
+    // can come back twice with two different `city` values.
+    const candidates = [
+      candidate({ address1: "123 Main St", city: "Toronto", postalCode: "M1A 1A1" }),
+      candidate({ address1: "123 Main St", city: "Scarborough", postalCode: "M1A 1A1" }),
+    ];
+    const result = dedupeWithinRun(candidates);
+    expect(result).toHaveLength(1);
+  });
+
+  it("keeps two same-named businesses at different addresses in the same city", () => {
+    const candidates = [
+      candidate({ address1: "123 Main St", city: "Toronto", postalCode: "M1A 1A1" }),
+      candidate({ address1: "456 Queen St", city: "Toronto", postalCode: "M1B 2B2" }),
+    ];
     const result = dedupeWithinRun(candidates);
     expect(result).toHaveLength(2);
   });
