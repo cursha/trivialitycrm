@@ -107,6 +107,18 @@ export function scoreCompanyMatch(a: CompanyMatchInput, b: CompanyMatchInput, mi
     hasStrongSignal = true;
   }
 
+  // The same business name at the same street address is about as
+  // decisive a real-world duplicate signal as exists short of a shared
+  // government ID -- more reliable than a single matched phone/email,
+  // which can be a shared front desk or generic inbox. Scored as its own
+  // bonus (not just the sum of the two individual signals above) so this
+  // specific combination reaches HIGH confidence on its own, rather than
+  // needing a third signal (phone/email/website) on top of it.
+  if (exactNameMatch && addressMatch) {
+    score += 35;
+    reasons.push("Company name and street address both match exactly.");
+  }
+
   // Corroborating signal only -- sharing a city/region is common and must
   // never by itself be enough to flag a pair (two unrelated companies both
   // in Toronto is not evidence of a duplicate). Only counted when some

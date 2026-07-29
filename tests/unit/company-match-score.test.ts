@@ -166,4 +166,102 @@ describe("scoreCompanyMatch", () => {
     const result = scoreCompanyMatch(a, b);
     expect(result.matchedFields).toContain("city");
   });
+
+  it("reaches HIGH confidence from an exact name + address match alone, with no phone/email/website in common", () => {
+    const a = company({
+      id: "1",
+      name: "The Copper Kettle",
+      normalizedName: "the copper kettle",
+      address1: "123 Main St",
+      postalCode: "M5V 3A8",
+      normalizedPostalCode: "M5V 3A8",
+      country: "Canada",
+      phone: "9055550134",
+      normalizedPhone: "9055550134",
+      email: "a@example.com",
+      normalizedEmail: "a@example.com",
+      websiteDomain: "aaa.com",
+    });
+    const b = company({
+      id: "2",
+      name: "The Copper Kettle",
+      normalizedName: "the copper kettle",
+      address1: "123 Main St",
+      postalCode: "M5V 3A8",
+      normalizedPostalCode: "M5V 3A8",
+      country: "Canada",
+      phone: "9055559999",
+      normalizedPhone: "9055559999",
+      email: "b@example.com",
+      normalizedEmail: "b@example.com",
+      websiteDomain: "bbb.com",
+    });
+    const result = scoreCompanyMatch(a, b);
+    expect(result.confidence).toBe("HIGH");
+    expect(result.score).toBeGreaterThanOrEqual(80);
+    expect(result.reasons.some((r) => r.includes("name and street address both match"))).toBe(true);
+  });
+
+  it("does not apply the name+address decisive bonus when only the name matches (address differs)", () => {
+    const a = company({
+      id: "1",
+      name: "The Copper Kettle",
+      normalizedName: "the copper kettle",
+      address1: "123 Main St",
+      postalCode: "M5V 3A8",
+      normalizedPostalCode: "M5V 3A8",
+      phone: null,
+      normalizedPhone: null,
+      email: null,
+      normalizedEmail: null,
+      websiteDomain: null,
+    });
+    const b = company({
+      id: "2",
+      name: "The Copper Kettle",
+      normalizedName: "the copper kettle",
+      address1: "999 Other Ave",
+      postalCode: "K1A 0B1",
+      normalizedPostalCode: "K1A 0B1",
+      phone: null,
+      normalizedPhone: null,
+      email: null,
+      normalizedEmail: null,
+      websiteDomain: null,
+    });
+    const result = scoreCompanyMatch(a, b);
+    expect(result.confidence).not.toBe("HIGH");
+    expect(result.reasons.some((r) => r.includes("both match exactly"))).toBe(false);
+  });
+
+  it("does not apply the name+address decisive bonus for a fuzzy (non-exact) name match", () => {
+    const a = company({
+      id: "1",
+      name: "The Copper Kettle",
+      normalizedName: "the copper kettle",
+      address1: "123 Main St",
+      postalCode: "M5V 3A8",
+      normalizedPostalCode: "M5V 3A8",
+      phone: null,
+      normalizedPhone: null,
+      email: null,
+      normalizedEmail: null,
+      websiteDomain: null,
+    });
+    const b = company({
+      id: "2",
+      name: "The Copper Kettel",
+      normalizedName: "the copper kettel",
+      address1: "123 Main St",
+      postalCode: "M5V 3A8",
+      normalizedPostalCode: "M5V 3A8",
+      phone: null,
+      normalizedPhone: null,
+      email: null,
+      normalizedEmail: null,
+      websiteDomain: null,
+    });
+    const result = scoreCompanyMatch(a, b);
+    expect(result.confidence).not.toBe("HIGH");
+  });
 });
