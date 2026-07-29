@@ -154,6 +154,8 @@ const CANDIDATE_SCHEMA = {
 
 const EOS_CATEGORY_KEYS = Object.keys(EOS_CATEGORY_MAXIMA) as (keyof typeof EOS_CATEGORY_MAXIMA)[];
 
+const WEEKDAY_VALUES = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"] as const;
+
 const SCORING_CATEGORY_VALUES = [
   "FOOD_BEVERAGE_FOCUS",
   "WEEKNIGHT_REVENUE_OPPORTUNITY",
@@ -228,6 +230,31 @@ const OPPORTUNITY_ANALYSIS_SCHEMA = {
     // score-adjustment discretion. null = genuinely unconfirmed; true/false
     // only from an explicit finding, never inferred from silence.
     hasTvs: { type: ["boolean", "null"] },
+    // Trivia-specific competitor already running at this venue, if any —
+    // see OpportunityAnalysisResult.competitorFound's doc comment. null when
+    // no positive evidence was found; day is independently nullable within
+    // the object when a competitor is confirmed but the specific night
+    // isn't.
+    competitorFound: {
+      type: ["object", "null"],
+      properties: {
+        providerName: { type: "string" },
+        // No "enum" here deliberately: confirmed live, Anthropic's
+        // structured-output validator rejects `enum` combined with a
+        // `type` array (`["string", "null"]`) — 400 "Enum value 'MONDAY'
+        // does not match declared type" — even though "MONDAY" plainly is
+        // a string. Every real (non-mock) opportunity analysis failed
+        // outright because of this until it was caught by a live smoke
+        // test. The prompt states the allowed values instead, and the
+        // result is normalized back to a real Weekday (or null) below in
+        // normalizeCompetitorFound() — never trusted to have come back
+        // clean from the model.
+        day: { type: ["string", "null"] },
+        sourceUrl: { type: ["string", "null"] },
+      },
+      required: ["providerName", "day", "sourceUrl"],
+      additionalProperties: false,
+    },
   },
   required: [
     "categoryScores",
@@ -245,6 +272,7 @@ const OPPORTUNITY_ANALYSIS_SCHEMA = {
     "foundEmail",
     "conflict",
     "hasTvs",
+    "competitorFound",
   ],
   additionalProperties: false,
 } as const;
@@ -336,6 +364,22 @@ function assertNotTruncated(stopReason: string | null, providerName: string): vo
   if (stopReason === "max_tokens") {
     throw new Error(`Provider "${providerName}" response was truncated (hit max_tokens) before it finished — its output is incomplete, not just slow to parse.`);
   }
+}
+
+/**
+ * The schema can no longer constrain `day` to the real Weekday values (see
+ * the schema's own comment on why "enum" had to be dropped) — normalize
+ * here instead, right where the model's raw output crosses into the app's
+ * typed result. A non-matching value becomes null rather than propagating
+ * into Company.competitorTriviaDay, whose Postgres enum column would
+ * otherwise reject the whole write.
+ */
+function normalizeCompetitorFound(raw: OpportunityAnalysisResult["competitorFound"]): OpportunityAnalysisResult["competitorFound"] {
+  if (!raw) return null;
+  const day = typeof raw.day === "string" && (WEEKDAY_VALUES as readonly string[]).includes(raw.day.toUpperCase())
+    ? (raw.day.toUpperCase() as (typeof WEEKDAY_VALUES)[number])
+    : null;
+  return { ...raw, day };
 }
 
 function modeInstructions(mode: DiscoverParams["mode"], competitorName?: string): string {
@@ -574,6 +618,11 @@ export class AnthropicOpportunityAnalysisProvider implements OpportunityAnalysis
     onProgress?: (event: { message: string }) => void,
   ): Promise<OpportunityAnalysisResult> {
     const { model, maxSearchToolUses } = await resolveOpportunityAnalysisSettings();
+    // Given to the model as known-name hints only (see the prompt below) —
+    // matching the found provider back to one of these by exact name
+    // happens deterministically in analyze-opportunity.ts, never trusted to
+    // the model's own judgment of "is this the same competitor."
+    const knownCompetitors = await prisma.competitor.findMany({ where: { active: true }, select: { name: true }, orderBy: { name: "asc" } });
     // 840s (14min), not the other providers' 300s: confirmed live, a
     // sparse-web-presence subject (e.g. small-town pubs) makes the model
     // burn many search/fetch rounds finding little, genuinely running past
@@ -633,6 +682,11 @@ export class AnthropicOpportunityAnalysisProvider implements OpportunityAnalysis
                 "Use web_search/web_fetch to research what's missing (public contact info, decision-maker accessibility, marketing presence, community engagement, etc.) and to find supporting evidence for each category score. " +
                 "Every evidence entry must cite a sourceUrl you actually found or fetched, and its category must be one of the 10 category keys above, in SCREAMING_SNAKE_CASE. " +
                 "Specifically check whether the venue has TVs/screens — trivia hosting requires a screen to display questions, so this is reported as its own field (hasTvs), separate from the category scores. Real signals: menus, \"watch the game\"/sports-bar branding, review mentions, or an explicit no-TV/conversation-focused policy. Set hasTvs true or false ONLY on a genuine explicit finding either way; a plain absence of any mention is NOT evidence of no TVs — leave hasTvs null when unconfirmed, and do not let this uncertainty lower turnkeyImplementationReadiness or salesPriorityScore on its own. " +
+                "Specifically check whether this venue ALREADY runs a trivia night through some other trivia company — not karaoke, live music, or other unrelated entertainment, only trivia/quiz nights. Look for a schedule page, event listing, or social post naming the trivia host, and use that finding as real evidence for the competitiveOpportunity category score. " +
+                (knownCompetitors.length > 0
+                  ? `Known trivia providers we track (use this EXACT spelling as providerName if you find a match): ${knownCompetitors.map((c) => c.name).join(", ")}. If you find a different, unlisted trivia provider instead, report its name exactly as found. `
+                  : "") +
+                "Report this as competitorFound: set providerName to the trivia provider's name and day to the weekday its trivia night runs (SCREAMING_SNAKE_CASE, e.g. THURSDAY) ONLY on a genuine positive finding, citing sourceUrl. Leave day null if a competitor is confirmed but the specific night isn't. Leave competitorFound entirely null if you find no positive evidence of an existing trivia competitor — a plain absence of any mention is NOT evidence of no competitor, so do not guess. " +
                 "Only set conflict.found to true if you discover a genuine contradiction of one of the trusted facts above (e.g. the business appears permanently closed, or the name at this address doesn't match) — never as a way to change the trusted facts themselves; otherwise leave conflict.found false.",
             },
           ],
@@ -674,7 +728,8 @@ export class AnthropicOpportunityAnalysisProvider implements OpportunityAnalysis
       if (!jsonBlock || !("text" in jsonBlock)) {
         throw new Error("Opportunity analysis provider returned no output.");
       }
-      return JSON.parse(jsonBlock.text) as OpportunityAnalysisResult;
+      const parsed = JSON.parse(jsonBlock.text) as OpportunityAnalysisResult;
+      return { ...parsed, competitorFound: normalizeCompetitorFound(parsed.competitorFound) };
     });
   }
 }

@@ -11,7 +11,7 @@ import { classifyProviderError } from "@/lib/integrations/provider-errors";
 import { gradeForScore, totalFromCategoryScores, validateCategoryScores } from "@/lib/eos/validation";
 import { writeAuditEvent } from "@/lib/audit/log";
 import { logger } from "@/lib/logger";
-import type { OpportunityGrade } from "@/generated/prisma/enums";
+import type { OpportunityGrade, Weekday } from "@/generated/prisma/enums";
 
 export type AnalyzeOpportunityResult =
   | { error: string }
@@ -32,6 +32,11 @@ export type AnalyzeOpportunityResult =
       needsReview: boolean;
       evidence: OpportunityAnalysisEvidence[];
       hasTvs: boolean | null;
+      // Trivia-specific competitor finding — see
+      // Company.competitorTriviaProvider's schema.prisma comment. null when
+      // no positive evidence of an existing trivia competitor was found.
+      competitorTriviaProvider: string | null;
+      competitorTriviaDay: Weekday | null;
     };
 
 /**
@@ -130,6 +135,16 @@ export async function runOpportunityAnalysis(
   const opportunityGrade = gradeForScore(eosTotal);
   const needsReview = result.conflict.found || company.needsReview;
 
+  // Resolve the found provider name against the existing Competitor list by
+  // exact, case-insensitive name — same "link only on a confident match,
+  // never invent a new Competitor record" precedent as run-search.ts's own
+  // competitorName resolution. A non-match leaves Company.competitorId
+  // untouched rather than clearing it — an AI finding that doesn't match a
+  // known name isn't evidence the previously-linked competitor is gone.
+  const matchedCompetitor = result.competitorFound
+    ? await prisma.competitor.findFirst({ where: { name: { equals: result.competitorFound.providerName, mode: "insensitive" } } })
+    : null;
+
   await prisma.$transaction(async (tx) => {
     const created = await tx.historicalScoreRecord.create({
       data: {
@@ -190,6 +205,16 @@ export async function runOpportunityAnalysis(
         // clearNeedsReview(), same "never silently un-reject" precedent as
         // restoreResult() in the lead-search results flow.
         ...(result.conflict.found ? { needsReview: true, needsReviewReason: result.conflict.reason } : {}),
+        // Fill-only-on-genuine-finding, same rule as hasTvs above: an
+        // inconclusive pass (competitorFound null) never erases a
+        // previously confirmed competitor finding.
+        ...(result.competitorFound
+          ? {
+              competitorTriviaProvider: result.competitorFound.providerName,
+              competitorTriviaDay: result.competitorFound.day,
+              ...(matchedCompetitor ? { competitorId: matchedCompetitor.id } : {}),
+            }
+          : {}),
       },
     });
   });
@@ -217,5 +242,7 @@ export async function runOpportunityAnalysis(
     needsReview,
     evidence: result.evidence,
     hasTvs,
+    competitorTriviaProvider: result.competitorFound?.providerName ?? null,
+    competitorTriviaDay: result.competitorFound?.day ?? null,
   };
 }

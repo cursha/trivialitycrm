@@ -6,7 +6,7 @@ import type { AnalyzeOpportunityResult } from "@/lib/companies/analyze-opportuni
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { GRADE_TONE, GRADE_LABEL } from "@/lib/ui/status-tones";
+import { GRADE_TONE, GRADE_LABEL, WEEKDAY_LABEL } from "@/lib/ui/status-tones";
 
 type Success = Exclude<AnalyzeOpportunityResult, { error: string }>;
 
@@ -20,6 +20,20 @@ type Row = {
 };
 
 type StreamEvent = { type: "status"; message: string } | { type: "done"; result: Success } | { type: "error"; message: string };
+
+/** One glanceable "is this venue already spoken for" signal — the whole
+ * point of surfacing competitorFound as its own field instead of leaving it
+ * buried in scoreExplanation/evidence prose. */
+function CompetitorBadge({ result }: { result: Success }) {
+  if (!result.competitorTriviaProvider) return null;
+  const day = result.competitorTriviaDay ? WEEKDAY_LABEL[result.competitorTriviaDay] : null;
+  return (
+    <Badge tone="warning">
+      {result.competitorTriviaProvider}
+      {day ? ` · ${day}` : ""}
+    </Badge>
+  );
+}
 
 /**
  * Calls the streaming Route Handler (src/app/api/companies/[id]/
@@ -160,6 +174,7 @@ export function OpportunityAnalysisPanel({ companies, onClose }: { companies: { 
                         <Badge tone={GRADE_TONE[row.result.opportunityGrade]}>{GRADE_LABEL[row.result.opportunityGrade]}</Badge>
                         <span className="font-bold text-text">{row.result.eosTotal}</span>
                         {row.result.hasTvs === false && <Badge tone="danger">No TVs</Badge>}
+                        <CompetitorBadge result={row.result} />
                         {row.result.needsReview && <Badge tone="warning">Needs review</Badge>}
                       </>
                     )}
@@ -210,6 +225,7 @@ export function OpportunityAnalysisPanel({ companies, onClose }: { companies: { 
                       <span className="text-text-muted">EOS {row.result.eosTotal}</span>
                       {row.result.salesPriorityScore !== null && <span className="text-text-muted">· Priority {row.result.salesPriorityScore}</span>}
                       {row.result.hasTvs === false && <Badge tone="danger">No TVs</Badge>}
+                      <CompetitorBadge result={row.result} />
                       {row.result.needsReview && <Badge tone="warning">Needs review</Badge>}
                     </li>
                   ))}

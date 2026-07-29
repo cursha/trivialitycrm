@@ -75,4 +75,16 @@ describe("MockOpportunityAnalysisProvider", () => {
   it("works fine with no onProgress callback given", async () => {
     await expect(new MockOpportunityAnalysisProvider().analyze(baseInput)).resolves.toBeTruthy();
   });
+
+  it("leaves competitorFound null (no evidence of an existing trivia competitor) by default", async () => {
+    const result = await new MockOpportunityAnalysisProvider().analyze(baseInput);
+    expect(result.competitorFound).toBeNull();
+  });
+
+  it("deterministically reports a competitor finding when notes contain the MOCK_COMPETITOR marker", async () => {
+    const result = await new MockOpportunityAnalysisProvider().analyze({ ...baseInput, notes: "Some notes. MOCK_COMPETITOR" });
+    expect(result.competitorFound).not.toBeNull();
+    expect(result.competitorFound?.providerName).toBeTruthy();
+    expect(result.competitorFound?.day).toBe("THURSDAY");
+  });
 });

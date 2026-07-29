@@ -13,6 +13,17 @@ enum TriviaStatus {
   UNCERTAIN
 }
 
+// Which night a venue's existing trivia competitor runs — Company.competitorTriviaDay.
+enum Weekday {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
 enum SearchResultDisposition {
   NEW
   REVIEWED
@@ -496,6 +507,19 @@ model Company {
   missingInformation       String?                @db.Text
   recommendedSalesApproach String?                @db.Text
   recommendedNextAction    String?                @db.Text
+  // Trivia-specific competitive finding from the most recent opportunity
+  // analysis — separate from competitiveOpportunity (a 0-5 category score)
+  // and from competitorId/competitor below (which only ever points at a
+  // known Competitor record when the name matches one exactly). These two
+  // fields hold the raw finding regardless of whether it matched anything on
+  // the Competitor list, so "who's already running trivia here, and which
+  // night" is always a glanceable fact rather than buried in prose. Same
+  // fill-only-on-genuine-finding rule as hasTvs below: a later inconclusive
+  // pass (no competitor evidence found) never erases a previously confirmed
+  // finding — see analyze-opportunity.ts's merge logic. A human can still
+  // clear/correct either manually via the company form.
+  competitorTriviaProvider String?
+  competitorTriviaDay      Weekday?
   lastScoredAt             DateTime?
   scoringVersion           String?
   isExistingCustomer       Boolean                @default(false)

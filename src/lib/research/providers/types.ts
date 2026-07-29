@@ -3,7 +3,7 @@
 // mock/demo provider implement these same shapes, so run-search.ts and the
 // prompt-assist action never depend on a specific vendor. See getProviders()
 // in factory.ts for how AI_PROVIDER/SEARCH_PROVIDER selects an implementation.
-import type { LeadSearchMode, TriviaStatus, ConfidenceLevel, PrimaryClassification, SecondaryTag, ScoringCategory, EvidenceVerificationStatus, EvidenceReliability } from "../../../generated/prisma/enums";
+import type { LeadSearchMode, TriviaStatus, ConfidenceLevel, PrimaryClassification, SecondaryTag, ScoringCategory, EvidenceVerificationStatus, EvidenceReliability, Weekday } from "../../../generated/prisma/enums";
 import type { EosCategoryScores } from "../../eos/constants";
 
 export type EvidenceEntry = {
@@ -152,6 +152,18 @@ export type OpportunityAnalysisResult = {
   // this address doesn't match) — never a mechanism for changing the
   // trusted fields themselves.
   conflict: { found: boolean; reason: string | null };
+  // Trivia-specific competitive finding — who (if anyone) already runs a
+  // competing trivia night at this venue, and which night. Deliberately its
+  // own top-level, structured field rather than folded into scoreExplanation
+  // or the competitiveOpportunity category score, so it's a single
+  // glanceable fact instead of something a reader has to dig prose for. null
+  // means no positive evidence of an existing trivia competitor was found —
+  // never a guess from silence (same rule as hasTvs below). day is
+  // independently nullable: the provider may confirm a competitor exists
+  // without being able to confirm which night. providerName is the name as
+  // found; it may or may not match an existing Competitor record by exact
+  // name — see analyze-opportunity.ts for how that link gets resolved.
+  competitorFound: { providerName: string; day: Weekday | null; sourceUrl: string | null } | null;
   // Tri-state, deliberately separate from categoryScores/salesPriorityScore
   // above — a black-and-white hard requirement (trivia hosting needs a
   // screen), not a soft signal folded into a weighted score. null means

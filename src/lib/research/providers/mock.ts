@@ -168,6 +168,11 @@ export class MockOpportunityAnalysisProvider implements OpportunityAnalysisProvi
       // Same "MOCK_" marker idiom as forcedConflict above — lets a test force
       // the hard-disqualifier path deterministically without real AI judgment.
       hasTvs: input.notes?.includes("MOCK_NO_TVS") ? false : null,
+      // Same "MOCK_" marker idiom again — lets a test force a positive
+      // competitor finding deterministically.
+      competitorFound: input.notes?.includes("MOCK_COMPETITOR")
+        ? { providerName: "Mock Trivia Co.", day: "THURSDAY", sourceUrl: input.websiteUrl }
+        : null,
     };
   }
 }

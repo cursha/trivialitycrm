@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { resetDatabase, testPrisma } from "../helpers/db";
-import { createRoleWithPermissions, createTestUser, createLeadTypeFixture, createPipelineStageFixture, createCompanyFixture, loginAs } from "../helpers/fixtures";
+import { createRoleWithPermissions, createTestUser, createLeadTypeFixture, createPipelineStageFixture, createCompanyFixture, createCompetitorFixture, loginAs } from "../helpers/fixtures";
 import { resetFakeCookies } from "../setup/mock-next";
 import { analyzeCompanyOpportunity } from "../../src/app/(dashboard)/companies/opportunity-analysis";
 
@@ -151,6 +151,69 @@ describe("analyzeCompanyOpportunity", () => {
     await analyzeCompanyOpportunity(company.id);
     const afterReanalysis = await testPrisma.company.findUniqueOrThrow({ where: { id: company.id } });
     expect(afterReanalysis.hasTvs).toBe(false);
+  });
+
+  it("leaves competitor fields untouched when the analysis finds no evidence of an existing trivia competitor", async () => {
+    const { admin, company } = await baseFixtures();
+    await loginAs(admin.id);
+
+    await analyzeCompanyOpportunity(company.id);
+    const updated = await testPrisma.company.findUniqueOrThrow({ where: { id: company.id } });
+    expect(updated.competitorTriviaProvider).toBeNull();
+    expect(updated.competitorTriviaDay).toBeNull();
+    expect(updated.competitorId).toBeNull();
+  });
+
+  it("records the found trivia provider and day, and links competitorId when the name matches a known Competitor", async () => {
+    const adminFixture = await createAdminFixture();
+    await loginAs(adminFixture.admin.id);
+    // Case-different from the mock's "Mock Trivia Co." on purpose — the match
+    // must be case-insensitive, same as run-search.ts's own resolution.
+    const competitor = await createCompetitorFixture("mock trivia co.");
+
+    const company = await createCompanyForAdmin(adminFixture, { notes: "MOCK_COMPETITOR" });
+    const outcome = await analyzeCompanyOpportunity(company.id);
+    expect("error" in outcome).toBe(false);
+    if (!("error" in outcome)) {
+      expect(outcome.competitorTriviaProvider).toBe("Mock Trivia Co.");
+      expect(outcome.competitorTriviaDay).toBe("THURSDAY");
+    }
+
+    const updated = await testPrisma.company.findUniqueOrThrow({ where: { id: company.id } });
+    expect(updated.competitorTriviaProvider).toBe("Mock Trivia Co.");
+    expect(updated.competitorTriviaDay).toBe("THURSDAY");
+    expect(updated.competitorId).toBe(competitor.id);
+  });
+
+  it("records the found trivia provider without touching competitorId when the name matches no known Competitor", async () => {
+    const adminFixture = await createAdminFixture();
+    await loginAs(adminFixture.admin.id);
+
+    const company = await createCompanyForAdmin(adminFixture, { notes: "MOCK_COMPETITOR" });
+    await analyzeCompanyOpportunity(company.id);
+
+    const updated = await testPrisma.company.findUniqueOrThrow({ where: { id: company.id } });
+    expect(updated.competitorTriviaProvider).toBe("Mock Trivia Co.");
+    expect(updated.competitorId).toBeNull();
+  });
+
+  it("never lets a later inconclusive pass erase a previously confirmed competitor finding", async () => {
+    const adminFixture = await createAdminFixture();
+    await loginAs(adminFixture.admin.id);
+
+    const company = await createCompanyForAdmin(adminFixture, { notes: "MOCK_COMPETITOR" });
+    await analyzeCompanyOpportunity(company.id);
+    const confirmed = await testPrisma.company.findUniqueOrThrow({ where: { id: company.id } });
+    expect(confirmed.competitorTriviaProvider).toBe("Mock Trivia Co.");
+
+    // Re-run without the marker — the mock now reports no competitor found,
+    // same as a real re-check that turned up nothing. The previously
+    // confirmed finding must survive, not be erased.
+    await testPrisma.company.update({ where: { id: company.id }, data: { notes: null } });
+    await analyzeCompanyOpportunity(company.id);
+    const afterReanalysis = await testPrisma.company.findUniqueOrThrow({ where: { id: company.id } });
+    expect(afterReanalysis.competitorTriviaProvider).toBe("Mock Trivia Co.");
+    expect(afterReanalysis.competitorTriviaDay).toBe("THURSDAY");
   });
 
   it("requires edit_leads, run_research, and bulk_update_leads", async () => {

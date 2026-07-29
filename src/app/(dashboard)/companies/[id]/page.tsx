@@ -26,7 +26,7 @@ import { resolveCompanyPageDefault } from "@/lib/comms/recipient";
 import { parseStoredLinks } from "@/lib/comms/links";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TRIVIA_STATUS_LABEL } from "@/lib/ui/status-tones";
+import { TRIVIA_STATUS_LABEL, WEEKDAY_LABEL } from "@/lib/ui/status-tones";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -220,6 +220,8 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               <Field label="Assigned salesperson" value={company.assignedTo?.name} />
               <Field label="Competitor" value={company.competitor?.name} />
               <Field label="Trivia status" value={TRIVIA_STATUS_LABEL[company.triviaStatus]} />
+              <Field label="Existing trivia provider" value={company.competitorTriviaProvider} />
+              <Field label="Trivia night" value={company.competitorTriviaDay ? WEEKDAY_LABEL[company.competitorTriviaDay] : null} />
               <Field
                 label="Next follow-up"
                 value={company.nextFollowUpAt ? new Date(company.nextFollowUpAt).toLocaleDateString() : null}

@@ -90,6 +90,16 @@ export const TRIVIA_STATUS_LABEL: Record<string, string> = {
   UNCERTAIN: "Uncertain",
 };
 
+export const WEEKDAY_LABEL: Record<string, string> = {
+  MONDAY: "Monday",
+  TUESDAY: "Tuesday",
+  WEDNESDAY: "Wednesday",
+  THURSDAY: "Thursday",
+  FRIDAY: "Friday",
+  SATURDAY: "Saturday",
+  SUNDAY: "Sunday",
+};
+
 export const DISPOSITION_TONE: Record<string, BadgeTone> = {
   NEW: "secondary",
   REVIEWED: "neutral",
