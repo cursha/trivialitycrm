@@ -279,6 +279,18 @@ model User {
   routePlan               RoutePlan?
   routePlanCompaniesAdded RoutePlanCompany[]
 
+  // Campaign and Calling Lists.
+  salesListsOwned                     SalesList[]
+  salesListMembersAdded               SalesListMember[]
+  salesListShares                     SalesListShare[]
+  callingSessionsStarted              CallingSession[]
+  callRecordsMade                     CallRecord[]
+  campaignInstructionTemplatesCreated CampaignInstructionTemplate[]
+  campaignsCreated                    Campaign[]                    @relation("CampaignCreator")
+  campaignsAsSender                   Campaign[]                    @relation("CampaignSender")
+  campaignsApproved                   Campaign[]                    @relation("CampaignApprover")
+  campaignsCancelled                  Campaign[]                    @relation("CampaignCanceller")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -386,6 +398,9 @@ model PipelineStage {
   followUpSequences FollowUpSequence[]
   orgDefaultFor     OrganizationSettings[]
   suggestedByEmails EmailMessage[]         @relation("EmailMessageSuggestedStage")
+
+  callOutcomeDefaults CallOutcome[]
+  callRecordsApplied  CallRecord[]  @relation("CallRecordAppliedStage")
 }
 
 model RejectionReason {
@@ -396,6 +411,7 @@ model RejectionReason {
   results   SearchResult[]
 
   lossHistoryEntries PipelineStageHistory[]
+  callRecords        CallRecord[]
 }
 
 model Competitor {
@@ -575,16 +591,21 @@ model Company {
   primaryContactId String?  @unique
   primaryContact   Contact? @relation("CompanyPrimaryContact", fields: [primaryContactId], references: [id], onDelete: SetNull)
 
-  contacts            Contact[]
-  activities          Activity[]
-  tasks               Task[]
-  sources             CompanySource[]
-  searchResults       SearchResult[]
-  stageHistory        PipelineStageHistory[]
-  emailMessages       EmailMessage[]
-  sequenceEnrollments SequenceEnrollment[]
-  appointments        Appointment[]
-  routePlanEntries    RoutePlanCompany[]
+  contacts                Contact[]
+  activities              Activity[]
+  tasks                   Task[]
+  sources                 CompanySource[]
+  searchResults           SearchResult[]
+  stageHistory            PipelineStageHistory[]
+  emailMessages           EmailMessage[]
+  sequenceEnrollments     SequenceEnrollment[]
+  appointments            Appointment[]
+  routePlanEntries        RoutePlanCompany[]
+  salesListMembers        SalesListMember[]
+  salesListDynamicMembers SalesListDynamicMember[]
+  callingSessionEntries   CallingSessionEntry[]
+  callRecords             CallRecord[]
+  campaignRecipients      CampaignRecipient[]
 
   // Module Seven: Data Quality, Duplicate Management, Record Merging, and
   // Enrichment History.
@@ -754,6 +775,23 @@ model WorkspaceSettings {
   // either field = disabled, the default.
   quietHoursStartHour Int?
   quietHoursEndHour   Int?
+
+  // Campaign and Calling Lists: the administrator-configured default order
+  // a new calling session starts in — sortBy is a plain string validated
+  // server-side against a fixed allowlist (src/lib/calling/order.ts), never
+  // trusted raw. A salesperson may override this for their own session
+  // (CallingSession.orderBy/orderDir stores whatever was actually used),
+  // per the spec's "the salesperson may change the order... preserve the
+  // selected order for that session."
+  defaultCallingOrderBy  String @default("salesPriorityScore")
+  defaultCallingOrderDir String @default("desc")
+
+  // Days after a campaign email actually sends before its automatic
+  // follow-up task is due — assigned to the company's real CRM owner
+  // (never the campaign's sender), per the spec's "After the initial
+  // campaign email is sent, create a follow-up task using the
+  // administrator-configured default number of days."
+  defaultCampaignFollowUpDays Int @default(3)
 }
 
 // A report's filter configuration lives entirely in the existing SavedView
@@ -868,6 +906,7 @@ model Contact {
   sequenceEnrollments SequenceEnrollment[]
   appointments        Appointment[]
   primaryForCompany   Company?             @relation("CompanyPrimaryContact")
+  campaignRecipients  CampaignRecipient[]
 
   // Module Seven: matching normalization (see Company.normalizedRegion's
   // doc comment — same "populated going forward + self-healed by scan"
@@ -986,6 +1025,8 @@ model Activity {
   company    Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
   user       User         @relation(fields: [userId], references: [id])
   createdAt  DateTime     @default(now())
+
+  callRecord CallRecord?
 }
 
 model Task {
@@ -1001,6 +1042,8 @@ model Task {
   assignedTo   User       @relation("TaskAssignee", fields: [assignedToId], references: [id])
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
+
+  callRecord CallRecord?
 }
 
 model PromptTemplate {
@@ -1326,6 +1369,7 @@ model EmailTemplate {
   emailMessages EmailMessage[]
   sequenceSteps SequenceStep[]
   links         EmailTemplateLink[]
+  campaigns     Campaign[]
 
   @@index([visibility, active])
   @@index([ownerId])
@@ -1471,7 +1515,8 @@ model EmailMessage {
   pipelineStageAppliedById String?
   pipelineStageAppliedBy   User?          @relation("EmailMessagePipelineStageApplier", fields: [pipelineStageAppliedById], references: [id], onDelete: SetNull)
 
-  sequenceStepRun SequenceStepRun?
+  sequenceStepRun          SequenceStepRun?
+  campaignRecipientStepRun CampaignRecipientStepRun?
 
   @@unique([providerConnectionId, providerMessageId])
   @@index([companyId])
@@ -2392,4 +2437,626 @@ model EmailDeliveryEvent {
   receivedAt      DateTime @default(now())
 
   @@unique([provider, providerEventId])
+}
+
+// ===== Campaign and Calling Lists (Phase 0: foundation + General Sales
+// List / List Builder) =====
+
+enum SalesListPurpose {
+  CALLING
+  EMAIL_CAMPAIGN
+  GENERAL_SALES
+}
+
+enum SalesListType {
+  FIXED
+  DYNAMIC
+}
+
+// PRIVATE = only the owner (and an Administrator) can see or use it.
+// SHARED_USERS = visible to the owner plus whoever has a SalesListShare row.
+// SHARED_TEAM = visible to the owner plus every user on the owner's Team —
+// resolved at read time against User.teamId, the same relationship
+// companyScope()'s team tier already uses; no membership table needed for
+// this tier.
+enum SalesListVisibility {
+  PRIVATE
+  SHARED_USERS
+  SHARED_TEAM
+}
+
+/**
+ * One shared saved-list model for all three purposes (Calling List / Email
+ * Campaign / General Sales List) — see the Campaign and Calling Lists spec.
+ * Deliberately NOT an extension of SavedView (src/lib/workspace/
+ * saved-view-filters.ts): SavedView is Pipeline/Companies-page-specific,
+ * dynamic-only, and has only a 2-tier PRIVATE/SHARED-to-everyone visibility
+ * model — bolting fixed membership, 3-tier sharing, and purpose onto it
+ * would risk the existing, working Pipeline saved-views feature for a
+ * shape it wasn't designed for. Only the creator or an Administrator may
+ * change or delete a list (enforced in src/lib/sales-lists/actions.ts,
+ * mirroring pipeline/actions.ts's requireOwnedView precedent exactly) —
+ * visibility governs who can SEE/USE it, never who can edit its definition.
+ */
+model SalesList {
+  id          String              @id @default(cuid())
+  name        String
+  description String?             @db.Text
+  purpose     SalesListPurpose
+  type        SalesListType
+  visibility  SalesListVisibility @default(PRIVATE)
+  ownerId     String
+  owner       User                @relation(fields: [ownerId], references: [id])
+
+  // Validated against SalesListFiltersSchema (src/lib/sales-lists/filters.ts)
+  // on every save AND every re-evaluation — same "never raw query text"
+  // discipline SavedView.filters already follows. Required for a DYNAMIC
+  // list (membership is recomputed from this on every open/refresh); null
+  // for a FIXED list, whose membership is the explicit SalesListMember rows
+  // below instead.
+  filters Json?
+
+  defaultSortBy  String?
+  defaultSortDir String?
+
+  // When this DYNAMIC list's membership was last (re-)evaluated — set only
+  // by an explicit "Refresh" action or by opening the list, never on a
+  // silent background timer. Null for a FIXED list (meaningless there) and
+  // for a DYNAMIC list that's never been opened yet.
+  lastEvaluatedAt DateTime?
+
+  active     Boolean   @default(true)
+  archivedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  members         SalesListMember[]
+  shares          SalesListShare[]
+  dynamicMembers  SalesListDynamicMember[]
+  callingSessions CallingSession[]
+  campaigns       Campaign[]
+
+  @@index([ownerId])
+  @@index([purpose, active])
+}
+
+/**
+ * Fixed-list membership — mirrors RoutePlanCompany's exact shape
+ * (prisma/schema.prisma's RoutePlanCompany model: listId/companyId/
+ * addedById/addedAt, unique pair per list) but many-list rather than
+ * one-active-list-per-user. Only ever populated for a FIXED-type SalesList;
+ * a DYNAMIC list's membership is never persisted here, only recomputed live
+ * from SalesList.filters.
+ */
+model SalesListMember {
+  id        String    @id @default(cuid())
+  listId    String
+  list      SalesList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  companyId String
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  addedById String
+  addedBy   User      @relation(fields: [addedById], references: [id])
+  addedAt   DateTime  @default(now())
+
+  @@unique([listId, companyId])
+  @@index([companyId])
+}
+
+/**
+ * Cached result of a DYNAMIC list's last filter evaluation — replaced
+ * wholesale (delete-all, insert-all) every time the list is refreshed,
+ * never incrementally patched. This is what the List page reads by default
+ * (fast, no live query on every view) and what a "Refresh" action diffs the
+ * newly-computed match set against to report "newly eligible" / "no longer
+ * matches" companies — see src/lib/sales-lists/queries.ts's
+ * refreshDynamicList(). Deliberately a separate model from SalesListMember:
+ * that table means "a person explicitly chose this company," this table
+ * means "the filters currently match this company" — mixing the two would
+ * make it impossible to tell which is which for a FIXED list that also had
+ * filters at some point, or to safely wholesale-replace one without
+ * touching the other.
+ */
+model SalesListDynamicMember {
+  id        String    @id @default(cuid())
+  listId    String
+  list      SalesList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  companyId String
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  cachedAt  DateTime  @default(now())
+
+  @@unique([listId, companyId])
+  @@index([companyId])
+}
+
+/**
+ * Per-user sharing grant — populated only when SalesList.visibility is
+ * SHARED_USERS (see that enum's doc comment for why SHARED_TEAM needs no
+ * equivalent table).
+ */
+model SalesListShare {
+  id     String    @id @default(cuid())
+  listId String
+  list   SalesList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  userId String
+  user   User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, userId])
+  @@index([userId])
+}
+
+// ===== Campaign and Calling Lists (Phase 1: Calling Lists) =====
+
+// Optional classification for session-progress reporting (Interested/Demo
+// Requested/Not Interested/Unreachable counts) — mirrors
+// PipelineStage.outcomeType's exact "admin-tagged, never hardcoded name
+// matching" precedent, since CallOutcome.name is admin-editable free text
+// and code must never guess meaning from it.
+enum CallOutcomeResultCategory {
+  UNREACHABLE
+  INTERESTED
+  DEMO_REQUESTED
+  NOT_INTERESTED
+}
+
+/**
+ * Table-driven, admin-editable call outcomes and their default actions —
+ * mirrors RejectionReason's id/name/active/sortOrder shape, extended with
+ * explicit typed configuration columns (not a Json blob — every field here
+ * is a fixed, known shape, matching AiSettings/OrganizationSettings'
+ * precedent rather than DataQualityRule's per-type Json config, which
+ * exists specifically because ITS shape varies by ruleType). Never
+ * hard-deleted — deactivate (active: false) instead, same as
+ * RejectionReason/PipelineStage/Competitor, so a CallRecord referencing an
+ * outcome an admin later retires stays fully explainable.
+ */
+model CallOutcome {
+  id        String  @id @default(cuid())
+  name      String  @unique
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
+
+  requiresNotes           Boolean                    @default(false)
+  requiresNextAction      Boolean                    @default(false)
+  defaultNextActionDays   Int?
+  defaultNextActionTitle  String?
+  defaultPipelineStageId  String?
+  defaultPipelineStage    PipelineStage?             @relation(fields: [defaultPipelineStageId], references: [id], onDelete: SetNull)
+  opensEmailComposer      Boolean                    @default(false)
+  requiresRejectionReason Boolean                    @default(false)
+  // When true, this entry is treated as done for the rest of the current
+  // session the moment this outcome is recorded — never offered again by
+  // "next"/"return to a previous company" navigation (true of every
+  // completed entry, regardless of this flag — see nextEntryToOffer in
+  // src/lib/calling/progress.ts) AND locked out of the one narrower
+  // capability this flag actually gates: reopening a completed entry to
+  // fix its notes. See getEditableCompletedEntry/updateCallRecordNotes
+  // (src/lib/calling/queries.ts / src/app/(dashboard)/calling-sessions/
+  // actions.ts) for the exact enforcement.
+  skipRestOfSession       Boolean                    @default(false)
+  // When true, recording this outcome sets Company.doNotContact — the
+  // spec's "Do Not Contact: apply the appropriate communication
+  // restriction." An explicit admin-tagged flag rather than matching on
+  // CallOutcome.name (free text, never trusted for meaning), same
+  // "admin-tagged, never hardcoded" precedent as resultCategory below.
+  appliesDoNotContact     Boolean                    @default(false)
+  resultCategory          CallOutcomeResultCategory?
+
+  callRecords CallRecord[]
+
+  @@index([active, sortOrder])
+}
+
+enum CallingSessionStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ENDED
+}
+
+/**
+ * One guided-calling work session, started from a CALLING-purpose
+ * SalesList. `orderBy`/`orderDir` record whatever order was actually used
+ * for this session (the admin-configured WorkspaceSettings default, or the
+ * salesperson's own override at start time) — preserved for the life of
+ * the session, per the spec's "preserve the selected order for that
+ * session." Progress (completed/remaining/skipped/etc.) is always computed
+ * live from CallingSessionEntry/CallRecord, never denormalized here, so it
+ * can never drift out of sync.
+ */
+model CallingSession {
+  id     String    @id @default(cuid())
+  listId String
+  list   SalesList @relation(fields: [listId], references: [id])
+
+  startedById String
+  startedBy   User                 @relation(fields: [startedById], references: [id])
+  status      CallingSessionStatus @default(ACTIVE)
+  orderBy     String
+  orderDir    String
+
+  // The pointer for "skip temporarily" (spec: pause/resume/skip-
+  // temporarily/return-to-a-previous-company) — distinct from
+  // CallingSessionEntry.status, which only ever moves PENDING -> COMPLETED/
+  // SKIPPED (a *permanent* outcome). Advancing this pointer moves past an
+  // entry for now without marking it done, so it's naturally revisited
+  // once every later position has been offered — see nextEntryToOffer()
+  // (src/lib/calling/queries.ts).
+  currentPosition Int @default(0)
+
+  startedAt DateTime  @default(now())
+  pausedAt  DateTime?
+  endedAt   DateTime?
+
+  entries     CallingSessionEntry[]
+  callRecords CallRecord[]
+
+  @@index([listId])
+  @@index([startedById, status])
+}
+
+enum CallingSessionEntryStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+}
+
+/**
+ * The frozen membership snapshot taken at session start — created once,
+ * from whichever companies were ELIGIBLE at that moment (the spec's
+ * "automatically skip ineligible records when starting calls"), and never
+ * re-synced against the source list afterward, even if the list is dynamic
+ * and its live matches change mid-session. `position` is the session's own
+ * fixed calling order.
+ */
+model CallingSessionEntry {
+  id        String                    @id @default(cuid())
+  sessionId String
+  session   CallingSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  companyId String
+  company   Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  position  Int
+  status    CallingSessionEntryStatus @default(PENDING)
+
+  callRecord CallRecord?
+
+  @@unique([sessionId, companyId])
+  @@index([sessionId, position])
+}
+
+/**
+ * One completed call result — `entryId` is `@unique`, the idempotency
+ * guard the spec requires ("prevent duplicate activity creation if a
+ * request is retried"): a retried save for the same entry finds the
+ * existing row and returns it rather than creating a second Activity/Task.
+ * `activityId`/`taskId` are themselves `@unique` so a CallRecord can never
+ * be double-linked to either. Company/session/outcome are all denormalized
+ * directly onto this row (not just reachable via entry) so a call's full
+ * history stays queryable even if an entry or session were ever removed.
+ */
+model CallRecord {
+  id        String              @id @default(cuid())
+  sessionId String
+  session   CallingSession      @relation(fields: [sessionId], references: [id])
+  entryId   String              @unique
+  entry     CallingSessionEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  companyId String
+  company   Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  outcomeId String
+  outcome   CallOutcome         @relation(fields: [outcomeId], references: [id])
+
+  notes        String?  @db.Text
+  recordedById String
+  recordedBy   User     @relation(fields: [recordedById], references: [id])
+  recordedAt   DateTime @default(now())
+
+  activityId String?   @unique
+  activity   Activity? @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  taskId     String?   @unique
+  task       Task?     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  appliedPipelineStageId String?
+  appliedPipelineStage   PipelineStage?   @relation("CallRecordAppliedStage", fields: [appliedPipelineStageId], references: [id], onDelete: SetNull)
+  rejectionReasonId      String?
+  rejectionReason        RejectionReason? @relation(fields: [rejectionReasonId], references: [id])
+
+  @@index([sessionId])
+  @@index([companyId])
+}
+
+// ===== Campaign and Calling Lists (Phase 2: Email Campaigns) =====
+
+/**
+ * Reusable, administrator-created campaign personalization instructions —
+ * one of the three optional guidance sources a campaign creator may combine
+ * (this-campaign instructions, this reusable template, an approved email
+ * template) per the spec. Mirrors EmailTemplate's PERSONAL/SHARED-less,
+ * simpler "one shared admin-managed list" shape (closer to RejectionReason
+ * than the full EmailTemplate model, since this has no placeholder
+ * resolution or per-user ownership).
+ */
+model CampaignInstructionTemplate {
+  id           String   @id @default(cuid())
+  name         String
+  instructions String   @db.Text
+  active       Boolean  @default(true)
+  sortOrder    Int      @default(0)
+  createdById  String
+  createdBy    User     @relation(fields: [createdById], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  campaigns Campaign[]
+
+  @@index([active, sortOrder])
+}
+
+enum CampaignStatus {
+  DRAFT
+  APPROVED
+  SCHEDULED
+  QUEUED
+  SENDING
+  COMPLETED
+  COMPLETED_WITH_WARNINGS
+  FAILED
+  CANCELLED
+}
+
+/**
+ * One (possibly multi-step) email campaign built from an EMAIL_CAMPAIGN-
+ * purpose SalesList. `senderId` is the single sender identity for the whole
+ * campaign — set at APPROVAL time (whoever clicks "approve and send" must
+ * have their own connected mailbox, since that's the account the send
+ * actually goes out from), not necessarily the creator — the spec's "any
+ * user granted send_campaigns may approve and send a campaign" implies the
+ * approver and builder can be different people. Null until approved.
+ * Independent of each recipient company's assigned CRM owner either way
+ * (see the plan's architectural decision #3: sender identity and lead
+ * ownership are kept separate, same as this app's existing
+ * LEAD_TRANSFERRED-activity-vs-assignedToId split). Approval freezes
+ * everything the spec requires by construction: once `status` passes DRAFT,
+ * CampaignRecipient/CampaignMessageSnapshot rows are never regenerated or
+ * edited, only appended-to (new attempt/status), so "later CRM changes must
+ * not silently alter an approved message" holds structurally, not just by
+ * convention.
+ */
+model Campaign {
+  id     String    @id @default(cuid())
+  name   String
+  listId String
+  list   SalesList @relation(fields: [listId], references: [id])
+
+  createdById String
+  createdBy   User    @relation("CampaignCreator", fields: [createdById], references: [id])
+  senderId    String?
+  sender      User?   @relation("CampaignSender", fields: [senderId], references: [id])
+
+  campaignInstructions   String?                      @db.Text
+  reusableInstructionsId String?
+  reusableInstructions   CampaignInstructionTemplate? @relation(fields: [reusableInstructionsId], references: [id], onDelete: SetNull)
+  emailTemplateId        String?
+  emailTemplate          EmailTemplate?               @relation(fields: [emailTemplateId], references: [id], onDelete: SetNull)
+
+  /**
+   * Admin-chosen stop stages — a recipient whose company reaches any of
+   * these pipeline stages has its remaining steps stopped, re-checked fresh
+   * before every step (never trusted from an earlier check), the same
+   * "sequence-level stop condition" precedent as
+   * FollowUpSequence.stopOnPipelineStageId, generalized to a list per the
+   * spec's "one or more stop stages." A plain scalar array (like
+   * ProviderConnection.scopes / EmailMessage.toAddresses elsewhere in this
+   * schema), not a join table — this is an unordered set-membership check
+   * with no per-row metadata of its own.
+   */
+  stopOnPipelineStageIds String[] @default([])
+
+  status           CampaignStatus @default(DRAFT)
+  scheduledFor     DateTime?
+  approvedAt       DateTime?
+  approvedById     String?
+  approvedBy       User?          @relation("CampaignApprover", fields: [approvedById], references: [id])
+  sendingStartedAt DateTime?
+  completedAt      DateTime?
+  cancelledAt      DateTime?
+  cancelledById    String?
+  cancelledBy      User?          @relation("CampaignCanceller", fields: [cancelledById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  steps      CampaignStep[]
+  recipients CampaignRecipient[]
+  events     CampaignEvent[]
+
+  @@index([listId])
+  @@index([status])
+  @@index([senderId])
+}
+
+/**
+ * One message in this campaign's sequence — mirrors SequenceStep's shape
+ * (order + waitDays + content guidance), but always "actionable": unlike
+ * SequenceStep there is no separate WAIT step type here, since every
+ * campaign step sends an email. `waitDays` is simply how many days after
+ * the *previous* step's send this step becomes due (0 for the first step
+ * means it fires the moment the campaign starts). `instructions` is this
+ * step's own AI-personalization guidance (e.g. step 1 introduces an offer,
+ * step 2 is a reminder) — falls back to Campaign.campaignInstructions when
+ * a step has nothing to say beyond the campaign's overall guidance. A
+ * single-email campaign is simply a Campaign with exactly one CampaignStep
+ * (waitDays 0) — there is no separate "simple" vs "sequence" campaign kind
+ * at the schema level.
+ */
+model CampaignStep {
+  id           String   @id @default(cuid())
+  campaignId   String
+  campaign     Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  stepOrder    Int
+  waitDays     Int      @default(0)
+  instructions String?  @db.Text
+  createdAt    DateTime @default(now())
+
+  snapshots           CampaignMessageSnapshot[]
+  stepRuns            CampaignRecipientStepRun[]
+  currentForRecipient CampaignRecipient[]
+  events              CampaignEvent[]
+
+  @@unique([campaignId, stepOrder])
+}
+
+enum CampaignRecipientStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  SKIPPED
+  STOPPED_OPT_OUT
+  STOPPED_STAGE
+  STOPPED_REPLY
+  CANCELLED
+}
+
+/**
+ * The frozen membership + per-recipient sequence progress — one row per
+ * company on the source list at campaign-creation time, INCLUDING
+ * ineligible companies (immediately SKIPPED with a reason, never silently
+ * dropped), per the spec's "generate a full campaign preview... skipped
+ * companies... reason for every skipped company." `contactId` is null only
+ * for a SKIPPED row with no eligible contact to begin with.
+ * `currentStepId`/`nextStepDueAt` mirror SequenceEnrollment.
+ * currentStepOrder/nextStepDueAt exactly — both null once status leaves
+ * ACTIVE. `@@unique([campaignId, companyId])` enforces "never send to
+ * multiple contacts at one company in the same campaign" at the schema
+ * level, not just in application logic.
+ */
+model CampaignRecipient {
+  id         String   @id @default(cuid())
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  contactId  String?
+  contact    Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  status     CampaignRecipientStatus @default(PENDING)
+  skipReason String?
+
+  currentStepId String?
+  currentStep   CampaignStep? @relation(fields: [currentStepId], references: [id], onDelete: SetNull)
+  nextStepDueAt DateTime?
+  stoppedAt     DateTime?
+  stopReason    String?
+
+  snapshots CampaignMessageSnapshot[]
+  stepRuns  CampaignRecipientStepRun[]
+  events    CampaignEvent[]
+
+  @@unique([campaignId, companyId])
+  @@index([campaignId, status])
+  @@index([status, nextStepDueAt])
+  @@index([contactId, status])
+}
+
+enum CampaignEventType {
+  SCHEDULED
+  QUEUED
+  SENT
+  FAILED
+  /// Declared for schema completeness against the full plan, matching this
+  /// codebase's existing precedent (e.g. SequenceEnrollment.STOPPED_REPLY
+  /// before inbound sync existed) — never emitted today. This app has no
+  /// open/click tracking pixel or link-wrapping infrastructure anywhere.
+  OPENED
+  /// See OPENED — same "schema-complete, unreachable" status.
+  CLICKED
+  REPLIED
+  /// See OPENED — bounce detection (Module Six Phase E) is wired to
+  /// inbound-sync's own EmailMessage rows, not to CampaignRecipientStepRun;
+  /// connecting the two is a real follow-up, not done here.
+  BOUNCED
+  UNSUBSCRIBED
+  SEQUENCE_STOPPED
+}
+
+/**
+ * Append-only per-campaign timeline — the plan's Phase 3 "CampaignEvent"
+ * model. Distinct from the current-state columns every other campaign model
+ * already carries (Campaign.scheduledFor/sendingStartedAt/completedAt,
+ * CampaignRecipient.stoppedAt/stopReason, CampaignRecipientStepRun.runAt) —
+ * those answer "what is the current state," this answers "show me
+ * everything that happened, in order," across the whole campaign in one
+ * query rather than joining three tables. Never updated once written.
+ * `recipientId`/`stepId` are null for a campaign-level event (SCHEDULED,
+ * QUEUED); both set for a per-step event (SENT/FAILED); `recipientId` alone
+ * set for a per-recipient stop event (REPLIED/UNSUBSCRIBED/SEQUENCE_STOPPED).
+ */
+model CampaignEvent {
+  id          String             @id @default(cuid())
+  campaignId  String
+  campaign    Campaign           @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  recipientId String?
+  recipient   CampaignRecipient? @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  stepId      String?
+  step        CampaignStep?      @relation(fields: [stepId], references: [id], onDelete: SetNull)
+
+  type       CampaignEventType
+  metadata   Json?
+  occurredAt DateTime          @default(now())
+
+  @@index([campaignId, occurredAt])
+  @@index([recipientId, occurredAt])
+}
+
+/**
+ * The frozen, AI-generated subject/body for one (recipient, step) pair —
+ * every step's message is generated for every recipient at preview time
+ * (before approval) and never regenerated afterward, even if the
+ * underlying company/contact data changes or the step doesn't run for
+ * days/weeks. Still contains the literal, unresolved `{{unsubscribeLink}}`
+ * token (and any other placeholder the send path itself resolves) — see
+ * src/lib/campaigns/personalize.ts and src/lib/comms/send-email.ts's
+ * existing placeholder-resolution step, reused unchanged at send time.
+ */
+model CampaignMessageSnapshot {
+  id          String            @id @default(cuid())
+  recipientId String
+  recipient   CampaignRecipient @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  stepId      String
+  step        CampaignStep      @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  subject     String
+  body        String            @db.Text
+  generatedAt DateTime          @default(now())
+
+  @@unique([recipientId, stepId])
+}
+
+enum CampaignRecipientStepRunStatus {
+  SENT
+  FAILED
+}
+
+/**
+ * One row per attempted step per recipient — mirrors SequenceStepRun
+ * exactly, playing the same dual role: the duplicate-send-prevention
+ * mechanism (`@@unique([recipientId, stepId])`, so an overlapping tick or
+ * worker retry can never re-send an already-attempted step) AND the
+ * per-step audit/reporting record (status, error, which EmailMessage it
+ * produced). A step a recipient never reached because a stop condition
+ * ended their sequence first has no row here at all — the stop itself is
+ * recorded on CampaignRecipient (status/stopReason/stoppedAt), the same
+ * split SequenceEnrollment/SequenceStepRun already uses.
+ */
+model CampaignRecipientStepRun {
+  id          String                         @id @default(cuid())
+  recipientId String
+  recipient   CampaignRecipient              @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  stepId      String
+  step        CampaignStep                   @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  status      CampaignRecipientStepRunStatus
+  runAt       DateTime                       @default(now())
+
+  emailMessageId String?       @unique
+  emailMessage   EmailMessage? @relation(fields: [emailMessageId], references: [id], onDelete: SetNull)
+  errorMessage   String?
+
+  @@unique([recipientId, stepId])
 }

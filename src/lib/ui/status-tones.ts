@@ -188,6 +188,18 @@ export const ENRICHMENT_DECISION_TONE: Record<string, BadgeTone> = {
   REJECTED: "neutral",
 };
 
+export const CAMPAIGN_STATUS_TONE: Record<string, BadgeTone> = {
+  DRAFT: "neutral",
+  APPROVED: "secondary",
+  SCHEDULED: "focus",
+  QUEUED: "focus",
+  SENDING: "focus",
+  COMPLETED: "success",
+  COMPLETED_WITH_WARNINGS: "warning",
+  FAILED: "danger",
+  CANCELLED: "neutral",
+};
+
 /** Fallback for any enum without a dedicated label map above: title-cases
  * "SOME_VALUE" -> "Some Value", replacing the app's previous convention of
  * leaving values SHOUTING ("CURRENT TRIVIA") after a bare underscore swap. */

@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { companyScope } from "@/lib/companies/scope";
 import { buildCsv, buildXlsx, type ExportColumn } from "@/lib/export/serialize";
 import { checkRateLimit } from "@/lib/rate-limit/postgres-bucket";
+import { salesListVisibilityWhere } from "@/lib/sales-lists/scope";
 import type { Prisma } from "@/generated/prisma/client";
 
 const COLUMNS: ExportColumn[] = [
@@ -48,17 +49,35 @@ export async function GET(request: Request) {
   // specific selection) overrides the default ACTIVE-only export.
   const status = searchParams.get("status") === "ARCHIVED" ? "ARCHIVED" : "ACTIVE";
   const filters: Prisma.CompanyWhereInput[] = [scope, { status }];
-  const leadTypeId = searchParams.get("leadTypeId");
-  const pipelineStageId = searchParams.get("pipelineStageId");
-  const competitorId = searchParams.get("competitorId");
-  // Bulk "Export selected" passes an explicit id list — still ANDed with
-  // scope above, so a selection can never export a record the requester
-  // isn't otherwise permitted to see.
-  const ids = searchParams.get("ids");
-  if (leadTypeId) filters.push({ leadTypeId });
-  if (pipelineStageId) filters.push({ pipelineStageId });
-  if (competitorId) filters.push({ competitorId });
-  if (ids) filters.push({ id: { in: ids.split(",").filter(Boolean) } });
+
+  // Sales List export ("General Sales List" -> Export, subject to
+  // permissions) — resolves list membership (fixed rows or the dynamic
+  // list's last-refreshed cache, never a live filter re-query at export
+  // time, matching what the List page itself displays) rather than passing
+  // a potentially huge id list through the URL. Still re-scoped by
+  // companyScope above, same as every other export path.
+  const listId = searchParams.get("listId");
+  if (listId) {
+    const listScope = salesListVisibilityWhere(user);
+    if (!listScope) return NextResponse.json({ error: "List not found" }, { status: 403 });
+    const list = await prisma.salesList.findFirst({ where: { id: listId, ...listScope }, select: { id: true, type: true } });
+    if (!list) return NextResponse.json({ error: "List not found" }, { status: 404 });
+    filters.push(
+      list.type === "FIXED" ? { salesListMembers: { some: { listId: list.id } } } : { salesListDynamicMembers: { some: { listId: list.id } } },
+    );
+  } else {
+    const leadTypeId = searchParams.get("leadTypeId");
+    const pipelineStageId = searchParams.get("pipelineStageId");
+    const competitorId = searchParams.get("competitorId");
+    // Bulk "Export selected" passes an explicit id list — still ANDed with
+    // scope above, so a selection can never export a record the requester
+    // isn't otherwise permitted to see.
+    const ids = searchParams.get("ids");
+    if (leadTypeId) filters.push({ leadTypeId });
+    if (pipelineStageId) filters.push({ pipelineStageId });
+    if (competitorId) filters.push({ competitorId });
+    if (ids) filters.push({ id: { in: ids.split(",").filter(Boolean) } });
+  }
 
   const companies = await prisma.company.findMany({
     where: { AND: filters },

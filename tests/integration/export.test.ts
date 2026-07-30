@@ -86,4 +86,26 @@ describe("GET /api/export/companies", () => {
     expect(body).toContain("Mine");
     expect(body).not.toContain("Not Mine");
   });
+
+  it("exports only a sales list's own members when listId is given, still scoped to the user's own access", async () => {
+    const { createSalesList } = await import("../../src/app/(dashboard)/sales-lists/actions");
+
+    const role = await createRoleWithPermissions("ListExporter", ["view_all_leads", "export_leads", "view_sales_lists", "create_sales_lists"]);
+    const user = await createTestUser({ roleId: role.id });
+    await loginAs(user.id);
+
+    const leadType = await createLeadTypeFixture("Pub");
+    const stage = await createPipelineStageFixture("New", { isDefault: true });
+    const inList = await createCompanyFixture({ name: "On The List", leadTypeId: leadType.id, pipelineStageId: stage.id, assignedToId: null, createdById: user.id });
+    await createCompanyFixture({ name: "Not On The List", leadTypeId: leadType.id, pipelineStageId: stage.id, assignedToId: null, createdById: user.id });
+
+    const created = await createSalesList({ name: "Export Me", purpose: "GENERAL_SALES", type: "FIXED", visibility: "PRIVATE", companyIds: [inList.id] });
+    if (!("success" in created)) throw new Error("list creation failed");
+
+    const response = await exportCompanies(new Request(`http://localhost/api/export/companies?format=csv&listId=${created.id}`));
+    const body = await response.text();
+
+    expect(body).toContain("On The List");
+    expect(body).not.toContain("Not On The List");
+  });
 });

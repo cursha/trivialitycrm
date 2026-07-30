@@ -34,6 +34,9 @@ export default async function ReportsLayout({ children }: { children: React.Reac
     { href: "/reports/lead-types", label: "Lead Types" },
     { href: "/reports/trends", label: "Trends" },
   );
+  if (hasPermission(user, "view_campaign_reports")) {
+    tabs.push({ href: "/reports/campaigns", label: "Campaigns" });
+  }
   if (hasPermission(user, "manage_scheduled_reports")) {
     tabs.push({ href: "/reports/scheduled", label: "Scheduled Reports" });
   }

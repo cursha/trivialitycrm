@@ -13,6 +13,7 @@ import {
   QUEUE_PROCESS_INBOUND_NOTIFICATION,
   QUEUE_DATA_QUALITY_SCAN,
   QUEUE_SEND_SYSTEM_EMAIL,
+  QUEUE_RUN_CAMPAIGN_STEP,
 } from "./boss-client";
 
 export type RunSearchJobData = { searchId: string };
@@ -22,6 +23,7 @@ export type RunSequenceStepJobData = { enrollmentId: string; stepId: string };
 export type ProcessInboundNotificationJobData = { connectionId: string; providerMessageId: string };
 export type DataQualityScanJobData = { scanId: string };
 export type SendSystemEmailJobData = { transactionalEmailMessageId: string };
+export type RunCampaignStepJobData = { recipientId: string; stepId: string };
 
 /** Enqueues a durable run-search job and returns pg-boss's job id (stored on
  * LeadSearch.providerJobId for cancellation lookup / log correlation). The
@@ -132,5 +134,20 @@ export async function enqueueSendSystemEmailJob(transactionalEmailMessageId: str
     QUEUE_SEND_SYSTEM_EMAIL,
     { transactionalEmailMessageId } satisfies SendSystemEmailJobData,
     { singletonKey: transactionalEmailMessageId },
+  );
+}
+
+/** Enqueues one campaign recipient's due step. singletonKey =
+ * `${recipientId}:${stepId}` — the same pair CampaignRecipientStepRun's own
+ * unique constraint dedups at the DB level, so a duplicate enqueue
+ * (campaign-step-tick offering an already-queued step, or sendCampaignNow
+ * racing a tick) is a no-op. Called by sendCampaignNow/retryFailedRecipients
+ * (immediate) and campaign-step-tick (once a step's nextStepDueAt is due). */
+export async function enqueueRunCampaignStepJob(recipientId: string, stepId: string): Promise<string | null> {
+  const boss = await startBoss({ supervise: false });
+  return boss.send(
+    QUEUE_RUN_CAMPAIGN_STEP,
+    { recipientId, stepId } satisfies RunCampaignStepJobData,
+    { singletonKey: `${recipientId}:${stepId}` },
   );
 }

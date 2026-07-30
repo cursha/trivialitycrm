@@ -12,7 +12,8 @@ export type NavIconKey =
   | "team"
   | "reports"
   | "dataQuality"
-  | "administration";
+  | "administration"
+  | "salesLists";
 
 export type NavItem = {
   label: string;
@@ -33,6 +34,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: "search",
     requiresAnyPermission: ["run_research", "review_research_results", "manage_prompts", "import_leads"],
   },
+  { label: "Sales Lists", href: "/sales-lists", icon: "salesLists", requiresAnyPermission: ["view_sales_lists"] },
   { label: "Follow-Ups", href: "/follow-ups", icon: "calendar", requiresAnyPermission: LEAD_VIEW_PERMISSIONS },
   { label: "Competitors", href: "/competitors", icon: "trophy" },
   { label: "Manager Workspace", href: "/manager", icon: "team", requiresAnyPermission: ["view_manager_workspace"] },

@@ -13,6 +13,7 @@ import {
   QUEUE_PROCESS_INBOUND_NOTIFICATION,
   QUEUE_DATA_QUALITY_SCAN,
   QUEUE_SEND_SYSTEM_EMAIL,
+  QUEUE_RUN_CAMPAIGN_STEP,
 } from "../src/lib/jobs/boss-client";
 import { handleRunSearchJob } from "./handlers/run-search";
 import { handleSendSystemEmailJob } from "./handlers/send-system-email";
@@ -28,6 +29,9 @@ import { handleProcessInboundNotificationJob } from "./handlers/process-inbound-
 import { handleDataQualityScanJob } from "./handlers/data-quality-scan";
 import { runWorkerHeartbeatTick } from "./handlers/worker-heartbeat-tick";
 import { runWorkerHeartbeatAlertTick } from "./handlers/worker-heartbeat-alert-tick";
+import { runSendCampaignTick } from "./handlers/send-campaign-tick";
+import { runCampaignStepTick } from "./handlers/campaign-step-tick";
+import { handleRunCampaignStepJob } from "./handlers/run-campaign-step";
 import { shutdownBoss } from "./shutdown";
 
 const execAsync = promisify(exec);
@@ -48,6 +52,14 @@ const QUEUE_WORKER_HEARTBEAT_TICK = "worker-heartbeat-tick";
 // — this one does real I/O (a query plus, when stale, an email send), which
 // the heartbeat tick deliberately keeps to a single trivial upsert.
 const QUEUE_WORKER_HEARTBEAT_ALERT_TICK = "worker-heartbeat-alert-tick";
+// Same 5-minute cadence as QUEUE_SEND_SCHEDULED_EMAIL_TICK, for the same
+// "the user picked a specific send time" timeliness reason. Only starts a
+// SCHEDULED campaign at its scheduled time — campaign-step-tick (below) is
+// what actually progresses recipients through their steps day to day.
+const QUEUE_SEND_CAMPAIGN_TICK = "send-campaign-tick";
+// Same cadence as sequence-tick, for the same role: finds every recipient
+// (across every campaign) whose next step is due and enqueues it.
+const QUEUE_CAMPAIGN_STEP_TICK = "campaign-step-tick";
 const MIGRATION_GATE_POLL_MS = 5_000;
 const MIGRATION_GATE_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -148,6 +160,12 @@ async function main(): Promise<void> {
   await boss.createQueue(QUEUE_WORKER_HEARTBEAT_ALERT_TICK, { retryLimit: 1 });
   await boss.schedule(QUEUE_WORKER_HEARTBEAT_ALERT_TICK, "*/5 * * * *");
 
+  await boss.createQueue(QUEUE_SEND_CAMPAIGN_TICK, { retryLimit: 1 });
+  await boss.schedule(QUEUE_SEND_CAMPAIGN_TICK, "*/5 * * * *");
+
+  await boss.createQueue(QUEUE_CAMPAIGN_STEP_TICK, { retryLimit: 1 });
+  await boss.schedule(QUEUE_CAMPAIGN_STEP_TICK, "*/5 * * * *");
+
   await boss.work(QUEUE_RUN_SEARCH, { localConcurrency: 1 }, handleRunSearchJob);
   await boss.work(QUEUE_GENERATE_REPORT, { localConcurrency: 1 }, handleGenerateReportJob);
   await boss.work(QUEUE_SEND_SCHEDULED_EMAIL, { localConcurrency: 1 }, handleSendScheduledEmailJob);
@@ -157,6 +175,7 @@ async function main(): Promise<void> {
   // run_duplicate_scan enqueues one via the /data-quality/scans action.
   await boss.work(QUEUE_DATA_QUALITY_SCAN, { localConcurrency: 1 }, handleDataQualityScanJob);
   await boss.work(QUEUE_SEND_SYSTEM_EMAIL, { localConcurrency: 1 }, handleSendSystemEmailJob);
+  await boss.work(QUEUE_RUN_CAMPAIGN_STEP, { localConcurrency: 1 }, handleRunCampaignStepJob);
   await boss.work(QUEUE_CLEANUP_SESSIONS, async () => {
     await sweepExpiredSessions();
   });
@@ -183,6 +202,12 @@ async function main(): Promise<void> {
   });
   await boss.work(QUEUE_WORKER_HEARTBEAT_ALERT_TICK, async () => {
     await runWorkerHeartbeatAlertTick();
+  });
+  await boss.work(QUEUE_SEND_CAMPAIGN_TICK, async () => {
+    await runSendCampaignTick();
+  });
+  await boss.work(QUEUE_CAMPAIGN_STEP_TICK, async () => {
+    await runCampaignStepTick();
   });
 
   boss.on("error", (error) => logger.error({ err: error }, "pg-boss error"));

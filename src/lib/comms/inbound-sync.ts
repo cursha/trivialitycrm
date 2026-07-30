@@ -9,6 +9,7 @@ import { getUsableAccessToken } from "@/lib/comms/connections";
 import { getEmailProvider } from "@/lib/comms/providers/factory";
 import { providerSlugFromKind } from "@/lib/comms/provider-kind";
 import { stopEnrollmentsForReply } from "@/lib/comms/sequences";
+import { stopCampaignRecipientsForReply } from "@/lib/campaigns/run-step";
 import type { ParsedInboundNotification } from "@/lib/comms/providers/types";
 import type { ProviderKind } from "@/generated/prisma/enums";
 import crypto from "node:crypto";
@@ -231,7 +232,8 @@ export async function matchContactForAddress(address: string): Promise<ContactMa
  * itself, only the original sent message's status changes), or (b) writes
  * a new inbound EmailMessage row (matched or unmatched — see
  * matchContactForAddress) and, only for a matched contact, stops any
- * active/paused sequence enrollment via stopEnrollmentsForReply.
+ * active/paused sequence enrollment via stopEnrollmentsForReply and any
+ * active campaign recipient via stopCampaignRecipientsForReply.
  * Idempotent at the message-content level too: EmailMessage's
  * (providerConnectionId, providerMessageId) unique constraint means a
  * duplicate call for the same message (the job queue's own singletonKey
@@ -282,11 +284,19 @@ export async function processInboundNotification(params: { connectionId: string;
   }
 
   if (match) {
-    const stopped = await stopEnrollmentsForReply(match.contactId);
-    if (stopped.length === 0) {
-      // No active sequence to stop, but the salesperson should still hear
-      // about the reply — notify whoever owns the lead, falling back to
-      // the mailbox owner if the company is unassigned.
+    const [stoppedSequences] = await Promise.all([
+      stopEnrollmentsForReply(match.contactId),
+      stopCampaignRecipientsForReply(match.contactId),
+    ]);
+    if (stoppedSequences.length === 0) {
+      // stopEnrollmentsForReply notifies per stopped sequence enrollment
+      // itself, so the fallback below only needs to cover the cases it
+      // doesn't: no active sequence at all, or only an active campaign
+      // recipient — stopCampaignRecipientsForReply doesn't send its own
+      // notification, so without this the salesperson would never hear
+      // about a reply that only stopped a campaign, not a sequence.
+      // Notify whoever owns the lead, falling back to the mailbox owner
+      // if the company is unassigned.
       const company = await prisma.company.findUnique({ where: { id: match.companyId }, select: { assignedToId: true } });
       await prisma.notification.create({
         data: {

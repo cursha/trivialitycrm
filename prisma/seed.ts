@@ -37,6 +37,7 @@ const COMMUNICATIONS_CATEGORY = "Communications";
 const DATA_QUALITY_CATEGORY = "Data Quality";
 const ADMINISTRATION_CATEGORY = "Administration";
 const ROUTE_PLANNING_CATEGORY = "Route Planning";
+const SALES_LISTS_CATEGORY = "Sales Lists & Campaigns";
 
 const permissions: { key: string; label: string; category: string; description: string }[] = [
   { key: "view_all_leads", label: "View all leads", category: LEADS_CATEGORY, description: "View every company and contact in the CRM, regardless of assignment or team." },
@@ -117,6 +118,17 @@ const permissions: { key: string; label: string; category: string; description: 
   { key: "manage_route_plan", label: "Manage Route Plan", category: ROUTE_PLANNING_CATEGORY, description: "Add, remove, and clear companies in your own Route Plan." },
   { key: "export_route_plan", label: "Export Route Plan", category: ROUTE_PLANNING_CATEGORY, description: "Download your Route Plan as a CSV file." },
   { key: "configure_route_plan_lead_types", label: "Configure Route Plan lead types", category: ROUTE_PLANNING_CATEGORY, description: "Choose which lead types are eligible for Route Planning." },
+  // Campaign and Calling Lists.
+  { key: "view_sales_lists", label: "View sales lists", category: SALES_LISTS_CATEGORY, description: "View sales lists you own or that have been shared with you." },
+  { key: "create_sales_lists", label: "Create sales lists", category: SALES_LISTS_CATEGORY, description: "Build and save a new fixed or dynamic sales list." },
+  { key: "manage_own_sales_lists", label: "Manage own sales lists", category: SALES_LISTS_CATEGORY, description: "Edit, share, archive, or delete a sales list you created." },
+  { key: "manage_all_sales_lists", label: "Manage all sales lists", category: SALES_LISTS_CATEGORY, description: "Edit, share, archive, or delete any sales list, regardless of who created it." },
+  { key: "use_calling_lists", label: "Use calling lists", category: SALES_LISTS_CATEGORY, description: "Start and work through a guided calling session from a calling list." },
+  { key: "manage_call_outcomes", label: "Manage call outcomes", category: SALES_LISTS_CATEGORY, description: "Add, edit, reorder, and activate or deactivate call outcomes and their default actions." },
+  { key: "create_campaigns", label: "Create email campaigns", category: SALES_LISTS_CATEGORY, description: "Build a single-email or multi-step email campaign from a sales list." },
+  { key: "send_campaigns", label: "Approve and send email campaigns", category: SALES_LISTS_CATEGORY, description: "Approve a campaign's preview and send it now or on a schedule." },
+  { key: "view_campaign_reports", label: "View campaign reports", category: SALES_LISTS_CATEGORY, description: "View campaign and calling-session reporting and dashboards." },
+  { key: "manage_campaign_instructions", label: "Manage reusable campaign instructions", category: SALES_LISTS_CATEGORY, description: "Create and edit reusable, house-wide AI personalization instructions campaign creators can apply." },
 ];
 
 // Initial role -> permission grants. All grants are stored as editable
@@ -147,6 +159,13 @@ const roleGrants: Record<(typeof roles)[number], string[]> = {
     "view_route_plan",
     "manage_route_plan",
     "export_route_plan",
+    "view_sales_lists",
+    "create_sales_lists",
+    "manage_own_sales_lists",
+    "use_calling_lists",
+    "create_campaigns",
+    "send_campaigns",
+    "view_campaign_reports",
   ],
   Salesperson: [
     "view_assigned_leads",
@@ -162,6 +181,10 @@ const roleGrants: Record<(typeof roles)[number], string[]> = {
     "manage_personal_templates",
     "enroll_in_sequences",
     "manage_calendar_connections",
+    "view_sales_lists",
+    "create_sales_lists",
+    "manage_own_sales_lists",
+    "use_calling_lists",
   ],
 };
 
@@ -189,6 +212,75 @@ async function seedRejectionReasons() {
     });
   }
   console.log(`Seeded ${rejectionReasons.length} rejection reasons.`);
+}
+
+// Campaign and Calling Lists: seeded starting call outcomes. defaultPipelineStageId
+// is resolved from PipelineStage.outcomeType ("LOST"), never a hardcoded stage
+// name, matching every other Won/Lost-aware lookup in this app.
+const callOutcomes: {
+  name: string;
+  requiresNotes?: boolean;
+  requiresNextAction?: boolean;
+  defaultNextActionDays?: number;
+  defaultNextActionTitle?: string;
+  opensEmailComposer?: boolean;
+  requiresRejectionReason?: boolean;
+  skipRestOfSession?: boolean;
+  appliesDoNotContact?: boolean;
+  resultCategory?: "UNREACHABLE" | "INTERESTED" | "DEMO_REQUESTED" | "NOT_INTERESTED";
+  useLostStage?: boolean;
+}[] = [
+  { name: "No Answer", requiresNextAction: true, defaultNextActionDays: 2, defaultNextActionTitle: "Follow up call", resultCategory: "UNREACHABLE" },
+  { name: "Left Message", requiresNextAction: true, defaultNextActionDays: 3, defaultNextActionTitle: "Follow up on voicemail", resultCategory: "UNREACHABLE" },
+  { name: "Spoke to Contact", requiresNotes: true },
+  { name: "Wrong Contact", requiresNotes: true, requiresNextAction: true, defaultNextActionDays: 3, defaultNextActionTitle: "Identify correct contact", resultCategory: "UNREACHABLE" },
+  { name: "Send Information", opensEmailComposer: true, requiresNextAction: true, defaultNextActionDays: 3, defaultNextActionTitle: "Follow up after sending information" },
+  { name: "Interested", requiresNotes: true, requiresNextAction: true, defaultNextActionDays: 2, defaultNextActionTitle: "Follow up with interested lead", resultCategory: "INTERESTED" },
+  { name: "Demo Requested", requiresNotes: true, requiresNextAction: true, defaultNextActionDays: 1, defaultNextActionTitle: "Schedule demo", resultCategory: "DEMO_REQUESTED" },
+  { name: "Call Back Later", requiresNextAction: true, defaultNextActionDays: 7, defaultNextActionTitle: "Call back" },
+  { name: "Not Interested", requiresNotes: true, requiresRejectionReason: true, skipRestOfSession: true, resultCategory: "NOT_INTERESTED", useLostStage: true },
+  { name: "Do Not Contact", requiresNotes: true, skipRestOfSession: true, appliesDoNotContact: true, resultCategory: "NOT_INTERESTED" },
+  { name: "Invalid Number", skipRestOfSession: true, resultCategory: "UNREACHABLE" },
+];
+
+async function seedCallOutcomes() {
+  const lostStage = await prisma.pipelineStage.findFirst({ where: { outcomeType: "LOST" } });
+
+  for (const [index, outcome] of callOutcomes.entries()) {
+    await prisma.callOutcome.upsert({
+      where: { name: outcome.name },
+      // Only descriptive/behavioral configuration is synced on re-run — active/
+      // sortOrder are operational settings an Administrator may have already
+      // changed, matching pipelineStage's own outcomeType-sync precedent.
+      update: {
+        requiresNotes: outcome.requiresNotes ?? false,
+        requiresNextAction: outcome.requiresNextAction ?? false,
+        defaultNextActionDays: outcome.defaultNextActionDays ?? null,
+        defaultNextActionTitle: outcome.defaultNextActionTitle ?? null,
+        defaultPipelineStageId: outcome.useLostStage ? (lostStage?.id ?? null) : null,
+        opensEmailComposer: outcome.opensEmailComposer ?? false,
+        requiresRejectionReason: outcome.requiresRejectionReason ?? false,
+        skipRestOfSession: outcome.skipRestOfSession ?? false,
+        appliesDoNotContact: outcome.appliesDoNotContact ?? false,
+        resultCategory: outcome.resultCategory ?? null,
+      },
+      create: {
+        name: outcome.name,
+        sortOrder: index,
+        requiresNotes: outcome.requiresNotes ?? false,
+        requiresNextAction: outcome.requiresNextAction ?? false,
+        defaultNextActionDays: outcome.defaultNextActionDays ?? null,
+        defaultNextActionTitle: outcome.defaultNextActionTitle ?? null,
+        defaultPipelineStageId: outcome.useLostStage ? (lostStage?.id ?? null) : null,
+        opensEmailComposer: outcome.opensEmailComposer ?? false,
+        requiresRejectionReason: outcome.requiresRejectionReason ?? false,
+        skipRestOfSession: outcome.skipRestOfSession ?? false,
+        appliesDoNotContact: outcome.appliesDoNotContact ?? false,
+        resultCategory: outcome.resultCategory ?? null,
+      },
+    });
+  }
+  console.log(`Seeded ${callOutcomes.length} call outcomes.`);
 }
 
 async function seedPermissions() {
@@ -402,6 +494,7 @@ async function seedBootstrapAdmin() {
 async function main() {
   await seedPipelineStages();
   await seedRejectionReasons();
+  await seedCallOutcomes();
   await seedPermissions();
   await seedRolesAndGrants();
   await seedBootstrapAdmin();

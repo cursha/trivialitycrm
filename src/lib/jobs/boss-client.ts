@@ -11,6 +11,7 @@ export const QUEUE_RUN_SEQUENCE_STEP = "run-sequence-step";
 export const QUEUE_PROCESS_INBOUND_NOTIFICATION = "process-inbound-notification";
 export const QUEUE_DATA_QUALITY_SCAN = "data-quality-scan";
 export const QUEUE_SEND_SYSTEM_EMAIL = "send-system-email";
+export const QUEUE_RUN_CAMPAIGN_STEP = "run-campaign-step";
 
 /**
  * Retry/expiry defaults for the run-search queue. expireInSeconds is
@@ -143,6 +144,24 @@ const SEND_SYSTEM_EMAIL_QUEUE_OPTIONS = {
   retentionSeconds: 30 * 24 * 60 * 60,
 };
 
+/**
+ * Keyed per (recipientId, stepId) — the same pair
+ * CampaignRecipientStepRun's `@@unique([recipientId, stepId])` constraint
+ * dedups at the database level, so a step can be offered by multiple ticks
+ * without ever running twice even under a race between two overlapping job
+ * attempts. Exactly RUN_SEQUENCE_STEP_QUEUE_OPTIONS's shape — one job per
+ * recipient per step, not one job per whole campaign, since a campaign's
+ * recipients now progress independently over days/weeks.
+ */
+const RUN_CAMPAIGN_STEP_QUEUE_OPTIONS = {
+  policy: "singleton" as const,
+  retryLimit: 2,
+  retryBackoff: true,
+  retryDelayMax: 60,
+  expireInSeconds: 120,
+  retentionSeconds: 30 * 24 * 60 * 60,
+};
+
 let instance: PgBoss | null = null;
 
 /**
@@ -180,6 +199,7 @@ export async function startBoss(options: { supervise?: boolean } = {}): Promise<
   await boss.createQueue(QUEUE_PROCESS_INBOUND_NOTIFICATION, PROCESS_INBOUND_NOTIFICATION_QUEUE_OPTIONS);
   await boss.createQueue(QUEUE_DATA_QUALITY_SCAN, DATA_QUALITY_SCAN_QUEUE_OPTIONS);
   await boss.createQueue(QUEUE_SEND_SYSTEM_EMAIL, SEND_SYSTEM_EMAIL_QUEUE_OPTIONS);
+  await boss.createQueue(QUEUE_RUN_CAMPAIGN_STEP, RUN_CAMPAIGN_STEP_QUEUE_OPTIONS);
   return boss;
 }
 

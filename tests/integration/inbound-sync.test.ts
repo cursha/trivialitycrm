@@ -118,6 +118,26 @@ describe("processInboundNotification", () => {
     expect(notification.userId).toBe(user.id);
   });
 
+  it("matches a known contact and stops an ACTIVE campaign recipient with STOPPED_REPLY", async () => {
+    const { user, company } = await baseFixtures();
+    const connection = await connectMailbox(user.id);
+    const contact = await testPrisma.contact.create({ data: { companyId: company.id, firstName: "Jamie", lastName: "Lead", email: "jamie@example.com" } });
+
+    const list = await testPrisma.salesList.create({ data: { name: "Campaign List", purpose: "EMAIL_CAMPAIGN", type: "FIXED", ownerId: user.id } });
+    const campaign = await testPrisma.campaign.create({ data: { name: "Nurture Campaign", listId: list.id, createdById: user.id, senderId: user.id } });
+    const step = await testPrisma.campaignStep.create({ data: { campaignId: campaign.id, stepOrder: 1, waitDays: 0 } });
+    const recipient = await testPrisma.campaignRecipient.create({
+      data: { campaignId: campaign.id, companyId: company.id, contactId: contact.id, status: "ACTIVE", currentStepId: step.id },
+    });
+
+    const providerMessageId = mockProviderMessageId({ fromAddress: "jamie@example.com", subject: "Re: Offer", bodyHtml: "<p>Interested</p>" });
+    await processInboundNotification({ connectionId: connection.id, providerMessageId });
+
+    const stopped = await testPrisma.campaignRecipient.findUniqueOrThrow({ where: { id: recipient.id } });
+    expect(stopped.status).toBe("STOPPED_REPLY");
+    expect(stopped.nextStepDueAt).toBeNull();
+  });
+
   it("sends a general NEW_REPLY notification to the assigned salesperson when a matched contact has no active enrollment to stop", async () => {
     const { user, company } = await baseFixtures();
     const connection = await connectMailbox(user.id);

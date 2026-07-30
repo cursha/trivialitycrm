@@ -15,6 +15,8 @@ import {
   ListChecks,
   Tag,
   CalendarClock,
+  PhoneCall,
+  Megaphone,
 } from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
@@ -48,6 +50,20 @@ export default async function SettingsPage() {
       description: "Reasons available when rejecting an AI research result.",
       icon: XCircle,
       visible: hasPermission(user, "manage_settings"),
+    },
+    {
+      href: "/settings/call-outcomes",
+      label: "Call Outcomes",
+      description: "Outcomes available in a guided calling session, and their default actions.",
+      icon: PhoneCall,
+      visible: hasPermission(user, "manage_call_outcomes"),
+    },
+    {
+      href: "/settings/campaign-instructions",
+      label: "Reusable Campaign Instructions",
+      description: "House-wide AI personalization guidance campaign creators can apply to an email campaign.",
+      icon: Megaphone,
+      visible: hasPermission(user, "manage_campaign_instructions"),
     },
     {
       href: "/leads/import/templates",

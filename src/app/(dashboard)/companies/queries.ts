@@ -10,6 +10,13 @@ export const PAGE_SIZE = 25;
 
 export type FollowUpFilter = "overdue" | "today" | "upcoming" | "none";
 
+// "Contact" activity types for the never-contacted/last-contacted filters
+// below — deliberately excludes NOTE (not necessarily a contact event) and
+// the system-generated types (PIPELINE_CHANGE/ASSIGNMENT_CHANGE/
+// LEAD_TRANSFERRED/COMPANY_MERGED), which never represent reaching out to
+// the company itself.
+const CONTACT_ACTIVITY_TYPES = ["PHONE", "EMAIL", "MEETING", "MATERIAL_SENT", "DEMO", "TRIAL"] as const;
+
 export type CompanyListParams = {
   q?: string;
   leadTypeId?: string;
@@ -23,6 +30,10 @@ export type CompanyListParams = {
   country?: string;
   region?: string;
   city?: string;
+  /** Matches any of these cities (case-insensitive) — the multi-city
+   * equivalent of `city` above. Was declared on SavedViewFiltersSchema
+   * since Module Four but never consumed by this function; wired in here. */
+  cities?: string[];
   opportunityGrade?: string;
   confidenceLevel?: string;
   primaryClassification?: string;
@@ -32,6 +43,38 @@ export type CompanyListParams = {
   outcome?: "WON" | "LOST";
   /** Defaults to ACTIVE, matching every existing caller's expectation. */
   status?: "ACTIVE" | "ARCHIVED";
+  /** Inclusive EOS-1.0 total score range. Was declared as scoreMin/scoreMax
+   * on SavedViewFiltersSchema since Module Four but never consumed by this
+   * function; wired in here (the Reports feature's own, separate
+   * reportFiltersToCompanyWhere already implemented an equivalent range —
+   * this is the same idea, applied to the shared company-list builder). */
+  scoreMin?: number;
+  scoreMax?: number;
+  /** ISO "YYYY-MM-DD" creation-date range. Same dormant-since-Module-Four
+   * story as scoreMin/scoreMax above. */
+  createdFrom?: string;
+  createdTo?: string;
+  /** True restricts to companies with zero PHONE/EMAIL/MEETING/
+   * MATERIAL_SENT/DEMO/TRIAL activities ever recorded. */
+  neverContactedOnly?: boolean;
+  /** Restricts to companies that HAVE been contacted (see above) but whose
+   * most recent contact activity was before this ISO "YYYY-MM-DD" date —
+   * deliberately excludes never-contacted companies, which are their own
+   * separate filter above rather than folded into "contacted long ago." */
+  lastContactedBefore?: string;
+  /** true = must have a phone/email on file; false = must be missing one.
+   * Undefined = no filter on this field. */
+  hasPhone?: boolean;
+  hasEmail?: boolean;
+  isExistingCustomer?: boolean;
+  doNotContactOnly?: boolean;
+  /** true = Company.lastScoredAt is null (never run through EOS analysis). */
+  neverAnalyzedOnly?: boolean;
+  /** ISO "YYYY-MM-DD" — restricts to companies last analyzed before this
+   * date. Companies never analyzed are excluded (their own filter above). */
+  lastAnalyzedBefore?: string;
+  /** true = has at least one open (OPEN/REOPENED/DEFERRED) DataQualityIssue. */
+  hasDataQualityWarnings?: boolean;
   sortBy?: string;
   sortDir?: string;
   page?: number;
@@ -115,12 +158,40 @@ export function buildCompanyWhere(user: AuthenticatedUser, params: CompanyListPa
   if (params.country) filters.push({ country: { equals: params.country, mode: "insensitive" } });
   if (params.region) filters.push({ region: { equals: params.region, mode: "insensitive" } });
   if (params.city) filters.push({ city: { equals: params.city, mode: "insensitive" } });
+  if (params.cities && params.cities.length > 0) {
+    filters.push({ OR: params.cities.map((c) => ({ city: { equals: c, mode: "insensitive" as const } })) });
+  }
   if (opportunityGrade) filters.push({ opportunityGrade });
   if (confidenceLevel) filters.push({ confidenceLevel });
   if (primaryClassification) filters.push({ primaryClassification });
   if (params.outcome) filters.push({ pipelineStage: { outcomeType: params.outcome } });
   const followUpClause = followUpWhere(followUp);
   if (followUpClause) filters.push(followUpClause);
+
+  if (params.scoreMin !== undefined) filters.push({ eosScore: { gte: params.scoreMin } });
+  if (params.scoreMax !== undefined) filters.push({ eosScore: { lte: params.scoreMax } });
+  if (params.createdFrom) filters.push({ createdAt: { gte: new Date(params.createdFrom) } });
+  if (params.createdTo) filters.push({ createdAt: { lte: new Date(params.createdTo) } });
+
+  if (params.neverContactedOnly) {
+    filters.push({ activities: { none: { type: { in: [...CONTACT_ACTIVITY_TYPES] } } } });
+  }
+  if (params.lastContactedBefore) {
+    const cutoff = new Date(params.lastContactedBefore);
+    filters.push({ activities: { some: { type: { in: [...CONTACT_ACTIVITY_TYPES] } } } });
+    filters.push({ activities: { none: { type: { in: [...CONTACT_ACTIVITY_TYPES] }, occurredAt: { gte: cutoff } } } });
+  }
+  if (params.hasPhone !== undefined) filters.push({ phone: params.hasPhone ? { not: null } : null });
+  if (params.hasEmail !== undefined) filters.push({ email: params.hasEmail ? { not: null } : null });
+  if (params.isExistingCustomer !== undefined) filters.push({ isExistingCustomer: params.isExistingCustomer });
+  if (params.doNotContactOnly) filters.push({ doNotContact: true });
+  if (params.neverAnalyzedOnly) filters.push({ lastScoredAt: null });
+  if (params.lastAnalyzedBefore) {
+    filters.push({ lastScoredAt: { not: null, lt: new Date(params.lastAnalyzedBefore) } });
+  }
+  if (params.hasDataQualityWarnings) {
+    filters.push({ dataQualityIssues: { some: { status: { in: ["OPEN", "REOPENED", "DEFERRED"] } } } });
+  }
 
   return { AND: filters };
 }
