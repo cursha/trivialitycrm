@@ -2,6 +2,7 @@ import type { EmailProvider, ProviderName } from "./types";
 import { MockEmailProvider } from "./mock";
 import { MicrosoftGraphProvider } from "./microsoft-graph";
 import { GoogleProvider } from "./google";
+import { TitanProvider } from "./titan";
 
 // Deliberately no `import "server-only"` — the worker's send-job handler
 // needs this; see token-crypto.ts for the same reasoning.
@@ -29,6 +30,8 @@ export function getEmailProvider(kind: ProviderName): EmailProvider {
       return new MicrosoftGraphProvider();
     case "google":
       return new GoogleProvider();
+    case "titan":
+      return new TitanProvider();
     default: {
       const exhaustive: never = kind;
       throw new Error(`Unknown email provider "${exhaustive}".`);

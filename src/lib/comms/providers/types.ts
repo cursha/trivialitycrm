@@ -19,6 +19,11 @@ export type ConnectedAccount = {
    * scope its rate limit to this one mailbox rather than sharing a single
    * bucket across every user connected to the same provider. */
   connectionId?: string;
+  /** ProviderConnection.providerAccountEmail. OAuth providers never need
+   * this — the access token alone identifies the account to Graph/Gmail —
+   * but a password-auth provider (Titan) needs it as the SMTP AUTH
+   * username, which isn't derivable from the password alone. */
+  accountEmail?: string;
 };
 
 export type SendEmailInput = {
@@ -80,7 +85,7 @@ export type InboundMessage = {
   receivedAt: Date;
 };
 
-export type ProviderName = "mock" | "microsoft" | "google";
+export type ProviderName = "mock" | "microsoft" | "google" | "titan";
 
 export interface EmailProvider {
   readonly name: ProviderName;

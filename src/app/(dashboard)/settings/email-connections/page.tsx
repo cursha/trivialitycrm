@@ -7,6 +7,7 @@ import { Card, SectionHeading } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PROVIDER_CONNECTION_STATUS_TONE } from "@/lib/ui/status-tones";
 import { DisconnectButton } from "./disconnect-button";
+import { TitanConnectForm } from "./titan-connect-form";
 
 export const metadata = { title: "Email Connections — Triviality CRM" };
 
@@ -27,7 +28,7 @@ export default async function EmailConnectionsPage({
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader
         title="Email Connections"
-        description="Connect your own business mailbox to send email from the CRM. Your password is never stored — the CRM only holds a revocable, encrypted access token."
+        description="Connect your own business mailbox to send email from the CRM. Microsoft and Google connect via OAuth — the CRM only ever holds a revocable, encrypted access token, never your password. Titan has no OAuth, so that one does store an encrypted password — see the note below before using it."
       />
 
       {justConnected && (
@@ -72,6 +73,7 @@ export default async function EmailConnectionsPage({
                 Connect Google Workspace / Gmail
               </a>
             </div>
+            <TitanConnectForm />
           </div>
         )}
       </Card>

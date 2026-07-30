@@ -3,6 +3,7 @@
 // reasoning as every other Module Six file the worker will eventually need.
 import { prisma } from "@/lib/prisma";
 import type { NotificationType } from "@/generated/prisma/client";
+import type { ProviderKind } from "@/generated/prisma/enums";
 import { getEnv } from "@/lib/env";
 import { getUsableAccessToken } from "@/lib/comms/connections";
 import { getEmailProvider } from "@/lib/comms/providers/factory";
@@ -46,7 +47,7 @@ type PreparedSend = {
   to: string[];
   resolvedSubject: string;
   resolvedBody: string;
-  connection: { id: string; provider: "MICROSOFT" | "GOOGLE" };
+  connection: { id: string; provider: ProviderKind };
   companyName: string;
   /** Snapshot of the template's own EmailTemplate.pipelineStageId, if a
    * template was used and it has one — null otherwise. Computed fresh here

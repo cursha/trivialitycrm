@@ -7,6 +7,7 @@ import {
 } from "../../src/lib/comms/providers/mock";
 import { MicrosoftGraphProvider } from "../../src/lib/comms/providers/microsoft-graph";
 import { GoogleProvider } from "../../src/lib/comms/providers/google";
+import { TitanProvider, verifyTitanCredentials } from "../../src/lib/comms/providers/titan";
 import { getEmailProvider } from "../../src/lib/comms/providers/factory";
 import { resetEnvCacheForTests } from "../../src/lib/env";
 import type { EmailProvider } from "../../src/lib/comms/providers/types";
@@ -226,6 +227,44 @@ describe("getEmailProvider", () => {
     // the exact guarantee this factory exists to provide.
     expect(getEmailProvider("microsoft").name).toBe("mock");
     expect(getEmailProvider("google").name).toBe("mock");
+    expect(getEmailProvider("titan").name).toBe("mock");
     expect(getEmailProvider("mock").name).toBe("mock");
+  });
+});
+
+describe("TitanProvider", () => {
+  it("throws a clear error for every OAuth method — Titan is password-auth only", async () => {
+    const provider: EmailProvider = new TitanProvider();
+    expect(() => provider.getAuthorizationUrl("state", "https://app.example.com/callback")).toThrow(/password authentication/);
+    await expect(provider.exchangeCodeForTokens("code", "https://app.example.com/callback")).rejects.toThrow(/password authentication/);
+    await expect(provider.refreshAccessToken("refresh")).rejects.toThrow(/password authentication/);
+  });
+
+  it("throws a clear error for every calendar method — Titan has no calendar API", async () => {
+    const provider: EmailProvider = new TitanProvider();
+    const account = { accessToken: "pw", refreshToken: "", accountEmail: "sales@example.test" };
+    const input = { title: "Demo", startAt: new Date(), endAt: new Date(), timezone: "America/Toronto", attendeeEmails: [] };
+
+    await expect(provider.createCalendarEvent(account, input)).rejects.toThrow(/no calendar API/);
+    await expect(provider.updateCalendarEvent(account, "event-1", input)).rejects.toThrow(/no calendar API/);
+    await expect(provider.cancelCalendarEvent(account, "event-1")).rejects.toThrow(/no calendar API/);
+  });
+
+  it("throws a clear 'no API' error for every inbound method — a permanent limitation, not a scoped-out phase", async () => {
+    const provider: EmailProvider = new TitanProvider();
+    const account = { accessToken: "pw", refreshToken: "", accountEmail: "sales@example.test" };
+
+    await expect(provider.createInboundSubscription(account, "https://app.example.com/webhook", "state")).rejects.toThrow(/no API for inbound sync/);
+    await expect(provider.renewInboundSubscription(account, "sub-1")).rejects.toThrow(/no API for inbound sync/);
+    await expect(provider.cancelInboundSubscription(account, "sub-1")).rejects.toThrow(/no API for inbound sync/);
+    expect(() => provider.parseInboundWebhookPayload("{}")).toThrow(/no API for inbound sync/);
+    await expect(provider.fetchInboundMessage(account, "msg-1")).rejects.toThrow(/no API for inbound sync/);
+  });
+
+  it("verifyTitanCredentials never makes a real network call under NODE_ENV=test", async () => {
+    // Same test-mode guarantee getEmailProvider() gives every other
+    // provider — this one lives outside the factory (see its own doc
+    // comment) so it needs its own explicit check, verified here.
+    await expect(verifyTitanCredentials("sales@example.test", "wrong-password-but-irrelevant")).resolves.toBeUndefined();
   });
 });

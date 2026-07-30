@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import { encryptToken, decryptToken } from "@/lib/comms/token-crypto";
 import { getEmailProvider } from "@/lib/comms/providers/factory";
-import { providerSlugFromKind } from "@/lib/comms/provider-kind";
+import { providerSlugFromKind, type ConnectableProvider } from "@/lib/comms/provider-kind";
 import type { ConnectedAccount } from "@/lib/comms/providers/types";
 
 // No `import "server-only"` — Phase A's doc comment here assumed the
@@ -46,7 +46,7 @@ export async function disconnectMailbox(userId: string): Promise<void> {
 }
 
 export type ConnectionStatusView = {
-  provider: "microsoft" | "google";
+  provider: ConnectableProvider;
   providerAccountEmail: string;
   status: "CONNECTED" | "EXPIRED" | "REVOKED" | "ERROR";
   connectedAt: Date;
@@ -76,22 +76,43 @@ export async function getConnectionStatus(userId: string): Promise<ConnectionSta
  * an unhandled exception — callers (the send action) still get a thrown
  * error to stop the send, but the connection's own status row already
  * explains why.
+ *
+ * A TITAN connection has nothing to refresh (password auth, not OAuth) —
+ * encryptedRefreshToken/tokenExpiresAt are both null for it, so it always
+ * takes this short-circuit branch and skips the refresh logic entirely.
+ * `accountEmail` is always populated (every provider's ProviderConnection
+ * has one), but only the password-based provider actually needs it — see
+ * ConnectedAccount's doc comment.
  */
 export async function getUsableAccessToken(userId: string): Promise<ConnectedAccount> {
   const connection = await prisma.providerConnection.findUniqueOrThrow({ where: { userId } });
-  const REFRESH_MARGIN_MS = 5 * 60 * 1000;
 
-  if (connection.tokenExpiresAt.getTime() - Date.now() > REFRESH_MARGIN_MS && connection.status === "CONNECTED") {
+  if (connection.provider === "TITAN") {
+    if (connection.status !== "CONNECTED") {
+      throw new Error("Your connected mailbox needs to be reconnected.");
+    }
     return {
       accessToken: decryptToken(connection.encryptedAccessToken),
-      refreshToken: decryptToken(connection.encryptedRefreshToken),
+      refreshToken: "",
+      accountEmail: connection.providerAccountEmail,
+      connectionId: connection.id,
+    };
+  }
+
+  const REFRESH_MARGIN_MS = 5 * 60 * 1000;
+
+  if (connection.tokenExpiresAt!.getTime() - Date.now() > REFRESH_MARGIN_MS && connection.status === "CONNECTED") {
+    return {
+      accessToken: decryptToken(connection.encryptedAccessToken),
+      refreshToken: decryptToken(connection.encryptedRefreshToken!),
+      accountEmail: connection.providerAccountEmail,
       connectionId: connection.id,
     };
   }
 
   const provider = getEmailProvider(providerSlugFromKind(connection.provider));
   try {
-    const refreshed = await provider.refreshAccessToken(decryptToken(connection.encryptedRefreshToken));
+    const refreshed = await provider.refreshAccessToken(decryptToken(connection.encryptedRefreshToken!));
     await prisma.providerConnection.update({
       where: { userId },
       data: {
@@ -102,7 +123,7 @@ export async function getUsableAccessToken(userId: string): Promise<ConnectedAcc
         lastError: null,
       },
     });
-    return { accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken, connectionId: connection.id };
+    return { accessToken: refreshed.accessToken, refreshToken: refreshed.refreshToken, accountEmail: connection.providerAccountEmail, connectionId: connection.id };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Token refresh failed.";
     await prisma.providerConnection.update({ where: { userId }, data: { status: "ERROR", lastError: message } });

@@ -1275,6 +1275,13 @@ model RateLimitBucket {
 enum ProviderKind {
   MICROSOFT
   GOOGLE
+  /// Password/SMTP-based, not OAuth — see providers/titan.ts. No calendar,
+  /// no inbound sync (Titan exposes no API for either); encryptedAccessToken
+  /// holds the mailbox password itself (still AES-256-GCM at rest, but a
+  /// real, non-revocable credential, unlike an OAuth token). encryptedRefreshToken
+  /// and tokenExpiresAt are both null for a TITAN connection — password auth
+  /// has no refresh/expiry concept to track.
+  TITAN
 }
 
 enum ProviderConnectionStatus {
@@ -1301,10 +1308,14 @@ model ProviderConnection {
   provider                  ProviderKind
   providerAccountEmail      String
   encryptedAccessToken      String                   @db.Text
-  encryptedRefreshToken     String                   @db.Text
+  /// Nullable only for a TITAN connection (password auth, no refresh
+  /// token) — always set for MICROSOFT/GOOGLE.
+  encryptedRefreshToken     String?                  @db.Text
   tokenEncryptionKeyVersion Int                      @default(1)
   scopes                    String[]
-  tokenExpiresAt            DateTime
+  /// Nullable only for a TITAN connection (password auth, no expiry to
+  /// track) — always set for MICROSOFT/GOOGLE.
+  tokenExpiresAt            DateTime?
   status                    ProviderConnectionStatus @default(CONNECTED)
   lastError                 String?
   lastSyncAt                DateTime?

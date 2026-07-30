@@ -7,7 +7,7 @@ import { logger } from "@/lib/logger";
 import { getEnv } from "@/lib/env";
 import { getUsableAccessToken } from "@/lib/comms/connections";
 import { getEmailProvider } from "@/lib/comms/providers/factory";
-import { providerSlugFromKind } from "@/lib/comms/provider-kind";
+import { providerSlugFromKind, type ConnectableProvider } from "@/lib/comms/provider-kind";
 import { stopEnrollmentsForReply } from "@/lib/comms/sequences";
 import { stopCampaignRecipientsForReply } from "@/lib/campaigns/run-step";
 import type { ParsedInboundNotification } from "@/lib/comms/providers/types";
@@ -23,7 +23,7 @@ export function generateClientState(): string {
   return crypto.randomBytes(24).toString("hex");
 }
 
-function notificationUrlFor(providerSlug: "microsoft" | "google"): string {
+function notificationUrlFor(providerSlug: ConnectableProvider): string {
   const { APP_URL } = getEnv();
   if (!APP_URL) {
     throw new Error("APP_URL is not configured — inbound sync needs a public base URL for the provider to call back on.");
