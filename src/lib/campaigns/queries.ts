@@ -1,4 +1,9 @@
-import "server-only";
+// No `import "server-only"` — resolveCampaignRecipients is needed by
+// run-step.ts, which the run-campaign-step/campaign-step-tick worker
+// handlers need too; that guard throws under plain Node/tsx execution.
+// Every consumer is itself a server-only context (web Server Actions/
+// pages, or the worker process). Same reasoning as src/lib/prisma.ts's
+// identical omission.
 import { prisma } from "@/lib/prisma";
 import { companyScope } from "@/lib/companies/scope";
 import { evaluateCompanyEligibility } from "@/lib/sales-lists/eligibility";
