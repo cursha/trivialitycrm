@@ -2,11 +2,15 @@ import Link from "next/link";
 import { BarChart3, Building2, CalendarClock, ListTree, Trophy, Users } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
+import { hasPermission } from "@/lib/auth/permissions";
+import { getAiSettings, getCurrentAiSpend, classifyAiBudgetStatus } from "@/lib/ai/budget";
 import { getDashboardStats } from "./queries";
 import { getMyPriorityList, getMyPipelineCounts } from "./priority-data";
 import { PriorityList } from "./priority-list";
 import { Card, SectionHeading } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
+import { Badge } from "@/components/ui/badge";
+import { AI_BUDGET_STATUS_TONE, AI_BUDGET_STATUS_LABEL, toneFor } from "@/lib/ui/status-tones";
 import clsx from "clsx";
 
 export const metadata = { title: "Dashboard — Triviality CRM" };
@@ -80,9 +84,16 @@ export default async function DashboardPage() {
     noActivityThresholdDays: workspaceSettings?.noActivityThresholdDays ?? 14,
     newlyAssignedThresholdDays: workspaceSettings?.newlyAssignedThresholdDays ?? 3,
   };
-  const [priorityItems, myPipelineCounts] = await Promise.all([
+  const canViewAiUsage = hasPermission(user, "view_administration");
+  const [priorityItems, myPipelineCounts, aiUsage] = await Promise.all([
     getMyPriorityList(user, thresholds),
     getMyPipelineCounts(user),
+    canViewAiUsage
+      ? Promise.all([getAiSettings(), getCurrentAiSpend()]).then(([settings, spend]) => ({
+          spend,
+          status: classifyAiBudgetStatus(settings, spend),
+        }))
+      : Promise.resolve(null),
   ]);
 
   const statTiles = [
@@ -109,6 +120,28 @@ export default async function DashboardPage() {
           </Link>
         }
       />
+
+      {aiUsage && (
+        <Card className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <SectionHeading>AI usage</SectionHeading>
+            <Badge tone={toneFor(AI_BUDGET_STATUS_TONE, aiUsage.status)}>{AI_BUDGET_STATUS_LABEL[aiUsage.status]}</Badge>
+          </div>
+          <div className="flex items-center gap-4 text-sm">
+            <span>
+              <span className="text-text-muted">Today: </span>
+              <strong className="text-text">${aiUsage.spend.todayUsd.toFixed(2)}</strong>
+            </span>
+            <span>
+              <span className="text-text-muted">This month: </span>
+              <strong className="text-text">${aiUsage.spend.monthUsd.toFixed(2)}</strong>
+            </span>
+            <Link href="/administration/ai-settings" className="text-secondary hover:underline">
+              Manage →
+            </Link>
+          </div>
+        </Card>
+      )}
 
       <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
         <Card>

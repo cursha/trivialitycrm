@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { getQueueSummary } from "@/lib/jobs/observability";
-import { getAiSettings, getCurrentAiSpend, isAiApiKeyConfigured } from "@/lib/ai/budget";
+import { getAiSettings, getCurrentAiSpend, isAiApiKeyConfigured, classifyAiBudgetStatus } from "@/lib/ai/budget";
 import { getEnv } from "@/lib/env";
 import { describeAuditEvent } from "@/lib/audit/describe";
 import { getIntegrationSettings } from "@/lib/integrations/settings";
@@ -24,16 +24,7 @@ export async function getAdministrationSummary() {
   const spend = await getCurrentAiSpend();
   const integrationSettings = await getIntegrationSettings();
 
-  let budgetStatus: "ok" | "near-threshold" | "over-budget" | "not-configured" = "not-configured";
-  if (aiSettings.dailyBudgetUsd !== null || aiSettings.monthlyBudgetUsd !== null) {
-    const overDaily = aiSettings.dailyBudgetUsd !== null && spend.todayUsd >= aiSettings.dailyBudgetUsd;
-    const overMonthly = aiSettings.monthlyBudgetUsd !== null && spend.monthUsd >= aiSettings.monthlyBudgetUsd;
-    const nearDaily = aiSettings.warningThresholdUsd !== null && spend.todayUsd >= aiSettings.warningThresholdUsd;
-    const nearMonthly = aiSettings.warningThresholdUsd !== null && spend.monthUsd >= aiSettings.warningThresholdUsd;
-    if (overDaily || overMonthly) budgetStatus = "over-budget";
-    else if (nearDaily || nearMonthly) budgetStatus = "near-threshold";
-    else budgetStatus = "ok";
-  }
+  const budgetStatus = classifyAiBudgetStatus(aiSettings, spend);
 
   return {
     activeUsers,

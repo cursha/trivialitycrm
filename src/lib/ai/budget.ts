@@ -112,6 +112,30 @@ export async function getCurrentAiSpend(reference: Date = new Date()): Promise<A
   };
 }
 
+export type AiBudgetStatus = "ok" | "near-threshold" | "over-budget" | "not-configured";
+
+/**
+ * Same over/near-threshold classification the Administration summary has
+ * always computed inline — pulled out here so the Dashboard's AI usage card
+ * (an admin-visible, at-a-glance version of the same figures, so budget
+ * overruns aren't only discovered when someone happens to visit
+ * Administration) can share the exact same logic rather than a second,
+ * driftable copy.
+ */
+export function classifyAiBudgetStatus(settings: AiSettingsValues, spend: AiSpend): AiBudgetStatus {
+  if (settings.dailyBudgetUsd === null && settings.monthlyBudgetUsd === null) return "not-configured";
+
+  const overDaily = settings.dailyBudgetUsd !== null && spend.todayUsd >= settings.dailyBudgetUsd;
+  const overMonthly = settings.monthlyBudgetUsd !== null && spend.monthUsd >= settings.monthlyBudgetUsd;
+  if (overDaily || overMonthly) return "over-budget";
+
+  const nearDaily = settings.warningThresholdUsd !== null && spend.todayUsd >= settings.warningThresholdUsd;
+  const nearMonthly = settings.warningThresholdUsd !== null && spend.monthUsd >= settings.warningThresholdUsd;
+  if (nearDaily || nearMonthly) return "near-threshold";
+
+  return "ok";
+}
+
 export type BudgetCheckResult = { allowed: boolean; reason?: string };
 
 /**
