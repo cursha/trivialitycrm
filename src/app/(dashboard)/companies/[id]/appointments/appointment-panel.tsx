@@ -45,11 +45,18 @@ export function AppointmentPanel({
   appointments,
   contacts,
   canManage,
+  calendarAvailable,
 }: {
   companyId: string;
   appointments: AppointmentRow[];
   contacts: ContactOption[];
   canManage: boolean;
+  /** False when the caller's connected mailbox has no calendar API at all
+   * (Titan) — scheduling/rescheduling/cancelling are hidden rather than
+   * left to throw "Titan Email has no calendar API" from the provider
+   * call. Past appointments (from before switching providers, say) still
+   * display read-only. */
+  calendarAvailable: boolean;
 }) {
   const router = useRouter();
   const [scheduling, setScheduling] = useState(false);
@@ -97,7 +104,7 @@ export function AppointmentPanel({
     <Card>
       <div className="flex items-center justify-between">
         <SectionHeading>Appointments</SectionHeading>
-        {canManage && !scheduling && (
+        {canManage && calendarAvailable && !scheduling && (
           <button
             type="button"
             onClick={() => setScheduling(true)}
@@ -108,6 +115,13 @@ export function AppointmentPanel({
           </button>
         )}
       </div>
+
+      {canManage && !calendarAvailable && (
+        <p className="mt-2 text-xs text-text-muted">
+          Your connected mailbox has no calendar API, so scheduling isn&apos;t available — connect Microsoft 365 or Google Workspace instead if
+          you need this.
+        </p>
+      )}
 
       {scheduling && (
         <form action={handleSchedule} className="mt-3 space-y-2 rounded-lg border border-dashed border-border-strong bg-black/[0.02] p-3">
@@ -203,7 +217,7 @@ export function AppointmentPanel({
                 {appointment.timezone})
               </p>
               {appointment.lastError && <p className="mt-1 text-xs font-semibold text-danger">{appointment.lastError}</p>}
-              {canManage && appointment.status !== "CANCELLED" && (
+              {canManage && calendarAvailable && appointment.status !== "CANCELLED" && (
                 <div className="mt-1 flex gap-3">
                   <button
                     type="button"

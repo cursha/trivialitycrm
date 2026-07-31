@@ -3,7 +3,7 @@ import { resetDatabase, testPrisma } from "../helpers/db";
 import { createRoleWithPermissions, createTestUser, loginAs } from "../helpers/fixtures";
 import { resetFakeCookies } from "../setup/mock-next";
 import { resetEnvCacheForTests } from "../../src/lib/env";
-import { connectTitanAccount, disconnectMailboxAction } from "../../src/app/(dashboard)/settings/email-connections/actions";
+import { connectTitanAccount, disconnectMailboxAction, sendConnectionTestEmail } from "../../src/app/(dashboard)/settings/email-connections/actions";
 import { getUsableAccessToken } from "../../src/lib/comms/connections";
 
 const TEST_KEY = "SRvbw8Ualx2XC/Ekfrk0RWORk0fg8/dcL1kL5krkqbk=";
@@ -97,5 +97,32 @@ describe("disconnectMailboxAction for a TITAN connection", () => {
 
     await disconnectMailboxAction();
     expect(await testPrisma.providerConnection.findUnique({ where: { userId: user.id } })).toBeNull();
+  });
+});
+
+describe("sendConnectionTestEmail", () => {
+  it("sends a test email to the caller's own connected address and audits it", async () => {
+    const user = await connectableUser();
+    await connectTitanAccount("sales@example.test", "correct-horse-battery-staple");
+
+    const result = await sendConnectionTestEmail();
+    expect(result).toHaveProperty("success", true);
+
+    const auditEvent = await testPrisma.auditEvent.findFirst({ where: { actorId: user.id, action: "mailbox_connection.test_email_sent" } });
+    expect(auditEvent).not.toBeNull();
+  });
+
+  it("refuses with no connection to test", async () => {
+    await connectableUser();
+    const result = await sendConnectionTestEmail();
+    expect(result).toHaveProperty("error");
+  });
+
+  it("rejects a user without connect_mailbox", async () => {
+    const role = await createRoleWithPermissions("NoConnectAccess2", []);
+    const user = await createTestUser({ roleId: role.id });
+    await loginAs(user.id);
+
+    await expect(sendConnectionTestEmail()).rejects.toThrow();
   });
 });

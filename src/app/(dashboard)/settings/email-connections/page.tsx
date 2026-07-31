@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { PROVIDER_CONNECTION_STATUS_TONE } from "@/lib/ui/status-tones";
 import { DisconnectButton } from "./disconnect-button";
 import { TitanConnectForm } from "./titan-connect-form";
+import { TestEmailButton } from "./test-email-button";
 
 export const metadata = { title: "Email Connections — Triviality CRM" };
 
@@ -51,7 +52,10 @@ export default async function EmailConnectionsPage({
               <p className="text-xs text-danger">{connection.lastError}</p>
             )}
             <p className="text-xs text-text-muted">Connected {connection.connectedAt.toISOString().slice(0, 10)}</p>
-            <DisconnectButton />
+            <div className="flex flex-wrap items-start gap-3">
+              <TestEmailButton />
+              <DisconnectButton />
+            </div>
           </div>
         ) : (
           <div className="mt-3 space-y-3">

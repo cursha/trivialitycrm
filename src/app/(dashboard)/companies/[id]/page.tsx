@@ -19,6 +19,7 @@ import { EvidencePanel } from "./eos/evidence-panel";
 import { EmailPanel } from "./email/email-panel";
 import { SequenceEnrollmentPanel } from "./sequences/sequence-enrollment-panel";
 import { AppointmentPanel } from "./appointments/appointment-panel";
+import { getConnectionStatus } from "@/lib/comms/connections";
 import { AddToRouteToggle } from "./route-plan-toggle";
 import { getRouteCompanyIds } from "@/lib/route-plan/service";
 import { previewSteps } from "@/lib/comms/sequences";
@@ -70,6 +71,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     workspaceSettings,
     pendingDuplicateCount,
     routeCompanyIds,
+    connection,
   ] = await Promise.all([
       listCompanyActivities(user, id),
       listCompanyTasks(user, id),
@@ -132,7 +134,9 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         where: { status: "PENDING", OR: [{ companyAId: id }, { companyBId: id }] },
       }),
       hasPermission(user, "manage_route_plan") ? getRouteCompanyIds(user.id) : Promise.resolve(new Set<string>()),
+      getConnectionStatus(user.id),
     ]);
+  const calendarAvailable = connection?.provider !== "titan";
   const canEdit = hasPermission(user, "edit_leads");
   const canRoutePlan = hasPermission(user, "manage_route_plan");
 
@@ -334,6 +338,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               .filter((c) => c.email)
               .map((c) => ({ id: c.id, name: `${c.firstName} ${c.lastName}`, email: c.email as string }))}
             canManage={hasPermission(user, "manage_calendar_connections")}
+            calendarAvailable={calendarAvailable}
           />
         </div>
 
