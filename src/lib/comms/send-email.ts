@@ -122,10 +122,17 @@ async function prepareSend(params: {
   // No CASL/express-consent gate here by design — outreach targets new
   // leads who haven't (and won't have) granted prior permission. doNotContact
   // above still blocks anyone who has explicitly opted out, and every send
-  // still requires an unsubscribe link (below).
-  if (!hasUnsubscribePlaceholder(params.body)) {
-    return { ok: false, error: "This email must include an unsubscribe link — use a template or add {{unsubscribeLink}} to the body." };
-  }
+  // still requires an unsubscribe link. A template can't be saved without
+  // one, but a from-scratch composer send has no template to enforce it —
+  // rather than block that send and make the sender go add the placeholder
+  // by hand, silently append a standard footer containing it. Still
+  // impossible to send a CAN-SPAM-noncompliant email either way; this just
+  // moves the guarantee from "reject" to "always provide," matching every
+  // sent message here always having ended up with a working link either
+  // way.
+  const bodyWithUnsubscribe = hasUnsubscribePlaceholder(params.body)
+    ? params.body
+    : `${params.body}<p style="margin-top:24px;font-size:12px;color:#888888;">Unsubscribe: {{unsubscribeLink}}</p>`;
   if (!connection || connection.status !== "CONNECTED") {
     return { ok: false, error: "Connect a mailbox before sending email." };
   }
@@ -139,7 +146,7 @@ async function prepareSend(params: {
     unsubscribeLink,
   };
   const subjectResolution = resolveTemplatePlaceholders(params.subject, placeholderData, "text");
-  const bodyResolution = resolveTemplatePlaceholders(params.body, placeholderData, "html");
+  const bodyResolution = resolveTemplatePlaceholders(bodyWithUnsubscribe, placeholderData, "html");
   const unresolved = [...new Set([...subjectResolution.unresolved, ...bodyResolution.unresolved])];
   if (unresolved.length > 0) {
     return { ok: false, error: `Unresolved placeholder(s): ${unresolved.map((t) => `{{${t}}}`).join(", ")}` };

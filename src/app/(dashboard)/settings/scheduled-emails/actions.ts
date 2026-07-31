@@ -5,7 +5,6 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission, hasPermission } from "@/lib/auth/permissions";
 import { formString } from "@/lib/form-data";
-import { hasUnsubscribePlaceholder } from "@/lib/comms/templates";
 import { validateOutgoingEmail } from "@/lib/comms/validate";
 import { cancelScheduledEmail } from "@/lib/comms/send-email";
 import type { AuthenticatedUser } from "@/lib/auth/current-user";
@@ -73,9 +72,10 @@ export async function updateScheduledEmail(emailMessageId: string, _prevState: A
   if (!recipientValidation.valid) {
     return { error: recipientValidation.errors.join(" ") };
   }
-  if (!hasUnsubscribePlaceholder(body)) {
-    return { error: "This email must include an unsubscribe link — use a template or add {{unsubscribeLink}} to the body." };
-  }
+  // No unsubscribe-placeholder check here — send-email.ts's prepareSend()
+  // silently appends a standard unsubscribe footer at actual-send time if
+  // one isn't already present, so this edit form doesn't need to block on
+  // it too (see that function's doc comment for the full reasoning).
 
   const updated = await prisma.emailMessage.updateMany({
     where: { id: emailMessageId, status: "SCHEDULED" },

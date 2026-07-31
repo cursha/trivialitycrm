@@ -192,7 +192,7 @@ describe("sendEmail", () => {
     if (!result.ok) expect(result.error).toMatch(/opted out/);
   });
 
-  it("blocks a contact-linked send whose body is missing the unsubscribe placeholder", async () => {
+  it("silently appends a working unsubscribe footer when the composed body has no placeholder, rather than blocking the send", async () => {
     const { user, company } = await baseFixtures();
     await connectMailbox(user.id);
     const contact = await permittedContactFixture(company.id);
@@ -204,9 +204,16 @@ describe("sendEmail", () => {
       subject: "Hi",
       body: "Thanks for your interest, no unsubscribe link here.",
     });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/unsubscribe link/);
-    expect(await testPrisma.emailMessage.count()).toBe(0);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable");
+
+    const message = await testPrisma.emailMessage.findUniqueOrThrow({ where: { id: result.emailMessageId } });
+    // Not `\S+` for the token — the appended footer is `...token=XXXX</p>`
+    // with no whitespace before the closing tag, so a whitespace-only
+    // boundary would swallow `</p>` into the capture. Stop at `<` too.
+    const linkMatch = message.body.match(/https?:\/\/[^\s<]+\/unsubscribe\?token=([^\s<]+)/);
+    expect(linkMatch).not.toBeNull();
+    expect(verifyUnsubscribeToken(linkMatch![1])).toEqual({ contactId: contact.id });
   });
 
   it("records a FAILED EmailMessage and a DELIVERY_FAILURE notification when the provider send fails", async () => {

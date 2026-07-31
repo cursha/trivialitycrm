@@ -100,10 +100,12 @@ describe("updateScheduledEmail", () => {
     expect(result?.error).toMatch(/future/);
   });
 
-  it("rejects a body missing the unsubscribe placeholder", async () => {
+  it("allows saving a body with no unsubscribe placeholder — the actual send appends one, this edit form no longer blocks on it", async () => {
     const { emailMessageId } = await scheduledEmailFixture();
     const result = await updateScheduledEmail(emailMessageId, undefined, editFormData({ body: "No unsubscribe link here." }));
-    expect(result?.error).toMatch(/unsubscribe/i);
+    expect(result?.error).toBeUndefined();
+    const updated = await testPrisma.emailMessage.findUniqueOrThrow({ where: { id: emailMessageId } });
+    expect(updated.body).toBe("No unsubscribe link here.");
   });
 
   it("blocks a different user without view_team_communications from editing someone else's scheduled email", async () => {
