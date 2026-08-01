@@ -418,6 +418,10 @@ model Competitor {
   id            String         @id @default(cuid())
   name          String         @unique
   websiteUrl    String?
+  // Manually entered by whoever manages competitors — not derived from
+  // linked Company rows, since a competitor's real footprint is almost
+  // always larger than what's been researched into this CRM.
+  locationCount Int            @default(0)
   active        Boolean        @default(true)
   companies     Company[]
   searches      LeadSearch[]

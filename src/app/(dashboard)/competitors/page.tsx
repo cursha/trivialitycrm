@@ -13,7 +13,6 @@ export default async function CompetitorsPage() {
 
   const competitors = await prisma.competitor.findMany({
     orderBy: { name: "asc" },
-    include: { _count: { select: { companies: true } } },
   });
 
   const rows = competitors.map((competitor) => ({
@@ -21,14 +20,14 @@ export default async function CompetitorsPage() {
     name: competitor.name,
     websiteUrl: competitor.websiteUrl,
     active: competitor.active,
-    locationCount: competitor._count.companies,
+    locationCount: competitor.locationCount,
   }));
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <PageHeader
         title="Competitors"
-        description="Location counts are calculated live from linked companies — click a count to see those companies."
+        description="Location count is a manually entered estimate of this competitor's total footprint — it isn't tied to how many of their locations you've linked as companies."
       />
 
       <CompetitorTable competitors={rows} canManage={canManage} />

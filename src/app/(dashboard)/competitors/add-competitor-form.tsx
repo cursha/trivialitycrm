@@ -14,6 +14,7 @@ export function AddCompetitorForm() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <Input name="name" placeholder="Competitor name" required className="flex-1" />
         <Input name="websiteUrl" placeholder="https://example.com (optional)" className="flex-1" />
+        <Input name="locationCount" type="number" min={0} step={1} placeholder="Locations" className="sm:w-32" />
         <Button type="submit" disabled={pending} variant="primary">
           <CirclePlus size={16} />
           {pending ? "Adding..." : "Add"}

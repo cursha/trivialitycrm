@@ -21,6 +21,7 @@ function parseCompetitorForm(formData: FormData) {
   return CompetitorSchema.safeParse({
     name: formString(formData, "name"),
     websiteUrl: formString(formData, "websiteUrl"),
+    locationCount: formString(formData, "locationCount"),
   });
 }
 
@@ -34,7 +35,7 @@ export async function createCompetitor(_prevState: ActionResult, formData: FormD
 
   try {
     await prisma.competitor.create({
-      data: { name: parsed.data.name, websiteUrl: parsed.data.websiteUrl || null },
+      data: { name: parsed.data.name, websiteUrl: parsed.data.websiteUrl || null, locationCount: parsed.data.locationCount },
     });
   } catch {
     return { error: "A competitor with that name already exists." };
@@ -54,7 +55,7 @@ export async function updateCompetitor(id: string, formData: FormData): Promise<
   try {
     await prisma.competitor.update({
       where: { id },
-      data: { name: parsed.data.name, websiteUrl: parsed.data.websiteUrl || null },
+      data: { name: parsed.data.name, websiteUrl: parsed.data.websiteUrl || null, locationCount: parsed.data.locationCount },
     });
   } catch {
     return { error: "A competitor with that name already exists." };

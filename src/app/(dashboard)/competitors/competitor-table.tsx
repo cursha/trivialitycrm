@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
 import { Pencil, Trash2 } from "lucide-react";
 import { setCompetitorActive, deleteCompetitor, updateCompetitor } from "./actions";
 import { Card } from "@/components/ui/card";
@@ -68,6 +67,7 @@ export function CompetitorTable({ competitors, canManage }: { competitors: Compe
                   <form action={(formData) => handleUpdate(competitor.id, formData)} className="space-y-2">
                     <Input name="name" defaultValue={competitor.name} autoFocus className="py-1" />
                     <Input name="websiteUrl" defaultValue={competitor.websiteUrl ?? ""} placeholder="https://example.com" className="py-1" />
+                    <Input name="locationCount" type="number" min={0} step={1} defaultValue={competitor.locationCount} className="py-1" />
                     <div className="flex gap-2">
                       <button type="submit" className="rounded bg-primary px-2 py-1 text-xs font-bold text-white hover:bg-primary-hover">
                         Save
@@ -103,9 +103,7 @@ export function CompetitorTable({ competitors, canManage }: { competitors: Compe
                 )}
               </td>
               <td className="px-5 py-4">
-                <Link href={`/companies?competitorId=${competitor.id}`} className="font-bold text-secondary hover:underline">
-                  {competitor.locationCount}
-                </Link>
+                <span className="font-bold text-text">{competitor.locationCount}</span>
               </td>
               <td className="px-5 py-4">
                 {canManage ? (

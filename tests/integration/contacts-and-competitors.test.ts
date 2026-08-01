@@ -11,6 +11,7 @@ import {
 } from "../helpers/fixtures";
 import { resetFakeCookies } from "../setup/mock-next";
 import { createContact, updateContact, deleteContact, setPrimaryContact } from "../../src/app/(dashboard)/companies/[id]/contacts/actions";
+import { createCompetitor, updateCompetitor } from "../../src/app/(dashboard)/competitors/actions";
 
 beforeEach(async () => {
   await resetDatabase();
@@ -167,8 +168,8 @@ describe("setPrimaryContact", () => {
   });
 });
 
-describe("competitor location count", () => {
-  it("is calculated live from linked companies, never stored", async () => {
+describe("competitor linked-company count", () => {
+  it("is calculated live from linked companies (used by the delete guard and reports)", async () => {
     const { admin, leadType, stage } = await baseFixtures();
     const competitor = await createCompetitorFixture("Geeks Who Drink");
 
@@ -202,7 +203,9 @@ describe("competitor location count", () => {
     expect(withCount._count.companies).toBe(2);
 
     // Deleting one linked company should immediately change the live count
-    // — there is no separately stored total to fall out of sync.
+    // — there is no separately stored total to fall out of sync. This is
+    // distinct from Competitor.locationCount (see below), which is a
+    // manually entered estimate, not derived from linked companies.
     const linked = await testPrisma.company.findFirst({ where: { competitorId: competitor.id } });
     await testPrisma.company.delete({ where: { id: linked!.id } });
 
@@ -211,5 +214,47 @@ describe("competitor location count", () => {
       include: { _count: { select: { companies: true } } },
     });
     expect(afterDelete._count.companies).toBe(1);
+  });
+});
+
+describe("competitor location count (manual field)", () => {
+  it("is set on create and edited independently of linked companies", async () => {
+    const role = await createRoleWithPermissions("Administrator", ["manage_competitors"]);
+    const admin = await createTestUser({ roleId: role.id });
+    await loginAs(admin.id);
+
+    const createForm = new FormData();
+    createForm.set("name", "Geeks Who Drink");
+    createForm.set("locationCount", "40");
+    await createCompetitor(undefined, createForm);
+
+    const created = await testPrisma.competitor.findFirstOrThrow({ where: { name: "Geeks Who Drink" } });
+    expect(created.locationCount).toBe(40);
+
+    const updateForm = new FormData();
+    updateForm.set("name", "Geeks Who Drink");
+    updateForm.set("locationCount", "55");
+    await updateCompetitor(created.id, updateForm);
+
+    const updated = await testPrisma.competitor.findUniqueOrThrow({ where: { id: created.id } });
+    expect(updated.locationCount).toBe(55);
+
+    // No linked companies at all — the manual estimate is independent of the CRM's own data.
+    const linkedCount = await testPrisma.company.count({ where: { competitorId: created.id } });
+    expect(linkedCount).toBe(0);
+  });
+
+  it("rejects a negative location count", async () => {
+    const role = await createRoleWithPermissions("Administrator", ["manage_competitors"]);
+    const admin = await createTestUser({ roleId: role.id });
+    await loginAs(admin.id);
+
+    const form = new FormData();
+    form.set("name", "Trivia Rivals");
+    form.set("locationCount", "-3");
+    const result = await createCompetitor(undefined, form);
+
+    expect(result?.error).toBeTruthy();
+    await expect(testPrisma.competitor.findFirst({ where: { name: "Trivia Rivals" } })).resolves.toBeNull();
   });
 });
