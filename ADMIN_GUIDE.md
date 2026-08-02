@@ -46,6 +46,33 @@ not to gate.
      variables or redeploying — useful mid-incident (see
      `INCIDENT_RESPONSE.md`).
 
+## Sales Lists, Calling Sessions, and Campaigns
+
+- **Call outcomes** (Settings → Call Outcomes, `manage_call_outcomes`): the
+  set of outcomes salespeople choose from after a call. For each one you
+  control whether notes or a rejection reason are required, whether it
+  auto-creates a follow-up (with a default title and days-out), moves the
+  pipeline stage, applies do-not-contact, opens the email composer, or
+  permanently removes the company from that calling session — plus which
+  progress category it counts toward (Unreachable / Interested / Demo
+  Requested / Not Interested). Outcomes can be reordered or deactivated
+  without deleting call history that already used them.
+- **Reusable campaign instructions** (Settings → Campaign Instructions,
+  `manage_campaign_instructions`): house-wide tone/guidance text any
+  campaign creator can apply on top of, or instead of, their own
+  instructions — useful for keeping AI-generated campaign copy consistent
+  without every sender having to write the same guidance from scratch.
+- Only Administrators can edit or delete another user's Sales List
+  (`manage_all_sales_lists`) or export leads; regular users manage their own
+  lists only.
+- Campaign creation, sending, and campaign reports (`/reports/campaigns`)
+  require permissions most Manager-level roles have by default but
+  Salesperson does not — review Settings → Roles if someone needs (or
+  shouldn't have) that access.
+- A campaign can only be approved (locking in the AI-generated messages
+  before sending) by someone with a connected mailbox, since they become
+  the sender of record — see "Email connections" below.
+
 ## Managing users and roles
 
 - Settings → Users: create/deactivate accounts, assign role and territory,
@@ -73,6 +100,23 @@ not to gate.
   already found, it just stops finding more.
 - The Integrations page shows recent AI/email usage and any recent provider
   errors — check here first if something AI/email-related seems off.
+- Anyone with `view_administration` also sees a running today's-spend/
+  this-month's-spend card right on the Dashboard, with a "Manage →" link
+  straight to AI Settings — you don't need to visit Administration just to
+  check spend at a glance. It shows "No budget configured" until you set a
+  daily or monthly cap.
+
+## Email connections (per-user)
+
+Settings → Email Connections (`connect_mailbox`) is where each user connects
+their own mailbox — there's no admin-side provisioning step. Microsoft 365 /
+Outlook and Google Workspace / Gmail connect via OAuth (revocable token
+only). Titan Email is the one exception: it has no OAuth, so the CRM stores
+an encrypted copy of the user's actual mailbox password to authenticate over
+SMTP — worth knowing before recommending it to your team, since it's a
+different trust model than the other two. Titan connections also can't use
+the in-app calendar/appointment scheduling (no calendar API), so that UI is
+hidden automatically for Titan-connected users.
 
 ## System Health and background jobs
 

@@ -62,6 +62,95 @@ On any company's page:
 - Changing the pipeline stage is a dropdown right at the top — no separate
   page needed.
 
+## Sales Lists
+
+A Sales List is a saved set of companies built from the same filters used
+elsewhere (location, lead type, pipeline stage, EOS score, contact history,
+and more). When you create one, you pick what it's for — a general list, a
+**Calling List**, or an **Email Campaign** list — which changes what counts
+as "eligible": archived, merged, or do-not-contact companies are always
+excluded; a Calling List additionally needs a phone number on file; an
+Email Campaign list additionally needs an active contact with an email
+address who hasn't opted out or bounced, and excludes existing customers.
+These eligibility rules can't be overridden — the preview table shows each
+company as Eligible or Ineligible with a plain-English reason before you
+save.
+
+You choose **Fixed** (a frozen snapshot of companies you hand-pick, up to
+5,000) or **Dynamic** (saves the filter itself and re-runs it — click
+Refresh to see what's newly eligible or no longer matches; it won't
+silently update on its own). Lists can be private, shared with specific
+people, or shared with the whole team. Only you (or an admin) can edit or
+archive your own list, and it can't be deleted outright once it has calling
+or campaign history — archive it instead.
+
+## Calling Sessions
+
+From a Calling List, choose a call order (priority score, EOS grade, oldest
+contact, most overdue follow-up, name, city, or pipeline stage) and click
+**Start calling session**. You can only have one active session at a
+time, and it's safe to close the tab or restart your browser — reopening
+Calling Sessions always picks up right where you left off.
+
+Each call screen shows the company, its primary contact with a
+click-to-call link, recent activity, and open follow-ups. After the call,
+pick a **Call Outcome** — your administrator defines what's available, and
+some outcomes require notes or a rejection reason before you can save.
+Saving an outcome can automatically create a follow-up, move the pipeline
+stage, mark the company do-not-contact, or open the email composer for you
+to review and send yourself — outcomes never send an email on their own.
+You can **Pause** the session to come back later, **End session** early, or
+**Skip** a company — either just for now (it comes back around later in the
+same session) or permanently (it won't be offered again this session, and
+nothing is recorded). If you need to fix a note on a call you already
+logged, you can edit it afterward from the session overview — but the
+outcome itself, and anything it triggered, won't re-fire.
+
+## Email Campaigns (if you have access)
+
+Built from an Email Campaign list. Give the campaign a name, tell the AI
+what to write (free text, a reusable house instruction set, and/or a
+template — at least one is required), and add one or more steps — a single
+email, or a drip sequence where each step sends a set number of days after
+the last. It can also be set to stop automatically once a company reaches
+a chosen pipeline stage.
+
+New campaigns start as a **Draft**. Click **Generate preview** to have the
+AI write every recipient's message for every step up front, review it, then
+**Approve** — this locks the messages in and does one final eligibility
+check. You need a connected mailbox to approve a campaign, since you become
+the sender. Once approved, choose **Send now** or **Schedule**, and you can
+**Cancel** at any point before or during sending — anything already sent
+stays sent. One thing that can look surprising: if a recipient replies or
+becomes ineligible partway through a sequence, they're silently dropped
+from the rest of it before their next step goes out — that's intentional,
+not a bug. Results live under Reports → Campaigns.
+
+## Connecting your email
+
+Settings → Email Connections lets you connect your own business mailbox so
+emails sent from the CRM come from you, and replies land back in your own
+inbox:
+
+- **Microsoft 365 / Outlook** and **Google Workspace / Gmail** connect via
+  OAuth — click Connect, sign in, and the CRM only ever holds a revocable
+  token, never your password. A personal (non-business) Outlook.com or
+  Gmail.com account won't work for this — it needs a Microsoft 365 or Google
+  Workspace business mailbox.
+- **Titan Email** has no OAuth to connect through, so this is the one
+  exception: the CRM stores an encrypted copy of your actual mailbox
+  password to send through Titan's servers. Only use it if you're
+  comfortable with that trade-off; Microsoft/Google are preferred when
+  available. Titan also has no calendar API, so scheduling appointments from
+  a company page isn't available while a Titan mailbox is connected — the
+  Schedule button is hidden and existing appointments are read-only.
+- Once connected, use the **Send test email** button on that page any time
+  you want to confirm the connection is actually working before relying on
+  it for a real send.
+- Every outbound email automatically gets an unsubscribe link appended if
+  your message doesn't already include one — you don't need to add it
+  yourself.
+
 ## AI lead research (if you have access)
 
 1. Under Leads, review or create a research prompt — this is what tells the
