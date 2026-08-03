@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Phone, Mail, Users, FileText, Presentation, FlaskConical, StickyNote, CalendarClock, Sparkles } from "lucide-react";
+import { Phone, Mail, Users, FileText, Presentation, FlaskConical, StickyNote, CalendarClock, Sparkles, Globe } from "lucide-react";
 import { changeCompanyStage } from "../actions";
 import { useQuickActions } from "./quick-action-context";
 import { Card } from "@/components/ui/card";
@@ -26,12 +26,14 @@ export function QuickActionsBar({
   stages,
   canEdit,
   canAnalyze,
+  websiteUrl,
 }: {
   companyId: string;
   currentStageId: string;
   stages: StageOption[];
   canEdit: boolean;
   canAnalyze: boolean;
+  websiteUrl: string | null;
 }) {
   const router = useRouter();
   const { requestActivity, requestFollowUp, requestAnalyze } = useQuickActions();
@@ -57,9 +59,20 @@ export function QuickActionsBar({
   return (
     <Card>
       <h2 className="font-bold text-accent">Quick sales actions</h2>
-      {canEdit ? (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {ACTIVITY_LINKS.map((link) => (
+      <div className="mt-3 flex flex-wrap gap-2">
+        {websiteUrl && (
+          <a
+            href={websiteUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="flex items-center gap-1.5 rounded-lg bg-secondary px-3 py-2 text-xs font-semibold text-white hover:bg-focus"
+          >
+            <Globe size={14} />
+            View website
+          </a>
+        )}
+        {canEdit &&
+          ACTIVITY_LINKS.map((link) => (
             <button
               key={link.label}
               type="button"
@@ -70,6 +83,7 @@ export function QuickActionsBar({
               {link.label}
             </button>
           ))}
+        {canEdit && (
           <button
             type="button"
             onClick={requestFollowUp}
@@ -78,20 +92,19 @@ export function QuickActionsBar({
             <CalendarClock size={14} />
             Follow-up
           </button>
-          {canAnalyze && (
-            <button
-              type="button"
-              onClick={requestAnalyze}
-              className="flex items-center gap-1.5 rounded-lg border border-border-strong px-3 py-2 text-xs font-semibold text-text hover:bg-black/5"
-            >
-              <Sparkles size={14} />
-              Analyze opportunity
-            </button>
-          )}
-        </div>
-      ) : (
-        <p className="mt-3 text-sm text-text-muted">You don&apos;t have permission to log activity for this company.</p>
-      )}
+        )}
+        {canEdit && canAnalyze && (
+          <button
+            type="button"
+            onClick={requestAnalyze}
+            className="flex items-center gap-1.5 rounded-lg border border-border-strong px-3 py-2 text-xs font-semibold text-text hover:bg-black/5"
+          >
+            <Sparkles size={14} />
+            Analyze opportunity
+          </button>
+        )}
+      </div>
+      {!canEdit && <p className="mt-3 text-sm text-text-muted">You don&apos;t have permission to log activity for this company.</p>}
       {canEdit && (
         <div className="mt-3 max-w-xs">
           <Label className="text-xs">Change pipeline stage</Label>

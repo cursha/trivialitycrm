@@ -198,6 +198,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         stages={pipelineStages.map((s) => ({ id: s.id, name: s.name, active: s.active }))}
         canEdit={canEdit}
         canAnalyze={canAnalyzeOpportunity}
+        websiteUrl={company.websiteUrl}
       />
 
       {canRoutePlan && <AddToRouteToggle companyId={company.id} initiallyInRoute={routeCompanyIds.has(company.id)} canManage={canRoutePlan} />}
