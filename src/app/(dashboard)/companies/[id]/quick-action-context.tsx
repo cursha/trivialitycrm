@@ -6,9 +6,11 @@ type QuickActionContextValue = {
   registerActivityHandler: (fn: (type: string) => void) => () => void;
   registerFollowUpHandler: (fn: () => void) => () => void;
   registerEmailHandler: (fn: (contactId: string) => void) => () => void;
+  registerAnalyzeHandler: (fn: () => void) => () => void;
   requestActivity: (type: string) => void;
   requestFollowUp: () => void;
   requestEmail: (contactId: string) => void;
+  requestAnalyze: () => void;
 };
 
 const QuickActionContext = createContext<QuickActionContextValue | null>(null);
@@ -27,6 +29,7 @@ export function QuickActionProvider({ children }: { children: React.ReactNode })
   const activityHandlerRef = useRef<((type: string) => void) | null>(null);
   const followUpHandlerRef = useRef<(() => void) | null>(null);
   const emailHandlerRef = useRef<((contactId: string) => void) | null>(null);
+  const analyzeHandlerRef = useRef<(() => void) | null>(null);
 
   const registerActivityHandler = useCallback((fn: (type: string) => void) => {
     activityHandlerRef.current = fn;
@@ -64,15 +67,29 @@ export function QuickActionProvider({ children }: { children: React.ReactNode })
     scrollToPanel("email-panel");
   }, []);
 
+  const registerAnalyzeHandler = useCallback((fn: () => void) => {
+    analyzeHandlerRef.current = fn;
+    return () => {
+      if (analyzeHandlerRef.current === fn) analyzeHandlerRef.current = null;
+    };
+  }, []);
+
+  const requestAnalyze = useCallback(() => {
+    analyzeHandlerRef.current?.();
+    scrollToPanel("eos-panel");
+  }, []);
+
   return (
     <QuickActionContext.Provider
       value={{
         registerActivityHandler,
         registerFollowUpHandler,
         registerEmailHandler,
+        registerAnalyzeHandler,
         requestActivity,
         requestFollowUp,
         requestEmail,
+        requestAnalyze,
       }}
     >
       {children}

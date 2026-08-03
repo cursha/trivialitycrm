@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CirclePlus } from "lucide-react";
 import { EOS_CATEGORY_MAXIMA, EOS_CATEGORY_LABELS } from "@/lib/eos/constants";
 import { recordHistoricalScore, clearNeedsReview, setHasTvs } from "./actions";
+import { OpportunityAnalysisPanel } from "@/app/(dashboard)/companies/opportunity-analysis-panel";
+import { useQuickActions } from "../quick-action-context";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/alert";
@@ -82,17 +84,23 @@ function CategoryBreakdown({ scores }: { scores: Record<keyof typeof EOS_CATEGOR
 
 export function ScorePanel({
   companyId,
+  companyName,
   summary,
   history,
   canEdit,
+  canAnalyze,
 }: {
   companyId: string;
+  companyName: string;
   summary: CompanySummary;
   history: ScoreHistoryRow[];
   canEdit: boolean;
+  canAnalyze: boolean;
 }) {
   const router = useRouter();
+  const { registerAnalyzeHandler } = useQuickActions();
   const [recording, setRecording] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isClearingReview, startClearReview] = useTransition();
@@ -100,6 +108,11 @@ export function ScorePanel({
   const [categoryValues, setCategoryValues] = useState<Record<string, number>>(
     Object.fromEntries(CATEGORY_KEYS.map((key) => [key, 0])),
   );
+
+  useEffect(() => {
+    if (!canAnalyze) return;
+    return registerAnalyzeHandler(() => setAnalyzing(true));
+  }, [canAnalyze, registerAnalyzeHandler]);
 
   const total = useMemo(() => CATEGORY_KEYS.reduce((sum, key) => sum + (categoryValues[key] || 0), 0), [categoryValues]);
 
@@ -134,6 +147,17 @@ export function ScorePanel({
           </button>
         )}
       </div>
+
+      {analyzing && (
+        <OpportunityAnalysisPanel
+          companies={[{ id: companyId, name: companyName }]}
+          autoStart
+          onClose={() => {
+            setAnalyzing(false);
+            router.refresh();
+          }}
+        />
+      )}
 
       <div className="mt-3 flex items-center gap-2">
         <span className="text-xs font-semibold uppercase tracking-wide text-text-muted">Has TVs</span>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useLayoutEffect, useState, useTransition } from "react";
 import { Loader2, ChevronDown, ChevronRight } from "lucide-react";
 import type { AnalyzeOpportunityResult } from "@/lib/companies/analyze-opportunity";
 import { Alert } from "@/components/ui/alert";
@@ -101,7 +101,21 @@ async function runStreamingAnalysis(companyId: string, onActivity: (message: str
  * company-by-company (and so checkAiBudget()'s mid-batch stop stays
  * meaningful).
  */
-export function OpportunityAnalysisPanel({ companies, onClose }: { companies: { id: string; name: string }[]; onClose: () => void }) {
+export function OpportunityAnalysisPanel({
+  companies,
+  onClose,
+  autoStart,
+}: {
+  companies: { id: string; name: string }[];
+  onClose: () => void;
+  // Skips the "Start analysis"/"Cancel" confirmation screen and runs
+  // immediately on mount — used by single-company entry points (e.g. the
+  // company page's Quick sales actions) where a company was already
+  // deliberately chosen, unlike the multi-select bulk-toolbar path where
+  // that screen is the only chance to review the selection/cost before
+  // committing.
+  autoStart?: boolean;
+}) {
   const [rows, setRows] = useState<Row[]>(companies.map((c) => ({ id: c.id, name: c.name, status: "pending", stepCount: 0 })));
   const [expanded, setExpanded] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -118,6 +132,16 @@ export function OpportunityAnalysisPanel({ companies, onClose }: { companies: { 
     const interval = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(interval);
   }, [started, finished]);
+
+  // useLayoutEffect (not useEffect) so the "Start analysis"/"Cancel"
+  // confirmation screen never actually paints for an autoStart mount — it
+  // flips to the running view before the browser shows the first frame.
+  useLayoutEffect(() => {
+    if (autoStart) runAnalysis();
+    // Run once on mount only — runAnalysis reads `rows` fresh at call time,
+    // so it doesn't need to be a dependency here.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function updateRow(id: string, patch: Partial<Row> | ((prev: Row) => Partial<Row>)) {
     setRows((prev) => prev.map((row) => (row.id === id ? { ...row, ...(typeof patch === "function" ? patch(row) : patch) } : row)));

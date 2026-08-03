@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Phone, Mail, Users, FileText, Presentation, FlaskConical, StickyNote, CalendarClock } from "lucide-react";
+import { Phone, Mail, Users, FileText, Presentation, FlaskConical, StickyNote, CalendarClock, Sparkles } from "lucide-react";
 import { changeCompanyStage } from "../actions";
 import { useQuickActions } from "./quick-action-context";
 import { Card } from "@/components/ui/card";
@@ -25,14 +25,16 @@ export function QuickActionsBar({
   currentStageId,
   stages,
   canEdit,
+  canAnalyze,
 }: {
   companyId: string;
   currentStageId: string;
   stages: StageOption[];
   canEdit: boolean;
+  canAnalyze: boolean;
 }) {
   const router = useRouter();
-  const { requestActivity, requestFollowUp } = useQuickActions();
+  const { requestActivity, requestFollowUp, requestAnalyze } = useQuickActions();
   const [stageId, setStageId] = useState(currentStageId);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | undefined>();
@@ -76,6 +78,16 @@ export function QuickActionsBar({
             <CalendarClock size={14} />
             Follow-up
           </button>
+          {canAnalyze && (
+            <button
+              type="button"
+              onClick={requestAnalyze}
+              className="flex items-center gap-1.5 rounded-lg border border-border-strong px-3 py-2 text-xs font-semibold text-text hover:bg-black/5"
+            >
+              <Sparkles size={14} />
+              Analyze opportunity
+            </button>
+          )}
         </div>
       ) : (
         <p className="mt-3 text-sm text-text-muted">You don&apos;t have permission to log activity for this company.</p>

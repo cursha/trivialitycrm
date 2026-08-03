@@ -139,6 +139,12 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const calendarAvailable = connection?.provider !== "titan";
   const canEdit = hasPermission(user, "edit_leads");
   const canRoutePlan = hasPermission(user, "manage_route_plan");
+  // Mirrors the permission checks inside runOpportunityAnalysis() itself
+  // (src/lib/companies/analyze-opportunity.ts) — shown here only when all
+  // three would actually succeed, not just canEdit, so the button never
+  // promises an action the server will then reject.
+  const canAnalyzeOpportunity =
+    hasPermission(user, "run_research") && hasPermission(user, "bulk_update_leads") && canEdit;
 
   const nextBestActions = computeNextBestActions({
     now: new Date(),
@@ -191,6 +197,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         currentStageId={company.pipelineStageId}
         stages={pipelineStages.map((s) => ({ id: s.id, name: s.name, active: s.active }))}
         canEdit={canEdit}
+        canAnalyze={canAnalyzeOpportunity}
       />
 
       {canRoutePlan && <AddToRouteToggle companyId={company.id} initiallyInRoute={routeCompanyIds.has(company.id)} canManage={canRoutePlan} />}
@@ -239,12 +246,16 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             )}
           </Card>
 
-          <ScorePanel
-            companyId={company.id}
-            summary={company}
-            history={scoreHistory}
-            canEdit={canEdit}
-          />
+          <div id="eos-panel">
+            <ScorePanel
+              companyId={company.id}
+              companyName={company.name}
+              summary={company}
+              history={scoreHistory}
+              canEdit={canEdit}
+              canAnalyze={canAnalyzeOpportunity}
+            />
+          </div>
 
           <div id="contacts-panel">
             <ContactsPanel
