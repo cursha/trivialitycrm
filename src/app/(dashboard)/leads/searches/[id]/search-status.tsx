@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { cancelSearch, retrySearchWithBudgetOverride } from "../actions";
-import { isBudgetBlockedReason } from "@/lib/ai/budget";
+import { isBudgetBlockedReason } from "@/lib/ai/budget-messages";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/alert";

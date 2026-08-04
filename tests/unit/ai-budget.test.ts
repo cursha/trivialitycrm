@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { evaluateAiBudget, isBudgetBlockedReason } from "../../src/lib/ai/budget";
+import { evaluateAiBudget } from "../../src/lib/ai/budget";
+import { isBudgetBlockedReason } from "../../src/lib/ai/budget-messages";
 
 const noSpend = { todayUsd: 0, monthUsd: 0 };
 

@@ -201,24 +201,14 @@ export function isAiApiKeyConfigured(): boolean {
   return Boolean(getEnv().AI_API_KEY);
 }
 
-// The three reason strings evaluateAiBudget()/checkMidRunAiBudget() ever
-// return for a spend-limit block (never for researchEnabled — see both
-// functions' own comments on why that one is deliberately never
-// override-able). Matched by substring, not exact equality, so a reason
-// string in either function can still gain more detail later (e.g.
-// interpolating the actual dollar amount) without silently breaking this
-// check.
-const BUDGET_BLOCKED_MARKERS = ["budget has been reached", "maximum per-search AI budget", "AI budget limit reached mid-run"];
-
-/** Whether a LeadSearch.errorMessage represents a spend-limit block that a
- * "Continue anyway" override (LeadSearch.budgetOverride) can actually fix —
- * as opposed to a real provider failure, or the researchEnabled kill-switch,
- * which no per-search override can bypass. Used by the resume UI to decide
- * whether offering that button would do anything. */
-export function isBudgetBlockedReason(reason: string | null | undefined): boolean {
-  if (!reason) return false;
-  return BUDGET_BLOCKED_MARKERS.some((marker) => reason.includes(marker));
-}
+// isBudgetBlockedReason() used to live here but moved to ./budget-messages —
+// this file has no "server-only" guard (the worker needs getAiSettings()
+// under plain tsx), so a client component importing anything from it pulls
+// the whole module graph (prisma, Node-only code) into the browser bundle.
+// Confirmed live: that broke the production build outright the moment a
+// "use client" status component imported it from here. Import
+// isBudgetBlockedReason from ./budget-messages directly instead — never
+// re-add it to this file.
 
 /**
  * Module Nine: rechecked between candidates in run-search.ts's per-candidate

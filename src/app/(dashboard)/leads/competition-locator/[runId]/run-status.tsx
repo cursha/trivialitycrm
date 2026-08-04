@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { cancelCompetitionLocatorRun, retryCompetitionLocatorRunWithOverride } from "./actions";
-import { isBudgetBlockedReason } from "@/lib/ai/budget";
+import { isBudgetBlockedReason } from "@/lib/ai/budget-messages";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { BadgeTone } from "@/lib/ui/status-tones";
