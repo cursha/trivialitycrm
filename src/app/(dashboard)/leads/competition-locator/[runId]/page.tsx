@@ -37,6 +37,15 @@ export default async function CompetitionLocatorRunPage({ params }: { params: Pr
   const found = resultCounts.reduce((sum, r) => sum + r._count, 0);
   const rejected = countFor("REJECTED");
 
+  // Same "at most one region genuinely RUNNING" reasoning as the polling
+  // status route — this is just its first-paint equivalent.
+  const activeSearch = searches
+    .filter((s) => s.status === "RUNNING")
+    .sort((a, b) => (b.heartbeatAt?.getTime() ?? 0) - (a.heartbeatAt?.getTime() ?? 0))[0];
+  const currentActivity = activeSearch
+    ? { region: activeSearch.region, country: activeSearch.country, message: activeSearch.progressMessage }
+    : null;
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader title={`Competition Locator: ${competitor?.name ?? "Unknown competitor"}`} description={`Searching ${totalRegions} region${totalRegions === 1 ? "" : "s"}.`} />
@@ -52,6 +61,7 @@ export default async function CompetitionLocatorRunPage({ params }: { params: Pr
           needsReview: countFor("BELOW_SCORE"),
           possibleDuplicates,
           errors,
+          currentActivity,
         }}
       />
     </div>

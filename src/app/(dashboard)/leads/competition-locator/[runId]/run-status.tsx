@@ -3,12 +3,15 @@
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 import { cancelCompetitionLocatorRun } from "./actions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { BadgeTone } from "@/lib/ui/status-tones";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+
+type CurrentActivity = { region: string; country: string; message: string | null } | null;
 
 type StatusPayload = {
   status: "RUNNING" | "PARTIAL_FAILURE" | "SUCCEEDED" | "CANCELLED";
@@ -20,6 +23,7 @@ type StatusPayload = {
   needsReview: number;
   possibleDuplicates: number;
   errors: string[];
+  currentActivity: CurrentActivity;
 };
 
 const STATUS_TONE: Record<StatusPayload["status"], BadgeTone> = {
@@ -84,6 +88,18 @@ export function RunStatus({ runId, initial }: { runId: string; initial: StatusPa
       <p className="mt-2 text-text-muted">
         {status.completedRegions} of {status.totalRegions} region{status.totalRegions === 1 ? "" : "s"} complete.
       </p>
+
+      {status.currentActivity && (
+        <div className="mt-3 rounded-lg border border-focus/30 bg-focus/5 p-3">
+          <p className="text-xs font-semibold uppercase text-text-muted">
+            Currently searching: {status.currentActivity.region}, {status.currentActivity.country}
+          </p>
+          <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-secondary">
+            <Loader2 size={14} className="shrink-0 animate-spin" />
+            {status.currentActivity.message ?? "Working..."}
+          </p>
+        </div>
+      )}
 
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatTile label="Possible locations" value={status.found} />

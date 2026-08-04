@@ -478,6 +478,26 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
     for (const batch of chunk(candidateRows, CANDIDATE_CONCURRENCY)) {
       if (options.isCancelled && (await options.isCancelled())) return;
 
+      // Visible proof-of-life for the per-candidate phase, same idiom as
+      // onDiscoveryProgress above — named venues currently being processed,
+      // not a synthetic timer, so a long-running search never goes quiet
+      // and indistinguishable from a stuck one.
+      try {
+        const batchNames = batch.map((row) => {
+          const raw = row.rawCandidate as unknown as ResearchCandidate;
+          return `${raw.name} (${raw.city})`;
+        });
+        await prisma.leadSearch.update({
+          where: { id: searchId },
+          data: {
+            progressMessage: `Processing ${batchNames.join(", ")}...`,
+            heartbeatAt: new Date(),
+          },
+        });
+      } catch {
+        // Best-effort — never let a progress-write failure fail the search.
+      }
+
       // allSettled, not all — every candidate in this batch must be allowed
       // to fully finish (reach COMPLETED, with its SearchResult written)
       // even if a sibling candidate in the same batch fails. Promise.all

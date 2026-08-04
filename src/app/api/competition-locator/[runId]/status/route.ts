@@ -21,7 +21,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ run
 
   const searches = await prisma.leadSearch.findMany({
     where: { runCorrelationId: runId },
-    select: { status: true, errorMessage: true },
+    select: { status: true, errorMessage: true, region: true, country: true, progressMessage: true, heartbeatAt: true },
   });
 
   if (searches.length === 0) {
@@ -34,6 +34,18 @@ export async function GET(_request: Request, { params }: { params: Promise<{ run
   const anyFailed = searches.some((s) => s.status === "FAILED");
   const anyRunning = searches.some((s) => s.status === "RUNNING" || s.status === "PENDING");
   const errors = Array.from(new Set(searches.filter((s) => s.status === "FAILED" && s.errorMessage).map((s) => s.errorMessage as string)));
+
+  // Worker concurrency is 1 (see boss-client.ts) — at most one region's
+  // LeadSearch is genuinely RUNNING at a time, so there's always at most
+  // one unambiguous "what's happening right now" line to surface. Picks
+  // the most recently-heartbeated RUNNING row defensively, in case that
+  // assumption ever changes.
+  const activeSearch = searches
+    .filter((s) => s.status === "RUNNING")
+    .sort((a, b) => (b.heartbeatAt?.getTime() ?? 0) - (a.heartbeatAt?.getTime() ?? 0))[0];
+  const currentActivity = activeSearch
+    ? { region: activeSearch.region, country: activeSearch.country, message: activeSearch.progressMessage }
+    : null;
 
   const [resultCounts, possibleDuplicates] = await Promise.all([
     prisma.searchResult.groupBy({ by: ["disposition"], where: { search: { runCorrelationId: runId } }, _count: true }),
@@ -58,5 +70,6 @@ export async function GET(_request: Request, { params }: { params: Promise<{ run
     needsReview,
     possibleDuplicates,
     errors,
+    currentActivity,
   });
 }
