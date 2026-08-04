@@ -53,9 +53,26 @@ services to coordinate a migration race.
    - Settings → Build: Builder = Dockerfile (leave Dockerfile Path at its
      default, `Dockerfile`)
    - Settings → Deploy: Start Command = leave as the image default
-     (`node_modules/.bin/next start`); Pre-Deploy Command =
-     `npx prisma migrate deploy`; Healthcheck Path = `/api/health`; Restart
-     Policy = `ON_FAILURE` (or `ALWAYS` — operator preference)
+     (`node_modules/.bin/next start`); Healthcheck Path = `/api/health`;
+     Restart Policy = `ON_FAILURE` (or `ALWAYS` — operator preference)
+   - **Pre-Deploy Command — critical gotcha, confirmed live**: Railway does
+     **not** run this field through a shell. A naive multi-command string
+     like `npx prisma migrate deploy && npx prisma db seed && echo DONE`
+     silently only executes the first command — everything after the first
+     `&&`/`;` never runs, with no error anywhere in the deploy logs (the
+     deploy still reports SUCCESS). Confirmed by direct testing: `echo A &&
+     echo B` prints only `A`; `echo A; echo B` prints only `A`; wrapping in
+     `sh -c "..."` is what actually makes it run both. This is exactly how
+     seeding silently stopped applying to production for an unknown period
+     — `migrate deploy` (the first command) kept succeeding every deploy,
+     masking that `db seed` right after it in the same `&&` chain never once
+     executed. Set the field to exactly:
+     ```
+     sh -c "npx prisma migrate deploy && npx prisma db seed && echo SEED_FINISHED"
+     ```
+     and confirm the `SEED_FINISHED` line actually appears in that deploy's
+     logs — that's the only reliable signal seeding really ran, since a
+     silently-truncated command still returns a successful deployment.
    - Enable public networking; attach a custom domain once ready (see below)
 3. **Create the `worker` service** from the same repo.
    - Settings → Build: Builder = Dockerfile, **Dockerfile Path =
@@ -78,8 +95,10 @@ services to coordinate a migration race.
    share one validation schema that runs at startup on each.
 5. **First deploy**: push to the branch Railway watches, or trigger a manual
    deploy on both services. Watch the `web` service's Pre-Deploy Command logs
-   for `prisma migrate deploy` succeeding, then watch the `worker` service's
-   logs for `"database schema is up to date."` followed by `"worker started,
+   for `prisma migrate deploy` succeeding AND the `SEED_FINISHED` line
+   actually appearing (see the gotcha above — a deploy reporting SUCCESS is
+   not proof seeding ran), then watch the `worker` service's logs for
+   `"database schema is up to date."` followed by `"worker started,
    listening for jobs."`.
 6. **Verify**: hit `https://<web-domain>/api/health` — expect
    `{"status":"ok","database":"up"}`. Sign in with the seeded administrator

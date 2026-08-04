@@ -49,6 +49,14 @@ schema to already be current before it starts accepting jobs. See
 npx prisma db seed
 ```
 
+If running this as part of Railway's Pre-Deploy Command chained after
+`migrate deploy`, see RAILWAY.md's Pre-Deploy Command gotcha first — that
+field is not run through a shell, so a naive `migrate deploy && db seed`
+string silently only runs the first command, with the deploy still
+reporting SUCCESS and no error anywhere in the logs. Confirmed live: this is
+exactly how seeding silently stopped applying to production for an unknown
+period. Wrap the whole chain in `sh -c "..."`.
+
 Runs `tsx prisma/seed.ts` (configured in `prisma.config.ts`). The seed script
 is fully idempotent — every row it creates uses `upsert`, keyed on a stable
 natural key (permission key, role name, pipeline-stage name, etc.), so running
