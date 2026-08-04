@@ -83,7 +83,16 @@ export interface PromptAssistant {
   refine(input: { description: string; currentPrompt?: string; userId?: string }): Promise<{ prompt: string }>;
 }
 
-export type DiscoveryProgressUpdate = { city: string; cityIndex: number; totalCities: number; foundSoFar: number };
+// "city": the directory providers (GooglePlacesDiscoveryProvider/
+// MockPlacesProvider), which genuinely process one city at a time.
+// "message": a single-call AI provider (AnthropicCandidateDiscoveryProvider)
+// discovering across a whole region in one streamed call — there's no
+// per-city checkpoint to report, only a freeform activity line (a real
+// web_search/web_fetch tool call, not a synthetic timer), same convention
+// already used by AnthropicOpportunityAnalysisProvider's onProgress.
+export type DiscoveryProgressUpdate =
+  | { kind: "city"; city: string; cityIndex: number; totalCities: number; foundSoFar: number }
+  | { kind: "message"; message: string };
 
 /** Finds raw business candidates matching the structured search criteria.
  * `onProgress`, when given, is called once per city as it finishes — only

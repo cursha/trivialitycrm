@@ -13,7 +13,7 @@ import { stampEvidenceVerificationDates, hasCurrentVerifiedEvidence } from "./re
 import { getAiSettings, checkMidRunAiBudget } from "../ai/budget";
 import { writeAuditEvent } from "../audit/log";
 import { classifyProviderError } from "../integrations/provider-errors";
-import type { DiscoverParams, ResearchCandidate } from "./providers/types";
+import type { DiscoverParams, ResearchCandidate, DiscoveryProgressUpdate } from "./providers/types";
 
 // Competition Locator's verification-standard rejection reasons (seeded in
 // prisma/seed.ts). Looked up once by name, not hardcoded ids, matching the
@@ -173,14 +173,15 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       // discover() call returns, since candidatesFound doesn't update until
       // the bulk checkpoint transaction below. Cheap, best-effort: never
       // lets a progress-write failure fail the actual search.
-      const onDiscoveryProgress = async (update: { city: string; cityIndex: number; totalCities: number; foundSoFar: number }) => {
+      const onDiscoveryProgress = async (update: DiscoveryProgressUpdate) => {
         try {
+          const progressMessage =
+            update.kind === "city"
+              ? `Searched ${update.city} (${update.cityIndex + 1}/${update.totalCities}) — ${update.foundSoFar} found so far.`
+              : update.message;
           await prisma.leadSearch.update({
             where: { id: searchId },
-            data: {
-              progressMessage: `Searched ${update.city} (${update.cityIndex + 1}/${update.totalCities}) — ${update.foundSoFar} found so far.`,
-              heartbeatAt: new Date(),
-            },
+            data: { progressMessage, heartbeatAt: new Date() },
           });
         } catch {
           // Best-effort — never let a progress-write failure fail the search.

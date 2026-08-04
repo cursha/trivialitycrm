@@ -166,7 +166,7 @@ export class GooglePlacesDiscoveryProvider implements CandidateDiscoveryProvider
         if (page < MAX_PAGES_PER_CITY - 1 && this.pageDelayMs > 0) await sleep(this.pageDelayMs);
       }
 
-      await onProgress?.({ city, cityIndex, totalCities: cities.length, foundSoFar: results.length });
+      await onProgress?.({ kind: "city", city, cityIndex, totalCities: cities.length, foundSoFar: results.length });
     }
 
     return results;

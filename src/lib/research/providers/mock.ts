@@ -96,7 +96,7 @@ export class MockPlacesProvider implements CandidateDiscoveryProvider {
         evidence: [],
         sources: [],
       });
-      await onProgress?.({ city, cityIndex, totalCities: cities.length, foundSoFar: results.length });
+      await onProgress?.({ kind: "city", city, cityIndex, totalCities: cities.length, foundSoFar: results.length });
     }
 
     return results;

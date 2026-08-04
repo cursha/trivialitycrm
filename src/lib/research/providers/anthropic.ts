@@ -13,6 +13,7 @@ import { EOS_CATEGORY_MAXIMA, EOS_CATEGORY_LABELS } from "../../eos/constants";
 import type {
   CandidateDiscoveryProvider,
   DiscoverParams,
+  DiscoveryProgressUpdate,
   EvidenceVerificationProvider,
   OpportunityAnalysisInput,
   OpportunityAnalysisProvider,
@@ -482,21 +483,28 @@ export class AnthropicPromptAssistant implements PromptAssistant {
 }
 
 export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryProvider {
-  async discover(params: DiscoverParams): Promise<ResearchCandidate[]> {
+  async discover(params: DiscoverParams, onProgress?: (update: DiscoveryProgressUpdate) => Promise<void>): Promise<ResearchCandidate[]> {
     const { model, maxSearchToolUses } = await resolveResearchSettings();
     // Up to maxSearchToolUses web_search + maxSearchToolUses web_fetch tool
-    // round-trips for a broad query (e.g. no city filter, or "all pubs in a
-    // city") can genuinely take several minutes — the run-search job itself
-    // is designed for that (expireInSeconds: 3600 in boss-client.ts, with
-    // per-candidate checkpointing run in concurrent batches, see
-    // run-search.ts's CANDIDATE_CONCURRENCY), but this call's own timeout
-    // was originally set well below that. Confirmed by an actual live run: a
-    // real search consistently hit the old 120s ceiling before Claude
-    // finished working through its tool calls.
-    return callProvider({ providerName: "anthropic-discovery", timeoutMs: 300_000 }, async (signal) => {
+    // round-trips for a broad query (e.g. no city filter, or a competitor
+    // with genuine market presence across a whole region) can genuinely take
+    // well past 5 minutes — confirmed live: a single-province COMPETITOR
+    // search with 10+ real locations hit the old 300s ceiling and failed
+    // outright. This call runs inside the worker's run-search job, never
+    // behind Railway's HTTP proxy the way a web-request-driven call would
+    // be (see AnthropicOpportunityAnalysisProvider's own comment on that
+    // proxy timeout) — so the only real ceiling is the run-search queue's
+    // own expireInSeconds: 3600 (boss-client.ts), which leaves generous
+    // headroom for verification/scoring afterward even at 900s here.
+    // Streamed (like AnthropicOpportunityAnalysisProvider) primarily for
+    // progress visibility, not proxy survival: without it, LeadSearch's own
+    // progressMessage/heartbeatAt never update for the full duration of a
+    // long call, making a legitimately-still-working search look identical
+    // to a dead one on its own status page.
+    return callProvider({ providerName: "anthropic-discovery", timeoutMs: 900_000 }, async (signal) => {
       const locationScope = params.cities.length > 0 ? params.cities.join(", ") : `all of ${params.region} (no city filter given)`;
 
-      const response = await client().messages.create(
+      const stream = client().messages.stream(
         {
           model,
           // Was 8000 — too tight for a broad, no-city-filter query returning
@@ -525,10 +533,44 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
         { signal },
       );
 
-      await recordUsage({ operation: "discover", model, usage: response.usage, searchId: params.searchId, userId: params.userId });
-      assertNotTruncated(response.stop_reason, "anthropic-discovery");
+      // Fire-and-forget, like AnthropicOpportunityAnalysisProvider's own
+      // onProgress calls — a progress-write failure (see run-search.ts's
+      // best-effort try/catch) must never affect the actual discovery call.
+      stream.on("contentBlock", (block) => {
+        if (block.type === "server_tool_use") {
+          void onProgress?.({ kind: "message", message: serverToolProgressMessage(block.name, block.input) });
+        } else if (block.type === "thinking") {
+          void onProgress?.({ kind: "message", message: "Reasoning about candidates found so far..." });
+        }
+      });
+      let lastThinkingHeartbeat = 0;
+      stream.on("streamEvent", (event) => {
+        if (event.type !== "content_block_delta" || event.delta.type !== "thinking_delta") return;
+        const now = Date.now();
+        if (now - lastThinkingHeartbeat < 5000) return;
+        lastThinkingHeartbeat = now;
+        void onProgress?.({ kind: "message", message: "Reasoning about candidates found so far..." });
+      });
 
-      const jsonBlock = response.content.find((block) => block.type === "text");
+      let finalMessage;
+      try {
+        finalMessage = await stream.finalMessage();
+      } catch (error) {
+        // Same "a timed-out/aborted call is still billed" reasoning as
+        // AnthropicOpportunityAnalysisProvider — record best-effort partial
+        // usage so a call that grinds the full 900s before timing out isn't
+        // invisible to the cost dashboard and checkAiBudget() enforcement.
+        const partialUsage = stream.currentMessage?.usage;
+        if (partialUsage) {
+          await recordUsage({ operation: "discover", model, usage: partialUsage, searchId: params.searchId, userId: params.userId });
+        }
+        throw error;
+      }
+
+      await recordUsage({ operation: "discover", model, usage: finalMessage.usage, searchId: params.searchId, userId: params.userId });
+      assertNotTruncated(finalMessage.stop_reason, "anthropic-discovery");
+
+      const jsonBlock = finalMessage.content.find((block) => block.type === "text");
       if (!jsonBlock || !("text" in jsonBlock)) return [];
       const parsed = JSON.parse(jsonBlock.text) as { candidates: ResearchCandidate[] };
       return parsed.candidates.map((candidate) => ({ ...candidate, contactData: candidate.contactData ?? [] }));
