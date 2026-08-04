@@ -3,24 +3,33 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
-import { requirePermission } from "@/lib/auth/permissions";
+import { requirePermission, hasPermission } from "@/lib/auth/permissions";
 import { SearchSetupSchema } from "@/lib/validation/search";
 import { formString } from "@/lib/form-data";
 import { enqueueSearchJob, cancelSearchJob } from "@/lib/jobs/enqueue";
 import { checkAiBudget, getAiSettings } from "@/lib/ai/budget";
 import { checkRateLimit } from "@/lib/rate-limit/postgres-bucket";
+import { writeAuditEvent } from "@/lib/audit/log";
 
-export type SearchFormState = { error?: string } | undefined;
+export type SearchFormState = { error?: string; budgetBlocked?: boolean } | undefined;
 
 export async function startSearch(_prevState: SearchFormState, formData: FormData): Promise<SearchFormState> {
   const user = await requireUser();
   requirePermission(user, "run_research");
 
+  // "Continue anyway" — a one-time, per-search bypass of the dollar-amount
+  // budget checks (never the researchEnabled kill-switch, see budget.ts).
+  // Only ever honored for a user with manage_ai_settings, checked here
+  // server-side — a client-sent checkbox value is never trusted on its own.
+  const requestedOverride = formString(formData, "overrideBudget") === "true";
+  const canOverrideBudget = hasPermission(user, "manage_ai_settings");
+  const applyOverride = requestedOverride && canOverrideBudget;
+
   // Module 8A: refuse a new paid AI job once research is disabled or a
   // configured hard budget is already reached — never blocks mock mode.
-  const budgetCheck = await checkAiBudget();
+  const budgetCheck = await checkAiBudget({ overrideSpendLimit: applyOverride });
   if (!budgetCheck.allowed) {
-    return { error: budgetCheck.reason };
+    return { error: budgetCheck.reason, budgetBlocked: true };
   }
 
   const aiSettings = await getAiSettings();
@@ -71,8 +80,20 @@ export async function startSearch(_prevState: SearchFormState, formData: FormDat
       minimumScore: parsed.data.minimumScore,
       mode: parsed.data.mode,
       promptSnapshot: prompt.qualificationPrompt,
+      budgetOverride: applyOverride,
     },
   });
+
+  if (applyOverride) {
+    await writeAuditEvent({
+      actorId: user.id,
+      module: "ai-integration",
+      action: "ai_budget.overridden",
+      entityType: "LeadSearch",
+      entityId: search.id,
+      metadata: { reason: budgetCheck.reason ?? null, stage: "start" },
+    });
+  }
 
   // Durable execution: enqueue onto the run-search queue and store pg-boss's
   // job id for cancellation lookup. The worker (see worker/handlers/run-search.ts)
@@ -107,6 +128,45 @@ export async function cancelSearch(searchId: string): Promise<{ error?: string }
     where: { id: searchId },
     data: { status: "CANCELLED", completedAt: new Date() },
   });
+
+  return {};
+}
+
+/**
+ * Resumes a search that stopped on a budget-blocked FAILED status (see
+ * isBudgetBlockedReason() in budget.ts) — sets the one-time override flag
+ * and re-enqueues. runSearchJob is fully resumable from its existing
+ * SearchCandidate checkpoints (see its own doc comment), so this picks up
+ * exactly where the search left off rather than starting over. Restricted
+ * to manage_ai_settings, same as the start-time override — resuming past a
+ * spend limit is the same authorization decision either way.
+ */
+export async function retrySearchWithBudgetOverride(searchId: string): Promise<{ error?: string }> {
+  const user = await requireUser();
+  requirePermission(user, "run_research");
+  requirePermission(user, "manage_ai_settings");
+
+  const search = await prisma.leadSearch.findUnique({ where: { id: searchId } });
+  if (!search) {
+    return { error: "That search no longer exists." };
+  }
+  if (search.status !== "FAILED") {
+    return { error: "Only a failed search can be resumed this way." };
+  }
+
+  await prisma.leadSearch.update({ where: { id: searchId }, data: { budgetOverride: true } });
+
+  await writeAuditEvent({
+    actorId: user.id,
+    module: "ai-integration",
+    action: "ai_budget.overridden",
+    entityType: "LeadSearch",
+    entityId: searchId,
+    metadata: { reason: search.errorMessage, stage: "resume" },
+  });
+
+  const providerJobId = await enqueueSearchJob(searchId);
+  await prisma.leadSearch.update({ where: { id: searchId }, data: { providerJobId } });
 
   return {};
 }

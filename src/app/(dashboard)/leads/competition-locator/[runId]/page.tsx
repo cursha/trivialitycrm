@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
-import { requirePermission } from "@/lib/auth/permissions";
+import { requirePermission, hasPermission } from "@/lib/auth/permissions";
 import { RunStatus } from "./run-status";
 import { PageHeader } from "@/components/ui/page-header";
 
@@ -51,6 +51,7 @@ export default async function CompetitionLocatorRunPage({ params }: { params: Pr
       <PageHeader title={`Competition Locator: ${competitor?.name ?? "Unknown competitor"}`} description={`Searching ${totalRegions} region${totalRegions === 1 ? "" : "s"}.`} />
       <RunStatus
         runId={runId}
+        canOverrideBudget={hasPermission(user, "manage_ai_settings")}
         initial={{
           status,
           totalRegions,

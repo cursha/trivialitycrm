@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
-import { requirePermission } from "@/lib/auth/permissions";
+import { requirePermission, hasPermission } from "@/lib/auth/permissions";
 import { SearchStatus } from "./search-status";
 import { PageHeader } from "@/components/ui/page-header";
 
@@ -29,6 +29,7 @@ export default async function SearchStatusPage({ params }: { params: Promise<{ i
           progressMessage: search.progressMessage,
           errorMessage: search.errorMessage,
         }}
+        canOverrideBudget={hasPermission(user, "manage_ai_settings")}
       />
     </div>
   );

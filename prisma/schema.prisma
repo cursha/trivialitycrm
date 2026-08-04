@@ -1106,6 +1106,17 @@ model LeadSearch {
   // audit trail (see writeAuditEvent()).
   runCorrelationId String?
 
+  // One-time, per-search bypass of the daily/monthly/per-search AI spend
+  // limits (see checkAiBudget()/checkMidRunAiBudget() in src/lib/ai/budget.ts)
+  // — set only when a user with manage_ai_settings explicitly chooses
+  // "Continue anyway" at start time or when resuming a budget-blocked
+  // search. Never bypasses AiSettings.researchEnabled — that kill-switch
+  // stays enforced regardless of this flag. Deliberately NOT a global
+  // setting: it's scoped to the one search/run the user actually approved
+  // exceeding budget for, so every other concurrent or future search still
+  // enforces the configured limit normally.
+  budgetOverride Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

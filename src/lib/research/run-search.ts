@@ -254,7 +254,7 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       // below), so this recheck is skipped for it — a pure DB-cost-avoidance
       // short-circuit, not a safety gap.
       if (search.mode !== "GENERAL") {
-        const midRunCheck = await checkMidRunAiBudget(search.id);
+        const midRunCheck = await checkMidRunAiBudget(search.id, { overrideSpendLimit: search.budgetOverride });
         if (!midRunCheck.allowed) {
           await writeAuditEvent({
             actorId: search.createdById,

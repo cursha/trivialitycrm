@@ -3,7 +3,8 @@
 import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { cancelSearch } from "../actions";
+import { cancelSearch, retrySearchWithBudgetOverride } from "../actions";
+import { isBudgetBlockedReason } from "@/lib/ai/budget";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/alert";
@@ -19,10 +20,12 @@ type StatusPayload = {
 
 const TERMINAL = new Set(["SUCCEEDED", "FAILED", "CANCELLED"]);
 
-export function SearchStatus({ searchId, initial }: { searchId: string; initial: StatusPayload }) {
+export function SearchStatus({ searchId, initial, canOverrideBudget }: { searchId: string; initial: StatusPayload; canOverrideBudget: boolean }) {
   const [status, setStatus] = useState<StatusPayload>(initial);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [isCancelling, startCancelling] = useTransition();
+  const [retryError, setRetryError] = useState<string | null>(null);
+  const [isRetrying, startRetrying] = useTransition();
   const router = useRouter();
 
   function handleCancel() {
@@ -34,6 +37,19 @@ export function SearchStatus({ searchId, initial }: { searchId: string; initial:
         return;
       }
       setStatus((current) => ({ ...current, status: "CANCELLED" }));
+      router.refresh();
+    });
+  }
+
+  function handleRetryWithOverride() {
+    setRetryError(null);
+    startRetrying(async () => {
+      const result = await retrySearchWithBudgetOverride(searchId);
+      if (result.error) {
+        setRetryError(result.error);
+        return;
+      }
+      setStatus((current) => ({ ...current, status: "RUNNING" }));
       router.refresh();
     });
   }
@@ -71,6 +87,16 @@ export function SearchStatus({ searchId, initial }: { searchId: string; initial:
         <Alert tone="danger" className="mt-3">
           {status.errorMessage}
         </Alert>
+      )}
+
+      {status.status === "FAILED" && canOverrideBudget && isBudgetBlockedReason(status.errorMessage) && (
+        <div className="mt-3">
+          <Button type="button" variant="primary" onClick={handleRetryWithOverride} disabled={isRetrying}>
+            {isRetrying ? "Resuming..." : "Continue anyway"}
+          </Button>
+          <p className="mt-1 text-xs text-text-muted">Resumes from where it stopped, bypassing the budget limit for this search only.</p>
+          {retryError && <p className="mt-2 text-sm font-semibold text-danger">{retryError}</p>}
+        </div>
       )}
 
       {status.status === "SUCCEEDED" && (

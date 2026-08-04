@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { evaluateAiBudget } from "../../src/lib/ai/budget";
+import { evaluateAiBudget, isBudgetBlockedReason } from "../../src/lib/ai/budget";
 
 const noSpend = { todayUsd: 0, monthUsd: 0 };
 
@@ -38,5 +38,34 @@ describe("evaluateAiBudget", () => {
   it("treats a null budget as unlimited for that axis", () => {
     const result = evaluateAiBudget({ isAnthropicMode: true, researchEnabled: true, spend: { todayUsd: 100000, monthUsd: 100000 }, dailyBudgetUsd: null, monthlyBudgetUsd: null });
     expect(result.allowed).toBe(true);
+  });
+});
+
+describe("isBudgetBlockedReason", () => {
+  it("recognizes the daily and monthly budget messages", () => {
+    expect(isBudgetBlockedReason("Today's AI research budget has been reached.")).toBe(true);
+    expect(isBudgetBlockedReason("This month's AI research budget has been reached.")).toBe(true);
+  });
+
+  it("recognizes the per-search cost ceiling message", () => {
+    expect(isBudgetBlockedReason("This search has reached its maximum per-search AI budget.")).toBe(true);
+  });
+
+  it("recognizes the mid-run fallback message", () => {
+    expect(isBudgetBlockedReason("AI budget limit reached mid-run.")).toBe(true);
+  });
+
+  it("does not treat the researchEnabled kill-switch message as override-able", () => {
+    expect(isBudgetBlockedReason("AI research is currently disabled by an administrator.")).toBe(false);
+  });
+
+  it("does not treat an unrelated provider error as budget-related", () => {
+    expect(isBudgetBlockedReason("The provider took too long to respond. Try again shortly.")).toBe(false);
+  });
+
+  it("handles null/undefined/empty safely", () => {
+    expect(isBudgetBlockedReason(null)).toBe(false);
+    expect(isBudgetBlockedReason(undefined)).toBe(false);
+    expect(isBudgetBlockedReason("")).toBe(false);
   });
 });

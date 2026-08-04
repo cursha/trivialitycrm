@@ -4,7 +4,8 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { cancelCompetitionLocatorRun } from "./actions";
+import { cancelCompetitionLocatorRun, retryCompetitionLocatorRunWithOverride } from "./actions";
+import { isBudgetBlockedReason } from "@/lib/ai/budget";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import type { BadgeTone } from "@/lib/ui/status-tones";
@@ -42,10 +43,12 @@ const STATUS_LABEL: Record<StatusPayload["status"], string> = {
 
 const TERMINAL = new Set<StatusPayload["status"]>(["SUCCEEDED", "PARTIAL_FAILURE", "CANCELLED"]);
 
-export function RunStatus({ runId, initial }: { runId: string; initial: StatusPayload }) {
+export function RunStatus({ runId, initial, canOverrideBudget }: { runId: string; initial: StatusPayload; canOverrideBudget: boolean }) {
   const [status, setStatus] = useState<StatusPayload>(initial);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [isCancelling, startCancelling] = useTransition();
+  const [retryError, setRetryError] = useState<string | null>(null);
+  const [isRetrying, startRetrying] = useTransition();
   const router = useRouter();
 
   function handleCancel() {
@@ -56,6 +59,23 @@ export function RunStatus({ runId, initial }: { runId: string; initial: StatusPa
         setCancelError(result.error);
         return;
       }
+      router.refresh();
+    });
+  }
+
+  function handleRetryWithOverride() {
+    setRetryError(null);
+    startRetrying(async () => {
+      const result = await retryCompetitionLocatorRunWithOverride(runId);
+      if (result.error) {
+        setRetryError(result.error);
+        return;
+      }
+      // Optimistic — the polling effect below only resumes once status is
+      // no longer terminal, and a server refresh alone wouldn't re-sync
+      // this component's own state (only its initial mount reads the
+      // initial prop). Same idiom as handleCancel's optimistic update above.
+      setStatus((current) => ({ ...current, status: "RUNNING" }));
       router.refresh();
     });
   }
@@ -115,6 +135,16 @@ export function RunStatus({ runId, initial }: { runId: string; initial: StatusPa
             <p key={index}>{message}</p>
           ))}
         </Alert>
+      )}
+
+      {status.status === "PARTIAL_FAILURE" && canOverrideBudget && status.errors.some(isBudgetBlockedReason) && (
+        <div className="mt-3">
+          <Button type="button" variant="primary" onClick={handleRetryWithOverride} disabled={isRetrying}>
+            {isRetrying ? "Resuming..." : "Continue anyway"}
+          </Button>
+          <p className="mt-1 text-xs text-text-muted">Resumes every stopped region from where it left off, bypassing the budget limit for this run only.</p>
+          {retryError && <p className="mt-2 text-sm font-semibold text-danger">{retryError}</p>}
+        </div>
       )}
 
       {(status.status === "SUCCEEDED" || status.status === "PARTIAL_FAILURE") && (

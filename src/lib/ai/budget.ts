@@ -165,13 +165,25 @@ export function evaluateAiBudget(params: { isAnthropicMode: boolean; researchEna
 /**
  * Refuses a new paid AI job once a configured hard budget is already met or
  * exceeded — the DB-wired caller of evaluateAiBudget() above.
+ *
+ * `overrideSpendLimit` is the one-time, per-search "Continue anyway" bypass
+ * (LeadSearch.budgetOverride) — it only ever skips the dollar-amount checks
+ * below. `researchEnabled` is checked first and unconditionally, regardless
+ * of the override: that's an administrator's explicit kill-switch, not a
+ * spend limit, and no per-search flag should be able to talk its way past
+ * "research is turned off."
  */
-export async function checkAiBudget(): Promise<BudgetCheckResult> {
+export async function checkAiBudget(options?: { overrideSpendLimit?: boolean }): Promise<BudgetCheckResult> {
   const env = getEnv();
   const isAnthropicMode = env.AI_PROVIDER === "anthropic";
   if (!isAnthropicMode) return { allowed: true };
 
   const settings = await getAiSettings();
+  if (!settings.researchEnabled) {
+    return { allowed: false, reason: "AI research is currently disabled by an administrator." };
+  }
+  if (options?.overrideSpendLimit) return { allowed: true };
+
   const spend = await getCurrentAiSpend();
   return evaluateAiBudget({
     isAnthropicMode,
@@ -189,6 +201,25 @@ export function isAiApiKeyConfigured(): boolean {
   return Boolean(getEnv().AI_API_KEY);
 }
 
+// The three reason strings evaluateAiBudget()/checkMidRunAiBudget() ever
+// return for a spend-limit block (never for researchEnabled — see both
+// functions' own comments on why that one is deliberately never
+// override-able). Matched by substring, not exact equality, so a reason
+// string in either function can still gain more detail later (e.g.
+// interpolating the actual dollar amount) without silently breaking this
+// check.
+const BUDGET_BLOCKED_MARKERS = ["budget has been reached", "maximum per-search AI budget", "AI budget limit reached mid-run"];
+
+/** Whether a LeadSearch.errorMessage represents a spend-limit block that a
+ * "Continue anyway" override (LeadSearch.budgetOverride) can actually fix —
+ * as opposed to a real provider failure, or the researchEnabled kill-switch,
+ * which no per-search override can bypass. Used by the resume UI to decide
+ * whether offering that button would do anything. */
+export function isBudgetBlockedReason(reason: string | null | undefined): boolean {
+  if (!reason) return false;
+  return BUDGET_BLOCKED_MARKERS.some((marker) => reason.includes(marker));
+}
+
 /**
  * Module Nine: rechecked between candidates in run-search.ts's per-candidate
  * loop — not just once before the search starts. A search that crosses the
@@ -196,12 +227,22 @@ export function isAiApiKeyConfigured(): boolean {
  * through stops immediately, before placing another paid call, rather than
  * finishing at full cost. Mock mode is always allowed (same rule as
  * checkAiBudget()).
+ *
+ * `overrideSpendLimit` — same one-time bypass as checkAiBudget() above,
+ * threaded through from LeadSearch.budgetOverride by the caller
+ * (run-search.ts). Skips the daily/monthly AND per-search cost ceiling
+ * checks, never the researchEnabled kill-switch.
  */
-export async function checkMidRunAiBudget(searchId: string): Promise<BudgetCheckResult> {
+export async function checkMidRunAiBudget(searchId: string, options?: { overrideSpendLimit?: boolean }): Promise<BudgetCheckResult> {
   const env = getEnv();
   if (env.AI_PROVIDER !== "anthropic") return { allowed: true };
 
   const settings = await getAiSettings();
+  if (!settings.researchEnabled) {
+    return { allowed: false, reason: "AI research is currently disabled by an administrator." };
+  }
+  if (options?.overrideSpendLimit) return { allowed: true };
+
   const spend = await getCurrentAiSpend();
   const overall = evaluateAiBudget({
     isAnthropicMode: true,

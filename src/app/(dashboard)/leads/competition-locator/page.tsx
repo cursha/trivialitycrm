@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
-import { requirePermission } from "@/lib/auth/permissions";
+import { requirePermission, hasPermission } from "@/lib/auth/permissions";
 import { CompetitionLocatorForm } from "./competition-locator-form";
 import { PageHeader } from "@/components/ui/page-header";
 
@@ -27,7 +27,7 @@ export default async function CompetitionLocatorPage() {
           </Link>
         }
       />
-      <CompetitionLocatorForm competitors={competitors} leadTypes={leadTypes} />
+      <CompetitionLocatorForm competitors={competitors} leadTypes={leadTypes} canOverrideBudget={hasPermission(user, "manage_ai_settings")} />
     </div>
   );
 }

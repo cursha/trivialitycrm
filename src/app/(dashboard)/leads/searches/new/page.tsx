@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
-import { requirePermission } from "@/lib/auth/permissions";
+import { requirePermission, hasPermission } from "@/lib/auth/permissions";
 import { SearchForm } from "../search-form";
 import { PageHeader } from "@/components/ui/page-header";
 
@@ -22,7 +22,7 @@ export default async function NewSearchPage() {
         title="New Research Search"
         description="The prompt describes the business criteria; country, state/province, cities, and Lead Type are the authoritative filters."
       />
-      <SearchForm prompts={prompts} leadTypes={leadTypes} competitors={competitors} />
+      <SearchForm prompts={prompts} leadTypes={leadTypes} competitors={competitors} canOverrideBudget={hasPermission(user, "manage_ai_settings")} />
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
-import { requirePermission } from "@/lib/auth/permissions";
+import { requirePermission, hasPermission } from "@/lib/auth/permissions";
 import { CompetitionLocatorStartSchema } from "@/lib/validation/competition-locator";
 import { ALL_NORTH_AMERICAN_REGIONS } from "@/lib/constants/north-american-regions";
 import { formString } from "@/lib/form-data";
@@ -12,7 +12,7 @@ import { checkAiBudget, getAiSettings } from "@/lib/ai/budget";
 import { checkRateLimit } from "@/lib/rate-limit/postgres-bucket";
 import { writeAuditEvent, newCorrelationId } from "@/lib/audit/log";
 
-export type CompetitionLocatorFormState = { error?: string } | undefined;
+export type CompetitionLocatorFormState = { error?: string; budgetBlocked?: boolean } | undefined;
 
 // Fixed, non-user-editable criteria snapshot — Competition Locator has no
 // PromptTemplate of its own (LeadSearch.promptId stays null); the venue-type
@@ -27,9 +27,16 @@ export async function startCompetitionLocatorRun(_prevState: CompetitionLocatorF
   const user = await requireUser();
   requirePermission(user, "run_competition_locator");
 
-  const budgetCheck = await checkAiBudget();
+  // "Continue anyway" — same one-time, per-run bypass as the regular Lead
+  // Search form (see leads/searches/actions.ts#startSearch). Only ever
+  // honored for manage_ai_settings, checked here server-side.
+  const requestedOverride = formString(formData, "overrideBudget") === "true";
+  const canOverrideBudget = hasPermission(user, "manage_ai_settings");
+  const applyOverride = requestedOverride && canOverrideBudget;
+
+  const budgetCheck = await checkAiBudget({ overrideSpendLimit: applyOverride });
   if (!budgetCheck.allowed) {
-    return { error: budgetCheck.reason };
+    return { error: budgetCheck.reason, budgetBlocked: true };
   }
 
   const aiSettings = await getAiSettings();
@@ -76,6 +83,10 @@ export async function startCompetitionLocatorRun(_prevState: CompetitionLocatorF
   const runCorrelationId = newCorrelationId();
 
   for (const region of regions) {
+    // budgetOverride set on every child search up front — not just the
+    // first one to hit the wall — since the daily/monthly budget is global,
+    // not per-search: without this, a multi-region run would just re-block
+    // on the very next region and force clicking "continue" over and over.
     const search = await prisma.leadSearch.create({
       data: {
         createdById: user.id,
@@ -88,6 +99,7 @@ export async function startCompetitionLocatorRun(_prevState: CompetitionLocatorF
         mode: "COMPETITOR",
         promptSnapshot: PROMPT_SNAPSHOT,
         runCorrelationId,
+        budgetOverride: applyOverride,
       },
     });
     const providerJobId = await enqueueSearchJob(search.id);
@@ -102,6 +114,17 @@ export async function startCompetitionLocatorRun(_prevState: CompetitionLocatorF
     correlationId: runCorrelationId,
     metadata: { competitorId: competitor.id, competitorName: competitor.name, regionCount: regions.length },
   });
+
+  if (applyOverride) {
+    await writeAuditEvent({
+      actorId: user.id,
+      module: "ai-integration",
+      action: "ai_budget.overridden",
+      entityType: "LeadSearch",
+      correlationId: runCorrelationId,
+      metadata: { reason: budgetCheck.reason ?? null, stage: "start", regionCount: regions.length },
+    });
+  }
 
   redirect(`/leads/competition-locator/${runCorrelationId}`);
 }

@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 export type CompetitionLocatorFormOptions = {
   competitors: { id: string; name: string }[];
   leadTypes: { id: string; name: string }[];
+  canOverrideBudget: boolean;
 };
 
 // Encodes each checkbox as "Country|CODE" so a plain FormData.getAll() round
@@ -19,7 +20,7 @@ function regionValue(country: "United States" | "Canada", code: string): string 
   return `${country}|${code}`;
 }
 
-export function CompetitionLocatorForm({ competitors, leadTypes }: CompetitionLocatorFormOptions) {
+export function CompetitionLocatorForm({ competitors, leadTypes, canOverrideBudget }: CompetitionLocatorFormOptions) {
   const [state, formAction, pending] = useActionState<CompetitionLocatorFormState, FormData>(startCompetitionLocatorRun, undefined);
   const [selectedCount, setSelectedCount] = useState(0);
 
@@ -101,6 +102,13 @@ export function CompetitionLocatorForm({ competitors, leadTypes }: CompetitionLo
         </Alert>
 
         {state?.error && <FieldError>{state.error}</FieldError>}
+
+        {state?.budgetBlocked && canOverrideBudget && (
+          <label className="flex items-center gap-2 rounded-lg border border-dashed border-border-strong bg-black/[0.02] p-3 text-sm text-text">
+            <input type="checkbox" name="overrideBudget" value="true" />
+            Continue anyway — start this run despite the budget limit above.
+          </label>
+        )}
 
         <Button type="submit" disabled={pending} variant="primary">
           {pending ? "Starting..." : "Start search"}

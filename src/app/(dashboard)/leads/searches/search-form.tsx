@@ -10,6 +10,7 @@ export type SearchFormOptions = {
   prompts: { id: string; name: string }[];
   leadTypes: { id: string; name: string }[];
   competitors: { id: string; name: string }[];
+  canOverrideBudget: boolean;
 };
 
 const MODES = [
@@ -19,7 +20,7 @@ const MODES = [
   { value: "COMPETITOR", label: "Competitor research" },
 ];
 
-export function SearchForm({ prompts, leadTypes, competitors }: SearchFormOptions) {
+export function SearchForm({ prompts, leadTypes, competitors, canOverrideBudget }: SearchFormOptions) {
   const [state, formAction, pending] = useActionState<SearchFormState, FormData>(startSearch, undefined);
   const [mode, setMode] = useState("GENERAL");
   const [citiesInput, setCitiesInput] = useState("");
@@ -119,6 +120,13 @@ export function SearchForm({ prompts, leadTypes, competitors }: SearchFormOption
       </div>
 
       {state?.error && <FieldError>{state.error}</FieldError>}
+
+      {state?.budgetBlocked && canOverrideBudget && (
+        <label className="flex items-center gap-2 rounded-lg border border-dashed border-border-strong bg-black/[0.02] p-3 text-sm text-text">
+          <input type="checkbox" name="overrideBudget" value="true" />
+          Continue anyway — start this search despite the budget limit above.
+        </label>
+      )}
 
       <Button type="submit" disabled={pending} variant="primary">
         {pending ? "Starting..." : "Start search"}
