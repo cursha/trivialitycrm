@@ -11,11 +11,26 @@ export type EvidenceEntry = {
   note: string;
   sourceUrl: string | null;
   verificationStatus: "VERIFIED" | "INFERRED" | "UNVERIFIED";
+  // Server-stamped (never model-self-reported) ISO 8601 timestamp of when
+  // this entry was last confirmed VERIFIED with a sourceUrl — see
+  // stampEvidenceVerificationDates() in result-explanation.ts. Optional so
+  // every existing row/consumer written before this field existed keeps
+  // reading as undefined rather than requiring a backfill.
+  verifiedAt?: string | null;
 };
 
 export type SourceEntry = {
   url: string;
   title: string | null;
+};
+
+export type ContactDataEntry = {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  email?: string;
+  title?: string;
+  note?: string;
 };
 
 export type ResearchCandidate = {
@@ -28,14 +43,14 @@ export type ResearchCandidate = {
   phone: string | null;
   email: string | null;
   websiteUrl: string | null;
-  contactData: {
-    firstName?: string;
-    lastName?: string;
-    phone?: string;
-    email?: string;
-    title?: string;
-    note?: string;
-  } | null;
+  // Array, not a single contact — Competition Locator (COMPETITOR mode)
+  // collects every useful role (owner/GM/venue/marketing/events/
+  // entertainment manager) found for a venue, not just one. Other modes
+  // still only ever populate at most one entry today. See
+  // readContactDataEntries() (contact-data.ts) for the compatibility shim
+  // that lets every read site handle null/legacy-single-object/array
+  // uniformly without a data migration (this is a Json column).
+  contactData: ContactDataEntry[] | null;
   triviaStatus: TriviaStatus;
   competitorName: string | null;
   evidence: EvidenceEntry[];

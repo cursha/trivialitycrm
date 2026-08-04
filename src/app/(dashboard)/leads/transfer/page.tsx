@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
+import { readContactDataEntries } from "@/lib/research/contact-data";
 import { TransferForm } from "./transfer-form";
 import { PageHeader } from "@/components/ui/page-header";
 
@@ -27,13 +28,10 @@ export default async function TransferPage({ searchParams }: { searchParams: Pro
   const defaultStage = pipelineStages.find((stage) => stage.isDefault) ?? pipelineStages[0];
 
   const rows = results.map((result) => {
-    const contactData = (result.contactData as {
-      firstName?: string;
-      lastName?: string;
-      phone?: string;
-      email?: string;
-      title?: string;
-    } | null) ?? {};
+    // Only the first collected contact is shown here — the generic transfer
+    // form has always been single-contact; Competition Locator's own review
+    // flow is where multiple collected contacts actually get surfaced.
+    const contactData = readContactDataEntries(result.contactData)[0] ?? {};
 
     return {
       resultId: result.id,

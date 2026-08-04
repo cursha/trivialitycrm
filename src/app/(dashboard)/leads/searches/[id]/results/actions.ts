@@ -8,6 +8,7 @@ import { checkAiBudget } from "@/lib/ai/budget";
 import { checkRateLimit } from "@/lib/rate-limit/postgres-bucket";
 import { getProviders } from "@/lib/research/providers/factory";
 import type { DiscoverParams, ResearchCandidate } from "@/lib/research/providers/types";
+import { readContactDataEntries } from "@/lib/research/contact-data";
 import { writeAuditEvent } from "@/lib/audit/log";
 import { classifyProviderError } from "@/lib/integrations/provider-errors";
 
@@ -98,7 +99,7 @@ export async function researchResult(id: string): Promise<ResultActionResult> {
     phone: result.phone,
     email: result.email,
     websiteUrl: result.websiteUrl,
-    contactData: result.contactData as ResearchCandidate["contactData"],
+    contactData: readContactDataEntries(result.contactData),
     triviaStatus: result.triviaStatus,
     competitorName: result.competitor?.name ?? null,
     evidence: result.evidence as ResearchCandidate["evidence"],

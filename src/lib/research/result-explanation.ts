@@ -3,6 +3,7 @@
 // No new scoring: everything here is derived from data already stored on
 // the result (score/evidence/explanation/disposition), never invented.
 // Pure — unit-tested directly, same convention as ./priority.ts.
+import type { EvidenceEntry } from "./providers/types";
 
 export type ResultConfidence = "HIGH" | "MEDIUM" | "LOW";
 
@@ -61,4 +62,26 @@ export function recommendResultNextAction(input: RecommendedActionInput): string
     return `Below this search's minimum score (${input.minimumScore}) — review the evidence carefully before transferring.`;
   }
   return "Meets the bar for this search — ready to select and transfer.";
+}
+
+/**
+ * Server-stamps (never model-self-reported) a `verifiedAt` timestamp on
+ * every evidence entry that's actually VERIFIED with a sourceUrl, and clears
+ * it on everything else — called right after verify()/score() returns
+ * (run-search.ts, results/actions.ts#researchResult). Deterministic: the
+ * model never supplies this date itself, so it can never invent one for a
+ * finding it merely claims is current. Competition Locator's "insufficient
+ * verifiable evidence" rejection (run-search.ts, COMPETITOR mode only)
+ * checks for at least one entry passing this exact bar.
+ */
+export function stampEvidenceVerificationDates(evidence: EvidenceEntry[]): EvidenceEntry[] {
+  const now = new Date().toISOString();
+  return evidence.map((entry) => ({
+    ...entry,
+    verifiedAt: entry.verificationStatus === "VERIFIED" && entry.sourceUrl ? now : null,
+  }));
+}
+
+export function hasCurrentVerifiedEvidence(evidence: EvidenceEntry[]): boolean {
+  return evidence.some((entry) => entry.verificationStatus === "VERIFIED" && !!entry.sourceUrl && !!entry.verifiedAt);
 }

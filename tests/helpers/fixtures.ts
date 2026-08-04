@@ -183,6 +183,7 @@ export async function createLeadSearchFixture(opts: {
   cities?: string[];
   minimumScore?: number;
   mode?: "TRIVIA_GAP" | "TRIVIA_CONFIRMED" | "COMPETITOR" | "GENERAL";
+  runCorrelationId?: string | null;
 }) {
   return testPrisma.leadSearch.create({
     data: {
@@ -196,6 +197,7 @@ export async function createLeadSearchFixture(opts: {
       minimumScore: opts.minimumScore ?? 80,
       mode: opts.mode ?? "GENERAL",
       promptSnapshot: "Independently-owned bars with a weekly events calendar.",
+      runCorrelationId: opts.runCorrelationId ?? null,
     },
   });
 }
@@ -217,6 +219,10 @@ export async function createSearchResultFixture(opts: {
   rejectionReasonId?: string | null;
   triviaStatus?: "CURRENT_TRIVIA" | "NO_CURRENT_TRIVIA" | "UNCERTAIN";
   competitorId?: string | null;
+  contactData?: object | null;
+  duplicateMatches?: object | null;
+  duplicateConfidence?: "HIGH" | "MEDIUM" | "LOW" | null;
+  competitorConflict?: boolean;
 }) {
   const name = opts.name ?? `Result ${crypto.randomUUID().slice(0, 8)}`;
   const normalized = computeNormalizedFields({
@@ -247,6 +253,10 @@ export async function createSearchResultFixture(opts: {
       rejectionReasonId: opts.rejectionReasonId ?? null,
       triviaStatus: opts.triviaStatus ?? "UNCERTAIN",
       competitorId: opts.competitorId ?? null,
+      contactData: opts.contactData ?? undefined,
+      duplicateMatches: opts.duplicateMatches ?? undefined,
+      duplicateConfidence: opts.duplicateConfidence ?? null,
+      competitorConflict: opts.competitorConflict ?? false,
     },
   });
 }

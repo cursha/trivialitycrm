@@ -1100,11 +1100,18 @@ model LeadSearch {
   progressMessage String?         @db.Text
   providerJobId   String?
 
+  // Shared across every child LeadSearch of one Competition Locator run (one
+  // row per region) — null for every search started via the regular Lead
+  // Search form. Also reused as AuditEvent.correlationId for the run's
+  // audit trail (see writeAuditEvent()).
+  runCorrelationId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([status, heartbeatAt])
   @@index([providerJobId])
+  @@index([runCorrelationId])
 }
 
 /**
@@ -1183,12 +1190,29 @@ model SearchResult {
   normalizedEmail String?
   websiteDomain   String?
 
+  // Competition Locator: computed once at discovery time (not recomputed on
+  // every review-page load) via findScoredDuplicateMatches(), reusing
+  // scoreCompanyMatch()'s confidence tiers. duplicateMatches is a Json array
+  // of up to 5 {companyId, companyName, score, confidence, reasons,
+  // matchedFields, conflictingFields}, following the same "structured
+  // convention, no schema-level shape" pattern already used by
+  // evidence/sources above. duplicateConfidence denormalizes the top match's
+  // confidence for cheap bucket filtering. competitorConflict is true when
+  // the top match's Company already has a different, non-null competitorId
+  // than the one being searched for — routed to a distinct review bucket
+  // rather than silently left alone or auto-overwritten.
+  duplicateMatches   Json?
+  duplicateConfidence ConfidenceLevel?
+  competitorConflict Boolean          @default(false)
+
   @@index([searchId, score])
   @@index([normalizedName])
   @@index([websiteDomain])
   @@index([normalizedPhone])
   @@index([normalizedEmail])
   @@index([disposition])
+  @@index([duplicateConfidence])
+  @@index([competitorConflict])
 }
 
 model ImportTemplate {

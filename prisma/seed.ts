@@ -26,6 +26,13 @@ const rejectionReasons = [
   "Already Has Trivia",
   "Bad Contact Information",
   "Other",
+  // Competition Locator verification-standard rejections (run-search.ts's
+  // COMPETITOR-mode guards) — "Closed" above already covers the
+  // permanently-closed-venue case, so it's reused rather than duplicated.
+  "Trivia Event Cancelled or One-Time Only",
+  "Outside Requested Country/Region",
+  "Different Trivia Provider",
+  "Insufficient Verifiable Evidence",
 ];
 
 const roles = ["Administrator", "Manager", "Salesperson"] as const;
@@ -56,6 +63,7 @@ const permissions: { key: string; label: string; category: string; description: 
   { key: "restore_rejected", label: "Restore rejected AI search results", category: LEADS_CATEGORY, description: "Restore an AI research result that was previously rejected." },
   { key: "restore_archived_leads", label: "Restore archived companies", category: LEADS_CATEGORY, description: "Restore an archived company back to active." },
   { key: "run_research", label: "Run AI lead research searches", category: LEADS_CATEGORY, description: "Start a new AI-assisted lead research search." },
+  { key: "run_competition_locator", label: "Run Competition Locator", category: LEADS_CATEGORY, description: "Start and manage Competition Locator competitor-discovery runs." },
   { key: "review_research_results", label: "Review AI research results", category: LEADS_CATEGORY, description: "Review and act on AI research results." },
   { key: "transfer_leads", label: "Transfer AI research results to the CRM", category: LEADS_CATEGORY, description: "Transfer AI research results into the CRM as companies." },
   { key: "view_evidence", label: "View AI research evidence and citations", category: LEADS_CATEGORY, description: "View the evidence and citations behind an AI research score." },

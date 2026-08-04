@@ -49,7 +49,17 @@ export class MockCandidateDiscoveryProvider implements CandidateDiscoveryProvide
         phone: null,
         email: null,
         websiteUrl: `https://example.test/${name.toLowerCase().replace(/\s+/g, "-")}`,
-        contactData: null,
+        // Only COMPETITOR mode's mock candidates carry contacts — matches
+        // the real Anthropic provider's contactData only being meaningfully
+        // populated for that mode's venue-manager-role research today, and
+        // gives Competition Locator's own tests real multi-contact data to
+        // exercise without touching other modes' existing mock output.
+        contactData: isCompetitorMode
+          ? [
+              { firstName: "Mock", lastName: "Manager", title: "General Manager", email: `manager@${slugCity(city, index).toLowerCase()}.example.test` },
+              { firstName: "Mock", lastName: "Events", title: "Events Manager", phone: "555-0199" },
+            ]
+          : null,
         triviaStatus: isTriviaConfirmed || isCompetitorMode ? "CURRENT_TRIVIA" : "UNCERTAIN",
         competitorName: isCompetitorMode ? (params.competitorName ?? null) : null,
         evidence: [],
@@ -95,6 +105,12 @@ export class MockPlacesProvider implements CandidateDiscoveryProvider {
 
 export class MockEvidenceVerificationProvider implements EvidenceVerificationProvider {
   async verify(candidate: ResearchCandidate, params: DiscoverParams): Promise<ResearchCandidate> {
+    // COMPETITOR mode reports VERIFIED (not UNVERIFIED) evidence — this mock
+    // stands in for a confirmed competitor-usage finding, and run-search.ts
+    // rejects COMPETITOR-mode candidates with no VERIFIED+sourced evidence
+    // (the "insufficient verifiable evidence" guard) — a real-provider-shaped
+    // baseline for that mode, not a change to any other mode's mock output.
+    const verificationStatus = params.mode === "COMPETITOR" ? "VERIFIED" : "UNVERIFIED";
     return {
       ...candidate,
       evidence: [
@@ -102,7 +118,7 @@ export class MockEvidenceVerificationProvider implements EvidenceVerificationPro
           category: "general",
           note: `[Mock evidence] Candidate matches the "${params.mode}" research mode for ${params.leadTypeName} in ${params.region}.`,
           sourceUrl: candidate.websiteUrl,
-          verificationStatus: "UNVERIFIED",
+          verificationStatus,
         },
       ],
       sources: candidate.websiteUrl ? [{ url: candidate.websiteUrl, title: candidate.name }] : [],

@@ -105,6 +105,29 @@ const CANDIDATE_SCHEMA = {
           websiteUrl: { type: ["string", "null"] },
           triviaStatus: { type: "string", enum: ["CURRENT_TRIVIA", "NO_CURRENT_TRIVIA", "UNCERTAIN"] },
           competitorName: { type: ["string", "null"] },
+          // Every useful role found for the venue (owner/GM/venue/
+          // marketing/events/entertainment manager), not just one — an
+          // empty array, never omitted, when nothing is publicly available.
+          // Always an array (not nullable) to sidestep any untested
+          // Anthropic structured-output interaction between a nullable type
+          // and an "array" schema — same reasoning as evidence/sources
+          // below, which are also plain non-nullable arrays.
+          contactData: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                firstName: { type: ["string", "null"] },
+                lastName: { type: ["string", "null"] },
+                phone: { type: ["string", "null"] },
+                email: { type: ["string", "null"] },
+                title: { type: ["string", "null"] },
+                note: { type: ["string", "null"] },
+              },
+              required: ["firstName", "lastName", "phone", "email", "title", "note"],
+              additionalProperties: false,
+            },
+          },
           evidence: {
             type: "array",
             items: {
@@ -141,6 +164,7 @@ const CANDIDATE_SCHEMA = {
           "websiteUrl",
           "triviaStatus",
           "competitorName",
+          "contactData",
           "evidence",
           "sources",
         ],
@@ -389,7 +413,13 @@ function modeInstructions(mode: DiscoverParams["mode"], competitorName?: string)
     case "TRIVIA_CONFIRMED":
       return "Find locations with POSITIVE, verifiable evidence that they currently run a trivia night (a schedule page, event listing, or social post naming a specific recurring trivia event). Uncertain or ambiguous evidence must be marked triviaStatus \"UNCERTAIN\", never \"CURRENT_TRIVIA\".";
     case "COMPETITOR":
-      return `Find locations using the trivia service "${competitorName}". Only set competitorName when there is direct evidence (the competitor's own name, branding, or host credit) tying the location to that service.`;
+      return (
+        `Find pubs, bars, breweries, taprooms, restaurants, or similar licensed venues currently running trivia hosted by the service "${competitorName}". ` +
+        `Only set competitorName to "${competitorName}" when there is direct, current evidence (the competitor's own name, branding, or host credit on the venue's own listing, event calendar, or official social-media page) tying the location to that specific service — never a generic "trivia night" mention with no named host. ` +
+        `If a location clearly runs trivia through a DIFFERENT named provider, still report it with that other provider's name in competitorName rather than omitting it — the caller filters mismatches, don't guess or force a match. ` +
+        "Exclude: venues that are permanently closed or out of business; a trivia event that was a one-time or cancelled occurrence rather than a regular recurring night; any listing you cannot reasonably confirm reflects the current/recent state (treat a listing with no date or evidence of freshness as stale, not current); private/members-only events that aren't a standing public venue offering; and any evidence quality below your own \"VERIFIED\" bar — mark those UNVERIFIED/INFERRED rather than reporting the location with unfounded confidence. " +
+        "Every evidence entry that supports the competitor match must cite a sourceUrl actually fetched or found in search results, and be marked \"VERIFIED\" only when that source itself is current."
+      );
     default:
       return "Find locations matching the business criteria below. Only mark triviaStatus \"CURRENT_TRIVIA\" with positive evidence; use \"UNCERTAIN\" rather than guessing.";
   }
@@ -501,7 +531,7 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
       const jsonBlock = response.content.find((block) => block.type === "text");
       if (!jsonBlock || !("text" in jsonBlock)) return [];
       const parsed = JSON.parse(jsonBlock.text) as { candidates: ResearchCandidate[] };
-      return parsed.candidates.map((candidate) => ({ ...candidate, contactData: null }));
+      return parsed.candidates.map((candidate) => ({ ...candidate, contactData: candidate.contactData ?? [] }));
     });
   }
 }

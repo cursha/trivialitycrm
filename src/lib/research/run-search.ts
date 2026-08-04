@@ -7,10 +7,27 @@ import { getProviders } from "./providers/factory";
 import { filterByModeExclusivity, dedupeWithinRun } from "./exclusivity";
 import { computeNormalizedFields, findPriorRejectedMatches } from "../duplicates/match";
 import { normalizeCompanyName } from "../duplicates/normalize";
+import { normalizeRegion } from "../data-quality/normalize";
+import { findScoredDuplicateMatches } from "../duplicates/scored-match";
+import { stampEvidenceVerificationDates, hasCurrentVerifiedEvidence } from "./result-explanation";
 import { getAiSettings, checkMidRunAiBudget } from "../ai/budget";
 import { writeAuditEvent } from "../audit/log";
 import { classifyProviderError } from "../integrations/provider-errors";
 import type { DiscoverParams, ResearchCandidate } from "./providers/types";
+
+// Competition Locator's verification-standard rejection reasons (seeded in
+// prisma/seed.ts). Looked up once by name, not hardcoded ids, matching the
+// rest of this app's "resolve by name/key" convention. COMPETITOR mode only
+// — see the three checks in processCandidate() below.
+const COMPETITOR_REJECTION_REASON_NAMES = {
+  outsideRegion: "Outside Requested Country/Region",
+  wrongProvider: "Different Trivia Provider",
+  insufficientEvidence: "Insufficient Verifiable Evidence",
+} as const;
+
+function normalizeCountry(country: string): string {
+  return country.trim().toLowerCase();
+}
 
 /**
  * Wraps a single provider call (discover/verify/score) so any raw error it
@@ -90,6 +107,25 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
 
   // A cancelled search must never be resurrected by a retried/resumed job.
   if (search.status === "CANCELLED") return;
+
+  // Competition Locator's verification-standard rejection reasons, resolved
+  // once per job run (not per candidate) — only needed for COMPETITOR mode.
+  let competitorRejectionReasonIds: Record<keyof typeof COMPETITOR_REJECTION_REASON_NAMES, string | null> = {
+    outsideRegion: null,
+    wrongProvider: null,
+    insufficientEvidence: null,
+  };
+  if (search.mode === "COMPETITOR") {
+    const reasons = await prisma.rejectionReason.findMany({
+      where: { name: { in: Object.values(COMPETITOR_REJECTION_REASON_NAMES) } },
+    });
+    const byName = new Map(reasons.map((r) => [r.name, r.id]));
+    competitorRejectionReasonIds = {
+      outsideRegion: byName.get(COMPETITOR_REJECTION_REASON_NAMES.outsideRegion) ?? null,
+      wrongProvider: byName.get(COMPETITOR_REJECTION_REASON_NAMES.wrongProvider) ?? null,
+      insufficientEvidence: byName.get(COMPETITOR_REJECTION_REASON_NAMES.insufficientEvidence) ?? null,
+    };
+  }
 
   try {
     const providers = getProviders(search.mode);
@@ -290,16 +326,47 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
         email: verified.email,
       });
 
+      // Competition Locator's verification-standard guards, COMPETITOR mode
+      // only — every other mode's disposition/competitorId logic below is
+      // completely untouched by this block.
+      let competitorLocatorRejectionReasonId: string | null = null;
+      let competitorLocatorRejectionNote: string | null = null;
+      if (search.mode === "COMPETITOR") {
+        verified = { ...verified, evidence: stampEvidenceVerificationDates(verified.evidence) };
+
+        const searchedRegion = normalizeRegion(search.region, search.country);
+        const candidateRegion = normalizeRegion(verified.region, verified.country);
+        const searchedCountry = normalizeCountry(search.country);
+        const candidateCountry = normalizeCountry(verified.country);
+
+        if (candidateCountry !== searchedCountry || (searchedRegion && candidateRegion !== searchedRegion)) {
+          competitorLocatorRejectionReasonId = competitorRejectionReasonIds.outsideRegion;
+          competitorLocatorRejectionNote = "[Auto-rejected: outside the requested country/region.]";
+        } else if (!hasCurrentVerifiedEvidence(verified.evidence)) {
+          competitorLocatorRejectionReasonId = competitorRejectionReasonIds.insufficientEvidence;
+          competitorLocatorRejectionNote = "[Auto-rejected: no current, verified evidence with a source citing this competitor.]";
+        }
+        // Wrong-provider check happens after competitorId is resolved below,
+        // since it needs the same normalized-name comparison either way.
+      }
+
       // Unresearched GENERAL-mode candidates carry a placeholder score of 0,
       // which is meaningless against minimumScore — sorting them into
       // BELOW_SCORE would hide every freshly-discovered business from the
       // default results view before anyone had a chance to research them.
-      const disposition =
+      let disposition: "REJECTED" | "NEW" | "BELOW_SCORE" =
         priorRejections.length > 0 ? "REJECTED" : search.mode === "GENERAL" ? "NEW" : score < search.minimumScore ? "BELOW_SCORE" : "NEW";
-      const finalExplanation =
+      let finalExplanation =
         priorRejections.length > 0
           ? `${explanation}\n\n[Auto-rejected: matches a previously rejected location — use "restore" to reconsider.]`
           : explanation;
+      let rejectionReasonId: string | null = null;
+
+      if (competitorLocatorRejectionReasonId && disposition !== "REJECTED") {
+        disposition = "REJECTED";
+        rejectionReasonId = competitorLocatorRejectionReasonId;
+        finalExplanation = `${explanation}\n\n${competitorLocatorRejectionNote}`;
+      }
 
       const normalized = computeNormalizedFields({
         name: verified.name,
@@ -308,10 +375,60 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
         websiteUrl: verified.websiteUrl,
       });
 
+      // Existing behavior (every mode): trust whatever Competitor name the
+      // provider returned, if any matches by exact name.
+      //
+      // COMPETITOR mode gets a real fix on top of that: today, a candidate
+      // whose returned competitorName happens to equal a DIFFERENT
+      // Competitor row than the one actually being searched for was
+      // silently attributed to that other competitor instead of being
+      // rejected — a pre-existing gap, not new-feature-only behavior. Now,
+      // for COMPETITOR mode, only an exact (case/whitespace-normalized)
+      // match against the searched-for competitor's own name is trusted;
+      // anything else is rejected as "Different Trivia Provider" rather than
+      // silently mis-attributed or silently dropped.
       let competitorId: string | null = null;
       if (verified.competitorName) {
-        const matchedCompetitor = await prisma.competitor.findUnique({ where: { name: verified.competitorName } });
-        competitorId = matchedCompetitor?.id ?? null;
+        if (search.mode === "COMPETITOR" && search.competitor) {
+          const matches = verified.competitorName.trim().toLowerCase() === search.competitor.name.trim().toLowerCase();
+          if (matches) {
+            competitorId = search.competitor.id;
+          } else if (disposition !== "REJECTED") {
+            disposition = "REJECTED";
+            rejectionReasonId = competitorRejectionReasonIds.wrongProvider;
+            finalExplanation = `${explanation}\n\n[Auto-rejected: evidence points to a different trivia provider ("${verified.competitorName}").]`;
+          }
+        } else {
+          const matchedCompetitor = await prisma.competitor.findUnique({ where: { name: verified.competitorName } });
+          competitorId = matchedCompetitor?.id ?? null;
+        }
+      }
+
+      // Competition Locator: confidence-tiered duplicate matching against
+      // existing companies, computed once here (not recomputed on every
+      // review-page load) — skipped for already-rejected rows, which never
+      // reach the review screen's duplicate/conflict buckets anyway.
+      let duplicateMatches: Awaited<ReturnType<typeof findScoredDuplicateMatches>> = [];
+      let duplicateConfidence: "HIGH" | "MEDIUM" | "LOW" | null = null;
+      let competitorConflict = false;
+      if (search.mode === "COMPETITOR" && disposition !== "REJECTED") {
+        duplicateMatches = await findScoredDuplicateMatches(prisma, {
+          name: verified.name,
+          address1: verified.address1,
+          city: verified.city,
+          region: verified.region,
+          postalCode: verified.postalCode,
+          country: verified.country,
+          websiteUrl: verified.websiteUrl,
+          phone: verified.phone,
+          email: verified.email,
+        });
+        const topMatch = duplicateMatches[0];
+        if (topMatch) {
+          duplicateConfidence = topMatch.confidence;
+          const topCompany = await prisma.company.findUnique({ where: { id: topMatch.companyId }, select: { competitorId: true } });
+          competitorConflict = !!topCompany?.competitorId && topCompany.competitorId !== competitorId;
+        }
       }
 
       // Upsert, not create — a resumed run whose previous attempt reached
@@ -338,7 +455,11 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
           sources: verified.sources,
           triviaStatus: verified.triviaStatus,
           disposition,
+          rejectionReasonId,
           competitorId,
+          duplicateMatches: duplicateMatches.length > 0 ? duplicateMatches : undefined,
+          duplicateConfidence,
+          competitorConflict,
           ...normalized,
         },
         update: {},

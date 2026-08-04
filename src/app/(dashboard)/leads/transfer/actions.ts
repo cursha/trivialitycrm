@@ -4,11 +4,11 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
-import { TransferPayloadSchema, type TransferPayload, type TransferRow } from "@/lib/validation/transfer";
+import { TransferPayloadSchema, type TransferPayload } from "@/lib/validation/transfer";
 import { findPotentialDuplicates, computeNormalizedFields } from "@/lib/duplicates/match";
 import type { DuplicateMatch } from "@/lib/duplicates/match";
 import { logInitialPipelineStage } from "@/lib/companies/activity-log";
-import type { Company } from "@/generated/prisma/client";
+import { resolveReplaceOrMergeFields, type ResolvedCompanyFields } from "@/lib/companies/field-resolution";
 
 export type TransferResult =
   | { error: string }
@@ -23,12 +23,6 @@ async function loadSourceResults(resultIds: string[]) {
     include: { search: true },
   });
 }
-
-// Fields a "replace"/"merge" resolution can change on the existing company.
-// Deliberately excludes leadTypeId/pipelineStageId/assignedToId/competitorId
-// — the company already has a real place in the pipeline, and neither
-// resolution is a reason to reset that.
-const MERGEABLE_CONTACT_FIELDS = ["name", "address1", "city", "region", "postalCode", "country", "phone", "email", "websiteUrl"] as const;
 
 type RowPlan =
   | { action: "create" }
@@ -153,7 +147,18 @@ export async function transferSearchResults(rawPayload: TransferPayload): Promis
         companyId = company.id;
       } else {
         const existing = await tx.company.findUniqueOrThrow({ where: { id: plan.targetCompanyId } });
-        const resolved = resolveReplaceOrMergeFields(plan.action, row, existing);
+        const fresh: ResolvedCompanyFields = {
+          name: row.name,
+          address1: row.address1 ?? null,
+          city: row.city,
+          region: row.region,
+          postalCode: row.postalCode ?? null,
+          country: row.country,
+          phone: row.phone ?? null,
+          email: row.email ?? null,
+          websiteUrl: row.websiteUrl ?? null,
+        };
+        const resolved = resolveReplaceOrMergeFields(plan.action, fresh, existing);
         const updated = await tx.company.update({
           where: { id: plan.targetCompanyId },
           data: {
@@ -200,57 +205,4 @@ export async function transferSearchResults(rawPayload: TransferPayload): Promis
 
   revalidatePath("/companies");
   return { transferredCount, ignoredCount };
-}
-
-type ResolvedContactFields = {
-  name: string;
-  address1: string | null;
-  city: string;
-  region: string;
-  postalCode: string | null;
-  country: string;
-  phone: string | null;
-  email: string | null;
-  websiteUrl: string | null;
-};
-
-/**
- * "replace": every mergeable field takes the fresh row's value,
- * unconditionally — including nulling out a field the fresh data doesn't
- * have, even if the existing company had a value there.
- * "merge": the fresh (most recent) value wins wherever it has one; a field
- * only falls back to the existing company's value when the fresh data left
- * it blank — so merge can never destroy data the fresh pass didn't cover,
- * but does take the newer value whenever both sides have one.
- */
-function resolveReplaceOrMergeFields(action: "replace" | "merge", row: TransferRow, existing: Company): ResolvedContactFields {
-  const fresh: ResolvedContactFields = {
-    name: row.name,
-    address1: row.address1 ?? null,
-    city: row.city,
-    region: row.region,
-    postalCode: row.postalCode ?? null,
-    country: row.country,
-    phone: row.phone ?? null,
-    email: row.email ?? null,
-    websiteUrl: row.websiteUrl ?? null,
-  };
-
-  if (action === "replace") return fresh;
-
-  // Loosely typed as a plain string|null record for the loop — name/city/
-  // region/country are typed as required `string` on ResolvedContactFields,
-  // but Zod (TransferRowSchema) already guarantees those are never blank,
-  // so freshIsBlank is never true for them in practice; this cast just lets
-  // the one generic loop handle every mergeable field instead of writing it
-  // out nine times.
-  const resolved = { ...fresh } as Record<keyof ResolvedContactFields, string | null>;
-  for (const field of MERGEABLE_CONTACT_FIELDS) {
-    const freshValue = fresh[field];
-    const freshIsBlank = freshValue === null || freshValue.trim() === "";
-    if (freshIsBlank) {
-      resolved[field] = (existing[field] as string | null) ?? null;
-    }
-  }
-  return resolved as ResolvedContactFields;
 }
