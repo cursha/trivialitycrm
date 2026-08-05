@@ -82,6 +82,25 @@ describe("runSearchJob — COMPETITOR mode verification guards", () => {
     expect(result.rejectionReason?.name).toBe("Different Trivia Provider");
   });
 
+  it("trusts a match even when the AI appends its own branding/event name to the competitor name", async () => {
+    // Confirmed live: pass-1 discovery returned competitorName "Ruby
+    // Entertainment (ruby PUB TRIVIA)" for a genuine Ruby Entertainment
+    // venue — the venue's own branded event name tacked on, not a different
+    // provider. An exact-match check rejected a real match on formatting
+    // noise alone; the fix is a substring check (run-search.ts).
+    const { user, leadType, competitor } = await baseFixtures();
+    vi.spyOn(MockCandidateDiscoveryProvider.prototype, "discover").mockResolvedValue([
+      candidateFixture({ competitorName: `${competitor.name} (ruby PUB TRIVIA)` }),
+    ]);
+    const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, mode: "COMPETITOR", competitorId: competitor.id, cities: ["Denver"] });
+
+    await runSearchJob(search.id);
+
+    const [result] = await testPrisma.searchResult.findMany({ where: { searchId: search.id } });
+    expect(result.disposition).not.toBe("REJECTED");
+    expect(result.competitorId).toBe(competitor.id);
+  });
+
   it("still trusts an exact match against the searched-for competitor's own name", async () => {
     const { user, leadType, competitor } = await baseFixtures();
     const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, mode: "COMPETITOR", competitorId: competitor.id, cities: ["Denver"] });

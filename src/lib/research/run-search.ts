@@ -402,14 +402,24 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       // Competitor row than the one actually being searched for was
       // silently attributed to that other competitor instead of being
       // rejected — a pre-existing gap, not new-feature-only behavior. Now,
-      // for COMPETITOR mode, only an exact (case/whitespace-normalized)
-      // match against the searched-for competitor's own name is trusted;
-      // anything else is rejected as "Different Trivia Provider" rather than
-      // silently mis-attributed or silently dropped.
+      // for COMPETITOR mode, only a match against the searched-for
+      // competitor's own name is trusted; anything else is rejected as
+      // "Different Trivia Provider" rather than silently mis-attributed or
+      // silently dropped.
+      //
+      // Substring, not exact equality: this now runs on pass-1 (raw
+      // discovery) output, which is less disciplined than the old
+      // deep-verification pass — confirmed live, the model returned
+      // `competitorName: "Ruby Entertainment (ruby PUB TRIVIA)"` for a
+      // genuine Ruby Entertainment venue, appending its own branding/event
+      // name rather than the bare competitor name. An exact-match check
+      // rejected a real match on formatting noise alone. A genuinely
+      // different provider's name still won't contain the searched-for
+      // competitor's name, so this stays a real filter, not a rubber stamp.
       let competitorId: string | null = null;
       if (verified.competitorName) {
         if (search.mode === "COMPETITOR" && search.competitor) {
-          const matches = verified.competitorName.trim().toLowerCase() === search.competitor.name.trim().toLowerCase();
+          const matches = verified.competitorName.trim().toLowerCase().includes(search.competitor.name.trim().toLowerCase());
           if (matches) {
             competitorId = search.competitor.id;
           } else if (disposition !== "REJECTED") {
