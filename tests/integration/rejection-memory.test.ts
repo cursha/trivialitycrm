@@ -74,4 +74,28 @@ describe("findPriorRejectedMatches", () => {
 
     expect(matches).toHaveLength(0);
   });
+
+  it("does not treat a same-name match in a different city as the same rejected location", async () => {
+    // Confirmed live: rejecting one location of a chain (e.g. "Keenan's
+    // Irish Pub" in Brampton) was silently auto-rejecting every other real,
+    // distinct location of that same chain anywhere in the province — a
+    // bare name match with no city/region corroboration was treated as
+    // sufficient. Different city, same chain name, must NOT match.
+    const { search } = await baseFixtures();
+    await createSearchResultFixture({ searchId: search.id, name: "Keenan's Irish Pub", city: "Brampton", region: "ON", disposition: "REJECTED" });
+
+    const matches = await findPriorRejectedMatches(testPrisma, { name: "Keenan's Irish Pub", city: "Mississauga", region: "ON", country: "Canada" });
+
+    expect(matches).toHaveLength(0);
+  });
+
+  it("still matches a same-name candidate in the same city", async () => {
+    const { search } = await baseFixtures();
+    await createSearchResultFixture({ searchId: search.id, name: "Keenan's Irish Pub", city: "Brampton", region: "ON", disposition: "REJECTED" });
+
+    const matches = await findPriorRejectedMatches(testPrisma, { name: "Keenan's Irish Pub", city: "Brampton", region: "ON", country: "Canada" });
+
+    expect(matches).toHaveLength(1);
+    expect(matches[0].matchedOn).toContain("name");
+  });
 });

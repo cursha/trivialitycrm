@@ -128,6 +128,8 @@ export async function findPriorRejectedMatches(
 ): Promise<RejectedMatch[]> {
   const { normalizedName, normalizedPhone, normalizedEmail, websiteDomain } = computeNormalizedFields(input);
   const normalizedAddress = input.address1 ? normalizeAddressLine(input.address1) : null;
+  const inputCity = input.city?.trim().toLowerCase() ?? null;
+  const inputRegion = input.region?.trim().toLowerCase() ?? null;
 
   const orConditions: Record<string, unknown>[] = [{ normalizedName }];
   if (websiteDomain) orConditions.push({ websiteDomain });
@@ -156,7 +158,19 @@ export async function findPriorRejectedMatches(
     .map((candidate) => {
       const matchedOn: DuplicateMatchReason[] = [];
 
-      if (candidate.normalizedName === normalizedName) matchedOn.push("name");
+      // A bare name match is too weak on its own for chain businesses —
+      // confirmed live: rejecting one location of "Keenan's Irish Pub"
+      // (Brampton) silently auto-rejected every other real, distinct
+      // Keenan's Irish Pub location found anywhere else in the province
+      // (Mississauga, Milton), since this used to match on name alone
+      // with no location corroboration. Only count a name match toward
+      // "this is the same rejected location" when the city AND region
+      // also match; a same-name match in a different city is simply not
+      // treated as a match at all (dropped, not just deprioritized) —
+      // matching by any of address/phone/email/website is unaffected,
+      // those are already location-specific signals on their own.
+      const sameLocation = inputCity !== null && inputRegion !== null && candidate.city.trim().toLowerCase() === inputCity && candidate.region.trim().toLowerCase() === inputRegion;
+      if (candidate.normalizedName === normalizedName && sameLocation) matchedOn.push("name");
       if (websiteDomain && candidate.websiteDomain === websiteDomain) matchedOn.push("websiteDomain");
       if (normalizedPhone && candidate.normalizedPhone === normalizedPhone) matchedOn.push("phone");
       if (normalizedEmail && candidate.normalizedEmail === normalizedEmail) matchedOn.push("email");
