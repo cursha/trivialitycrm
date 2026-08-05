@@ -591,6 +591,18 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
       try {
         finalMessage = await stream.finalMessage();
       } catch (error) {
+        // TEMPORARY diagnostic — classifyProviderError() sanitizes this
+        // before it ever reaches LeadSearch.errorMessage, so a confusing
+        // "couldn't understand" with near-zero output tokens and zero tool
+        // uses (confirmed live, discover-mode COMPETITOR calls) has no raw
+        // detail to go on. Logs to the worker's stdout only, never
+        // persisted. Remove once the underlying cause is identified.
+        console.error("[discover() raw error]", {
+          name: error instanceof Error ? error.name : typeof error,
+          message: error instanceof Error ? error.message : String(error),
+          status: (error as { status?: unknown })?.status,
+          stack: error instanceof Error ? error.stack : undefined,
+        });
         // Same "a timed-out/aborted call is still billed" reasoning as
         // AnthropicOpportunityAnalysisProvider — record best-effort partial
         // usage so a call that grinds the full 900s before timing out isn't
