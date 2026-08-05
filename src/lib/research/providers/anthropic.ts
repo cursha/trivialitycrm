@@ -576,7 +576,22 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
                 { type: "web_search_20260209", name: "web_search", max_uses: maxSearchToolUses },
                 { type: "web_fetch_20260209", name: "web_fetch", max_uses: maxSearchToolUses },
               ],
-          output_config: { format: { type: "json_schema", schema: isCompetitorPass1 ? COMPETITOR_DISCOVERY_SCHEMA : CANDIDATE_SCHEMA } },
+          // Confirmed live: even after cutting COMPETITOR pass-1 to a
+          // 5-search budget with no web_fetch tool, the same Ontario/Ruby
+          // Entertainment search still ran the full 900s and timed out with
+          // zero candidates — tool-call count wasn't the bottleneck.
+          // output_config.effort defaults to "high" whenever omitted (this
+          // call, until now), and per Anthropic's docs that governs ALL
+          // tokens — thinking and code-execution work included — not just
+          // tool calls, which is exactly the pattern already fixed the same
+          // way for AnthropicOpportunityAnalysisProvider below. "medium" is
+          // Anthropic's documented step-down for Sonnet 5, appropriate here
+          // since pass-1 is a bounded identification task, not open-ended
+          // exploration.
+          output_config: {
+            ...(isCompetitorPass1 ? { effort: "medium" as const } : {}),
+            format: { type: "json_schema", schema: isCompetitorPass1 ? COMPETITOR_DISCOVERY_SCHEMA : CANDIDATE_SCHEMA },
+          },
           messages: [
             {
               role: "user",
