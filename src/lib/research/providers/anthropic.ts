@@ -683,6 +683,18 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
       try {
         finalMessage = await stream.finalMessage();
       } catch (error) {
+        // TEMPORARY diagnostic — reproducible live: a 2-city (Milton,
+        // Mississauga) COMPETITOR pass-1 search fails twice in a row within
+        // ~30s, zero AiUsageRecord rows either time (so the failure is here,
+        // in step 1, before any generation completed). Single buffered log
+        // at the point of failure, matching the pattern that actually
+        // worked earlier tonight — remove once the cause is identified.
+        console.error("[discover-research raw error]", {
+          name: error instanceof Error ? error.name : typeof error,
+          message: error instanceof Error ? error.message : String(error),
+          status: (error as { status?: unknown })?.status,
+          errorBody: (error as { error?: unknown })?.error ? JSON.stringify((error as { error?: unknown }).error).slice(0, 1000) : undefined,
+        });
         const partialUsage = stream.currentMessage?.usage;
         if (partialUsage) {
           await recordUsage({ operation: "discover", model, usage: partialUsage, searchId: params.searchId, userId: params.userId });
