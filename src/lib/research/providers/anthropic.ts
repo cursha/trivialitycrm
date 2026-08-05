@@ -47,6 +47,18 @@ const FALLBACK_MAX_SEARCH_TOOL_USES = 8;
 // default — see that field's schema.prisma comment for why it's lower than
 // FALLBACK_MAX_SEARCH_TOOL_USES above.
 const FALLBACK_MAX_SEARCH_TOOL_USES_OPPORTUNITY_ANALYSIS = 4;
+// COMPETITOR pass-1 discovery's own fixed, much smaller search budget —
+// deliberately NOT the shared, admin-configurable maxSearchToolUsesPerCall
+// (up to 20). Confirmed live: a plain conversational answer to "pubs in
+// Ontario that host Ruby trivia" came back in well under a minute; this
+// pass1 discover() call was taking 15-20+ minutes for the same underlying
+// question, and the shared 20-search budget was the single biggest reason
+// why — most of that time was 20 sequential web_search round-trips, not
+// the (already-removed, see the tools array below) evidence-gathering
+// work. Identification-only discovery doesn't need anywhere near that many
+// searches; this is a small, fixed cap, not another admin setting, to keep
+// this pass genuinely fast rather than configurably slow.
+const COMPETITOR_PASS1_MAX_SEARCH_USES = 5;
 
 async function resolveModel(): Promise<string> {
   try {
@@ -559,7 +571,7 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
           // only — take away the tool that lets it be slow instead of
           // hoping it self-limits.
           tools: isCompetitorPass1
-            ? [{ type: "web_search_20260209", name: "web_search", max_uses: maxSearchToolUses }]
+            ? [{ type: "web_search_20260209", name: "web_search", max_uses: COMPETITOR_PASS1_MAX_SEARCH_USES }]
             : [
                 { type: "web_search_20260209", name: "web_search", max_uses: maxSearchToolUses },
                 { type: "web_fetch_20260209", name: "web_fetch", max_uses: maxSearchToolUses },
