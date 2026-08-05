@@ -608,10 +608,31 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
         { signal },
       );
 
+      // TEMPORARY diagnostic — a documented "code_execution" server tool use
+      // block is showing up in pass-1 COMPETITOR discovery progress
+      // messages, taking many minutes, even though this call was never
+      // given a code_execution tool. Confirmed against Anthropic's own
+      // structured-outputs docs: there is no documented automatic internal
+      // code_execution invocation for json_schema output. Rather than guess
+      // again at what it's doing, log every block's type/name/input and
+      // elapsed time to the worker's stdout, once, to see the real
+      // sequence. Remove once the cause is identified.
+      const t0 = Date.now();
+      if (isCompetitorPass1) {
+        console.error(`[discover trace] request start`);
+      }
+
       // Fire-and-forget, like AnthropicOpportunityAnalysisProvider's own
       // onProgress calls — a progress-write failure (see run-search.ts's
       // best-effort try/catch) must never affect the actual discovery call.
       stream.on("contentBlock", (block) => {
+        if (isCompetitorPass1) {
+          console.error(`[discover trace] +${Math.round((Date.now() - t0) / 1000)}s contentBlock`, {
+            type: block.type,
+            name: "name" in block ? block.name : undefined,
+            input: "input" in block ? JSON.stringify(block.input).slice(0, 500) : undefined,
+          });
+        }
         if (block.type === "server_tool_use") {
           void onProgress?.({ kind: "message", message: serverToolProgressMessage(block.name, block.input) });
         } else if (block.type === "thinking") {
@@ -620,6 +641,9 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
       });
       let lastThinkingHeartbeat = 0;
       stream.on("streamEvent", (event) => {
+        if (isCompetitorPass1 && event.type !== "content_block_delta") {
+          console.error(`[discover trace] +${Math.round((Date.now() - t0) / 1000)}s streamEvent`, event.type);
+        }
         if (event.type !== "content_block_delta" || event.delta.type !== "thinking_delta") return;
         const now = Date.now();
         if (now - lastThinkingHeartbeat < 5000) return;
