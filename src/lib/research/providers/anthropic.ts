@@ -608,29 +608,33 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
         { signal },
       );
 
-      // TEMPORARY diagnostic — a documented "code_execution" server tool use
-      // block is showing up in pass-1 COMPETITOR discovery progress
-      // messages, taking many minutes, even though this call was never
-      // given a code_execution tool. Confirmed against Anthropic's own
+      // TEMPORARY diagnostic — a "code_execution"/"bash_code_execution"
+      // server tool use block is showing up in pass-1 COMPETITOR discovery
+      // progress messages, taking many minutes, even though this call was
+      // never given either tool. Confirmed against Anthropic's own
       // structured-outputs docs: there is no documented automatic internal
-      // code_execution invocation for json_schema output. Rather than guess
-      // again at what it's doing, log every block's type/name/input and
-      // elapsed time to the worker's stdout, once, to see the real
-      // sequence. Remove once the cause is identified.
+      // code_execution invocation for json_schema output. Per-event
+      // console.error logging (a prior version of this diagnostic) never
+      // showed up in `railway logs` even after the job finished — only a
+      // SINGLE log call made at the exact moment of completion/failure was
+      // ever actually captured, suggesting frequent small log lines get
+      // dropped somewhere in Railway's pipeline. Buffering here and
+      // flushing once, right before returning or re-throwing, instead of
+      // logging incrementally. Remove once the cause is identified.
       const t0 = Date.now();
-      if (isCompetitorPass1) {
-        console.error(`[discover trace] request start`);
-      }
+      const trace: unknown[] = [];
 
       // Fire-and-forget, like AnthropicOpportunityAnalysisProvider's own
       // onProgress calls — a progress-write failure (see run-search.ts's
       // best-effort try/catch) must never affect the actual discovery call.
       stream.on("contentBlock", (block) => {
         if (isCompetitorPass1) {
-          console.error(`[discover trace] +${Math.round((Date.now() - t0) / 1000)}s contentBlock`, {
+          trace.push({
+            t: Math.round((Date.now() - t0) / 1000),
+            kind: "contentBlock",
             type: block.type,
             name: "name" in block ? block.name : undefined,
-            input: "input" in block ? JSON.stringify(block.input).slice(0, 500) : undefined,
+            input: "input" in block ? JSON.stringify(block.input).slice(0, 300) : undefined,
           });
         }
         if (block.type === "server_tool_use") {
@@ -642,7 +646,7 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
       let lastThinkingHeartbeat = 0;
       stream.on("streamEvent", (event) => {
         if (isCompetitorPass1 && event.type !== "content_block_delta") {
-          console.error(`[discover trace] +${Math.round((Date.now() - t0) / 1000)}s streamEvent`, event.type);
+          trace.push({ t: Math.round((Date.now() - t0) / 1000), kind: "streamEvent", type: event.type });
         }
         if (event.type !== "content_block_delta" || event.delta.type !== "thinking_delta") return;
         const now = Date.now();
@@ -655,6 +659,11 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
       try {
         finalMessage = await stream.finalMessage();
       } catch (error) {
+        if (isCompetitorPass1) {
+          console.error(
+            `[discover trace] FAILED after ${Math.round((Date.now() - t0) / 1000)}s — ${trace.length} events: ${JSON.stringify(trace)}`,
+          );
+        }
         // Same "a timed-out/aborted call is still billed" reasoning as
         // AnthropicOpportunityAnalysisProvider — record best-effort partial
         // usage so a call that grinds the full 900s before timing out isn't
@@ -670,6 +679,11 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
       assertNotTruncated(finalMessage.stop_reason, "anthropic-discovery");
 
       const jsonBlock = finalMessage.content.find((block) => block.type === "text");
+      if (isCompetitorPass1) {
+        console.error(
+          `[discover trace] DONE after ${Math.round((Date.now() - t0) / 1000)}s, stop_reason=${finalMessage.stop_reason} — ${trace.length} events: ${JSON.stringify(trace)} — text: ${jsonBlock && "text" in jsonBlock ? jsonBlock.text.slice(0, 1000) : "(none)"}`,
+        );
+      }
       if (!jsonBlock || !("text" in jsonBlock)) return [];
       const parsed = JSON.parse(jsonBlock.text) as { candidates: ResearchCandidate[] };
       // COMPETITOR_DISCOVERY_SCHEMA omits evidence/contactData entirely, so
