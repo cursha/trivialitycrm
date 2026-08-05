@@ -49,17 +49,12 @@ export class MockCandidateDiscoveryProvider implements CandidateDiscoveryProvide
         phone: null,
         email: null,
         websiteUrl: `https://example.test/${name.toLowerCase().replace(/\s+/g, "-")}`,
-        // Only COMPETITOR mode's mock candidates carry contacts — matches
-        // the real Anthropic provider's contactData only being meaningfully
-        // populated for that mode's venue-manager-role research today, and
-        // gives Competition Locator's own tests real multi-contact data to
-        // exercise without touching other modes' existing mock output.
-        contactData: isCompetitorMode
-          ? [
-              { firstName: "Mock", lastName: "Manager", title: "General Manager", email: `manager@${slugCity(city, index).toLowerCase()}.example.test` },
-              { firstName: "Mock", lastName: "Events", title: "Events Manager", phone: "555-0199" },
-            ]
-          : null,
+        // Always null at discovery — matches the real Anthropic provider's
+        // COMPETITOR-mode pass-1 discover() call, which is identification
+        // only (see AnthropicCandidateDiscoveryProvider's own comment on the
+        // two-pass split); contactData is now only ever populated by
+        // verify() below, mirroring the deferred deep-dive.
+        contactData: null,
         triviaStatus: isTriviaConfirmed || isCompetitorMode ? "CURRENT_TRIVIA" : "UNCERTAIN",
         competitorName: isCompetitorMode ? (params.competitorName ?? null) : null,
         evidence: [],
@@ -122,6 +117,19 @@ export class MockEvidenceVerificationProvider implements EvidenceVerificationPro
         },
       ],
       sources: candidate.websiteUrl ? [{ url: candidate.websiteUrl, title: candidate.name }] : [],
+      // Only COMPETITOR mode's mock deep-dive fills in contacts — matches
+      // the real Anthropic verify() call, which is now the only place
+      // COMPETITOR-mode contactData gets populated at all (see discover()'s
+      // pass-1 comment). Gives Competition Locator's own tests real
+      // multi-contact data to exercise, sourced from this step rather than
+      // discovery.
+      contactData:
+        params.mode === "COMPETITOR"
+          ? [
+              { firstName: "Mock", lastName: "Manager", title: "General Manager", email: `manager@${candidate.city.replace(/[^a-zA-Z0-9]/g, "").toLowerCase()}.example.test` },
+              { firstName: "Mock", lastName: "Events", title: "Events Manager", phone: "555-0199" },
+            ]
+          : candidate.contactData,
     };
   }
 }

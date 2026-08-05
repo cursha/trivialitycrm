@@ -87,95 +87,108 @@ async function resolveOpportunityAnalysisSettings(): Promise<{ model: string; ma
   }
 }
 
-const CANDIDATE_SCHEMA = {
-  type: "object",
-  properties: {
-    candidates: {
+// Shared item schema is built by a function, not one shared literal object —
+// verify() (which must always keep gathering full evidence/contactData,
+// since pass-2 verification is now the ONLY place that happens for
+// COMPETITOR mode, see discover() below) and discover() for TRIVIA_GAP/
+// TRIVIA_CONFIRMED both need the full shape; a pass-1 COMPETITOR discover()
+// call needs a smaller one. Mutating one shared object would have silently
+// stripped evidence/contactData from verify()'s own output too.
+function buildCandidateItemSchema(options: { includeDeepEvidence: boolean }) {
+  const properties: Record<string, unknown> = {
+    name: { type: "string" },
+    address1: { type: ["string", "null"] },
+    city: { type: "string" },
+    region: { type: "string" },
+    postalCode: { type: ["string", "null"] },
+    country: { type: "string" },
+    phone: { type: ["string", "null"] },
+    email: { type: ["string", "null"] },
+    websiteUrl: { type: ["string", "null"] },
+    triviaStatus: { type: "string", enum: ["CURRENT_TRIVIA", "NO_CURRENT_TRIVIA", "UNCERTAIN"] },
+    competitorName: { type: ["string", "null"] },
+    // Kept even in the lightweight pass-1 shape — cheap (just url+title per
+    // entry, no analysis text) and still useful to a reviewer before the
+    // deep-dive research pass runs.
+    sources: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { url: { type: "string" }, title: { type: ["string", "null"] } },
+        required: ["url", "title"],
+        additionalProperties: false,
+      },
+    },
+  };
+  const required = ["name", "address1", "city", "region", "postalCode", "country", "phone", "email", "websiteUrl", "triviaStatus", "competitorName", "sources"];
+
+  if (options.includeDeepEvidence) {
+    // Every useful role found for the venue (owner/GM/venue/marketing/
+    // events/entertainment manager), not just one — an empty array, never
+    // omitted, when nothing is publicly available. Always an array (not
+    // nullable) to sidestep any untested Anthropic structured-output
+    // interaction between a nullable type and an "array" schema — same
+    // reasoning as evidence below, also a plain non-nullable array.
+    properties.contactData = {
       type: "array",
       items: {
         type: "object",
         properties: {
-          name: { type: "string" },
-          address1: { type: ["string", "null"] },
-          city: { type: "string" },
-          region: { type: "string" },
-          postalCode: { type: ["string", "null"] },
-          country: { type: "string" },
+          firstName: { type: ["string", "null"] },
+          lastName: { type: ["string", "null"] },
           phone: { type: ["string", "null"] },
           email: { type: ["string", "null"] },
-          websiteUrl: { type: ["string", "null"] },
-          triviaStatus: { type: "string", enum: ["CURRENT_TRIVIA", "NO_CURRENT_TRIVIA", "UNCERTAIN"] },
-          competitorName: { type: ["string", "null"] },
-          // Every useful role found for the venue (owner/GM/venue/
-          // marketing/events/entertainment manager), not just one — an
-          // empty array, never omitted, when nothing is publicly available.
-          // Always an array (not nullable) to sidestep any untested
-          // Anthropic structured-output interaction between a nullable type
-          // and an "array" schema — same reasoning as evidence/sources
-          // below, which are also plain non-nullable arrays.
-          contactData: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                firstName: { type: ["string", "null"] },
-                lastName: { type: ["string", "null"] },
-                phone: { type: ["string", "null"] },
-                email: { type: ["string", "null"] },
-                title: { type: ["string", "null"] },
-                note: { type: ["string", "null"] },
-              },
-              required: ["firstName", "lastName", "phone", "email", "title", "note"],
-              additionalProperties: false,
-            },
-          },
-          evidence: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                category: { type: "string" },
-                note: { type: "string" },
-                sourceUrl: { type: ["string", "null"] },
-                verificationStatus: { type: "string", enum: ["VERIFIED", "INFERRED", "UNVERIFIED"] },
-              },
-              required: ["category", "note", "sourceUrl", "verificationStatus"],
-              additionalProperties: false,
-            },
-          },
-          sources: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: { url: { type: "string" }, title: { type: ["string", "null"] } },
-              required: ["url", "title"],
-              additionalProperties: false,
-            },
-          },
+          title: { type: ["string", "null"] },
+          note: { type: ["string", "null"] },
         },
-        required: [
-          "name",
-          "address1",
-          "city",
-          "region",
-          "postalCode",
-          "country",
-          "phone",
-          "email",
-          "websiteUrl",
-          "triviaStatus",
-          "competitorName",
-          "contactData",
-          "evidence",
-          "sources",
-        ],
+        required: ["firstName", "lastName", "phone", "email", "title", "note"],
         additionalProperties: false,
       },
-    },
-  },
-  required: ["candidates"],
-  additionalProperties: false,
-} as const;
+    };
+    properties.evidence = {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          category: { type: "string" },
+          note: { type: "string" },
+          sourceUrl: { type: ["string", "null"] },
+          verificationStatus: { type: "string", enum: ["VERIFIED", "INFERRED", "UNVERIFIED"] },
+        },
+        required: ["category", "note", "sourceUrl", "verificationStatus"],
+        additionalProperties: false,
+      },
+    };
+    required.push("contactData", "evidence");
+  }
+
+  return { type: "object", properties, required, additionalProperties: false };
+}
+
+function wrapCandidatesSchema(itemSchema: ReturnType<typeof buildCandidateItemSchema>) {
+  return {
+    type: "object",
+    properties: { candidates: { type: "array", items: itemSchema } },
+    required: ["candidates"],
+    additionalProperties: false,
+  };
+}
+
+const CANDIDATE_ITEM_SCHEMA = buildCandidateItemSchema({ includeDeepEvidence: true });
+const CANDIDATE_SCHEMA = wrapCandidatesSchema(CANDIDATE_ITEM_SCHEMA);
+
+// Pass-1 COMPETITOR discovery only: identification info (name/address/etc.)
+// without evidence/contactData. Confirmed live: a broad COMPETITOR discover()
+// call gathering deep per-candidate evidence for many venues in one response
+// burned $2.44 (988K input tokens, heavy web_fetch use) and then discarded
+// its ENTIRE candidate list because the JSON hit the 16000-token output cap
+// mid-object and failed to parse. Keeping pass-1 to identification-only data
+// keeps each candidate's footprint small enough that a broad search can
+// enumerate far more venues before hitting that cap, and defers the
+// expensive per-venue research to the existing opt-in "Research this
+// business" action (researchResult(), results/actions.ts) — the same
+// two-pass pattern GENERAL mode already uses.
+const COMPETITOR_DISCOVERY_SCHEMA = wrapCandidatesSchema(buildCandidateItemSchema({ includeDeepEvidence: false }));
 
 const EOS_CATEGORY_KEYS = Object.keys(EOS_CATEGORY_MAXIMA) as (keyof typeof EOS_CATEGORY_MAXIMA)[];
 
@@ -407,13 +420,26 @@ function normalizeCompetitorFound(raw: OpportunityAnalysisResult["competitorFoun
   return { ...raw, day };
 }
 
-function modeInstructions(mode: DiscoverParams["mode"], competitorName?: string): string {
+// `identificationOnly` is passed only by discover()'s COMPETITOR pass-1 call
+// (see COMPETITOR_DISCOVERY_SCHEMA's comment) — verify() always gets the
+// full deep-evidence instructions below, since pass-2 verification is now
+// the only place that evidence gathering happens for COMPETITOR mode.
+function modeInstructions(mode: DiscoverParams["mode"], competitorName?: string, options?: { identificationOnly?: boolean }): string {
   switch (mode) {
     case "TRIVIA_GAP":
       return "Find locations that offer regular events (live music, karaoke, other entertainment) but do NOT currently offer trivia. Do not include any location with positive evidence of an existing trivia night.";
     case "TRIVIA_CONFIRMED":
       return "Find locations with POSITIVE, verifiable evidence that they currently run a trivia night (a schedule page, event listing, or social post naming a specific recurring trivia event). Uncertain or ambiguous evidence must be marked triviaStatus \"UNCERTAIN\", never \"CURRENT_TRIVIA\".";
     case "COMPETITOR":
+      if (options?.identificationOnly) {
+        return (
+          `This is a broad IDENTIFICATION pass, not a deep-research pass: find pubs, bars, breweries, taprooms, restaurants, or similar licensed venues that appear — from web_search results and listings you encounter directly — to be associated with the trivia service "${competitorName}". ` +
+          "Prioritize breadth over depth: list every plausible venue you find rather than spending tool calls confirming each one. Do NOT fetch full pages or gather detailed evidence/contact research for this pass — that happens later, per-venue, only for whichever candidates get selected for a closer look. " +
+          `Only include a venue when something in what you already see (the competitor's own name, branding, or host credit on a listing, event calendar, or social snippet) suggests a tie to that specific service — never a generic "trivia night" mention with no named host. ` +
+          "If a location clearly runs trivia through a DIFFERENT named provider, still report it with that other provider's name in competitorName rather than omitting it — the caller filters mismatches, don't guess or force a match. " +
+          "Exclude only venues you can already tell are permanently closed or out of business from what you've seen — leave freshness/evidence-quality judgment calls for the later per-venue pass."
+        );
+      }
       return (
         `Find pubs, bars, breweries, taprooms, restaurants, or similar licensed venues currently running trivia hosted by the service "${competitorName}". ` +
         `Only set competitorName to "${competitorName}" when there is direct, current evidence (the competitor's own name, branding, or host credit on the venue's own listing, event calendar, or official social-media page) tying the location to that specific service — never a generic "trivia night" mention with no named host. ` +
@@ -501,6 +527,13 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
     // progressMessage/heartbeatAt never update for the full duration of a
     // long call, making a legitimately-still-working search look identical
     // to a dead one on its own status page.
+    // COMPETITOR mode's discover() call is pass 1 of a two-pass split (see
+    // COMPETITOR_DISCOVERY_SCHEMA's own comment) — identification only, no
+    // evidence/contactData. Every other mode keeps the original one-pass
+    // shape, since only COMPETITOR mode has an opt-in per-result deep-dive
+    // (researchResult(), results/actions.ts) to defer that work to.
+    const isCompetitorPass1 = params.mode === "COMPETITOR";
+
     return callProvider({ providerName: "anthropic-discovery", timeoutMs: 900_000 }, async (signal) => {
       const locationScope = params.cities.length > 0 ? params.cities.join(", ") : `all of ${params.region} (no city filter given)`;
 
@@ -512,18 +545,20 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
           // list; confirmed live by a truncated (stop_reason "max_tokens")
           // response that failed JSON.parse. 16000 stays under the ~16K
           // ceiling non-streaming requests are safe at (see http.ts/SDK
-          // docs) while giving real headroom.
+          // docs) while giving real headroom. Still relevant even for the
+          // now-lighter COMPETITOR pass-1 shape: a genuinely broad region
+          // can still return enough candidates to approach this cap.
           max_tokens: 16000,
           tools: [
             { type: "web_search_20260209", name: "web_search", max_uses: maxSearchToolUses },
             { type: "web_fetch_20260209", name: "web_fetch", max_uses: maxSearchToolUses },
           ],
-          output_config: { format: { type: "json_schema", schema: CANDIDATE_SCHEMA } },
+          output_config: { format: { type: "json_schema", schema: isCompetitorPass1 ? COMPETITOR_DISCOVERY_SCHEMA : CANDIDATE_SCHEMA } },
           messages: [
             {
               role: "user",
               content:
-                `${modeInstructions(params.mode, params.competitorName)}\n\n` +
+                `${modeInstructions(params.mode, params.competitorName, { identificationOnly: isCompetitorPass1 })}\n\n` +
                 `Business criteria: ${params.promptText}\n\n` +
                 `Location: ${locationScope}, ${params.country}. Lead type: ${params.leadTypeName}.\n\n` +
                 "Only report facts you can support with a web_search or web_fetch result. Do not invent addresses, phone numbers, or emails — leave a field null rather than guessing. Every evidence entry must cite a sourceUrl you actually fetched or found in search results. address1 must be the street address ONLY (e.g. \"123 Main St\") — never append city, region, postal code, or country, since those are already separate fields.",
@@ -573,7 +608,16 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
       const jsonBlock = finalMessage.content.find((block) => block.type === "text");
       if (!jsonBlock || !("text" in jsonBlock)) return [];
       const parsed = JSON.parse(jsonBlock.text) as { candidates: ResearchCandidate[] };
-      return parsed.candidates.map((candidate) => ({ ...candidate, contactData: candidate.contactData ?? [] }));
+      // COMPETITOR_DISCOVERY_SCHEMA omits evidence/contactData entirely, so
+      // those keys are simply absent from the model's JSON, not null —
+      // default them here so every ResearchCandidate downstream keeps its
+      // required array shape regardless of which schema produced it.
+      return parsed.candidates.map((candidate) => ({
+        ...candidate,
+        contactData: candidate.contactData ?? [],
+        evidence: candidate.evidence ?? [],
+        sources: candidate.sources ?? [],
+      }));
     });
   }
 }
@@ -601,7 +645,7 @@ export class AnthropicEvidenceVerificationProvider implements EvidenceVerificati
           output_config: {
             format: {
               type: "json_schema",
-              schema: CANDIDATE_SCHEMA.properties.candidates.items,
+              schema: CANDIDATE_ITEM_SCHEMA,
             },
           },
           messages: [

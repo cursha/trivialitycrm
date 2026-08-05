@@ -9,7 +9,6 @@ import { computeNormalizedFields, findPriorRejectedMatches } from "../duplicates
 import { normalizeCompanyName } from "../duplicates/normalize";
 import { normalizeRegion } from "../data-quality/normalize";
 import { findScoredDuplicateMatches } from "../duplicates/scored-match";
-import { stampEvidenceVerificationDates, hasCurrentVerifiedEvidence } from "./result-explanation";
 import { getAiSettings, checkMidRunAiBudget } from "../ai/budget";
 import { writeAuditEvent } from "../audit/log";
 import { classifyProviderError } from "../integrations/provider-errors";
@@ -252,8 +251,11 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       // candidates, letting a breach mid-batch go uncaught until the next
       // batch entirely. GENERAL mode never places a paid call at all (see
       // below), so this recheck is skipped for it — a pure DB-cost-avoidance
-      // short-circuit, not a safety gap.
-      if (search.mode !== "GENERAL") {
+      // short-circuit, not a safety gap. COMPETITOR mode joined this list
+      // once its own verify/score calls moved to the opt-in "Research this
+      // business" pass (below) — pass-1 COMPETITOR candidates place no paid
+      // call here either now.
+      if (search.mode !== "GENERAL" && search.mode !== "COMPETITOR") {
         const midRunCheck = await checkMidRunAiBudget(search.id, { overrideSpendLimit: search.budgetOverride });
         if (!midRunCheck.allowed) {
           await writeAuditEvent({
@@ -274,15 +276,23 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       let score: number;
       let explanation: string;
 
-      if (search.mode === "GENERAL") {
-        // Directory-sourced candidates never get an automatic AI verify/score
-        // pass — that's the entire point of the discovery/research split
-        // (see providers/google-places.ts and results/actions.ts#
-        // researchResult): browsing a city's businesses stays fast, cheap,
-        // and off the AI budget entirely. triviaStatus stays "UNCERTAIN" and
-        // evidence/sources stay empty (as returned by the discovery
-        // provider) until a user opts into "Research this business" on a
-        // specific row.
+      if (search.mode === "GENERAL" || search.mode === "COMPETITOR") {
+        // Directory-sourced (GENERAL) candidates never got an automatic AI
+        // verify/score pass — that's the entire point of the discovery/
+        // research split (see providers/google-places.ts and results/
+        // actions.ts#researchResult): browsing a city's businesses stays
+        // fast, cheap, and off the AI budget entirely, until a user opts
+        // into "Research this business" on a specific row.
+        //
+        // COMPETITOR mode now follows the exact same two-pass pattern.
+        // Confirmed live: a single one-shot COMPETITOR discover() call that
+        // both enumerated candidates AND gathered deep per-candidate
+        // evidence burned $2.44 (988K input tokens) and then discarded its
+        // entire candidate list when the JSON response hit the output token
+        // cap mid-object. discover() (anthropic.ts) now returns
+        // identification-only candidates for COMPETITOR mode — evidence and
+        // contactData stay empty here and only get filled in by
+        // researchResult() on request, per venue.
         verified = raw;
         score = 0;
         explanation = 'Not yet researched — use "Research this business" for an AI-evaluated score and trivia status.';
@@ -329,12 +339,17 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
 
       // Competition Locator's verification-standard guards, COMPETITOR mode
       // only — every other mode's disposition/competitorId logic below is
-      // completely untouched by this block.
+      // completely untouched by this block. Now runs on pass-1 (raw/
+      // unverified) data, not post-verify data — region/country and
+      // competitorName are already present on the raw candidate, so this
+      // stays a free, automatic check with no paid call. The insufficient-
+      // evidence check (and stamping verifiedAt on evidence entries) moved
+      // to researchResult()'s COMPETITOR-mode block (results/actions.ts) —
+      // evidence is always empty at this point now, so checking it here
+      // would reject every single candidate.
       let competitorLocatorRejectionReasonId: string | null = null;
       let competitorLocatorRejectionNote: string | null = null;
       if (search.mode === "COMPETITOR") {
-        verified = { ...verified, evidence: stampEvidenceVerificationDates(verified.evidence) };
-
         const searchedRegion = normalizeRegion(search.region, search.country);
         const candidateRegion = normalizeRegion(verified.region, verified.country);
         const searchedCountry = normalizeCountry(search.country);
@@ -343,20 +358,23 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
         if (candidateCountry !== searchedCountry || (searchedRegion && candidateRegion !== searchedRegion)) {
           competitorLocatorRejectionReasonId = competitorRejectionReasonIds.outsideRegion;
           competitorLocatorRejectionNote = "[Auto-rejected: outside the requested country/region.]";
-        } else if (!hasCurrentVerifiedEvidence(verified.evidence)) {
-          competitorLocatorRejectionReasonId = competitorRejectionReasonIds.insufficientEvidence;
-          competitorLocatorRejectionNote = "[Auto-rejected: no current, verified evidence with a source citing this competitor.]";
         }
         // Wrong-provider check happens after competitorId is resolved below,
         // since it needs the same normalized-name comparison either way.
       }
 
-      // Unresearched GENERAL-mode candidates carry a placeholder score of 0,
-      // which is meaningless against minimumScore — sorting them into
-      // BELOW_SCORE would hide every freshly-discovered business from the
-      // default results view before anyone had a chance to research them.
+      // Unresearched GENERAL/COMPETITOR-mode candidates carry a placeholder
+      // score of 0, which is meaningless against minimumScore — sorting them
+      // into BELOW_SCORE would hide every freshly-discovered business from
+      // the default results view before anyone had a chance to research it.
       let disposition: "REJECTED" | "NEW" | "BELOW_SCORE" =
-        priorRejections.length > 0 ? "REJECTED" : search.mode === "GENERAL" ? "NEW" : score < search.minimumScore ? "BELOW_SCORE" : "NEW";
+        priorRejections.length > 0
+          ? "REJECTED"
+          : search.mode === "GENERAL" || search.mode === "COMPETITOR"
+            ? "NEW"
+            : score < search.minimumScore
+              ? "BELOW_SCORE"
+              : "NEW";
       let finalExplanation =
         priorRejections.length > 0
           ? `${explanation}\n\n[Auto-rejected: matches a previously rejected location — use "restore" to reconsider.]`

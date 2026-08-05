@@ -10,7 +10,36 @@ import {
   createPipelineStageFixture,
 } from "../helpers/fixtures";
 import { runSearchJob } from "../../src/lib/research/run-search";
-import { MockEvidenceVerificationProvider } from "../../src/lib/research/providers/mock";
+import { MockCandidateDiscoveryProvider, MockEvidenceVerificationProvider } from "../../src/lib/research/providers/mock";
+import type { ResearchCandidate } from "../../src/lib/research/providers/types";
+
+// COMPETITOR mode's region/wrong-provider guards moved to pass-1
+// (run-search.ts, gated on search.mode === "COMPETITOR") since they only
+// need identification-level fields — see anthropic.ts's own comment on the
+// two-pass split. This builds a full pass-1-shaped candidate for tests that
+// need to override discover() output directly, rather than verify()'s.
+function candidateFixture(overrides: Partial<ResearchCandidate>): ResearchCandidate {
+  return {
+    name: "Some Pub",
+    address1: "1 Main St",
+    city: "Denver",
+    // Matches createLeadSearchFixture's own defaults (Canada/ON) — a test
+    // overriding only competitorName (not region/country) must not
+    // accidentally also trip the region-mismatch guard first.
+    region: "ON",
+    postalCode: null,
+    country: "Canada",
+    phone: null,
+    email: null,
+    websiteUrl: "https://example.test/some-pub",
+    triviaStatus: "CURRENT_TRIVIA",
+    competitorName: null,
+    contactData: null,
+    evidence: [],
+    sources: [],
+    ...overrides,
+  };
+}
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -36,13 +65,13 @@ async function baseFixtures() {
 }
 
 describe("runSearchJob — COMPETITOR mode verification guards", () => {
-  it("rejects a candidate whose evidence points to a different trivia provider than the one searched for", async () => {
+  it("rejects a candidate whose returned competitorName is a different trivia provider than the one searched for", async () => {
     const { user, leadType, competitor } = await baseFixtures();
-    vi.spyOn(MockEvidenceVerificationProvider.prototype, "verify").mockImplementation(async (candidate) => ({
-      ...candidate,
-      competitorName: "A Totally Different Trivia Co",
-      evidence: [{ category: "general", note: "found", sourceUrl: candidate.websiteUrl, verificationStatus: "VERIFIED" }],
-    }));
+    // Wrong-provider now runs on pass-1 (discover()) output directly — see
+    // run-search.ts's own comment — since evidence-gathering (verify()) is
+    // deferred to the opt-in "Research this business" pass and would be
+    // empty at this point regardless.
+    vi.spyOn(MockCandidateDiscoveryProvider.prototype, "discover").mockResolvedValue([candidateFixture({ competitorName: "A Totally Different Trivia Co" })]);
     const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, mode: "COMPETITOR", competitorId: competitor.id, cities: ["Denver"] });
 
     await runSearchJob(search.id);
@@ -62,16 +91,20 @@ describe("runSearchJob — COMPETITOR mode verification guards", () => {
     const [result] = await testPrisma.searchResult.findMany({ where: { searchId: search.id } });
     expect(result.disposition).not.toBe("REJECTED");
     expect(result.competitorId).toBe(competitor.id);
+    // Pass-1 only — score/evidence stay at their unresearched placeholders
+    // until "Research this business" (researchResult()) runs.
+    expect(result.score).toBe(0);
+    expect(result.evidence).toEqual([]);
   });
 
   it("rejects a candidate outside the searched country/region", async () => {
     const { user, leadType, competitor } = await baseFixtures();
-    vi.spyOn(MockEvidenceVerificationProvider.prototype, "verify").mockImplementation(async (candidate) => ({
-      ...candidate,
-      region: "TX",
-      country: "United States",
-      evidence: [{ category: "general", note: "found", sourceUrl: candidate.websiteUrl, verificationStatus: "VERIFIED" }],
-    }));
+    // Region/country mismatch also now runs on pass-1 (discover()) output —
+    // both fields are already present on the raw candidate, so this stays a
+    // free, automatic check with no paid call.
+    vi.spyOn(MockCandidateDiscoveryProvider.prototype, "discover").mockResolvedValue([
+      candidateFixture({ region: "TX", country: "United States", competitorName: competitor.name }),
+    ]);
     const search = await createLeadSearchFixture({
       createdById: user.id,
       leadTypeId: leadType.id,
@@ -87,36 +120,6 @@ describe("runSearchJob — COMPETITOR mode verification guards", () => {
     const [result] = await testPrisma.searchResult.findMany({ where: { searchId: search.id }, include: { rejectionReason: true } });
     expect(result.disposition).toBe("REJECTED");
     expect(result.rejectionReason?.name).toBe("Outside Requested Country/Region");
-  });
-
-  it("rejects a candidate with no current VERIFIED evidence", async () => {
-    const { user, leadType, competitor } = await baseFixtures();
-    vi.spyOn(MockEvidenceVerificationProvider.prototype, "verify").mockImplementation(async (candidate) => ({
-      ...candidate,
-      evidence: [{ category: "general", note: "unverified mention", sourceUrl: null, verificationStatus: "UNVERIFIED" }],
-    }));
-    const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, mode: "COMPETITOR", competitorId: competitor.id, cities: ["Denver"] });
-
-    await runSearchJob(search.id);
-
-    const [result] = await testPrisma.searchResult.findMany({ where: { searchId: search.id }, include: { rejectionReason: true } });
-    expect(result.disposition).toBe("REJECTED");
-    expect(result.rejectionReason?.name).toBe("Insufficient Verifiable Evidence");
-  });
-
-  it("stamps verifiedAt on VERIFIED evidence entries, and never on non-VERIFIED ones", async () => {
-    const { user, leadType, competitor } = await baseFixtures();
-    const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, mode: "COMPETITOR", competitorId: competitor.id, cities: ["Denver"] });
-
-    await runSearchJob(search.id);
-
-    const [result] = await testPrisma.searchResult.findMany({ where: { searchId: search.id } });
-    const evidence = result.evidence as { verificationStatus: string; verifiedAt?: string | null }[];
-    expect(evidence.length).toBeGreaterThan(0);
-    for (const entry of evidence) {
-      if (entry.verificationStatus === "VERIFIED") expect(entry.verifiedAt).toBeTruthy();
-      else expect(entry.verifiedAt).toBeFalsy();
-    }
   });
 
   it("does not apply any COMPETITOR-only guard to a GENERAL-mode search", async () => {

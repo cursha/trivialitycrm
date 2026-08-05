@@ -116,6 +116,11 @@ describe("runSearchJob", () => {
     const [result] = await testPrisma.searchResult.findMany({ where: { searchId: search.id } });
     expect(result.competitorId).toBe(competitor.id);
     expect(result.triviaStatus).toBe("CURRENT_TRIVIA");
+    // COMPETITOR mode is pass-1 only (see run-search.ts's own comment on the
+    // two-pass split) — verify()/score() never run automatically, so these
+    // stay at their unresearched placeholders straight out of discovery.
+    expect(result.score).toBe(0);
+    expect(result.evidence).toEqual([]);
   });
 
   it("never produces a CURRENT_TRIVIA result for a TRIVIA_GAP search", async () => {
