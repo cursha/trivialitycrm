@@ -49,16 +49,17 @@ const FALLBACK_MAX_SEARCH_TOOL_USES = 8;
 const FALLBACK_MAX_SEARCH_TOOL_USES_OPPORTUNITY_ANALYSIS = 4;
 // COMPETITOR pass-1 discovery's own fixed, much smaller search budget —
 // deliberately NOT the shared, admin-configurable maxSearchToolUsesPerCall
-// (up to 20). Confirmed live: a plain conversational answer to "pubs in
-// Ontario that host Ruby trivia" came back in well under a minute; this
-// pass1 discover() call was taking 15-20+ minutes for the same underlying
-// question, and the shared 20-search budget was the single biggest reason
-// why — most of that time was 20 sequential web_search round-trips, not
-// the (already-removed, see the tools array below) evidence-gathering
-// work. Identification-only discovery doesn't need anywhere near that many
-// searches; this is a small, fixed cap, not another admin setting, to keep
-// this pass genuinely fast rather than configurably slow.
-const COMPETITOR_PASS1_MAX_SEARCH_USES = 5;
+// (up to 20) — a small, fixed cap instead, to keep this pass genuinely
+// fast rather than configurably slow. Was 5, initially set that low while
+// still chasing the real slowness cause. Confirmed live once the actual
+// bottleneck (web_search's automatic code_execution dynamic filtering,
+// see discoverCompetitorTwoStep()'s own comment) was fixed: a 5-search
+// budget finished a whole-Ontario search in 66s but only surfaced 11
+// candidates for a competitor known to have 20+ real locations — each
+// search is now fast and cheap on its own (no more dynamic-filtering
+// overhead), so there's real room to trade a little of that speed back
+// for broader coverage.
+const COMPETITOR_PASS1_MAX_SEARCH_USES = 15;
 
 async function resolveModel(): Promise<string> {
   try {
