@@ -149,7 +149,15 @@ export async function saveCompetitionLocatorResults(rawPayload: unknown): Promis
         afterData: { name: result.name, competitorId: result.search.competitorId },
       });
     }
-  });
+    // Prisma's array-form/callback $transaction defaults to a 5s
+    // interactive-transaction timeout — fine for one or two rows, but this
+    // loop does real per-row work (company create/update, contact dedup
+    // checks, an audit event write) and a realistic batch confirmed live
+    // exceeded 5s ("A query cannot be executed on an expired transaction
+    // ... 5367 ms passed"). Matches the same fix already applied to
+    // run-search.ts's own bulk-checkpoint transaction for the identical
+    // reason.
+  }, { timeout: 60_000 });
 
   revalidatePath("/companies");
   return { createdCount, updatedCount, skippedContactCount, ignoredCount };
