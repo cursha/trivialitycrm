@@ -549,10 +549,21 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
           // now-lighter COMPETITOR pass-1 shape: a genuinely broad region
           // can still return enough candidates to approach this cap.
           max_tokens: 16000,
-          tools: [
-            { type: "web_search_20260209", name: "web_search", max_uses: maxSearchToolUses },
-            { type: "web_fetch_20260209", name: "web_fetch", max_uses: maxSearchToolUses },
-          ],
+          // COMPETITOR pass-1 drops web_fetch entirely rather than just
+          // asking the model not to use it — confirmed live, a soft "don't
+          // fetch full pages" prompt instruction wasn't reliable: the same
+          // broad Ontario/Ruby Entertainment search sometimes finished in
+          // ~15min (right at the timeout ceiling) and sometimes exceeded it,
+          // suggesting the model was still doing slow, deep work despite the
+          // wording. Pass-1 is identification from search-result snippets
+          // only — take away the tool that lets it be slow instead of
+          // hoping it self-limits.
+          tools: isCompetitorPass1
+            ? [{ type: "web_search_20260209", name: "web_search", max_uses: maxSearchToolUses }]
+            : [
+                { type: "web_search_20260209", name: "web_search", max_uses: maxSearchToolUses },
+                { type: "web_fetch_20260209", name: "web_fetch", max_uses: maxSearchToolUses },
+              ],
           output_config: { format: { type: "json_schema", schema: isCompetitorPass1 ? COMPETITOR_DISCOVERY_SCHEMA : CANDIDATE_SCHEMA } },
           messages: [
             {
@@ -561,7 +572,9 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
                 `${modeInstructions(params.mode, params.competitorName, { identificationOnly: isCompetitorPass1 })}\n\n` +
                 `Business criteria: ${params.promptText}\n\n` +
                 `Location: ${locationScope}, ${params.country}. Lead type: ${params.leadTypeName}.\n\n` +
-                "Only report facts you can support with a web_search or web_fetch result. Do not invent addresses, phone numbers, or emails — leave a field null rather than guessing. Every evidence entry must cite a sourceUrl you actually fetched or found in search results. address1 must be the street address ONLY (e.g. \"123 Main St\") — never append city, region, postal code, or country, since those are already separate fields.",
+                (isCompetitorPass1
+                  ? "Only report facts you can support with a web_search result — you do not have a page-fetching tool for this pass. Do not invent addresses, phone numbers, or emails — leave a field null rather than guessing. address1 must be the street address ONLY (e.g. \"123 Main St\") — never append city, region, postal code, or country, since those are already separate fields."
+                  : "Only report facts you can support with a web_search or web_fetch result. Do not invent addresses, phone numbers, or emails — leave a field null rather than guessing. Every evidence entry must cite a sourceUrl you actually fetched or found in search results. address1 must be the street address ONLY (e.g. \"123 Main St\") — never append city, region, postal code, or country, since those are already separate fields."),
             },
           ],
         },
@@ -591,18 +604,6 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
       try {
         finalMessage = await stream.finalMessage();
       } catch (error) {
-        // TEMPORARY diagnostic — classifyProviderError() sanitizes this
-        // before it ever reaches LeadSearch.errorMessage, so a confusing
-        // "couldn't understand" with near-zero output tokens and zero tool
-        // uses (confirmed live, discover-mode COMPETITOR calls) has no raw
-        // detail to go on. Logs to the worker's stdout only, never
-        // persisted. Remove once the underlying cause is identified.
-        console.error("[discover() raw error]", {
-          name: error instanceof Error ? error.name : typeof error,
-          message: error instanceof Error ? error.message : String(error),
-          status: (error as { status?: unknown })?.status,
-          stack: error instanceof Error ? error.stack : undefined,
-        });
         // Same "a timed-out/aborted call is still billed" reasoning as
         // AnthropicOpportunityAnalysisProvider — record best-effort partial
         // usage so a call that grinds the full 900s before timing out isn't
