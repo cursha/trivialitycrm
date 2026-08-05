@@ -432,26 +432,18 @@ function normalizeCompetitorFound(raw: OpportunityAnalysisResult["competitorFoun
   return { ...raw, day };
 }
 
-// `identificationOnly` is passed only by discover()'s COMPETITOR pass-1 call
-// (see COMPETITOR_DISCOVERY_SCHEMA's comment) — verify() always gets the
-// full deep-evidence instructions below, since pass-2 verification is now
-// the only place that evidence gathering happens for COMPETITOR mode.
-function modeInstructions(mode: DiscoverParams["mode"], competitorName?: string, options?: { identificationOnly?: boolean }): string {
+// Shared by discover() (every non-COMPETITOR mode — see
+// discoverCompetitorTwoStep()'s own comment for why COMPETITOR mode no
+// longer uses this at all) and verify() (every mode, including COMPETITOR's
+// own step-2-equivalent structuring pass does NOT use this — that prompt is
+// bespoke, see discoverCompetitorTwoStep()).
+function modeInstructions(mode: DiscoverParams["mode"], competitorName?: string): string {
   switch (mode) {
     case "TRIVIA_GAP":
       return "Find locations that offer regular events (live music, karaoke, other entertainment) but do NOT currently offer trivia. Do not include any location with positive evidence of an existing trivia night.";
     case "TRIVIA_CONFIRMED":
       return "Find locations with POSITIVE, verifiable evidence that they currently run a trivia night (a schedule page, event listing, or social post naming a specific recurring trivia event). Uncertain or ambiguous evidence must be marked triviaStatus \"UNCERTAIN\", never \"CURRENT_TRIVIA\".";
     case "COMPETITOR":
-      if (options?.identificationOnly) {
-        return (
-          `This is a broad IDENTIFICATION pass, not a deep-research pass: find pubs, bars, breweries, taprooms, restaurants, or similar licensed venues that appear — from web_search results and listings you encounter directly — to be associated with the trivia service "${competitorName}". ` +
-          "Prioritize breadth over depth: list every plausible venue you find rather than spending tool calls confirming each one. Do NOT fetch full pages or gather detailed evidence/contact research for this pass — that happens later, per-venue, only for whichever candidates get selected for a closer look. " +
-          `Only include a venue when something in what you already see (the competitor's own name, branding, or host credit on a listing, event calendar, or social snippet) suggests a tie to that specific service — never a generic "trivia night" mention with no named host. ` +
-          "If a location clearly runs trivia through a DIFFERENT named provider, still report it with that other provider's name in competitorName rather than omitting it — the caller filters mismatches, don't guess or force a match. " +
-          "Exclude only venues you can already tell are permanently closed or out of business from what you've seen — leave freshness/evidence-quality judgment calls for the later per-venue pass."
-        );
-      }
       return (
         `Find pubs, bars, breweries, taprooms, restaurants, or similar licensed venues currently running trivia hosted by the service "${competitorName}". ` +
         `Only set competitorName to "${competitorName}" when there is direct, current evidence (the competitor's own name, branding, or host credit on the venue's own listing, event calendar, or official social-media page) tying the location to that specific service — never a generic "trivia night" mention with no named host. ` +
@@ -522,6 +514,13 @@ export class AnthropicPromptAssistant implements PromptAssistant {
 
 export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryProvider {
   async discover(params: DiscoverParams, onProgress?: (update: DiscoveryProgressUpdate) => Promise<void>): Promise<ResearchCandidate[]> {
+    // COMPETITOR mode gets its own two-step implementation — see
+    // discoverCompetitorTwoStep()'s own comment for why. Every other mode
+    // keeps this original one-shot shape, unchanged.
+    if (params.mode === "COMPETITOR") {
+      return this.discoverCompetitorTwoStep(params, onProgress);
+    }
+
     const { model, maxSearchToolUses } = await resolveResearchSettings();
     // Up to maxSearchToolUses web_search + maxSearchToolUses web_fetch tool
     // round-trips for a broad query (e.g. no city filter, or a competitor
@@ -539,13 +538,6 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
     // progressMessage/heartbeatAt never update for the full duration of a
     // long call, making a legitimately-still-working search look identical
     // to a dead one on its own status page.
-    // COMPETITOR mode's discover() call is pass 1 of a two-pass split (see
-    // COMPETITOR_DISCOVERY_SCHEMA's own comment) — identification only, no
-    // evidence/contactData. Every other mode keeps the original one-pass
-    // shape, since only COMPETITOR mode has an opt-in per-result deep-dive
-    // (researchResult(), results/actions.ts) to defer that work to.
-    const isCompetitorPass1 = params.mode === "COMPETITOR";
-
     return callProvider({ providerName: "anthropic-discovery", timeoutMs: 900_000 }, async (signal) => {
       const locationScope = params.cities.length > 0 ? params.cities.join(", ") : `all of ${params.region} (no city filter given)`;
 
@@ -557,86 +549,31 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
           // list; confirmed live by a truncated (stop_reason "max_tokens")
           // response that failed JSON.parse. 16000 stays under the ~16K
           // ceiling non-streaming requests are safe at (see http.ts/SDK
-          // docs) while giving real headroom. Still relevant even for the
-          // now-lighter COMPETITOR pass-1 shape: a genuinely broad region
-          // can still return enough candidates to approach this cap.
+          // docs) while giving real headroom.
           max_tokens: 16000,
-          // COMPETITOR pass-1 drops web_fetch entirely rather than just
-          // asking the model not to use it — confirmed live, a soft "don't
-          // fetch full pages" prompt instruction wasn't reliable: the same
-          // broad Ontario/Ruby Entertainment search sometimes finished in
-          // ~15min (right at the timeout ceiling) and sometimes exceeded it,
-          // suggesting the model was still doing slow, deep work despite the
-          // wording. Pass-1 is identification from search-result snippets
-          // only — take away the tool that lets it be slow instead of
-          // hoping it self-limits.
-          tools: isCompetitorPass1
-            ? [{ type: "web_search_20260209", name: "web_search", max_uses: COMPETITOR_PASS1_MAX_SEARCH_USES }]
-            : [
-                { type: "web_search_20260209", name: "web_search", max_uses: maxSearchToolUses },
-                { type: "web_fetch_20260209", name: "web_fetch", max_uses: maxSearchToolUses },
-              ],
-          // Confirmed live: even after cutting COMPETITOR pass-1 to a
-          // 5-search budget with no web_fetch tool, the same Ontario/Ruby
-          // Entertainment search still ran the full 900s and timed out with
-          // zero candidates — tool-call count wasn't the bottleneck.
-          // output_config.effort defaults to "high" whenever omitted (this
-          // call, until now), and per Anthropic's docs that governs ALL
-          // tokens — thinking and code-execution work included — not just
-          // tool calls, which is exactly the pattern already fixed the same
-          // way for AnthropicOpportunityAnalysisProvider below. "medium" is
-          // Anthropic's documented step-down for Sonnet 5, appropriate here
-          // since pass-1 is a bounded identification task, not open-ended
-          // exploration.
-          output_config: {
-            ...(isCompetitorPass1 ? { effort: "medium" as const } : {}),
-            format: { type: "json_schema", schema: isCompetitorPass1 ? COMPETITOR_DISCOVERY_SCHEMA : CANDIDATE_SCHEMA },
-          },
+          tools: [
+            { type: "web_search_20260209", name: "web_search", max_uses: maxSearchToolUses },
+            { type: "web_fetch_20260209", name: "web_fetch", max_uses: maxSearchToolUses },
+          ],
+          output_config: { format: { type: "json_schema", schema: CANDIDATE_SCHEMA } },
           messages: [
             {
               role: "user",
               content:
-                `${modeInstructions(params.mode, params.competitorName, { identificationOnly: isCompetitorPass1 })}\n\n` +
+                `${modeInstructions(params.mode, params.competitorName)}\n\n` +
                 `Business criteria: ${params.promptText}\n\n` +
                 `Location: ${locationScope}, ${params.country}. Lead type: ${params.leadTypeName}.\n\n` +
-                (isCompetitorPass1
-                  ? "Only report facts you can support with a web_search result — you do not have a page-fetching tool for this pass. Do not invent addresses, phone numbers, or emails — leave a field null rather than guessing. address1 must be the street address ONLY (e.g. \"123 Main St\") — never append city, region, postal code, or country, since those are already separate fields."
-                  : "Only report facts you can support with a web_search or web_fetch result. Do not invent addresses, phone numbers, or emails — leave a field null rather than guessing. Every evidence entry must cite a sourceUrl you actually fetched or found in search results. address1 must be the street address ONLY (e.g. \"123 Main St\") — never append city, region, postal code, or country, since those are already separate fields."),
+                "Only report facts you can support with a web_search or web_fetch result. Do not invent addresses, phone numbers, or emails — leave a field null rather than guessing. Every evidence entry must cite a sourceUrl you actually fetched or found in search results. address1 must be the street address ONLY (e.g. \"123 Main St\") — never append city, region, postal code, or country, since those are already separate fields.",
             },
           ],
         },
         { signal },
       );
 
-      // TEMPORARY diagnostic — a "code_execution"/"bash_code_execution"
-      // server tool use block is showing up in pass-1 COMPETITOR discovery
-      // progress messages, taking many minutes, even though this call was
-      // never given either tool. Confirmed against Anthropic's own
-      // structured-outputs docs: there is no documented automatic internal
-      // code_execution invocation for json_schema output. Per-event
-      // console.error logging (a prior version of this diagnostic) never
-      // showed up in `railway logs` even after the job finished — only a
-      // SINGLE log call made at the exact moment of completion/failure was
-      // ever actually captured, suggesting frequent small log lines get
-      // dropped somewhere in Railway's pipeline. Buffering here and
-      // flushing once, right before returning or re-throwing, instead of
-      // logging incrementally. Remove once the cause is identified.
-      const t0 = Date.now();
-      const trace: unknown[] = [];
-
       // Fire-and-forget, like AnthropicOpportunityAnalysisProvider's own
       // onProgress calls — a progress-write failure (see run-search.ts's
       // best-effort try/catch) must never affect the actual discovery call.
       stream.on("contentBlock", (block) => {
-        if (isCompetitorPass1) {
-          trace.push({
-            t: Math.round((Date.now() - t0) / 1000),
-            kind: "contentBlock",
-            type: block.type,
-            name: "name" in block ? block.name : undefined,
-            input: "input" in block ? JSON.stringify(block.input).slice(0, 300) : undefined,
-          });
-        }
         if (block.type === "server_tool_use") {
           void onProgress?.({ kind: "message", message: serverToolProgressMessage(block.name, block.input) });
         } else if (block.type === "thinking") {
@@ -645,9 +582,6 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
       });
       let lastThinkingHeartbeat = 0;
       stream.on("streamEvent", (event) => {
-        if (isCompetitorPass1 && event.type !== "content_block_delta") {
-          trace.push({ t: Math.round((Date.now() - t0) / 1000), kind: "streamEvent", type: event.type });
-        }
         if (event.type !== "content_block_delta" || event.delta.type !== "thinking_delta") return;
         const now = Date.now();
         if (now - lastThinkingHeartbeat < 5000) return;
@@ -659,11 +593,6 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
       try {
         finalMessage = await stream.finalMessage();
       } catch (error) {
-        if (isCompetitorPass1) {
-          console.error(
-            `[discover trace] FAILED after ${Math.round((Date.now() - t0) / 1000)}s — ${trace.length} events: ${JSON.stringify(trace)}`,
-          );
-        }
         // Same "a timed-out/aborted call is still billed" reasoning as
         // AnthropicOpportunityAnalysisProvider — record best-effort partial
         // usage so a call that grinds the full 900s before timing out isn't
@@ -679,11 +608,103 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
       assertNotTruncated(finalMessage.stop_reason, "anthropic-discovery");
 
       const jsonBlock = finalMessage.content.find((block) => block.type === "text");
-      if (isCompetitorPass1) {
-        console.error(
-          `[discover trace] DONE after ${Math.round((Date.now() - t0) / 1000)}s, stop_reason=${finalMessage.stop_reason} — ${trace.length} events: ${JSON.stringify(trace)} — text: ${jsonBlock && "text" in jsonBlock ? jsonBlock.text.slice(0, 1000) : "(none)"}`,
-        );
+      if (!jsonBlock || !("text" in jsonBlock)) return [];
+      const parsed = JSON.parse(jsonBlock.text) as { candidates: ResearchCandidate[] };
+      return parsed.candidates.map((candidate) => ({ ...candidate, contactData: candidate.contactData ?? [] }));
+    });
+  }
+
+  /**
+   * COMPETITOR mode's discovery, split into two calls instead of one.
+   * Confirmed live: combining broad, open-ended web_search exploration
+   * with strict json_schema structured output in a single call was
+   * unreliable — 15-20 minute runs, sometimes timing out outright,
+   * sometimes "succeeding" with zero candidates, and repeatedly invoking
+   * undeclared "code_execution"/"bash_code_execution" tools with no
+   * identifiable cause (confirmed against Anthropic's own docs: there is
+   * no automatic internal code_execution step for json_schema output). A
+   * plain, schema-free conversational question for the exact same search
+   * ("pubs in Ontario that host Ruby trivia") answered correctly in under
+   * a minute — the web research itself was never the slow part; combining
+   * it with constrained-grammar generation was.
+   *
+   * Step 1 does the broad research as free text (no schema, so no grammar
+   * constraint), matching that fast shape. Step 2 is a small, bounded,
+   * tool-free pass that structures the ALREADY-FOUND text into
+   * COMPETITOR_DISCOVERY_SCHEMA — the schema constraint now only applies
+   * to a short, fixed piece of input, not to open-ended exploration.
+   */
+  private async discoverCompetitorTwoStep(
+    params: DiscoverParams,
+    onProgress?: (update: DiscoveryProgressUpdate) => Promise<void>,
+  ): Promise<ResearchCandidate[]> {
+    const { model } = await resolveResearchSettings();
+    const locationScope = params.cities.length > 0 ? params.cities.join(", ") : `all of ${params.region} (no city filter given)`;
+
+    const researchText = await callProvider({ providerName: "anthropic-discovery-research", timeoutMs: 300_000 }, async (signal) => {
+      const stream = client().messages.stream(
+        {
+          model,
+          max_tokens: 4000,
+          tools: [{ type: "web_search_20260209", name: "web_search", max_uses: COMPETITOR_PASS1_MAX_SEARCH_USES }],
+          messages: [
+            {
+              role: "user",
+              content:
+                `Find ${params.leadTypeName} venues in ${locationScope}, ${params.country} that currently run trivia hosted by the service "${params.competitorName}". ` +
+                `Business criteria: ${params.promptText}\n\n` +
+                "Search the web and list every plausible venue you find — name, city/town, and day of the week if mentioned. Plain text, one venue per line, nothing else needed. If a venue is clearly running a DIFFERENT named trivia provider instead, still list it and note that provider's name — don't omit or guess.",
+            },
+          ],
+        },
+        { signal },
+      );
+      stream.on("contentBlock", (block) => {
+        if (block.type === "server_tool_use") {
+          void onProgress?.({ kind: "message", message: serverToolProgressMessage(block.name, block.input) });
+        }
+      });
+
+      let finalMessage;
+      try {
+        finalMessage = await stream.finalMessage();
+      } catch (error) {
+        const partialUsage = stream.currentMessage?.usage;
+        if (partialUsage) {
+          await recordUsage({ operation: "discover", model, usage: partialUsage, searchId: params.searchId, userId: params.userId });
+        }
+        throw error;
       }
+      await recordUsage({ operation: "discover", model, usage: finalMessage.usage, searchId: params.searchId, userId: params.userId });
+      const textBlock = finalMessage.content.find((block) => block.type === "text");
+      return textBlock && "text" in textBlock ? textBlock.text : "";
+    });
+
+    if (!researchText.trim()) return [];
+
+    void onProgress?.({ kind: "message", message: "Organizing what was found into a candidate list..." });
+
+    return callProvider({ providerName: "anthropic-discovery-structure", timeoutMs: 120_000 }, async (signal) => {
+      const response = await client().messages.create(
+        {
+          model,
+          max_tokens: 12000,
+          output_config: { format: { type: "json_schema", schema: COMPETITOR_DISCOVERY_SCHEMA } },
+          messages: [
+            {
+              role: "user",
+              content:
+                "Convert these research notes into a structured candidate list. Only include venues actually named in the notes — never invent one. Leave a field null when the notes don't say. address1 must be the street address ONLY (no city, region, postal code, or country). " +
+                `Region: ${params.region}, Country: ${params.country}. Only set competitorName to "${params.competitorName}" when the notes tie that venue to this specific service — if the notes name a different provider for a venue, use that provider's name instead.\n\n` +
+                `Research notes:\n${researchText}`,
+            },
+          ],
+        },
+        { signal },
+      );
+      await recordUsage({ operation: "discover", model, usage: response.usage, searchId: params.searchId, userId: params.userId });
+      assertNotTruncated(response.stop_reason, "anthropic-discovery-structure");
+      const jsonBlock = response.content.find((block) => block.type === "text");
       if (!jsonBlock || !("text" in jsonBlock)) return [];
       const parsed = JSON.parse(jsonBlock.text) as { candidates: ResearchCandidate[] };
       // COMPETITOR_DISCOVERY_SCHEMA omits evidence/contactData entirely, so
