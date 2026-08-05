@@ -191,6 +191,40 @@ describe("runSearchJob — COMPETITOR mode duplicate/conflict detection", () => 
     expect((result.duplicateMatches as unknown[]).length).toBeGreaterThan(0);
   });
 
+  it("does not flag a name-only match against an existing company in a different city as a duplicate", async () => {
+    // Confirmed live: "St. Louis Bar & Grill" (Orangeville) matched an
+    // existing company of the same name via name alone (score 20, LOW
+    // confidence, conflictingFields: ["city"]) and still got bucketed as a
+    // "possible duplicate" needing review — a real, distinct location of a
+    // common chain name, not an actual duplicate.
+    const { user, leadType, competitor } = await baseFixtures();
+    const stage = await createPipelineStageFixture("New", { isDefault: true });
+    await createCompanyFixture({
+      name: "Mock Pub Milton0",
+      leadTypeId: leadType.id,
+      pipelineStageId: stage.id,
+      assignedToId: null,
+      createdById: user.id,
+      city: "Toronto",
+      region: "ON",
+      country: "Canada",
+    });
+    const search = await createLeadSearchFixture({
+      createdById: user.id,
+      leadTypeId: leadType.id,
+      mode: "COMPETITOR",
+      competitorId: competitor.id,
+      country: "Canada",
+      region: "ON",
+      cities: ["Milton"],
+    });
+
+    await runSearchJob(search.id);
+
+    const [result] = await testPrisma.searchResult.findMany({ where: { searchId: search.id } });
+    expect(result.duplicateConfidence).toBeNull();
+  });
+
   it("flags competitorConflict when the matched company already has a different competitor on file", async () => {
     const { user, leadType, competitor } = await baseFixtures();
     const otherCompetitor = await createCompetitorFixture("Trivia Kings");

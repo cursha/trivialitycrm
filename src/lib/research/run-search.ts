@@ -453,7 +453,22 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
           email: verified.email,
         });
         const topMatch = duplicateMatches[0];
-        if (topMatch) {
+        // A bare name match with a confirmed city conflict is just two
+        // different real locations sharing a chain name (Keenan's Irish
+        // Pub, Kelseys, St. Louis Bar & Grill, Boston Pizza, etc. are all
+        // common in this exact use case) — scoreCompanyMatch() already
+        // scores that LOW and records the conflict honestly, but the
+        // review screen's bucketing treats ANY non-null duplicateConfidence
+        // (LOW included) as "possible duplicate" needing a decision.
+        // Confirmed live: this surfaced real, distinct locations as
+        // false-positive duplicates. Only suppressed when name is the
+        // ONLY matched signal — a name match plus any other corroborating
+        // field (phone/email/website/address) alongside a city conflict is
+        // still a real signal worth a human look (e.g. a relocated
+        // business), so that combination is left untouched.
+        const isWeakNameOnlyWithCityConflict =
+          topMatch && topMatch.matchedFields.length === 1 && topMatch.matchedFields[0] === "name" && topMatch.conflictingFields.includes("city");
+        if (topMatch && !isWeakNameOnlyWithCityConflict) {
           duplicateConfidence = topMatch.confidence;
           const topCompany = await prisma.company.findUnique({ where: { id: topMatch.companyId }, select: { competitorId: true } });
           competitorConflict = !!topCompany?.competitorId && topCompany.competitorId !== competitorId;

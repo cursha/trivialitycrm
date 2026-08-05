@@ -3,6 +3,7 @@ import { testPrisma } from "./db";
 import { hashPassword } from "../../src/lib/auth/password";
 import { createSession } from "../../src/lib/auth/session";
 import { computeNormalizedFields } from "../../src/lib/duplicates/match";
+import { computeAddressNormalizedFields } from "../../src/lib/data-quality/normalize";
 
 export async function createPermission(key: string, label = key) {
   return testPrisma.permission.upsert({
@@ -107,14 +108,26 @@ export async function createCompanyFixture(opts: {
   createdAt?: Date;
 }) {
   const name = opts.name ?? `Company ${crypto.randomUUID().slice(0, 8)}`;
+  const city = opts.city ?? "Testville";
+  const region = opts.region ?? "ON";
+  const country = opts.country ?? "Canada";
+  // Real companies always get these set at creation time (see
+  // review/actions.ts#createCompany, companies/actions.ts) — without them,
+  // scoreCompanyMatch()'s city/region corroboration signal (both matched-
+  // AND conflicting-field branches) can never fire for a fixture company,
+  // silently making city-conflict-dependent test assertions untestable.
+  const { normalizedCity, normalizedRegion, normalizedPostalCode } = computeAddressNormalizedFields({ city, region, country, postalCode: null });
 
   const company = await testPrisma.company.create({
     data: {
       name,
       normalizedName: name.toLowerCase(),
-      city: opts.city ?? "Testville",
-      region: opts.region ?? "ON",
-      country: opts.country ?? "Canada",
+      city,
+      region,
+      country,
+      normalizedCity,
+      normalizedRegion,
+      normalizedPostalCode,
       leadTypeId: opts.leadTypeId,
       pipelineStageId: opts.pipelineStageId,
       assignedToId: opts.assignedToId,
