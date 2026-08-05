@@ -646,7 +646,20 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
         {
           model,
           max_tokens: 4000,
-          tools: [{ type: "web_search_20260209", name: "web_search", max_uses: COMPETITOR_PASS1_MAX_SEARCH_USES }],
+          // ACTUAL root cause of every slow/failed run tonight, found by
+          // reading Anthropic's own web_search tool docs directly (not
+          // guessed): web_search_20260209's `allowed_callers` defaults to
+          // ["code_execution_20260120"], meaning the API automatically
+          // routes every search through a "Dynamic Filtering" pass — Claude
+          // invokes code_execution/bash_code_execution to filter results
+          // before they reach the context window. This runs on EVERY
+          // attempt regardless of tool budget, effort level, or schema
+          // presence (confirmed: it happened even in this schema-free call)
+          // — none of those were ever the actual lever. Restricting to
+          // "direct" calling disables that automatic filtering pass,
+          // matching a plain conversational web_search call's fast,
+          // unfiltered behavior.
+          tools: [{ type: "web_search_20260209", name: "web_search", max_uses: COMPETITOR_PASS1_MAX_SEARCH_USES, allowed_callers: ["direct"] }],
           messages: [
             {
               role: "user",
