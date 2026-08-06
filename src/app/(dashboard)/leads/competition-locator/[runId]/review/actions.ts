@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
 import { CompetitionLocatorSaveSchema, type CompetitionLocatorRowDecision } from "@/lib/validation/competition-locator-review";
 import { computeNormalizedFields } from "@/lib/duplicates/match";
-import { computeContactNormalizedFields } from "@/lib/data-quality/normalize";
+import { computeContactNormalizedFields, computeAddressNormalizedFields } from "@/lib/data-quality/normalize";
 import { resolveFieldDecisions, type ResolvedCompanyFields } from "@/lib/companies/field-resolution";
 import { readContactDataEntries } from "@/lib/research/contact-data";
 import { logInitialPipelineStage } from "@/lib/companies/activity-log";
@@ -110,6 +110,19 @@ export async function saveCompetitionLocatorResults(rawPayload: unknown): Promis
             data: {
               ...resolved,
               ...computeNormalizedFields(resolved),
+              // Without this, normalizedCity/Region/PostalCode stay null on
+              // every Competition-Locator-created/updated company forever —
+              // confirmed live: it silently broke scoreCompanyMatch()'s own
+              // city-conflict check (company-match.ts requires both sides'
+              // normalizedCity to be set to flag ANY city conflict at all),
+              // so two genuinely different real locations sharing a chain
+              // name (e.g. "Boston Pizza" in Oakville vs. Mississauga) could
+              // score as an unqualified LOW-confidence match with an empty
+              // conflictingFields — and since every such pair ties at the
+              // same score, which one "topMatch" merge picked was
+              // effectively arbitrary, silently merging the wrong location
+              // instead of the real duplicate.
+              ...computeAddressNormalizedFields(resolved),
               // Both fields together, same "never record it only once" rule
               // as analyze-opportunity.ts — competitorId is the relational
               // link, competitorTriviaProvider/Day are the raw finding for
@@ -187,7 +200,9 @@ async function createCompany(
   fresh: ResolvedCompanyFields,
   payload: { assignedToId: string; pipelineStageId: string },
 ): Promise<string> {
-  const normalized = computeNormalizedFields(fresh);
+  // Both computed here — see the update path's own comment on why
+  // computeAddressNormalizedFields is required, not optional.
+  const normalized = { ...computeNormalizedFields(fresh), ...computeAddressNormalizedFields(fresh) };
   const company = await tx.company.create({
     data: {
       ...fresh,

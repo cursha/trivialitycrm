@@ -14,6 +14,7 @@ import {
 import { resetFakeCookies } from "../setup/mock-next";
 import { saveCompetitionLocatorResults } from "../../src/app/(dashboard)/leads/competition-locator/[runId]/review/actions";
 import type { CompetitionLocatorRowDecision } from "../../src/lib/validation/competition-locator-review";
+import { findScoredDuplicateMatches } from "../../src/lib/duplicates/scored-match";
 
 beforeEach(async () => {
   await resetDatabase();
@@ -125,6 +126,43 @@ describe("saveCompetitionLocatorResults", () => {
     expect(updated.competitorId).toBe(competitor.id);
     expect(updated.competitorTriviaProvider).toBe("Geeks Who Drink");
     expect(updated.competitorTriviaDay).toBe("WEDNESDAY");
+  });
+
+  it("sets normalizedCity/Region/PostalCode on a created company, so a same-name-different-city venue is never treated as an unqualified tie", async () => {
+    const { user, leadType, stage, competitor, runId, search } = await baseFixtures();
+    await loginAs(user.id);
+
+    // Thin "chain name, no address yet" result for a real Oakville location.
+    const oakvilleResult = await createSearchResultFixture({ searchId: search.id, name: "Boston Pizza", city: "Oakville", competitorId: competitor.id });
+    await saveCompetitionLocatorResults({ runId, assignedToId: user.id, pipelineStageId: stage.id, rows: [baseRow(oakvilleResult.id)] });
+
+    // A second, genuinely different real location sharing the chain name,
+    // from a separate run.
+    const search2 = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, mode: "COMPETITOR", competitorId: competitor.id, runCorrelationId: "run-2" });
+    const mississaugaResult = await createSearchResultFixture({ searchId: search2.id, name: "Boston Pizza", city: "Mississauga", competitorId: competitor.id });
+    await saveCompetitionLocatorResults({ runId: "run-2", assignedToId: user.id, pipelineStageId: stage.id, rows: [baseRow(mississaugaResult.id)] });
+
+    const oakville = await testPrisma.company.findFirstOrThrow({ where: { city: "Oakville", name: "Boston Pizza" } });
+    const mississauga = await testPrisma.company.findFirstOrThrow({ where: { city: "Mississauga", name: "Boston Pizza" } });
+    expect(oakville.normalizedCity).toBeTruthy();
+    expect(mississauga.normalizedCity).toBeTruthy();
+    expect(oakville.normalizedCity).not.toBe(mississauga.normalizedCity);
+
+    // A later, better-specified Oakville candidate (same name, real address)
+    // must top-match the Oakville company, not tie with Mississauga's —
+    // confirmed live: before normalizedCity was set on create, both scored
+    // an identical LOW/20 name-only match with no city conflict recorded,
+    // and "topMatch" picked whichever the DB happened to return first.
+    const matches = await findScoredDuplicateMatches(testPrisma, {
+      name: "Boston Pizza",
+      address1: "499 Dundas St W",
+      city: "Oakville",
+      region: "ON",
+      country: "Canada",
+    });
+    expect(matches[0].companyId).toBe(oakville.id);
+    const mississaugaMatch = matches.find((m) => m.companyId === mississauga.id);
+    expect(mississaugaMatch?.conflictingFields).toContain("city");
   });
 
   it("merges into the matched existing company using per-field decisions", async () => {
