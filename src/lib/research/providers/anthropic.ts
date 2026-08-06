@@ -646,7 +646,11 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
       const stream = client().messages.stream(
         {
           model,
-          max_tokens: 4000,
+          // Was 4000 — raised since each venue's line now also carries
+          // address/phone/email/website when visible, not just name/city/
+          // day, so a broad search finding many venues needs more headroom
+          // per candidate than before.
+          max_tokens: 8000,
           // ACTUAL root cause of every slow/failed run tonight, found by
           // reading Anthropic's own web_search tool docs directly (not
           // guessed): web_search_20260209's `allowed_callers` defaults to
@@ -667,7 +671,7 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
               content:
                 `Find ${params.leadTypeName} venues in ${locationScope}, ${params.country} that currently run trivia hosted by the service "${params.competitorName}". ` +
                 `Business criteria: ${params.promptText}\n\n` +
-                "Search the web and list every plausible venue you find — name, city/town, and day of the week if mentioned. Plain text, one venue per line, nothing else needed. If a venue is clearly running a DIFFERENT named trivia provider instead, still list it and note that provider's name — don't omit or guess.",
+                "Search the web and list every plausible venue you find — name, city/town, and day of the week if mentioned, plus address, phone number, email, and website whenever they're visible directly in the search results or listing snippet (don't fetch full pages digging for these — only what's already shown). Plain text, one venue per line. If a venue is clearly running a DIFFERENT named trivia provider instead, still list it and note that provider's name — don't omit or guess.",
             },
           ],
         },
@@ -683,18 +687,6 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
       try {
         finalMessage = await stream.finalMessage();
       } catch (error) {
-        // TEMPORARY diagnostic — reproducible live: a 2-city (Milton,
-        // Mississauga) COMPETITOR pass-1 search fails twice in a row within
-        // ~30s, zero AiUsageRecord rows either time (so the failure is here,
-        // in step 1, before any generation completed). Single buffered log
-        // at the point of failure, matching the pattern that actually
-        // worked earlier tonight — remove once the cause is identified.
-        console.error("[discover-research raw error]", {
-          name: error instanceof Error ? error.name : typeof error,
-          message: error instanceof Error ? error.message : String(error),
-          status: (error as { status?: unknown })?.status,
-          errorBody: (error as { error?: unknown })?.error ? JSON.stringify((error as { error?: unknown }).error).slice(0, 1000) : undefined,
-        });
         const partialUsage = stream.currentMessage?.usage;
         if (partialUsage) {
           await recordUsage({ operation: "discover", model, usage: partialUsage, searchId: params.searchId, userId: params.userId });
@@ -702,6 +694,7 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
         throw error;
       }
       await recordUsage({ operation: "discover", model, usage: finalMessage.usage, searchId: params.searchId, userId: params.userId });
+      assertNotTruncated(finalMessage.stop_reason, "anthropic-discovery-research");
       const textBlock = finalMessage.content.find((block) => block.type === "text");
       return textBlock && "text" in textBlock ? textBlock.text : "";
     });
