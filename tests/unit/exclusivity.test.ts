@@ -16,6 +16,7 @@ function candidate(overrides: Partial<ResearchCandidate> = {}): ResearchCandidat
     contactData: null,
     triviaStatus: "UNCERTAIN",
     competitorName: null,
+    day: null,
     evidence: [],
     sources: [],
     ...overrides,

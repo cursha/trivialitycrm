@@ -13,6 +13,7 @@ import { logInitialPipelineStage } from "@/lib/companies/activity-log";
 import { writeAuditEvent } from "@/lib/audit/log";
 import type { ScoredDuplicateMatch } from "@/lib/duplicates/scored-match";
 import type { Prisma } from "@/generated/prisma/client";
+import type { Weekday } from "@/generated/prisma/enums";
 
 export type CompetitionLocatorSaveResult =
   | { error: string }
@@ -109,7 +110,17 @@ export async function saveCompetitionLocatorResults(rawPayload: unknown): Promis
             data: {
               ...resolved,
               ...computeNormalizedFields(resolved),
-              ...(assignCompetitorNow && result.search.competitorId ? { competitorId: result.search.competitorId } : {}),
+              // Both fields together, same "never record it only once" rule
+              // as analyze-opportunity.ts — competitorId is the relational
+              // link, competitorTriviaProvider/Day are the raw finding for
+              // this specific venue (its own day, not the Competitor's).
+              ...(assignCompetitorNow && result.search.competitorId
+                ? {
+                    competitorId: result.search.competitorId,
+                    ...(result.competitorName ? { competitorTriviaProvider: result.competitorName } : {}),
+                    ...(result.day ? { competitorTriviaDay: result.day } : {}),
+                  }
+                : {}),
               updatedById: user.id,
             },
           });
@@ -166,7 +177,13 @@ export async function saveCompetitionLocatorResults(rawPayload: unknown): Promis
 async function createCompany(
   tx: Prisma.TransactionClient,
   userId: string,
-  result: { competitorId: string | null; search: { leadTypeId: string; competitorId: string | null }; triviaStatus: "CURRENT_TRIVIA" | "NO_CURRENT_TRIVIA" | "UNCERTAIN" },
+  result: {
+    competitorId: string | null;
+    competitorName: string | null;
+    day: Weekday | null;
+    search: { leadTypeId: string; competitorId: string | null };
+    triviaStatus: "CURRENT_TRIVIA" | "NO_CURRENT_TRIVIA" | "UNCERTAIN";
+  },
   fresh: ResolvedCompanyFields,
   payload: { assignedToId: string; pipelineStageId: string },
 ): Promise<string> {
@@ -177,6 +194,9 @@ async function createCompany(
       leadTypeId: result.search.leadTypeId,
       pipelineStageId: payload.pipelineStageId,
       competitorId: result.search.competitorId,
+      // Both fields together — see the update path's own comment above.
+      ...(result.competitorName ? { competitorTriviaProvider: result.competitorName } : {}),
+      ...(result.day ? { competitorTriviaDay: result.day } : {}),
       assignedToId: payload.assignedToId,
       triviaStatus: result.triviaStatus,
       createdById: userId,

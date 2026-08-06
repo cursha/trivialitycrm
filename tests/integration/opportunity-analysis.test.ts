@@ -185,16 +185,31 @@ describe("analyzeCompanyOpportunity", () => {
     expect(updated.competitorId).toBe(competitor.id);
   });
 
-  it("records the found trivia provider without touching competitorId when the name matches no known Competitor", async () => {
+  it("auto-creates a Competitor and links it when the found name matches no known Competitor", async () => {
     const adminFixture = await createAdminFixture();
     await loginAs(adminFixture.admin.id);
+
+    expect(await testPrisma.competitor.findFirst({ where: { name: "Mock Trivia Co." } })).toBeNull();
 
     const company = await createCompanyForAdmin(adminFixture, { notes: "MOCK_COMPETITOR" });
     await analyzeCompanyOpportunity(company.id);
 
+    const created = await testPrisma.competitor.findFirstOrThrow({ where: { name: "Mock Trivia Co." } });
     const updated = await testPrisma.company.findUniqueOrThrow({ where: { id: company.id } });
     expect(updated.competitorTriviaProvider).toBe("Mock Trivia Co.");
-    expect(updated.competitorId).toBeNull();
+    expect(updated.competitorId).toBe(created.id);
+  });
+
+  it("reuses the same auto-created Competitor on a repeat finding instead of creating a duplicate", async () => {
+    const adminFixture = await createAdminFixture();
+    await loginAs(adminFixture.admin.id);
+
+    const first = await createCompanyForAdmin(adminFixture, { notes: "MOCK_COMPETITOR" });
+    await analyzeCompanyOpportunity(first.id);
+    const second = await createCompanyForAdmin(adminFixture, { notes: "MOCK_COMPETITOR" });
+    await analyzeCompanyOpportunity(second.id);
+
+    expect(await testPrisma.competitor.count({ where: { name: "Mock Trivia Co." } })).toBe(1);
   });
 
   it("never lets a later inconclusive pass erase a previously confirmed competitor finding", async () => {

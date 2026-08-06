@@ -4,6 +4,7 @@ import { hashPassword } from "../../src/lib/auth/password";
 import { createSession } from "../../src/lib/auth/session";
 import { computeNormalizedFields } from "../../src/lib/duplicates/match";
 import { computeAddressNormalizedFields } from "../../src/lib/data-quality/normalize";
+import type { Weekday } from "../../src/generated/prisma/enums";
 
 export async function createPermission(key: string, label = key) {
   return testPrisma.permission.upsert({
@@ -234,6 +235,8 @@ export async function createSearchResultFixture(opts: {
   rejectionReasonId?: string | null;
   triviaStatus?: "CURRENT_TRIVIA" | "NO_CURRENT_TRIVIA" | "UNCERTAIN";
   competitorId?: string | null;
+  competitorName?: string | null;
+  day?: Weekday | null;
   contactData?: object | null;
   duplicateMatches?: object | null;
   duplicateConfidence?: "HIGH" | "MEDIUM" | "LOW" | null;
@@ -268,6 +271,8 @@ export async function createSearchResultFixture(opts: {
       rejectionReasonId: opts.rejectionReasonId ?? null,
       triviaStatus: opts.triviaStatus ?? "UNCERTAIN",
       competitorId: opts.competitorId ?? null,
+      competitorName: opts.competitorName ?? null,
+      day: opts.day ?? null,
       contactData: opts.contactData ?? undefined,
       duplicateMatches: opts.duplicateMatches ?? undefined,
       duplicateConfidence: opts.duplicateConfidence ?? null,

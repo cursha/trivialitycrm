@@ -12,6 +12,7 @@ import { findScoredDuplicateMatches } from "../duplicates/scored-match";
 import { getAiSettings, checkMidRunAiBudget } from "../ai/budget";
 import { writeAuditEvent } from "../audit/log";
 import { classifyProviderError } from "../integrations/provider-errors";
+import { findOrCreateCompetitor } from "../competitors/find-or-create";
 import type { DiscoverParams, ResearchCandidate, DiscoveryProgressUpdate } from "./providers/types";
 
 // Competition Locator's verification-standard rejection reasons (seeded in
@@ -428,8 +429,12 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
             finalExplanation = `${explanation}\n\n[Auto-rejected: evidence points to a different trivia provider ("${verified.competitorName}").]`;
           }
         } else {
-          const matchedCompetitor = await prisma.competitor.findUnique({ where: { name: verified.competitorName } });
-          competitorId = matchedCompetitor?.id ?? null;
+          // Auto-create (case-insensitive match first) rather than link-only
+          // — same rule as analyze-opportunity.ts's own resolution, so a
+          // name found here with no catalog match yet still ends up linked
+          // instead of orphaned.
+          const matchedCompetitor = await findOrCreateCompetitor(prisma, verified.competitorName);
+          competitorId = matchedCompetitor.id;
         }
       }
 
@@ -501,6 +506,8 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
           disposition,
           rejectionReasonId,
           competitorId,
+          competitorName: verified.competitorName,
+          day: verified.day,
           duplicateMatches: duplicateMatches.length > 0 ? duplicateMatches : undefined,
           duplicateConfidence,
           competitorConflict,

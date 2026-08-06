@@ -107,6 +107,7 @@ function candidateFromPlace(place: NonNullable<PlacesTextSearchResult["places"]>
     // business" action for how a user opts into finding out.
     triviaStatus: "UNCERTAIN",
     competitorName: null,
+    day: null,
     evidence: [],
     sources: [],
   };

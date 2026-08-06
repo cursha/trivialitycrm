@@ -6,6 +6,7 @@ import { companyScope } from "@/lib/companies/scope";
 import { checkAiBudget } from "@/lib/ai/budget";
 import { checkRateLimit } from "@/lib/rate-limit/postgres-bucket";
 import { getOpportunityAnalysisProvider } from "@/lib/research/providers/factory";
+import { findOrCreateCompetitor } from "@/lib/competitors/find-or-create";
 import type { OpportunityAnalysisInput, OpportunityAnalysisEvidence } from "@/lib/research/providers/types";
 import { classifyProviderError } from "@/lib/integrations/provider-errors";
 import { gradeForScore, totalFromCategoryScores, validateCategoryScores } from "@/lib/eos/validation";
@@ -136,14 +137,10 @@ export async function runOpportunityAnalysis(
   const needsReview = result.conflict.found || company.needsReview;
 
   // Resolve the found provider name against the existing Competitor list by
-  // exact, case-insensitive name — same "link only on a confident match,
-  // never invent a new Competitor record" precedent as run-search.ts's own
-  // competitorName resolution. A non-match leaves Company.competitorId
-  // untouched rather than clearing it — an AI finding that doesn't match a
-  // known name isn't evidence the previously-linked competitor is gone.
-  const matchedCompetitor = result.competitorFound
-    ? await prisma.competitor.findFirst({ where: { name: { equals: result.competitorFound.providerName, mode: "insensitive" } } })
-    : null;
+  // exact, case-insensitive name, auto-creating one when nothing matches —
+  // same rule as run-search.ts's own competitorName resolution, so a
+  // genuine finding always ends up linked instead of stuck as text-only.
+  const matchedCompetitor = result.competitorFound ? await findOrCreateCompetitor(prisma, result.competitorFound.providerName) : null;
 
   await prisma.$transaction(async (tx) => {
     const created = await tx.historicalScoreRecord.create({

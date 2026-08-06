@@ -57,6 +57,7 @@ export class MockCandidateDiscoveryProvider implements CandidateDiscoveryProvide
         contactData: null,
         triviaStatus: isTriviaConfirmed || isCompetitorMode ? "CURRENT_TRIVIA" : "UNCERTAIN",
         competitorName: isCompetitorMode ? (params.competitorName ?? null) : null,
+        day: isCompetitorMode ? "THURSDAY" : null,
         evidence: [],
         sources: [],
       };
@@ -88,6 +89,7 @@ export class MockPlacesProvider implements CandidateDiscoveryProvider {
         contactData: null,
         triviaStatus: "UNCERTAIN",
         competitorName: null,
+        day: null,
         evidence: [],
         sources: [],
       });

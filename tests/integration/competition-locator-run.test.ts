@@ -34,6 +34,7 @@ function candidateFixture(overrides: Partial<ResearchCandidate>): ResearchCandid
     websiteUrl: "https://example.test/some-pub",
     triviaStatus: "CURRENT_TRIVIA",
     competitorName: null,
+    day: null,
     contactData: null,
     evidence: [],
     sources: [],

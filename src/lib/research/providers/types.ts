@@ -53,6 +53,10 @@ export type ResearchCandidate = {
   contactData: ContactDataEntry[] | null;
   triviaStatus: TriviaStatus;
   competitorName: string | null;
+  // Weekday the competitor's trivia night runs, if mentioned — see
+  // SearchResult.day's schema.prisma comment for why this travels alongside
+  // competitorName instead of being folded into evidence prose.
+  day: Weekday | null;
   evidence: EvidenceEntry[];
   sources: SourceEntry[];
 };

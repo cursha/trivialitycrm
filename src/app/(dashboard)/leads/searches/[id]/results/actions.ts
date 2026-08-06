@@ -102,6 +102,7 @@ export async function researchResult(id: string): Promise<ResultActionResult> {
     contactData: readContactDataEntries(result.contactData),
     triviaStatus: result.triviaStatus,
     competitorName: result.competitor?.name ?? null,
+    day: result.day,
     evidence: result.evidence as ResearchCandidate["evidence"],
     sources: result.sources as ResearchCandidate["sources"],
   };

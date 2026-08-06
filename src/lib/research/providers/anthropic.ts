@@ -120,6 +120,12 @@ function buildCandidateItemSchema(options: { includeDeepEvidence: boolean }) {
     websiteUrl: { type: ["string", "null"] },
     triviaStatus: { type: "string", enum: ["CURRENT_TRIVIA", "NO_CURRENT_TRIVIA", "UNCERTAIN"] },
     competitorName: { type: ["string", "null"] },
+    // No "enum" here, same reason as OPPORTUNITY_ANALYSIS_SCHEMA's
+    // competitorFound.day below: Anthropic's structured-output validator
+    // rejects "enum" combined with a ["string", "null"] type. The prompt
+    // states the allowed values instead; normalizeWeekday() below cleans up
+    // the raw string (or nulls it out) before it ever reaches a candidate.
+    day: { type: ["string", "null"] },
     // Kept even in the lightweight pass-1 shape — cheap (just url+title per
     // entry, no analysis text) and still useful to a reviewer before the
     // deep-dive research pass runs.
@@ -133,7 +139,7 @@ function buildCandidateItemSchema(options: { includeDeepEvidence: boolean }) {
       },
     },
   };
-  const required = ["name", "address1", "city", "region", "postalCode", "country", "phone", "email", "websiteUrl", "triviaStatus", "competitorName", "sources"];
+  const required = ["name", "address1", "city", "region", "postalCode", "country", "phone", "email", "websiteUrl", "triviaStatus", "competitorName", "day", "sources"];
 
   if (options.includeDeepEvidence) {
     // Every useful role found for the venue (owner/GM/venue/marketing/
@@ -425,13 +431,22 @@ function assertNotTruncated(stopReason: string | null, providerName: string): vo
  * into Company.competitorTriviaDay, whose Postgres enum column would
  * otherwise reject the whole write.
  */
+function normalizeWeekday(raw: unknown): (typeof WEEKDAY_VALUES)[number] | null {
+  return typeof raw === "string" && (WEEKDAY_VALUES as readonly string[]).includes(raw.toUpperCase()) ? (raw.toUpperCase() as (typeof WEEKDAY_VALUES)[number]) : null;
+}
+
 function normalizeCompetitorFound(raw: OpportunityAnalysisResult["competitorFound"]): OpportunityAnalysisResult["competitorFound"] {
   if (!raw) return null;
-  const day = typeof raw.day === "string" && (WEEKDAY_VALUES as readonly string[]).includes(raw.day.toUpperCase())
-    ? (raw.day.toUpperCase() as (typeof WEEKDAY_VALUES)[number])
-    : null;
-  return { ...raw, day };
+  return { ...raw, day: normalizeWeekday(raw.day) };
 }
+
+// Shared across every prompt that produces a `day` field (both
+// modeInstructions() call sites below, plus discoverCompetitorTwoStep()'s
+// bespoke step-2 prompt) — one instruction, not restated per mode, so the
+// allowed-values wording (see the schema's own "no enum" comment) never
+// drifts between them.
+const DAY_FIELD_INSTRUCTION =
+  "Set day to the weekday its trivia night runs (SCREAMING_SNAKE_CASE, e.g. THURSDAY) only when a specific night is stated; leave it null when trivia is confirmed but the night isn't, or there's no trivia night to report.";
 
 // Shared by discover() (every non-COMPETITOR mode — see
 // discoverCompetitorTwoStep()'s own comment for why COMPETITOR mode no
@@ -564,7 +579,8 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
                 `${modeInstructions(params.mode, params.competitorName)}\n\n` +
                 `Business criteria: ${params.promptText}\n\n` +
                 `Location: ${locationScope}, ${params.country}. Lead type: ${params.leadTypeName}.\n\n` +
-                "Only report facts you can support with a web_search or web_fetch result. Do not invent addresses, phone numbers, or emails — leave a field null rather than guessing. Every evidence entry must cite a sourceUrl you actually fetched or found in search results. address1 must be the street address ONLY (e.g. \"123 Main St\") — never append city, region, postal code, or country, since those are already separate fields.",
+                "Only report facts you can support with a web_search or web_fetch result. Do not invent addresses, phone numbers, or emails — leave a field null rather than guessing. Every evidence entry must cite a sourceUrl you actually fetched or found in search results. address1 must be the street address ONLY (e.g. \"123 Main St\") — never append city, region, postal code, or country, since those are already separate fields. " +
+                DAY_FIELD_INSTRUCTION,
             },
           ],
         },
@@ -611,7 +627,7 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
       const jsonBlock = finalMessage.content.find((block) => block.type === "text");
       if (!jsonBlock || !("text" in jsonBlock)) return [];
       const parsed = JSON.parse(jsonBlock.text) as { candidates: ResearchCandidate[] };
-      return parsed.candidates.map((candidate) => ({ ...candidate, contactData: candidate.contactData ?? [] }));
+      return parsed.candidates.map((candidate) => ({ ...candidate, contactData: candidate.contactData ?? [], day: normalizeWeekday(candidate.day) }));
     });
   }
 
@@ -730,7 +746,8 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
               content:
                 "Convert these research notes into a structured candidate list. Only include venues actually named in the notes — never invent one. Leave a field null when the notes don't say. address1 must be the street address ONLY (no city, region, postal code, or country). " +
                 "Each candidate must be one specific physical location with a real city — if a note groups several branches together (e.g. \"multiple locations\" or similar, with no single city given), skip that note entirely rather than creating one candidate with a vague or non-city value in the city field. " +
-                `Region: ${params.region}, Country: ${params.country}. Only set competitorName to "${params.competitorName}" when the notes tie that venue to this specific service — if the notes name a different provider for a venue, use that provider's name instead.\n\n` +
+                `Region: ${params.region}, Country: ${params.country}. Only set competitorName to "${params.competitorName}" when the notes tie that venue to this specific service — if the notes name a different provider for a venue, use that provider's name instead. ` +
+                `${DAY_FIELD_INSTRUCTION}\n\n` +
                 `Research notes:\n${researchText}`,
             },
           ],
@@ -751,6 +768,7 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
         contactData: candidate.contactData ?? [],
         evidence: candidate.evidence ?? [],
         sources: candidate.sources ?? [],
+        day: normalizeWeekday(candidate.day),
       }));
     });
   }
@@ -786,7 +804,7 @@ export class AnthropicEvidenceVerificationProvider implements EvidenceVerificati
             {
               role: "user",
               content:
-                `${modeInstructions(params.mode, params.competitorName)}\n\nVerify and refresh the evidence for this specific candidate, re-checking its website/public listings:\n\n${JSON.stringify(candidate)}`,
+                `${modeInstructions(params.mode, params.competitorName)}\n\n${DAY_FIELD_INSTRUCTION}\n\nVerify and refresh the evidence for this specific candidate, re-checking its website/public listings:\n\n${JSON.stringify(candidate)}`,
             },
           ],
         },
@@ -796,7 +814,8 @@ export class AnthropicEvidenceVerificationProvider implements EvidenceVerificati
       assertNotTruncated(response.stop_reason, "anthropic-verification");
       const jsonBlock = response.content.find((block) => block.type === "text");
       if (!jsonBlock || !("text" in jsonBlock)) return candidate;
-      return { ...candidate, ...(JSON.parse(jsonBlock.text) as Partial<ResearchCandidate>) };
+      const merged = { ...candidate, ...(JSON.parse(jsonBlock.text) as Partial<ResearchCandidate>) };
+      return { ...merged, day: normalizeWeekday(merged.day) };
     });
   }
 }

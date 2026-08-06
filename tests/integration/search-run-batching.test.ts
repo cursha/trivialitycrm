@@ -33,6 +33,7 @@ function fakeCandidate(name: string): ResearchCandidate {
     contactData: null,
     triviaStatus: "UNCERTAIN",
     competitorName: null,
+    day: null,
     evidence: [],
     sources: [],
   };

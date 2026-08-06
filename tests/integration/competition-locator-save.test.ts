@@ -69,6 +69,64 @@ describe("saveCompetitionLocatorResults", () => {
     expect(updatedResult.companyId).toBe(company.id);
   });
 
+  it("writes competitorTriviaProvider/Day alongside competitorId on a fresh create", async () => {
+    const { user, stage, competitor, runId, search } = await baseFixtures();
+    await loginAs(user.id);
+    const result = await createSearchResultFixture({
+      searchId: search.id,
+      name: "The Copper Kettle",
+      competitorId: competitor.id,
+      competitorName: "Geeks Who Drink (branded event)",
+      day: "TUESDAY",
+    });
+
+    await saveCompetitionLocatorResults({
+      runId,
+      assignedToId: user.id,
+      pipelineStageId: stage.id,
+      rows: [baseRow(result.id)],
+    });
+
+    const company = await testPrisma.company.findFirstOrThrow({ where: { name: "The Copper Kettle" } });
+    expect(company.competitorId).toBe(competitor.id);
+    expect(company.competitorTriviaProvider).toBe("Geeks Who Drink (branded event)");
+    expect(company.competitorTriviaDay).toBe("TUESDAY");
+  });
+
+  it("writes competitorTriviaProvider/Day alongside competitorId when merging into an existing company", async () => {
+    const { user, leadType, stage, competitor, runId, search } = await baseFixtures();
+    await loginAs(user.id);
+    const existing = await createCompanyFixture({
+      name: "The Copper Kettle",
+      leadTypeId: leadType.id,
+      pipelineStageId: stage.id,
+      assignedToId: user.id,
+      createdById: user.id,
+      city: "Milton",
+      region: "ON",
+    });
+    const result = await createSearchResultFixture({
+      searchId: search.id,
+      name: "The Copper Kettle",
+      competitorName: "Geeks Who Drink",
+      day: "WEDNESDAY",
+      duplicateMatches: [{ companyId: existing.id, companyName: existing.name, score: 90, confidence: "HIGH", reasons: [], matchedFields: ["name"], conflictingFields: [] }],
+      duplicateConfidence: "HIGH",
+    });
+
+    await saveCompetitionLocatorResults({
+      runId,
+      assignedToId: user.id,
+      pipelineStageId: stage.id,
+      rows: [baseRow(result.id, { duplicateResolution: "merge" })],
+    });
+
+    const updated = await testPrisma.company.findUniqueOrThrow({ where: { id: existing.id } });
+    expect(updated.competitorId).toBe(competitor.id);
+    expect(updated.competitorTriviaProvider).toBe("Geeks Who Drink");
+    expect(updated.competitorTriviaDay).toBe("WEDNESDAY");
+  });
+
   it("merges into the matched existing company using per-field decisions", async () => {
     const { user, leadType, stage, competitor, runId, search } = await baseFixtures();
     await loginAs(user.id);

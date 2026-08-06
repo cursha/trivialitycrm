@@ -1185,6 +1185,15 @@ model SearchResult {
   // sources  = { url, title }[] flat citation list for quick display
   evidence          Json
   sources           Json
+  // Raw findings from discovery, kept alongside the resolved competitorId
+  // above so Competition Locator's transfer step can write BOTH
+  // Company.competitorId and Company.competitorTriviaProvider/Day, the same
+  // "link when possible, keep the raw finding either way" rule
+  // analyze-opportunity.ts already applies. competitorName is the provider
+  // name as found (may differ from competitor.name's canonical spelling);
+  // day is the weekday found, if any.
+  competitorName    String?
+  day               Weekday?
   triviaStatus      TriviaStatus            @default(UNCERTAIN)
   disposition       SearchResultDisposition @default(NEW)
   researchedAt      DateTime                @default(now())
