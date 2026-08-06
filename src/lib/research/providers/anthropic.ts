@@ -671,7 +671,9 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
               content:
                 `Find ${params.leadTypeName} venues in ${locationScope}, ${params.country} that currently run trivia hosted by the service "${params.competitorName}". ` +
                 `Business criteria: ${params.promptText}\n\n` +
-                "Search the web and list every plausible venue you find — name, city/town, and day of the week if mentioned, plus address, phone number, email, and website whenever they're visible directly in the search results or listing snippet (don't fetch full pages digging for these — only what's already shown). Plain text, one venue per line. If a venue is clearly running a DIFFERENT named trivia provider instead, still list it and note that provider's name — don't omit or guess.",
+                "Search the web and list every plausible venue you find — name, city/town, and day of the week if mentioned, plus address, phone number, email, and website whenever they're visible directly in the search results or listing snippet (don't fetch full pages digging for these — only what's already shown). " +
+                "One line per PHYSICAL LOCATION, never one line per chain/brand: if a chain has multiple branches running this competitor's trivia, list each branch on its own line with its own city (e.g. \"St. Louis Bar & Grill — Burlington\" and \"St. Louis Bar & Grill — Newmarket\" as two separate lines) — never summarize them together as one entry like \"St. Louis Bar & Grill (multiple locations)\", which throws away real, distinct leads. " +
+                "If a location clearly runs trivia through a DIFFERENT named provider, still list it and note that provider's name — don't omit or guess.",
             },
           ],
         },
@@ -714,6 +716,7 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
               role: "user",
               content:
                 "Convert these research notes into a structured candidate list. Only include venues actually named in the notes — never invent one. Leave a field null when the notes don't say. address1 must be the street address ONLY (no city, region, postal code, or country). " +
+                "Each candidate must be one specific physical location with a real city — if a note groups several branches together (e.g. \"multiple locations\" or similar, with no single city given), skip that note entirely rather than creating one candidate with a vague or non-city value in the city field. " +
                 `Region: ${params.region}, Country: ${params.country}. Only set competitorName to "${params.competitorName}" when the notes tie that venue to this specific service — if the notes name a different provider for a venue, use that provider's name instead.\n\n` +
                 `Research notes:\n${researchText}`,
             },
