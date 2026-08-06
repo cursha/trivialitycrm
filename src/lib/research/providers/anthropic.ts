@@ -701,6 +701,16 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
       return textBlock && "text" in textBlock ? textBlock.text : "";
     });
 
+    // TEMPORARY diagnostic — confirmed live, a real broad search ($1.14,
+    // 464K input tokens of genuine research) produced zero final
+    // candidates. console.error-based logging has been unreliable this
+    // session (railway logs sometimes never surfaces it); writing straight
+    // to the DB, a channel that's worked reliably all night, instead.
+    // Remove once the cause is identified.
+    if (params.searchId) {
+      await prisma.leadSearch.update({ where: { id: params.searchId }, data: { errorMessage: `[DEBUG step1 text, ${researchText.length} chars]\n${researchText.slice(0, 4000)}` } }).catch(() => {});
+    }
+
     if (!researchText.trim()) return [];
 
     void onProgress?.({ kind: "message", message: "Organizing what was found into a candidate list..." });
@@ -728,6 +738,19 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
       assertNotTruncated(response.stop_reason, "anthropic-discovery-structure");
       const jsonBlock = response.content.find((block) => block.type === "text");
       if (!jsonBlock || !("text" in jsonBlock)) return [];
+      // TEMPORARY diagnostic — see the matching comment above this
+      // function's step-1 call. Appends step 2's raw output to the same
+      // debug field so both are visible together. Remove once the cause
+      // is identified.
+      if (params.searchId) {
+        const existing = await prisma.leadSearch.findUnique({ where: { id: params.searchId }, select: { errorMessage: true } }).catch(() => null);
+        await prisma.leadSearch
+          .update({
+            where: { id: params.searchId },
+            data: { errorMessage: `${existing?.errorMessage ?? ""}\n\n[DEBUG step2 raw json, ${jsonBlock.text.length} chars]\n${jsonBlock.text.slice(0, 4000)}` },
+          })
+          .catch(() => {});
+      }
       const parsed = JSON.parse(jsonBlock.text) as { candidates: ResearchCandidate[] };
       // COMPETITOR_DISCOVERY_SCHEMA omits evidence/contactData entirely, so
       // those keys are simply absent from the model's JSON, not null —
