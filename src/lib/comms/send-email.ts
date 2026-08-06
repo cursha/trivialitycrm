@@ -175,8 +175,11 @@ async function prepareSend(params: {
  * row and finalizes it (SENT + activity, or FAILED + a notification of
  * `notificationType`). Shared by the immediate-send and
  * scheduled/sequence-send paths so both produce identical audit trails.
+ * Exported — also reused by sendEmailToCompany() below (the Company-direct
+ * send path has no Contact involved, but this function never looks at
+ * contactId at all, so it's already generic enough to share as-is).
  */
-async function attemptDelivery(
+export async function attemptDelivery(
   emailMessageId: string,
   params: { userId: string; companyId: string; cc?: string[]; bcc?: string[] },
   prepared: PreparedSend,
@@ -265,6 +268,112 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailOutco
   });
 
   return attemptDelivery(emailMessage.id, params, prepared, params.notifyOnFailure === false ? null : "DELIVERY_FAILURE");
+}
+
+export type SendCompanyEmailParams = {
+  userId: string;
+  companyId: string;
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  body: string;
+};
+
+/**
+ * The Company-direct equivalent of prepareSend() above — a manual, ad-hoc
+ * send tied to Company.email directly, triggered by the Company detail
+ * page's "Send email" quick action, not a tracked Contact. Deliberately
+ * skips what prepareSend() does for consent/templates: there's no Contact
+ * to check consent against, no template system for this compose form, and
+ * no per-recipient unsubscribe token to attach (createUnsubscribeToken is
+ * hard-typed to a contactId — there's no company-scoped equivalent). Still
+ * enforces Company.doNotContact and business quiet hours, since those are
+ * cheap, already-built safety checks that apply regardless of which path a
+ * send takes. Returns an already-valid PreparedSend (resolvedSubject/Body
+ * set directly from the given subject/body, no placeholder resolution) so
+ * sendEmailToCompany() below can hand it straight to the shared
+ * attemptDelivery() unmodified.
+ */
+async function prepareSendToCompany(params: {
+  userId: string;
+  companyId: string;
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  body: string;
+}): Promise<{ ok: true; prepared: PreparedSend } | { ok: false; error: string }> {
+  const [company, workspaceSettings, connection] = await Promise.all([
+    prisma.company.findUniqueOrThrow({ where: { id: params.companyId }, select: { name: true, email: true, doNotContact: true } }),
+    prisma.workspaceSettings.findUnique({ where: { id: 1 }, select: { quietHoursStartHour: true, quietHoursEndHour: true } }),
+    prisma.providerConnection.findUnique({ where: { userId: params.userId } }),
+  ]);
+
+  if (company.doNotContact) {
+    return { ok: false, error: "This company is marked Do Not Contact." };
+  }
+  if (!company.email) {
+    return { ok: false, error: "This company has no email address on file." };
+  }
+
+  const quietHoursWindow =
+    workspaceSettings?.quietHoursStartHour != null && workspaceSettings?.quietHoursEndHour != null
+      ? { startHour: workspaceSettings.quietHoursStartHour, endHour: workspaceSettings.quietHoursEndHour }
+      : null;
+  if (isWithinQuietHours(quietHoursWindow)) {
+    return {
+      ok: false,
+      error: `Sending is currently outside business hours (quiet hours: ${quietHoursWindow!.startHour}:00–${quietHoursWindow!.endHour}:00). Try again later.`,
+    };
+  }
+  if (!connection || connection.status !== "CONNECTED") {
+    return { ok: false, error: "Connect a mailbox before sending email." };
+  }
+
+  const to = [company.email];
+  const recipientValidation = validateOutgoingEmail({ to, cc: params.cc, bcc: params.bcc, subject: params.subject });
+  if (!recipientValidation.valid) {
+    return { ok: false, error: recipientValidation.errors.join(" ") };
+  }
+
+  return {
+    ok: true,
+    prepared: {
+      to,
+      resolvedSubject: params.subject,
+      resolvedBody: params.body,
+      connection: { id: connection.id, provider: connection.provider },
+      companyName: company.name,
+      suggestedPipelineStageId: null,
+    },
+  };
+}
+
+/** Sends immediately to the Company's own email address — see
+ * prepareSendToCompany()'s doc comment for how this differs from
+ * sendEmail()'s Contact-bound path. Reuses the same attemptDelivery() the
+ * Contact path uses, so both produce identical SENT/FAILED handling,
+ * activity logging, and failure notifications. */
+export async function sendEmailToCompany(params: SendCompanyEmailParams): Promise<SendEmailOutcome> {
+  const result = await prepareSendToCompany(params);
+  if (!result.ok) return result;
+  const { prepared } = result;
+
+  const emailMessage = await prisma.emailMessage.create({
+    data: {
+      companyId: params.companyId,
+      contactId: null,
+      providerConnectionId: prepared.connection.id,
+      toAddresses: prepared.to,
+      ccAddresses: params.cc ?? [],
+      bccAddresses: params.bcc ?? [],
+      subject: prepared.resolvedSubject,
+      body: prepared.resolvedBody,
+      status: "QUEUED",
+      createdById: params.userId,
+    },
+  });
+
+  return attemptDelivery(emailMessage.id, { userId: params.userId, companyId: params.companyId, cc: params.cc, bcc: params.bcc }, prepared, "DELIVERY_FAILURE");
 }
 
 export type ScheduleEmailParams = SendEmailParams & { scheduledFor: Date };

@@ -4,9 +4,9 @@ import { createRoleWithPermissions, createTestUser, createLeadTypeFixture, creat
 import { resetFakeCookies } from "../setup/mock-next";
 import { resetEnvCacheForTests } from "../../src/lib/env";
 import { encryptToken } from "../../src/lib/comms/token-crypto";
-import { sendEmail } from "../../src/lib/comms/send-email";
+import { sendEmail, sendEmailToCompany } from "../../src/lib/comms/send-email";
 import { verifyUnsubscribeToken } from "../../src/lib/comms/unsubscribe-token";
-import { sendComposedEmail } from "../../src/app/(dashboard)/companies/[id]/email/actions";
+import { sendComposedEmail, sendCompanyEmail } from "../../src/app/(dashboard)/companies/[id]/email/actions";
 import { SIMULATED_SEND_FAILURE_ADDRESS } from "../../src/lib/comms/providers/mock";
 
 const TEST_KEY = "SRvbw8Ualx2XC/Ekfrk0RWORk0fg8/dcL1kL5krkqbk=";
@@ -27,12 +27,18 @@ afterEach(() => {
   resetEnvCacheForTests();
 });
 
-async function baseFixtures(permissions: string[] = ["send_email", "view_assigned_leads"]) {
+async function baseFixtures(permissions: string[] = ["send_email", "view_assigned_leads"], companyEmail: string | null = null) {
   const role = await createRoleWithPermissions("Sender", permissions);
   const user = await createTestUser({ roleId: role.id });
   const leadType = await createLeadTypeFixture();
   const stage = await createPipelineStageFixture("New", { isDefault: true });
-  const company = await createCompanyFixture({ leadTypeId: leadType.id, pipelineStageId: stage.id, assignedToId: user.id, createdById: user.id });
+  const company = await createCompanyFixture({
+    leadTypeId: leadType.id,
+    pipelineStageId: stage.id,
+    assignedToId: user.id,
+    createdById: user.id,
+    email: companyEmail,
+  });
   return { user, company };
 }
 
@@ -277,5 +283,95 @@ describe("sendComposedEmail (server action)", () => {
     const message = await testPrisma.emailMessage.findFirstOrThrow({ where: { companyId: company.id } });
     expect(message.toAddresses).toEqual([contact.email]);
     expect(message.ccAddresses).toEqual(["one@example.com", "two@example.com", "three@example.com"]);
+  });
+});
+
+describe("sendEmailToCompany", () => {
+  it("sends directly to Company.email with no Contact involved, recording contactId: null", async () => {
+    const { user, company } = await baseFixtures(["send_email", "view_assigned_leads"], "info@example.test");
+    await connectMailbox(user.id);
+
+    const result = await sendEmailToCompany({ userId: user.id, companyId: company.id, subject: "Hi", body: "Just checking in." });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const message = await testPrisma.emailMessage.findUniqueOrThrow({ where: { id: result.emailMessageId } });
+    expect(message.status).toBe("SENT");
+    expect(message.contactId).toBeNull();
+    expect(message.companyId).toBe(company.id);
+    expect(message.toAddresses).toEqual(["info@example.test"]);
+    expect(message.subject).toBe("Hi");
+    expect(message.body).toBe("Just checking in.");
+
+    const activity = await testPrisma.activity.findFirstOrThrow({ where: { companyId: company.id, type: "EMAIL" } });
+    expect(activity.notes).toContain("Hi");
+  });
+
+  it("rejects when the company has no email address on file", async () => {
+    const { user, company } = await baseFixtures(["send_email", "view_assigned_leads"], null);
+    await connectMailbox(user.id);
+
+    const result = await sendEmailToCompany({ userId: user.id, companyId: company.id, subject: "Hi", body: "Body." });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/no email address on file/);
+    expect(await testPrisma.emailMessage.count()).toBe(0);
+  });
+
+  it("blocks a send to a company marked Do Not Contact", async () => {
+    const { user, company } = await baseFixtures(["send_email", "view_assigned_leads"], "info@example.test");
+    await connectMailbox(user.id);
+    await testPrisma.company.update({ where: { id: company.id }, data: { doNotContact: true } });
+
+    const result = await sendEmailToCompany({ userId: user.id, companyId: company.id, subject: "Hi", body: "Body." });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/Do Not Contact/);
+  });
+
+  it("blocks a send when the user has no connected mailbox", async () => {
+    const { user, company } = await baseFixtures(["send_email", "view_assigned_leads"], "info@example.test");
+
+    const result = await sendEmailToCompany({ userId: user.id, companyId: company.id, subject: "Hi", body: "Body." });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toMatch(/Connect a mailbox/);
+  });
+
+  it("blocks a send with an invalid cc address, and does not use a template/unsubscribe footer", async () => {
+    const { user, company } = await baseFixtures(["send_email", "view_assigned_leads"], "info@example.test");
+    await connectMailbox(user.id);
+
+    const result = await sendEmailToCompany({ userId: user.id, companyId: company.id, cc: ["not-an-email"], subject: "Hi", body: "Body." });
+    expect(result.ok).toBe(false);
+    expect(await testPrisma.emailMessage.count()).toBe(0);
+  });
+});
+
+describe("sendCompanyEmail (server action)", () => {
+  it("blocks a user without send_email from sending", async () => {
+    const { user, company } = await baseFixtures([], "info@example.test");
+    await loginAs(user.id);
+
+    await expect(sendCompanyEmail(company.id, "Hi", "Body.")).rejects.toThrow(/Forbidden/);
+  });
+
+  it("re-validates the company's email server-side rather than trusting the client", async () => {
+    const { user, company } = await baseFixtures(["send_email", "view_assigned_leads"], null);
+    await connectMailbox(user.id);
+    await loginAs(user.id);
+
+    const result = await sendCompanyEmail(company.id, "Hi", "Body.");
+    expect(result?.error).toMatch(/no email address on file/);
+  });
+
+  it("sends to the company's email and revalidates the page", async () => {
+    const { user, company } = await baseFixtures(["send_email", "view_assigned_leads"], "info@example.test");
+    await connectMailbox(user.id);
+    await loginAs(user.id);
+
+    const result = await sendCompanyEmail(company.id, "Hi", "Body.");
+    expect(result).toBeUndefined();
+
+    const message = await testPrisma.emailMessage.findFirstOrThrow({ where: { companyId: company.id } });
+    expect(message.toAddresses).toEqual(["info@example.test"]);
+    expect(message.contactId).toBeNull();
   });
 });

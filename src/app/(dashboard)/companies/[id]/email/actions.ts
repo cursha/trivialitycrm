@@ -6,7 +6,7 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { companyScope } from "@/lib/companies/scope";
 import { prisma } from "@/lib/prisma";
 import { formString } from "@/lib/form-data";
-import { sendEmail, scheduleEmail, cancelScheduledEmail } from "@/lib/comms/send-email";
+import { sendEmail, scheduleEmail, cancelScheduledEmail, sendEmailToCompany } from "@/lib/comms/send-email";
 import { parseLinksInput } from "@/lib/comms/links";
 import { changeCompanyStage } from "@/app/(dashboard)/companies/actions";
 import type { AuthenticatedUser } from "@/lib/auth/current-user";
@@ -76,6 +76,30 @@ export async function sendComposedEmail(companyId: string, _prevState: ActionRes
 
   requirePermission(user, "send_email");
   const result = await sendEmail({ userId: user.id, companyId, contactId, templateId, cc, bcc, subject, body, links });
+  if (!result.ok) return { error: result.error };
+
+  revalidatePath(`/companies/${companyId}`);
+}
+
+/**
+ * The Company detail page's "Send email" quick action — sends directly to
+ * Company.email, no Contact involved (see sendEmailToCompany's own doc
+ * comment for why this is a deliberately separate, simpler path than
+ * sendComposedEmail above). Re-fetches the company fresh rather than
+ * trusting the client on whether a valid email exists — the button is only
+ * ever rendered when one does, but that must never be assumed server-side.
+ */
+export async function sendCompanyEmail(companyId: string, subject: string, body: string): Promise<ActionResult> {
+  const user = await requireUser();
+  await requireCompanyInScope(companyId, user);
+  requirePermission(user, "send_email");
+
+  const company = await prisma.company.findUnique({ where: { id: companyId }, select: { email: true } });
+  if (!company?.email) {
+    return { error: "This company has no email address on file." };
+  }
+
+  const result = await sendEmailToCompany({ userId: user.id, companyId, subject, body });
   if (!result.ok) return { error: result.error };
 
   revalidatePath(`/companies/${companyId}`);

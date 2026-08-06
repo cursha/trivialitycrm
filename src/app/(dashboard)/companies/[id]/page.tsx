@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { Pencil } from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
+import { validateEmailAddress } from "@/lib/comms/validate";
 import { prisma } from "@/lib/prisma";
 import { getScopedCompany, listCompanyActivities, listCompanyTasks, listCompanyEvidence, listCompanyScoreHistory } from "../queries";
 import { resolveSurvivingCompanyId } from "@/lib/data-quality/merge-company";
@@ -145,6 +146,12 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   // promises an action the server will then reject.
   const canAnalyzeOpportunity =
     hasPermission(user, "run_research") && hasPermission(user, "bulk_update_leads") && canEdit;
+  const canSendCompanyEmail = hasPermission(user, "send_email");
+  // The Quick Sales Actions "Send email" button — see quick-actions-bar.tsx
+  // and email/actions.ts#sendCompanyEmail — is only ever rendered when this
+  // is set, but that's a UI nicety only; sendCompanyEmail() re-validates
+  // this itself server-side rather than trusting it.
+  const validCompanyEmail = company.email && validateEmailAddress(company.email).valid ? company.email : null;
 
   const nextBestActions = computeNextBestActions({
     now: new Date(),
@@ -199,6 +206,8 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         canEdit={canEdit}
         canAnalyze={canAnalyzeOpportunity}
         websiteUrl={company.websiteUrl}
+        canSendEmail={canSendCompanyEmail}
+        companyEmail={validCompanyEmail}
       />
 
       {canRoutePlan && <AddToRouteToggle companyId={company.id} initiallyInRoute={routeCompanyIds.has(company.id)} canManage={canRoutePlan} />}

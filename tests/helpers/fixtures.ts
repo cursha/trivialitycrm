@@ -103,6 +103,7 @@ export async function createCompanyFixture(opts: {
   city?: string;
   region?: string;
   country?: string;
+  email?: string | null;
   eosScore?: number | null;
   triviaStatus?: "CURRENT_TRIVIA" | "NO_CURRENT_TRIVIA" | "UNCERTAIN";
   createdAt?: Date;
@@ -128,6 +129,7 @@ export async function createCompanyFixture(opts: {
       normalizedCity,
       normalizedRegion,
       normalizedPostalCode,
+      email: opts.email ?? null,
       leadTypeId: opts.leadTypeId,
       pipelineStageId: opts.pipelineStageId,
       assignedToId: opts.assignedToId,

@@ -2,9 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Phone, Mail, Users, FileText, Presentation, FlaskConical, StickyNote, CalendarClock, Sparkles, Globe } from "lucide-react";
+import { Phone, Mail, Users, FileText, Presentation, FlaskConical, StickyNote, CalendarClock, Sparkles, Globe, Send } from "lucide-react";
 import { changeCompanyStage } from "../actions";
 import { useQuickActions } from "./quick-action-context";
+import { SendCompanyEmailModal } from "./send-company-email-modal";
 import { Card } from "@/components/ui/card";
 import { Label, Select } from "@/components/ui/field";
 
@@ -27,6 +28,8 @@ export function QuickActionsBar({
   canEdit,
   canAnalyze,
   websiteUrl,
+  canSendEmail,
+  companyEmail,
 }: {
   companyId: string;
   currentStageId: string;
@@ -34,12 +37,18 @@ export function QuickActionsBar({
   canEdit: boolean;
   canAnalyze: boolean;
   websiteUrl: string | null;
+  canSendEmail: boolean;
+  /** Already validated server-side (see page.tsx) — null when the company
+   * has no email on file, or it doesn't pass validateEmailAddress(). The
+   * "Send email" button is only ever rendered when this is set. */
+  companyEmail: string | null;
 }) {
   const router = useRouter();
   const { requestActivity, requestFollowUp, requestAnalyze } = useQuickActions();
   const [stageId, setStageId] = useState(currentStageId);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | undefined>();
+  const [showSendEmail, setShowSendEmail] = useState(false);
 
   function handleStageChange(newStageId: string) {
     const previous = stageId;
@@ -70,6 +79,16 @@ export function QuickActionsBar({
             <Globe size={14} />
             View website
           </a>
+        )}
+        {canSendEmail && companyEmail && (
+          <button
+            type="button"
+            onClick={() => setShowSendEmail(true)}
+            className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white hover:bg-primary-hover"
+          >
+            <Send size={14} />
+            Send email
+          </button>
         )}
         {canEdit &&
           ACTIVITY_LINKS.map((link) => (
@@ -117,6 +136,9 @@ export function QuickActionsBar({
           </Select>
           {error && <p className="mt-1 text-xs font-semibold text-danger">{error}</p>}
         </div>
+      )}
+      {showSendEmail && companyEmail && (
+        <SendCompanyEmailModal companyId={companyId} companyEmail={companyEmail} onClose={() => setShowSendEmail(false)} />
       )}
     </Card>
   );
