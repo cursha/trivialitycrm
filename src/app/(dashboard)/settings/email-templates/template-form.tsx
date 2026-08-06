@@ -62,7 +62,16 @@ export function TemplateForm({
         )}
       </div>
 
-      {!defaultValues && (
+      {defaultValues ? (
+        // Visibility isn't editable after creation (see the create-only
+        // branch below) — but the update action still requires a valid
+        // "visibility" value in the submitted form data (validateFields()
+        // in actions.ts is shared between create and update). Without this
+        // hidden input, editing an existing template always failed with
+        // "Choose a visibility." since no visibility field was ever
+        // submitted at all — confirmed live.
+        <input type="hidden" name="visibility" value={defaultValues.visibility} />
+      ) : (
         <div>
           <Label>Visibility</Label>
           <Select name="visibility" required className="mt-1" defaultValue="PERSONAL">

@@ -3,6 +3,7 @@
 // the worker once Phase C's sequence-step runner needs to resolve a
 // template's placeholders too.
 import { escapeHtml } from "./sanitize-html";
+import { BUSINESS_TIMEZONE } from "../timezone";
 
 /** Data a template's placeholders may reference. Every field is optional
  * because a contact (and its name/email) may not exist for a company-only
@@ -36,6 +37,15 @@ function lookupPlaceholder(token: string, data: TemplatePlaceholderData): string
       return data.sender?.mailingAddress ?? undefined;
     case "unsubscribeLink":
       return data.unsubscribeLink ?? undefined;
+    case "today":
+      // Resolved fresh here, not passed through TemplatePlaceholderData —
+      // unlike every other token, "today" needs no per-send data, only the
+      // instant resolution actually happens (matters for a scheduled send,
+      // which must show the date it was actually sent, not when it was
+      // composed/scheduled). Formatted in the business timezone
+      // (src/lib/timezone.ts), not server-local time, so it can't read a
+      // day early/late for a server running in a different zone.
+      return new Intl.DateTimeFormat("en-US", { timeZone: BUSINESS_TIMEZONE, year: "numeric", month: "long", day: "numeric" }).format(new Date());
     default:
       return undefined;
   }
@@ -53,6 +63,7 @@ export const KNOWN_PLACEHOLDERS = [
   "sender.name",
   "sender.mailingAddress",
   "unsubscribeLink",
+  "today",
 ] as const;
 
 /** Every outbound template must include this placeholder (CAN-SPAM requires

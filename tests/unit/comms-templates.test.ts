@@ -109,3 +109,15 @@ describe("unsubscribeLink and sender.mailingAddress resolution", () => {
     expect(unresolved).toEqual(["unsubscribeLink"]);
   });
 });
+
+describe("{{today}} resolution", () => {
+  it("resolves to today's date without needing any data passed in", () => {
+    const { resolved, unresolved } = resolveTemplatePlaceholders("Sent on {{today}}.", {});
+    expect(unresolved).toEqual([]);
+    expect(resolved).toMatch(/^Sent on [A-Z][a-z]+ \d{1,2}, \d{4}\.$/);
+  });
+
+  it("is a known placeholder, not flagged at template save time", () => {
+    expect(unknownPlaceholderTokens("{{today}}")).toEqual([]);
+  });
+});
