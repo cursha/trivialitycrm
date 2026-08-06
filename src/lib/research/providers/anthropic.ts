@@ -697,19 +697,22 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
       }
       await recordUsage({ operation: "discover", model, usage: finalMessage.usage, searchId: params.searchId, userId: params.userId });
       assertNotTruncated(finalMessage.stop_reason, "anthropic-discovery-research");
-      const textBlock = finalMessage.content.find((block) => block.type === "text");
-      return textBlock && "text" in textBlock ? textBlock.text : "";
+      // Confirmed live: taking only the FIRST text block (the old
+      // .find(...) here) silently discarded the model's actual venue list.
+      // With web_search tool use interleaved into the response, the model
+      // produces multiple separate text blocks across turns — e.g. a short
+      // intro sentence ("Based on extensive searching, here is a
+      // comprehensive list...") as one block, then the real list in a
+      // LATER block once it's done searching. A real search burned $1.14
+      // doing genuine research and this bug threw all of it away, leaving
+      // only the 299-character intro paragraph. Concatenate every text
+      // block, in order, instead of just the first.
+      const researchText = finalMessage.content
+        .filter((block): block is Extract<typeof block, { type: "text" }> => block.type === "text")
+        .map((block) => block.text)
+        .join("\n");
+      return researchText;
     });
-
-    // TEMPORARY diagnostic — confirmed live, a real broad search ($1.14,
-    // 464K input tokens of genuine research) produced zero final
-    // candidates. console.error-based logging has been unreliable this
-    // session (railway logs sometimes never surfaces it); writing straight
-    // to the DB, a channel that's worked reliably all night, instead.
-    // Remove once the cause is identified.
-    if (params.searchId) {
-      await prisma.leadSearch.update({ where: { id: params.searchId }, data: { errorMessage: `[DEBUG step1 text, ${researchText.length} chars]\n${researchText.slice(0, 4000)}` } }).catch(() => {});
-    }
 
     if (!researchText.trim()) return [];
 
@@ -738,19 +741,6 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
       assertNotTruncated(response.stop_reason, "anthropic-discovery-structure");
       const jsonBlock = response.content.find((block) => block.type === "text");
       if (!jsonBlock || !("text" in jsonBlock)) return [];
-      // TEMPORARY diagnostic — see the matching comment above this
-      // function's step-1 call. Appends step 2's raw output to the same
-      // debug field so both are visible together. Remove once the cause
-      // is identified.
-      if (params.searchId) {
-        const existing = await prisma.leadSearch.findUnique({ where: { id: params.searchId }, select: { errorMessage: true } }).catch(() => null);
-        await prisma.leadSearch
-          .update({
-            where: { id: params.searchId },
-            data: { errorMessage: `${existing?.errorMessage ?? ""}\n\n[DEBUG step2 raw json, ${jsonBlock.text.length} chars]\n${jsonBlock.text.slice(0, 4000)}` },
-          })
-          .catch(() => {});
-      }
       const parsed = JSON.parse(jsonBlock.text) as { candidates: ResearchCandidate[] };
       // COMPETITOR_DISCOVERY_SCHEMA omits evidence/contactData entirely, so
       // those keys are simply absent from the model's JSON, not null —
