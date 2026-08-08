@@ -20,7 +20,21 @@ type StatusPayload = {
 
 const TERMINAL = new Set(["SUCCEEDED", "FAILED", "CANCELLED"]);
 
-export function SearchStatus({ searchId, initial, canOverrideBudget }: { searchId: string; initial: StatusPayload; canOverrideBudget: boolean }) {
+export function SearchStatus({
+  searchId,
+  initial,
+  canOverrideBudget,
+  // Every existing caller (which never passes this) keeps the exact same
+  // link target as before — only PUB_RADIUS mode's caller overrides it to
+  // point at its own dedicated review route (no generic results-table view
+  // exists for that mode's duplicate-bucketed review screen).
+  resultsHref,
+}: {
+  searchId: string;
+  initial: StatusPayload;
+  canOverrideBudget: boolean;
+  resultsHref?: string;
+}) {
   const [status, setStatus] = useState<StatusPayload>(initial);
   const [cancelError, setCancelError] = useState<string | null>(null);
   const [isCancelling, startCancelling] = useTransition();
@@ -101,7 +115,7 @@ export function SearchStatus({ searchId, initial, canOverrideBudget }: { searchI
 
       {status.status === "SUCCEEDED" && (
         <Link
-          href={`/leads/searches/${searchId}/results`}
+          href={resultsHref ?? `/leads/searches/${searchId}/results`}
           className="mt-4 inline-block rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary-hover"
         >
           View results

@@ -46,6 +46,12 @@ enum LeadSearchMode {
   TRIVIA_CONFIRMED
   COMPETITOR
   GENERAL
+  PUB_RADIUS
+}
+
+enum DistanceUnit {
+  MI
+  KM
 }
 
 enum ActivityType {
@@ -480,6 +486,9 @@ model Company {
   assignedTo           User?         @relation("AssignedSalesperson", fields: [assignedToId], references: [id])
   createdBy            User          @relation("CompanyCreator", fields: [createdById], references: [id])
   updatedBy            User?         @relation("CompanyUpdater", fields: [updatedById], references: [id])
+  // Back-relation required by Prisma for the named FK on LeadSearch above —
+  // no new business data, purely relational bookkeeping.
+  originOfSearches     LeadSearch[]  @relation("LeadSearchOriginCompany")
 
   // Module Five: origin attribution. Nullable — set once at creation by
   // each of the three creation paths (manual add, AI transfer, import
@@ -1068,6 +1077,17 @@ model LeadSearch {
   createdById    String
   leadTypeId     String
   competitorId   String?
+  // PUB_RADIUS only. originCompanyId is the existing Lead-Type="Pub" Company
+  // the search was centered on; originLat/originLng are that company's
+  // address geocoded once at search-creation time (startPubRadiusSearch) —
+  // never recomputed by the worker. radiusValue is the user's raw input in
+  // radiusUnit (converted to meters on read via src/lib/geo/distance.ts,
+  // never persisted redundantly). All five stay null for every other mode.
+  originCompanyId String?
+  radiusValue     Int?
+  radiusUnit      DistanceUnit?
+  originLat       Float?
+  originLng       Float?
   country        String
   region         String
   cities         Json
@@ -1078,6 +1098,7 @@ model LeadSearch {
   createdBy      User              @relation(fields: [createdById], references: [id])
   leadType       LeadType          @relation(fields: [leadTypeId], references: [id])
   competitor     Competitor?       @relation(fields: [competitorId], references: [id], onDelete: SetNull)
+  originCompany  Company?          @relation("LeadSearchOriginCompany", fields: [originCompanyId], references: [id], onDelete: SetNull)
   results        SearchResult[]
   candidates     SearchCandidate[]
   usageRecords   AiUsageRecord[]
@@ -1123,6 +1144,7 @@ model LeadSearch {
   @@index([status, heartbeatAt])
   @@index([providerJobId])
   @@index([runCorrelationId])
+  @@index([originCompanyId])
 }
 
 /**

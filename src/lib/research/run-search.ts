@@ -13,6 +13,7 @@ import { getAiSettings, checkMidRunAiBudget } from "../ai/budget";
 import { writeAuditEvent } from "../audit/log";
 import { classifyProviderError } from "../integrations/provider-errors";
 import { findOrCreateCompetitor } from "../competitors/find-or-create";
+import { radiusToMeters } from "../geo/distance";
 import type { DiscoverParams, ResearchCandidate, DiscoveryProgressUpdate } from "./providers/types";
 
 // Competition Locator's verification-standard rejection reasons (seeded in
@@ -53,6 +54,16 @@ async function callProviderSafely<T>(fn: () => Promise<T>): Promise<T> {
 
 function candidateIdentity(candidate: { name: string; city: string }): string {
   return `${normalizeCompanyName(candidate.name)}|${candidate.city.trim().toLowerCase()}`;
+}
+
+// PUB_RADIUS only: Nearby Search is centered on the origin pub's own
+// address, so it will very likely return that pub itself as a result. Left
+// unhandled, a rep would see their own search-origin pub listed back as a
+// "New" lead (or a self-matching "possible duplicate"). A pragmatic
+// heuristic, not exhaustive — normalized name + city, same signals
+// candidateIdentity() above already uses for within-run dedup.
+function isOriginCompany(candidate: ResearchCandidate, originCompany: { normalizedName: string; city: string }): boolean {
+  return normalizeCompanyName(candidate.name) === originCompany.normalizedName && candidate.city.trim().toLowerCase() === originCompany.city.trim().toLowerCase();
 }
 
 // Module Ten: candidates within one search are now verified/scored in
@@ -102,7 +113,7 @@ export type RunSearchJobOptions = {
 export async function runSearchJob(searchId: string, options: RunSearchJobOptions = {}): Promise<void> {
   const search = await prisma.leadSearch.findUniqueOrThrow({
     where: { id: searchId },
-    include: { leadType: true, competitor: true },
+    include: { leadType: true, competitor: true, originCompany: true },
   });
 
   // A cancelled search must never be resurrected by a retried/resumed job.
@@ -139,6 +150,12 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       leadTypeName: search.leadType.name,
       mode: search.mode,
       competitorName: search.competitor?.name,
+      // PUB_RADIUS only — geocoded once at search-creation time
+      // (startPubRadiusSearch), never recomputed here. radiusValue/radiusUnit
+      // are only ever both set together with originLat/originLng (see the
+      // schema comment on LeadSearch), so this is safe as a single condition.
+      originLatLng: search.mode === "PUB_RADIUS" && search.originLat !== null && search.originLng !== null ? { lat: search.originLat, lng: search.originLng } : undefined,
+      radiusMeters: search.mode === "PUB_RADIUS" && search.radiusValue !== null && search.radiusUnit !== null ? radiusToMeters(search.radiusValue, search.radiusUnit) : undefined,
       searchId: search.id,
       userId: search.createdById,
     };
@@ -191,13 +208,18 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       const rawCandidates = await callProviderSafely(() => providers.discovery.discover(params, onDiscoveryProgress));
       const deduped = dedupeWithinRun(filterByModeExclusivity(rawCandidates, search.mode));
 
+      // PUB_RADIUS only: drop the origin pub itself from its own results —
+      // see isOriginCompany()'s comment above. Every other mode has no
+      // originCompany, so this is a no-op for them.
+      const filtered = search.mode === "PUB_RADIUS" && search.originCompany ? deduped.filter((candidate) => !isOriginCompany(candidate, search.originCompany!)) : deduped;
+
       // Module 8A: an administrator-configured cap (AiSettings.
       // maxResultsPerSearch, null = unlimited) — applied here, after
       // dedup/exclusivity filtering, not as a discover() parameter, so the
       // cap is enforced consistently regardless of what a given provider
       // implementation does or doesn't support natively.
       const { maxResultsPerSearch } = await getAiSettings();
-      const scoped = maxResultsPerSearch !== null ? deduped.slice(0, maxResultsPerSearch) : deduped;
+      const scoped = maxResultsPerSearch !== null ? filtered.slice(0, maxResultsPerSearch) : filtered;
 
       await prisma.$transaction(
         scoped.map((candidate, index) =>
@@ -256,7 +278,7 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       // once its own verify/score calls moved to the opt-in "Research this
       // business" pass (below) — pass-1 COMPETITOR candidates place no paid
       // call here either now.
-      if (search.mode !== "GENERAL" && search.mode !== "COMPETITOR") {
+      if (search.mode !== "GENERAL" && search.mode !== "COMPETITOR" && search.mode !== "PUB_RADIUS") {
         const midRunCheck = await checkMidRunAiBudget(search.id, { overrideSpendLimit: search.budgetOverride });
         if (!midRunCheck.allowed) {
           await writeAuditEvent({
@@ -277,8 +299,8 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       let score: number;
       let explanation: string;
 
-      if (search.mode === "GENERAL" || search.mode === "COMPETITOR") {
-        // Directory-sourced (GENERAL) candidates never got an automatic AI
+      if (search.mode === "GENERAL" || search.mode === "COMPETITOR" || search.mode === "PUB_RADIUS") {
+        // Directory-sourced (GENERAL, PUB_RADIUS) candidates never got an automatic AI
         // verify/score pass — that's the entire point of the discovery/
         // research split (see providers/google-places.ts and results/
         // actions.ts#researchResult): browsing a city's businesses stays
@@ -371,7 +393,7 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       let disposition: "REJECTED" | "NEW" | "BELOW_SCORE" =
         priorRejections.length > 0
           ? "REJECTED"
-          : search.mode === "GENERAL" || search.mode === "COMPETITOR"
+          : search.mode === "GENERAL" || search.mode === "COMPETITOR" || search.mode === "PUB_RADIUS"
             ? "NEW"
             : score < search.minimumScore
               ? "BELOW_SCORE"
@@ -445,7 +467,14 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       let duplicateMatches: Awaited<ReturnType<typeof findScoredDuplicateMatches>> = [];
       let duplicateConfidence: "HIGH" | "MEDIUM" | "LOW" | null = null;
       let competitorConflict = false;
-      if (search.mode === "COMPETITOR" && disposition !== "REJECTED") {
+      // PUB_RADIUS reuses this exact same duplicate-scoring call — it's
+      // fully mode-agnostic (address/name/phone/email fuzzy matching against
+      // live Company rows), no COMPETITOR-specific logic inside it. The
+      // competitorConflict sub-logic just below stays false for PUB_RADIUS
+      // in practice (competitorId is null unless a candidate's own
+      // competitorName happens to resolve one, same as GENERAL mode) — no
+      // separate branch needed for that part.
+      if ((search.mode === "COMPETITOR" || search.mode === "PUB_RADIUS") && disposition !== "REJECTED") {
         duplicateMatches = await findScoredDuplicateMatches(prisma, {
           name: verified.name,
           address1: verified.address1,

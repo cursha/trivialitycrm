@@ -74,6 +74,14 @@ export type DiscoverParams = {
   leadTypeName: string;
   mode: LeadSearchMode;
   competitorName?: string;
+  // PUB_RADIUS mode only — the origin Company's geocoded coordinates and the
+  // user's chosen radius (already converted to meters via
+  // src/lib/geo/distance.ts). Populated only by run-search.ts when
+  // search.mode === "PUB_RADIUS"; every other mode leaves both undefined.
+  // GooglePlacesNearbyDiscoveryProvider/MockPubRadiusPlacesProvider require
+  // these; every other provider ignores them.
+  originLatLng?: { lat: number; lng: number };
+  radiusMeters?: number;
   // Optional attribution for AiUsageRecord (worker-side cost tracking). Not
   // used by mock providers; the Anthropic provider writes one row per call
   // when present. Absent for callers with no LeadSearch context (e.g. the

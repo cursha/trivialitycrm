@@ -14,13 +14,26 @@ export default async function SearchStatusPage({ params }: { params: Promise<{ i
 
   const search = await prisma.leadSearch.findUnique({
     where: { id },
-    select: { id: true, status: true, candidatesFound: true, progressMessage: true, errorMessage: true, region: true, country: true, mode: true },
+    select: {
+      id: true,
+      status: true,
+      candidatesFound: true,
+      progressMessage: true,
+      errorMessage: true,
+      region: true,
+      country: true,
+      mode: true,
+      originCompany: { select: { name: true } },
+    },
   });
   if (!search) notFound();
 
+  const isPubRadius = search.mode === "PUB_RADIUS";
+  const title = isPubRadius ? `Search: near ${search.originCompany?.name ?? "Unknown pub"}` : `Search: ${search.region}, ${search.country}`;
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader title={`Search: ${search.region}, ${search.country}`} description={`Mode: ${search.mode}`} />
+      <PageHeader title={title} description={`Mode: ${search.mode}`} />
       <SearchStatus
         searchId={search.id}
         initial={{
@@ -30,6 +43,7 @@ export default async function SearchStatusPage({ params }: { params: Promise<{ i
           errorMessage: search.errorMessage,
         }}
         canOverrideBudget={hasPermission(user, "manage_ai_settings")}
+        resultsHref={isPubRadius ? `/leads/pub-radius/${search.id}/review` : undefined}
       />
     </div>
   );

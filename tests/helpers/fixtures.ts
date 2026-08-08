@@ -198,8 +198,15 @@ export async function createLeadSearchFixture(opts: {
   region?: string;
   cities?: string[];
   minimumScore?: number;
-  mode?: "TRIVIA_GAP" | "TRIVIA_CONFIRMED" | "COMPETITOR" | "GENERAL";
+  mode?: "TRIVIA_GAP" | "TRIVIA_CONFIRMED" | "COMPETITOR" | "GENERAL" | "PUB_RADIUS";
   runCorrelationId?: string | null;
+  // PUB_RADIUS only — see the schema comment on LeadSearch. Left undefined
+  // for every other mode's fixture calls.
+  originCompanyId?: string | null;
+  radiusValue?: number | null;
+  radiusUnit?: "MI" | "KM" | null;
+  originLat?: number | null;
+  originLng?: number | null;
 }) {
   return testPrisma.leadSearch.create({
     data: {
@@ -214,6 +221,11 @@ export async function createLeadSearchFixture(opts: {
       mode: opts.mode ?? "GENERAL",
       promptSnapshot: "Independently-owned bars with a weekly events calendar.",
       runCorrelationId: opts.runCorrelationId ?? null,
+      originCompanyId: opts.originCompanyId ?? null,
+      radiusValue: opts.radiusValue ?? null,
+      radiusUnit: opts.radiusUnit ?? null,
+      originLat: opts.originLat ?? null,
+      originLng: opts.originLng ?? null,
     },
   });
 }

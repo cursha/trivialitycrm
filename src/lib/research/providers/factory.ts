@@ -1,6 +1,6 @@
 import type { LeadSearchMode } from "../../../generated/prisma/enums";
 import type { OpportunityAnalysisProvider, ResearchProviders } from "./types";
-import { MockPromptAssistant, MockCandidateDiscoveryProvider, MockEvidenceVerificationProvider, MockScoringProvider, MockPlacesProvider, MockOpportunityAnalysisProvider } from "./mock";
+import { MockPromptAssistant, MockCandidateDiscoveryProvider, MockEvidenceVerificationProvider, MockScoringProvider, MockPlacesProvider, MockPubRadiusPlacesProvider, MockOpportunityAnalysisProvider } from "./mock";
 import {
   AnthropicPromptAssistant,
   AnthropicCandidateDiscoveryProvider,
@@ -9,6 +9,7 @@ import {
   AnthropicOpportunityAnalysisProvider,
 } from "./anthropic";
 import { GooglePlacesDiscoveryProvider } from "./google-places";
+import { GooglePlacesNearbyDiscoveryProvider } from "./google-places-nearby";
 
 /**
  * Selects the research provider implementation from AI_PROVIDER (and, for
@@ -20,16 +21,17 @@ import { GooglePlacesDiscoveryProvider } from "./google-places";
  * provider (or none).
  *
  * Discovery is mode-aware: a business-directory API (Google Places) can
- * answer "what businesses of type X exist in this city" but has no way to
- * answer "does this specific one run trivia" or "does it use competitor Y's
- * service" — those are the entire reason TRIVIA_GAP/TRIVIA_CONFIRMED/
+ * answer "what businesses of type X exist in this city/area" but has no way
+ * to answer "does this specific one run trivia" or "does it use competitor
+ * Y's service" — those are the entire reason TRIVIA_GAP/TRIVIA_CONFIRMED/
  * COMPETITOR modes exist. So the fast/cheap directory provider only ever
- * backs GENERAL mode; every other mode always uses AI_PROVIDER's discovery,
- * exactly as before. verification/scoring/promptAssistant are never
- * mode-dependent — they're always AI-driven regardless of discovery source,
- * since a directory-sourced candidate still needs an AI pass (via the
- * opt-in per-result "Research this business" action) to ever get a real
- * triviaStatus.
+ * backs GENERAL (Text Search by city) and PUB_RADIUS (Nearby Search by
+ * lat/lng+radius — see google-places-nearby.ts); every other mode always
+ * uses AI_PROVIDER's discovery, exactly as before. verification/scoring/
+ * promptAssistant are never mode-dependent — they're always AI-driven
+ * regardless of discovery source, since a directory-sourced candidate still
+ * needs an AI pass (via the opt-in per-result "Research this business"
+ * action) to ever get a real triviaStatus.
  */
 export function getProviders(mode: LeadSearchMode): ResearchProviders {
   const aiProvider = (process.env.AI_PROVIDER || "mock").toLowerCase();
@@ -56,6 +58,10 @@ export function getProviders(mode: LeadSearchMode): ResearchProviders {
     discovery = new GooglePlacesDiscoveryProvider();
   } else if (mode === "GENERAL" && placesProvider === "mock") {
     discovery = new MockPlacesProvider();
+  } else if (mode === "PUB_RADIUS" && placesProvider === "google") {
+    discovery = new GooglePlacesNearbyDiscoveryProvider();
+  } else if (mode === "PUB_RADIUS" && placesProvider === "mock") {
+    discovery = new MockPubRadiusPlacesProvider();
   } else if (placesProvider !== "google" && placesProvider !== "mock") {
     throw new Error(`Unknown PLACES_PROVIDER "${placesProvider}" — expected "mock" or "google".`);
   } else {

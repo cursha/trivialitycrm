@@ -100,6 +100,40 @@ export class MockPlacesProvider implements CandidateDiscoveryProvider {
   }
 }
 
+/** Mock stand-in for GooglePlacesNearbyDiscoveryProvider (PUB_RADIUS mode) —
+ * deterministic fake nearby venues, ignoring the actual radius/coordinates
+ * (same "no network, clearly-fake data" contract as MockPlacesProvider
+ * above). Every AI-only field is left honestly empty/UNCERTAIN. */
+export class MockPubRadiusPlacesProvider implements CandidateDiscoveryProvider {
+  async discover(params: DiscoverParams, onProgress?: (update: DiscoveryProgressUpdate) => Promise<void>): Promise<ResearchCandidate[]> {
+    const areaLabel = params.cities[0] ?? "search area";
+    const results: ResearchCandidate[] = [0, 1].map((index) => {
+      const name = `Mock Nearby ${params.leadTypeName} ${index + 1}`;
+      return {
+        name,
+        address1: `${300 + index} Radius Blvd`,
+        city: areaLabel,
+        region: params.region,
+        postalCode: null,
+        country: params.country,
+        phone: "555-0200",
+        email: null,
+        websiteUrl: `https://example.test/${name.toLowerCase().replace(/\s+/g, "-")}`,
+        contactData: null,
+        triviaStatus: "UNCERTAIN",
+        competitorName: null,
+        day: null,
+        evidence: [],
+        sources: [],
+      };
+    });
+
+    await onProgress?.({ kind: "city", city: areaLabel, cityIndex: 0, totalCities: 1, foundSoFar: results.length });
+
+    return results;
+  }
+}
+
 export class MockEvidenceVerificationProvider implements EvidenceVerificationProvider {
   async verify(candidate: ResearchCandidate, params: DiscoverParams): Promise<ResearchCandidate> {
     // COMPETITOR mode reports VERIFIED (not UNVERIFIED) evidence — this mock

@@ -11,7 +11,10 @@
 import { getEnv } from "../../env";
 import type { CandidateDiscoveryProvider, DiscoverParams, DiscoveryProgressUpdate, ResearchCandidate } from "./types";
 
-const TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
+// Exported: geocoder.ts reuses this same Text Search endpoint to resolve a
+// known address to coordinates (see that file for why a separate Geocoding
+// API product isn't used).
+export const TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
 
 // Only the fields this app actually stores — requesting anything from the
 // Atmosphere tier (rating, reviews, price level) would push every call into
@@ -35,7 +38,11 @@ const FIELD_MASK = [
 // across pages for Text Search (New).
 const MAX_PAGES_PER_CITY = 3;
 
-type PlaceAddressComponent = { longText?: string; shortText?: string; types?: string[] };
+// Exported: shared with google-places-nearby.ts and geocoder.ts, which parse
+// the same addressComponents shape from Places API (New)'s other endpoints
+// (Nearby Search, Text Search-as-geocode) — see those files for why this
+// isn't duplicated.
+export type PlaceAddressComponent = { longText?: string; shortText?: string; types?: string[] };
 
 type PlacesTextSearchResult = {
   places?: {
@@ -53,7 +60,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function extractPostalCode(addressComponents: PlaceAddressComponent[] | undefined): string | null {
+export function extractPostalCode(addressComponents: PlaceAddressComponent[] | undefined): string | null {
   const component = addressComponents?.find((c) => c.types?.includes("postal_code"));
   return component?.longText ?? component?.shortText ?? null;
 }
@@ -65,12 +72,12 @@ function extractPostalCode(addressComponents: PlaceAddressComponent[] | undefine
 // component is the place's real city; only fall back to queryCity (which,
 // for a whole-region run, is really the region code, not a city — a known,
 // accepted imprecision) when Google didn't return one.
-function extractCity(addressComponents: PlaceAddressComponent[] | undefined, queryCity: string): string {
+export function extractCity(addressComponents: PlaceAddressComponent[] | undefined, queryCity: string): string {
   const component = addressComponents?.find((c) => c.types?.includes("locality"));
   return component?.longText ?? component?.shortText ?? queryCity;
 }
 
-function componentText(component: PlaceAddressComponent | undefined): string | undefined {
+export function componentText(component: PlaceAddressComponent | undefined): string | undefined {
   return component?.longText ?? component?.shortText ?? undefined;
 }
 
@@ -81,7 +88,7 @@ function componentText(component: PlaceAddressComponent | undefined): string | u
 // rather than string-splitting formattedAddress, which is locale-dependent.
 // Falls back to formattedAddress on the rare place with no street_number/
 // route components (e.g. a location known only by name) rather than null.
-function extractStreetAddress(addressComponents: PlaceAddressComponent[] | undefined, fallback: string | null): string | null {
+export function extractStreetAddress(addressComponents: PlaceAddressComponent[] | undefined, fallback: string | null): string | null {
   const streetNumber = componentText(addressComponents?.find((c) => c.types?.includes("street_number")));
   const route = componentText(addressComponents?.find((c) => c.types?.includes("route")));
   const street = [streetNumber, route].filter(Boolean).join(" ");
@@ -90,7 +97,15 @@ function extractStreetAddress(addressComponents: PlaceAddressComponent[] | undef
   return subpremise ? `${street} ${subpremise}` : street;
 }
 
-function candidateFromPlace(place: NonNullable<PlacesTextSearchResult["places"]>[number], params: DiscoverParams, queryCity: string): ResearchCandidate {
+// Exported: the Place resource shape (displayName/formattedAddress/
+// addressComponents/nationalPhoneNumber/websiteUri/businessStatus) is
+// identical whether it comes back from Text Search or Nearby Search (New) —
+// both are the same underlying Places API (New) resource — so
+// google-places-nearby.ts reuses this mapper unchanged rather than
+// duplicating it.
+export type GooglePlace = NonNullable<PlacesTextSearchResult["places"]>[number];
+
+export function candidateFromPlace(place: GooglePlace, params: DiscoverParams, queryCity: string): ResearchCandidate {
   return {
     name: place.displayName?.text ?? "Unknown business",
     address1: extractStreetAddress(place.addressComponents, place.formattedAddress ?? null),
