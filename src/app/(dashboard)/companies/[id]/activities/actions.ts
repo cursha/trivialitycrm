@@ -30,6 +30,7 @@ export async function createActivity(
 
   const parsed = ActivitySchema.safeParse({
     type: formString(formData, "type"),
+    occurredAt: formString(formData, "occurredAt"),
     notes: formString(formData, "notes"),
     outcome: formString(formData, "outcome"),
   });
@@ -43,6 +44,7 @@ export async function createActivity(
       companyId,
       userId: user.id,
       type: parsed.data.type,
+      occurredAt: parsed.data.occurredAt ? new Date(parsed.data.occurredAt) : undefined,
       notes: parsed.data.notes ?? null,
       outcome: parsed.data.outcome ?? null,
     },

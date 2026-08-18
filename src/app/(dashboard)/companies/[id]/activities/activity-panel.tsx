@@ -47,6 +47,7 @@ export function ActivityPanel({ companyId, activities, canLog }: { companyId: st
   const [error, setError] = useState<string | null>(null);
   const [justLogged, setJustLogged] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [today] = useState(() => new Date().toISOString().slice(0, 10));
 
   useEffect(() => {
     if (!canLog) return;
@@ -107,6 +108,7 @@ export function ActivityPanel({ companyId, activities, canLog }: { companyId: st
             <option value="TRIAL">Trial</option>
             <option value="NOTE">General note</option>
           </Select>
+          <Input name="occurredAt" type="date" defaultValue={today} className="py-1.5" />
           <Input name="outcome" placeholder="Outcome (optional)" className="py-1.5" />
           <Textarea name="notes" placeholder="Notes" rows={3} className="py-1.5" />
           <div className="flex gap-2">

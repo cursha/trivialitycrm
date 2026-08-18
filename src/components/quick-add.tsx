@@ -343,6 +343,7 @@ function QuickAddActivityForm({
     return result;
   };
   const [state, formAction, pending] = useActionState(wrappedAction, undefined);
+  const [today] = useState(() => new Date().toISOString().slice(0, 10));
 
   return (
     <form action={formAction} className="space-y-3">
@@ -363,6 +364,10 @@ function QuickAddActivityForm({
           </Select>
         </div>
       )}
+      <div>
+        <Label>Date</Label>
+        <Input name="occurredAt" type="date" defaultValue={today} className="mt-1" />
+      </div>
       <div>
         <Label>{presetType === "NOTE" ? "Note" : "Notes"}</Label>
         <Textarea name="notes" rows={4} autoFocus required={presetType === "NOTE"} className="mt-1" />

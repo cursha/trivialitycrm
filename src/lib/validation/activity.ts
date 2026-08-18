@@ -12,6 +12,12 @@ export const ActivityTypeValues = [
 
 export const ActivitySchema = z.object({
   type: z.enum(ActivityTypeValues, { error: "Choose an activity type." }),
+  occurredAt: z
+    .string()
+    .trim()
+    .optional()
+    .or(z.literal(""))
+    .transform((value) => (value ? value : undefined)),
   notes: z
     .string()
     .trim()
