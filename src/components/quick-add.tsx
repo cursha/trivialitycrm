@@ -9,6 +9,7 @@ import { createContact } from "@/app/(dashboard)/companies/[id]/contacts/actions
 import { createActivity } from "@/app/(dashboard)/companies/[id]/activities/actions";
 import { createTask } from "@/app/(dashboard)/companies/[id]/tasks/actions";
 import { Label, Input, Select, Textarea, FieldError } from "@/components/ui/field";
+import { toDateTimeInputValue } from "@/lib/dates";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
@@ -343,7 +344,7 @@ function QuickAddActivityForm({
     return result;
   };
   const [state, formAction, pending] = useActionState(wrappedAction, undefined);
-  const [today] = useState(() => new Date().toISOString().slice(0, 10));
+  const [now] = useState(() => toDateTimeInputValue());
 
   return (
     <form action={formAction} className="space-y-3">
@@ -365,8 +366,8 @@ function QuickAddActivityForm({
         </div>
       )}
       <div>
-        <Label>Date</Label>
-        <Input name="occurredAt" type="date" defaultValue={today} className="mt-1" />
+        <Label>Date &amp; time</Label>
+        <Input name="occurredAt" type="datetime-local" defaultValue={now} className="mt-1" />
       </div>
       <div>
         <Label>{presetType === "NOTE" ? "Note" : "Notes"}</Label>
