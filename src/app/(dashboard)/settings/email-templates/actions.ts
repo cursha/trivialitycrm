@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission, hasPermission } from "@/lib/auth/permissions";
@@ -146,6 +147,45 @@ export async function deleteEmailTemplate(id: string): Promise<void> {
   await requireEditAccess(id);
   await prisma.emailTemplate.delete({ where: { id } });
   revalidatePath(PATH);
+}
+
+/**
+ * Clones a template (and its links) into a new PERSONAL template owned
+ * by the current user, regardless of the source's own visibility or
+ * owner — anyone who can see a template on this page already has
+ * manage_personal_templates (the page-level gate), so duplicating only
+ * needs read access to the source, not edit access to it. Starts
+ * inactive so a not-yet-reviewed copy can't be picked up by a send
+ * before it's checked over and renamed.
+ */
+export async function duplicateEmailTemplate(id: string): Promise<void> {
+  const user = await requireUser();
+  requirePermission(user, "manage_personal_templates");
+
+  const [source, links] = await Promise.all([
+    prisma.emailTemplate.findUniqueOrThrow({ where: { id } }),
+    prisma.emailTemplateLink.findMany({ where: { emailTemplateId: id }, orderBy: { sortOrder: "asc" } }),
+  ]);
+
+  const copy = await prisma.emailTemplate.create({
+    data: {
+      name: `Copy of ${source.name}`,
+      categoryId: source.categoryId,
+      subject: source.subject,
+      body: source.body,
+      visibility: "PERSONAL",
+      ownerId: user.id,
+      leadTypeId: source.leadTypeId,
+      pipelineStageId: source.pipelineStageId,
+      language: source.language,
+      active: false,
+      createdById: user.id,
+      links: { create: links.map((link) => ({ label: link.label, url: link.url, sortOrder: link.sortOrder })) },
+    },
+  });
+
+  revalidatePath(PATH);
+  redirect(`${PATH}/${copy.id}/edit`);
 }
 
 /**
