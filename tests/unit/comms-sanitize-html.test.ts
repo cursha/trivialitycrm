@@ -54,4 +54,17 @@ describe("sanitizeEmailHtml", () => {
     expect(result).not.toContain("onclick");
     expect(result).toContain("<p>Hi</p>");
   });
+
+  it("keeps the one fixed logo image the editor can insert", () => {
+    const result = sanitizeEmailHtml('<p>Hi</p><img src="https://trivialitycrm.com/triviality-mayhem-logo.png" alt="Triviality Mayhem" width="160" height="160">');
+    expect(result).toContain('<img src="https://trivialitycrm.com/triviality-mayhem-logo.png"');
+    expect(result).toContain('width="160"');
+  });
+
+  it("strips any image that isn't the exact fixed logo URL, even though img is otherwise allowed", () => {
+    const result = sanitizeEmailHtml('<img src="https://evil.example.com/tracker.png"><p>Hi</p>');
+    expect(result).not.toContain("<img");
+    expect(result).not.toContain("evil.example.com");
+    expect(result).toContain("<p>Hi</p>");
+  });
 });

@@ -29,22 +29,34 @@ export function textToSafeHtml(text: string): string {
   return escapeHtml(text).replace(/\r\n|\r|\n/g, "<br>\n");
 }
 
+// Must match rich-text-editor.tsx's LOGO_URL exactly — the only `img src`
+// this sanitizer will ever let through (see exclusiveFilter below).
+const ALLOWED_LOGO_URL = "https://trivialitycrm.com/triviality-mayhem-logo.png";
+
 /**
  * Allowlist matches exactly what the composer/template rich-text editor
- * (Tiptap StarterKit + Link extension — see src/components/ui/
+ * (Tiptap StarterKit + Link + Image extensions — see src/components/ui/
  * rich-text-editor.tsx) can produce: paragraphs, line breaks, bold,
- * italic, links, and bulleted/numbered lists. Called right before a
- * resolved template/composer body is handed to a provider's sendEmail()
- * (see SendEmailInput.bodyHtml's own doc comment) — defense in depth even
- * though the editor's own schema already constrains what a user can
- * author, since resolveTemplatePlaceholders() also splices merge-field
- * values into this same string via plain substitution.
+ * italic, links, bulleted/numbered lists, and the one fixed logo image.
+ * Called right before a resolved template/composer body is handed to a
+ * provider's sendEmail() (see SendEmailInput.bodyHtml's own doc comment)
+ * — defense in depth even though the editor's own schema already
+ * constrains what a user can author, since resolveTemplatePlaceholders()
+ * also splices merge-field values into this same string via plain
+ * substitution.
+ *
+ * `img` is intentionally not a general capability — exclusiveFilter
+ * strips any `img` whose src isn't exactly ALLOWED_LOGO_URL, so even a
+ * hand-crafted request that bypassed the editor's UI couldn't get an
+ * arbitrary image into a sent email (no general upload/hosting system
+ * exists in this app for that to be safe yet — see Curt's ask).
  */
 export function sanitizeEmailHtml(html: string): string {
   return sanitizeHtml(html, {
-    allowedTags: ["p", "br", "strong", "b", "em", "i", "a", "ul", "ol", "li"],
-    allowedAttributes: { a: ["href", "target", "rel"] },
+    allowedTags: ["p", "br", "strong", "b", "em", "i", "a", "ul", "ol", "li", "img"],
+    allowedAttributes: { a: ["href", "target", "rel"], img: ["src", "alt", "width", "height"] },
     allowedSchemes: ["http", "https", "mailto"],
+    exclusiveFilter: (frame) => frame.tag === "img" && frame.attribs.src !== ALLOWED_LOGO_URL,
     transformTags: {
       a: sanitizeHtml.simpleTransform("a", { target: "_blank", rel: "noopener noreferrer" }),
     },

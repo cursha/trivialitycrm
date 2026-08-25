@@ -4,8 +4,15 @@ import { useEffect } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
+import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
-import { Bold, Italic, Link as LinkIcon, List, ListOrdered, Undo, Redo } from "lucide-react";
+import { Bold, Italic, Link as LinkIcon, List, ListOrdered, Undo, Redo, ImageIcon } from "lucide-react";
+
+// Always the real, publicly-hosted production URL, regardless of which
+// environment composed the template — email clients have no "current
+// origin" to resolve a relative path against, and we only ever want
+// the one real logo image in a sent email either way.
+const LOGO_URL = "https://trivialitycrm.com/triviality-mayhem-logo.png";
 
 function ToolbarButton({
   onClick,
@@ -48,6 +55,14 @@ function ToolbarButton({
  * sent, and templates.ts's resolveTemplatePlaceholders() "html" context
  * for how merge-field values get safely spliced into it.
  *
+ * Images are intentionally not a general capability — there's no upload
+ * system, and letting anyone embed arbitrary image URLs would be a much
+ * bigger feature than what was actually asked for (per Curt). The one
+ * "Insert logo" button below always inserts the exact same fixed
+ * LOGO_URL; sanitizeEmailHtml() only allows `img` tags whose `src`
+ * matches that one URL, so even a hand-crafted request that bypassed
+ * this UI couldn't get an arbitrary image into a sent email.
+ *
  * Renders a `name`d hidden input carrying the current HTML so a plain
  * `<form action={...}>` submission (this app's convention — no client-side
  * fetch/JSON) still includes it under FormData.get(name), exactly like the
@@ -75,6 +90,7 @@ export function RichTextEditor({
         strike: false,
       }),
       Link.configure({ openOnClick: false, autolink: true, linkOnPaste: true }),
+      Image.configure({ HTMLAttributes: { alt: "Triviality Mayhem", width: "160", height: "160" } }),
       Placeholder.configure({ placeholder: placeholder ?? "" }),
     ],
     content: value,
@@ -125,6 +141,9 @@ export function RichTextEditor({
             }}
           >
             <LinkIcon size={14} />
+          </ToolbarButton>
+          <ToolbarButton label="Insert logo" onClick={() => editor.chain().focus().setImage({ src: LOGO_URL, alt: "Triviality Mayhem" }).run()}>
+            <ImageIcon size={14} />
           </ToolbarButton>
           <ToolbarButton label="Bulleted list" active={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()}>
             <List size={14} />
