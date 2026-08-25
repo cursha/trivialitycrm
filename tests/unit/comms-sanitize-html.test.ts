@@ -67,4 +67,31 @@ describe("sanitizeEmailHtml", () => {
     expect(result).not.toContain("evil.example.com");
     expect(result).toContain("<p>Hi</p>");
   });
+
+  it("keeps the logo image with any of the three alignment styles the editor's buttons can produce", () => {
+    // sanitize-html re-serializes the style attribute (e.g. drops a
+    // trailing ";"), so this checks the image survived and the
+    // meaningful CSS is intact, not an exact string match.
+    for (const style of ["display:block;margin:0 auto 0 0;", "display:block;margin:0 auto;", "display:block;margin:0 0 0 auto;"]) {
+      const result = sanitizeEmailHtml(`<img src="https://trivialitycrm.com/triviality-mayhem-logo.png" style="${style}">`);
+      expect(result).toContain("<img");
+      expect(result).toContain(style.replace(/;$/, ""));
+    }
+  });
+
+  it("keeps the logo image with the browser-reformatted style ProseMirror actually saves (confirmed against a real saved template)", () => {
+    // What editor.getHTML() actually produces isn't the literal
+    // ALIGN_STYLE source string — the browser reformats "0" to "0px"
+    // and adds spacing when serializing the style attribute. This is
+    // the exact string read back from a real saved EmailTemplate.body.
+    for (const style of ["display: block; margin: 0px auto 0px 0px;", "display: block; margin: 0px auto;", "display: block; margin: 0px 0px 0px auto;"]) {
+      const result = sanitizeEmailHtml(`<img src="https://trivialitycrm.com/triviality-mayhem-logo.png" style="${style}">`);
+      expect(result).toContain("<img");
+    }
+  });
+
+  it("strips the logo image if its style isn't one of the three exact allowed alignment values", () => {
+    const result = sanitizeEmailHtml('<img src="https://trivialitycrm.com/triviality-mayhem-logo.png" style="position:fixed;top:0;">');
+    expect(result).not.toContain("<img");
+  });
 });

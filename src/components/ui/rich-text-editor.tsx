@@ -6,7 +6,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
 import Placeholder from "@tiptap/extension-placeholder";
-import { Bold, Italic, Link as LinkIcon, List, ListOrdered, Undo, Redo, ImageIcon } from "lucide-react";
+import { Bold, Italic, Link as LinkIcon, List, ListOrdered, Undo, Redo, ImageIcon, AlignLeft, AlignCenter, AlignRight } from "lucide-react";
 
 // Always the real, publicly-hosted production URL, regardless of which
 // environment composed the template — email clients have no "current
@@ -20,13 +20,27 @@ const LOGO_URL = "https://trivialitycrm.com/triviality-mayhem-logo.png";
 // all, showing the source file at its true 3919x3919 size). Extending
 // addAttributes() with real defaults is what's needed for them to
 // actually serialize into the stored/sent HTML. The source is square,
-// so a single value works for both.
+// so a single value works for both. `display:block;margin:0 auto` is
+// the standard email-safe way to center a block image — it's a direct
+// block-level node (Tiptap's Image is `group: "block"`, not wrapped in
+// a <p>), so this centers it against its container's width.
+type ImageAlign = "left" | "center" | "right";
+
+// Auto-margin trick for aligning a fixed-width block element without
+// flexbox/CSS grid — the widely-supported email-safe way to do this.
+const ALIGN_STYLE: Record<ImageAlign, string> = {
+  left: "display:block;margin:0 auto 0 0;",
+  center: "display:block;margin:0 auto;",
+  right: "display:block;margin:0 0 0 auto;",
+};
+
 const LogoImage = Image.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
       width: { default: "160" },
       height: { default: "160" },
+      style: { default: ALIGN_STYLE.center },
     };
   },
 });
@@ -76,8 +90,12 @@ function ToolbarButton({
  * system, and letting anyone embed arbitrary image URLs would be a much
  * bigger feature than what was actually asked for (per Curt). The one
  * "Insert logo" button below always inserts the exact same fixed
- * LOGO_URL; sanitizeEmailHtml() only allows `img` tags whose `src`
- * matches that one URL, so even a hand-crafted request that bypassed
+ * LOGO_URL, defaulting to centered; the three align buttons next to it
+ * only ever set `style` to one of ALIGN_STYLE's three exact values, and
+ * only act on/enable for a currently-selected image node.
+ * sanitizeEmailHtml() only allows `img` tags whose `src` matches that
+ * one URL and whose `style` (if present) is one of those three exact
+ * values, so even a hand-crafted request that bypassed
  * this UI couldn't get an arbitrary image into a sent email.
  *
  * Renders a `name`d hidden input carrying the current HTML so a plain
@@ -159,9 +177,26 @@ export function RichTextEditor({
           >
             <LinkIcon size={14} />
           </ToolbarButton>
-          <ToolbarButton label="Insert logo" onClick={() => editor.chain().focus().setImage({ src: LOGO_URL, alt: "Triviality Mayhem" }).run()}>
+          <ToolbarButton
+            label="Insert logo"
+            onClick={() => editor.chain().focus().setImage({ src: LOGO_URL, alt: "Triviality Mayhem" }).run()}
+          >
             <ImageIcon size={14} />
           </ToolbarButton>
+          {(["left", "center", "right"] as const).map((align) => {
+            const Icon = align === "left" ? AlignLeft : align === "center" ? AlignCenter : AlignRight;
+            return (
+              <ToolbarButton
+                key={align}
+                label={`Align logo ${align}`}
+                disabled={!editor.isActive("image")}
+                active={editor.isActive("image", { style: ALIGN_STYLE[align] })}
+                onClick={() => editor.chain().focus().updateAttributes("image", { style: ALIGN_STYLE[align] }).run()}
+              >
+                <Icon size={14} />
+              </ToolbarButton>
+            );
+          })}
           <ToolbarButton label="Bulleted list" active={editor.isActive("bulletList")} onClick={() => editor.chain().focus().toggleBulletList().run()}>
             <List size={14} />
           </ToolbarButton>

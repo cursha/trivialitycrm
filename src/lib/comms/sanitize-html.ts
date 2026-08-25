@@ -33,6 +33,22 @@ export function textToSafeHtml(text: string): string {
 // this sanitizer will ever let through (see exclusiveFilter below).
 const ALLOWED_LOGO_URL = "https://trivialitycrm.com/triviality-mayhem-logo.png";
 
+// Same posture as ALLOWED_LOGO_URL above, restricting `style` to only
+// the three alignments rich-text-editor.tsx's ALIGN_STYLE defines —
+// but compared via normalizeStyle() rather than exact string equality:
+// confirmed by actually saving a template and reading the stored HTML
+// back that the browser reformats "0" to "0px" and adds spacing when
+// Tiptap/ProseMirror serializes the style attribute, so the value that
+// actually reaches this function never matches the editor's literal
+// source string byte-for-byte.
+const ALLOWED_IMAGE_STYLES = new Set(
+  ["display:block;margin:0 auto 0 0;", "display:block;margin:0 auto;", "display:block;margin:0 0 0 auto;"].map(normalizeStyle),
+);
+
+function normalizeStyle(style: string): string {
+  return style.replace(/\s+/g, "").replace(/0px/g, "0").toLowerCase();
+}
+
 /**
  * Allowlist matches exactly what the composer/template rich-text editor
  * (Tiptap StarterKit + Link + Image extensions — see src/components/ui/
@@ -46,17 +62,22 @@ const ALLOWED_LOGO_URL = "https://trivialitycrm.com/triviality-mayhem-logo.png";
  * substitution.
  *
  * `img` is intentionally not a general capability — exclusiveFilter
- * strips any `img` whose src isn't exactly ALLOWED_LOGO_URL, so even a
- * hand-crafted request that bypassed the editor's UI couldn't get an
- * arbitrary image into a sent email (no general upload/hosting system
+ * strips any `img` whose src isn't exactly ALLOWED_LOGO_URL, or whose
+ * style (if present) isn't one of the three alignment values the
+ * editor's own buttons can produce, so even a hand-crafted request
+ * that bypassed the editor's UI couldn't get an arbitrary image or
+ * arbitrary CSS into a sent email (no general upload/hosting system
  * exists in this app for that to be safe yet — see Curt's ask).
  */
 export function sanitizeEmailHtml(html: string): string {
   return sanitizeHtml(html, {
     allowedTags: ["p", "br", "strong", "b", "em", "i", "a", "ul", "ol", "li", "img"],
-    allowedAttributes: { a: ["href", "target", "rel"], img: ["src", "alt", "width", "height"] },
+    allowedAttributes: { a: ["href", "target", "rel"], img: ["src", "alt", "width", "height", "style"] },
     allowedSchemes: ["http", "https", "mailto"],
-    exclusiveFilter: (frame) => frame.tag === "img" && frame.attribs.src !== ALLOWED_LOGO_URL,
+    exclusiveFilter: (frame) =>
+      frame.tag === "img" &&
+      (frame.attribs.src !== ALLOWED_LOGO_URL ||
+        (frame.attribs.style !== undefined && !ALLOWED_IMAGE_STYLES.has(normalizeStyle(frame.attribs.style)))),
     transformTags: {
       a: sanitizeHtml.simpleTransform("a", { target: "_blank", rel: "noopener noreferrer" }),
     },
