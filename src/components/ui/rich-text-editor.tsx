@@ -14,6 +14,23 @@ import { Bold, Italic, Link as LinkIcon, List, ListOrdered, Undo, Redo, ImageIco
 // the one real logo image in a sent email either way.
 const LOGO_URL = "https://trivialitycrm.com/triviality-mayhem-logo.png";
 
+// Plain Image.configure({ HTMLAttributes: { width, height } }) does NOT
+// make width/height part of the node's actual schema — they never
+// survive editor.getHTML() (confirmed: rendered with no width/height at
+// all, showing the source file at its true 3919x3919 size). Extending
+// addAttributes() with real defaults is what's needed for them to
+// actually serialize into the stored/sent HTML. The source is square,
+// so a single value works for both.
+const LogoImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: { default: "160" },
+      height: { default: "160" },
+    };
+  },
+});
+
 function ToolbarButton({
   onClick,
   active,
@@ -90,7 +107,7 @@ export function RichTextEditor({
         strike: false,
       }),
       Link.configure({ openOnClick: false, autolink: true, linkOnPaste: true }),
-      Image.configure({ HTMLAttributes: { alt: "Triviality Mayhem", width: "160", height: "160" } }),
+      LogoImage,
       Placeholder.configure({ placeholder: placeholder ?? "" }),
     ],
     content: value,
