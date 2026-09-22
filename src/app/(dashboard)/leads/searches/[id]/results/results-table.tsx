@@ -311,7 +311,10 @@ export function ResultsTable({
                 <input type="checkbox" checked={allSelected} onChange={toggleSelectAll} aria-label="Select all on this page" />
               </th>
               <th className="px-4 py-3">Company</th>
-              <th className="px-4 py-3">Location</th>
+              <th className="px-4 py-3">Address</th>
+              <th className="px-4 py-3">City</th>
+              <th className="px-4 py-3">Prov/State</th>
+              <th className="px-4 py-3">Postal/Zip</th>
               <th className="px-4 py-3">Trivia status</th>
               <th className="px-4 py-3">Score</th>
               <th className="px-4 py-3">Disposition</th>
@@ -341,9 +344,10 @@ export function ResultsTable({
                     </button>
                     {result.competitorName && <p className="mt-0.5 text-xs text-amber-700">Uses {result.competitorName}</p>}
                   </td>
-                  <td className="px-4 py-3 text-text-muted">
-                    {result.city}, {result.region}
-                  </td>
+                  <td className="px-4 py-3 text-text-muted">{result.address1 ?? "—"}</td>
+                  <td className="px-4 py-3 text-text-muted">{result.city}</td>
+                  <td className="px-4 py-3 text-text-muted">{result.region}</td>
+                  <td className="whitespace-nowrap px-4 py-3 text-text-muted">{result.postalCode ?? "—"}</td>
                   <td className="px-4 py-3">
                     <Badge tone={TRIVIA_STATUS_TONE[result.triviaStatus]}>{humanizeEnum(result.triviaStatus)}</Badge>
                     {result.triviaStatus === "UNCERTAIN" && result.evidence.length === 0 && (
@@ -384,14 +388,14 @@ export function ResultsTable({
                 </tr>
                 {researchErrors[result.id] && (
                   <tr className="border-t-0">
-                    <td colSpan={7} className="bg-danger/5 px-4 py-2 text-right text-xs font-semibold text-danger">
+                    <td colSpan={10} className="bg-danger/5 px-4 py-2 text-right text-xs font-semibold text-danger">
                       {researchErrors[result.id]}
                     </td>
                   </tr>
                 )}
                 {expanded === result.id && canViewEvidence && (
                   <tr className="border-t border-border bg-black/[0.02]">
-                    <td colSpan={7} className="px-4 py-4">
+                    <td colSpan={10} className="px-4 py-4">
                       <ResultEvidencePanel result={result} minimumScore={minimumScore} />
                     </td>
                   </tr>
@@ -400,7 +404,7 @@ export function ResultsTable({
             ))}
             {results.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-5 py-8 text-center text-text-muted">
+                <td colSpan={10} className="px-5 py-8 text-center text-text-muted">
                   No results in this view.
                 </td>
               </tr>
@@ -432,7 +436,9 @@ export function ResultsTable({
                   </button>
                   {result.competitorName && <p className="mt-0.5 text-xs text-amber-700">Uses {result.competitorName}</p>}
                   <p className="text-xs text-text-muted">
+                    {result.address1 && <>{result.address1}, </>}
                     {result.city}, {result.region}
+                    {result.postalCode && <> {result.postalCode}</>}
                   </p>
 
                   <div className="mt-2 flex flex-wrap items-center gap-2">
