@@ -221,30 +221,23 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       const { maxResultsPerSearch } = await getAiSettings();
       const scoped = maxResultsPerSearch !== null ? filtered.slice(0, maxResultsPerSearch) : filtered;
 
-      await prisma.$transaction(
-        scoped.map((candidate, index) =>
-          prisma.searchCandidate.upsert({
-            where: { searchId_normalizedIdentity: { searchId, normalizedIdentity: candidateIdentity(candidate) } },
-            create: {
-              searchId,
-              index,
-              normalizedIdentity: candidateIdentity(candidate),
-              rawCandidate: candidate as unknown as object,
-            },
-            update: {},
-          }),
-        ),
-        // Prisma's array-form $transaction defaults to a 5s timeout — fine
-        // for a handful of candidates, but a real live search with a good,
-        // specific prompt (unlike the earlier bracket-template one) can
-        // discover enough candidates that bulk-checkpointing them all here
-        // genuinely exceeds 5s. Confirmed live: "A commit cannot be
-        // executed on an expired transaction... 5505 ms passed since the
-        // start." 30s comfortably covers even the app's own upper bound
-        // (maxResultsPerSearch/maxCitiesPerSearch), and this is a bulk
-        // checkpoint step, not a fast interactive one.
-        { timeout: 30_000 },
-      );
+      // One INSERT ... ON CONFLICT DO NOTHING, not one upsert round-trip per
+      // candidate inside a transaction. The per-row version blew Prisma's
+      // transaction timeout twice in production — first the 5s default
+      // ("5505 ms passed"), then the raised 30s one ("30670 ms passed") on a
+      // large search — because its cost grows with the candidate count.
+      // Same semantics: all-or-nothing (a single statement is atomic), and
+      // skipDuplicates keeps a retried checkpoint duplicate-free exactly as
+      // the old `update: {}` did.
+      await prisma.searchCandidate.createMany({
+        data: scoped.map((candidate, index) => ({
+          searchId,
+          index,
+          normalizedIdentity: candidateIdentity(candidate),
+          rawCandidate: candidate as unknown as object,
+        })),
+        skipDuplicates: true,
+      });
     } else {
       await prisma.leadSearch.update({
         where: { id: searchId },

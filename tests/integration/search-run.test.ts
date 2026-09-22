@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { resetDatabase, testPrisma } from "../helpers/db";
 import { createRoleWithPermissions, createTestUser, createLeadTypeFixture, createCompetitorFixture, createLeadSearchFixture, createSearchResultFixture } from "../helpers/fixtures";
 import { runSearchJob } from "../../src/lib/research/run-search";
-import { MockCandidateDiscoveryProvider } from "../../src/lib/research/providers/mock";
+import { MockCandidateDiscoveryProvider, MockPlacesProvider } from "../../src/lib/research/providers/mock";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -174,23 +174,34 @@ describe("runSearchJob", () => {
     expect(updated.errorMessage).not.toContain("overloaded_error");
   });
 
-  it("checkpoints discovered candidates with a generous transaction timeout, not Prisma's 5s default", async () => {
-    // Regression test: the discovery-checkpoint bulk upsert previously
-    // called prisma.$transaction([...]) with no explicit timeout, which
-    // defaults to 5s — confirmed live to fail once a real search discovered
-    // enough genuine candidates ("A commit cannot be executed on an expired
-    // transaction... 5505 ms passed since the start."). Locks in the fix
-    // (an explicit { timeout: 30_000 }) rather than only re-testing the
-    // symptom, since a slow-transaction repro isn't practical in tests.
+  it("checkpoints a large discovery in one bulk insert, not a per-candidate transaction", async () => {
+    // Regression test: the discovery checkpoint was a $transaction of one
+    // upsert per candidate, whose duration grows with the candidate count —
+    // confirmed live to blow Prisma's transaction timeout twice ("5505 ms
+    // passed", then "30670 ms passed" after raising it to 30s). Locks in the
+    // fix (a single createMany + skipDuplicates) and exercises a large batch,
+    // including two same-name/same-city candidates at different addresses:
+    // they survive dedupeWithinRun (address-keyed) but share one
+    // normalizedIdentity, so the second must be skipped, not crash the insert.
     const { user, leadType } = await baseFixtures();
-    const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, cities: ["Milton"], mode: "TRIVIA_GAP" });
+    const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, cities: ["Oakville"] });
 
+    const original = MockPlacesProvider.prototype.discover;
+    vi.spyOn(MockPlacesProvider.prototype, "discover").mockImplementationOnce(async function (this: MockPlacesProvider, params, onProgress) {
+      const [template] = await original.call(this, params, onProgress);
+      const many = Array.from({ length: 250 }, (_, i) => ({ ...template, name: `Bulk Pub ${i}`, address1: `${i + 1} Bulk St`, websiteUrl: null, phone: null }));
+      return [...many, { ...template, name: "Bulk Pub 0", address1: "999 Other St", websiteUrl: null, phone: null }];
+    });
     const transactionSpy = vi.spyOn(testPrisma, "$transaction");
+    const createManySpy = vi.spyOn(testPrisma.searchCandidate, "createMany");
 
     await runSearchJob(search.id);
 
-    const bulkUpsertCall = transactionSpy.mock.calls.find((call) => Array.isArray(call[0]));
-    expect(bulkUpsertCall).toBeDefined();
-    expect(bulkUpsertCall?.[1]).toEqual({ timeout: 30_000 });
-  });
+    const updated = await testPrisma.leadSearch.findUniqueOrThrow({ where: { id: search.id } });
+    expect(updated.status).toBe("SUCCEEDED");
+    expect(await testPrisma.searchCandidate.count({ where: { searchId: search.id } })).toBe(250);
+    expect(createManySpy).toHaveBeenCalledTimes(1);
+    expect(createManySpy.mock.calls[0][0]).toMatchObject({ skipDuplicates: true });
+    expect(transactionSpy.mock.calls.some((call) => Array.isArray(call[0]))).toBe(false);
+  }, 120_000);
 });
