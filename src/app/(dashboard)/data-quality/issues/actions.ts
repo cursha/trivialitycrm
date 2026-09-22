@@ -8,6 +8,7 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { evaluateCompanyRule, evaluateContactRule } from "@/lib/data-quality/rules";
 import { computeNormalizedFields } from "@/lib/duplicates/match";
 import { computeAddressNormalizedFields, computeContactNormalizedFields } from "@/lib/data-quality/normalize";
+import { checkCompanyAddressField } from "@/lib/validation/postal";
 
 export type IssueActionResult = { error?: string } | undefined;
 
@@ -84,11 +85,15 @@ export async function correctIssueField(issueId: string, formData: FormData): Pr
 
   const parsed = CorrectionSchema.safeParse({ value: formData.get("value") });
   if (!parsed.success) return { error: "Enter a value." };
-  const newValue = parsed.data.value || null;
+  let newValue = parsed.data.value || null;
 
   if (issue.entityType === "COMPANY" && issue.companyId) {
     const company = await prisma.company.findUnique({ where: { id: issue.companyId } });
     if (!company) return { error: "Company not found." };
+
+    const checked = checkCompanyAddressField(issue.field, newValue, company);
+    if ("error" in checked) return { error: checked.error };
+    newValue = checked.value;
 
     const previousValue = (company as unknown as Record<string, unknown>)[issue.field] ?? null;
     const updateData: Record<string, unknown> = { [issue.field]: newValue, updatedById: user.id };

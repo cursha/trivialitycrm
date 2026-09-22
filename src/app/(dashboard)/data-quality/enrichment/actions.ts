@@ -9,6 +9,7 @@ import { checkRateLimit } from "@/lib/rate-limit/postgres-bucket";
 import { getEnrichmentProvider } from "@/lib/enrichment/providers/factory";
 import { computeNormalizedFields } from "@/lib/duplicates/match";
 import { computeAddressNormalizedFields, computeContactNormalizedFields } from "@/lib/data-quality/normalize";
+import { checkCompanyAddressField } from "@/lib/validation/postal";
 
 export type EnrichmentActionResult = { error?: string } | undefined;
 
@@ -79,14 +80,19 @@ export async function acceptEnrichmentSuggestion(id: string): Promise<Enrichment
   if (!suggestion) return { error: "Suggestion not found." };
   if (suggestion.decision !== "PENDING") return { error: "This suggestion has already been decided." };
 
+  let appliedValue: string | null = suggestion.suggestedValue;
   if (suggestion.entityType === "COMPANY" && suggestion.companyId) {
     const company = await prisma.company.findUniqueOrThrow({ where: { id: suggestion.companyId } });
-    const updateData: Record<string, unknown> = { [suggestion.field]: suggestion.suggestedValue, updatedById: user.id };
+    const checked = checkCompanyAddressField(suggestion.field, suggestion.suggestedValue, company);
+    if ("error" in checked) return { error: `This suggestion can't be accepted: ${checked.error}` };
+    const newValue = checked.value;
+    appliedValue = newValue;
+    const updateData: Record<string, unknown> = { [suggestion.field]: newValue, updatedById: user.id };
     if (["name", "phone", "email", "websiteUrl"].includes(suggestion.field)) {
-      Object.assign(updateData, computeNormalizedFields({ ...company, [suggestion.field]: suggestion.suggestedValue }));
+      Object.assign(updateData, computeNormalizedFields({ ...company, [suggestion.field]: newValue }));
     }
     if (["city", "region", "postalCode", "country"].includes(suggestion.field)) {
-      Object.assign(updateData, computeAddressNormalizedFields({ ...company, [suggestion.field]: suggestion.suggestedValue }));
+      Object.assign(updateData, computeAddressNormalizedFields({ ...company, [suggestion.field]: newValue }));
     }
     await prisma.company.update({ where: { id: suggestion.companyId }, data: updateData });
   } else if (suggestion.entityType === "CONTACT" && suggestion.contactId) {
@@ -102,7 +108,7 @@ export async function acceptEnrichmentSuggestion(id: string): Promise<Enrichment
 
   await prisma.enrichmentRecord.update({ where: { id }, data: { decision: "ACCEPTED", decidedAt: new Date(), decidedById: user.id } });
   await prisma.dataQualityAuditEvent.create({
-    data: { action: "ENRICHMENT_ACCEPTED", actorId: user.id, enrichmentRecordId: id, companyId: suggestion.companyId, contactId: suggestion.contactId, beforeData: { value: suggestion.previousValue } as never, afterData: { value: suggestion.suggestedValue } as never },
+    data: { action: "ENRICHMENT_ACCEPTED", actorId: user.id, enrichmentRecordId: id, companyId: suggestion.companyId, contactId: suggestion.contactId, beforeData: { value: suggestion.previousValue } as never, afterData: { value: appliedValue } as never },
   });
 
   revalidatePath(PATH);

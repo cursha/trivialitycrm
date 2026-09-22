@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { looksLikeFormulaInjection } from "@/lib/security/formula-injection";
 import { titleCaseCity } from "@/lib/text-case";
+import { checkPostalCode } from "@/lib/validation/postal";
 
 export const IMPORT_TARGET_FIELDS = [
   "name",
@@ -63,6 +64,11 @@ export function mapAndValidateRow(rawRow: Record<string, string>, mapping: Impor
     if (!values[field]) errors.push(`Missing required field "${field}".`);
   }
   if (values.region && values.region.length !== 2) errors.push("Region must be a 2-letter state/province code (e.g. ON, CO) — not the full name.");
+  if (values.postalCode) {
+    const postal = checkPostalCode(values.postalCode, values.country, values.region);
+    if ("error" in postal) errors.push(postal.error);
+    else values.postalCode = postal.value ?? "";
+  }
   if (values.email && !z.email().safeParse(values.email).success) errors.push("Invalid company email.");
   if (values.contactEmail && !z.email().safeParse(values.contactEmail).success) errors.push("Invalid contact email.");
   if (values.websiteUrl && !z.url().safeParse(values.websiteUrl).success) errors.push("Invalid website URL.");
