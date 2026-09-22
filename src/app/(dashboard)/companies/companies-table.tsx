@@ -13,8 +13,10 @@ type Option = { id: string; name: string };
 export type CompanyRow = {
   id: string;
   name: string;
+  address1: string | null;
   city: string;
   region: string;
+  postalCode: string | null;
   leadType: { name: string };
   pipelineStage: { name: string };
   assignedTo: { name: string } | null;
@@ -23,6 +25,12 @@ export type CompanyRow = {
   nextFollowUpAt: Date | null;
   needsReview: boolean;
 };
+
+/** One-line "123 Main St, Toronto, ON M5V 2T6", skipping missing parts. */
+function formatAddressLine(company: Pick<CompanyRow, "address1" | "city" | "region" | "postalCode">): string {
+  const regionPostal = [company.region, company.postalCode].filter(Boolean).join(" ");
+  return [company.address1, company.city, regionPostal].filter(Boolean).join(", ");
+}
 
 export function CompaniesTable({
   companies,
@@ -115,8 +123,8 @@ export function CompaniesTable({
                       </Link>
                       {inRoute.has(company.id) && <Badge tone="focus">In Route</Badge>}
                     </div>
-                    <div className="text-xs text-text-muted">
-                      {company.city}, {company.region}
+                    <div className="max-w-xs truncate text-xs text-text-muted" title={formatAddressLine(company)}>
+                      {formatAddressLine(company)}
                     </div>
                   </td>
                   <td className="px-5 py-4">{company.leadType.name}</td>
@@ -182,9 +190,7 @@ export function CompaniesTable({
                       {company.pipelineStage.name}
                     </Badge>
                   </div>
-                  <p className="text-xs text-text-muted">
-                    {company.city}, {company.region}
-                  </p>
+                  <p className="text-xs text-text-muted">{formatAddressLine(company)}</p>
                   <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
                     <div>
                       <dt className="text-text-muted">Lead type</dt>
