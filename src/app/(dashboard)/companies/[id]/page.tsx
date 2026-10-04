@@ -22,6 +22,7 @@ import { SequenceEnrollmentPanel } from "./sequences/sequence-enrollment-panel";
 import { AppointmentPanel } from "./appointments/appointment-panel";
 import { BarIntelPanel } from "./bar-intel/bar-intel-panel";
 import { SalesProcessPanel, type ProcessStepView } from "./sales-process/sales-process-panel";
+import { trialWeeksFor } from "@/lib/companies/sales-track";
 import type { VisitSetup } from "./activities/activity-panel";
 import { getConnectionStatus } from "@/lib/comms/connections";
 import { AddToRouteToggle } from "./route-plan-toggle";
@@ -87,7 +88,9 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
       listCompanyScoreHistory(user, id),
       prisma.pipelineStage.findMany({
         orderBy: { sortOrder: "asc" },
-        include: { entryTasks: { orderBy: [{ daysAfter: "asc" }, { sortOrder: "asc" }], select: { title: true, daysAfter: true, track: true } } },
+        include: {
+          entryTasks: { orderBy: [{ daysAfter: "asc" }, { sortOrder: "asc" }], select: { title: true, daysAfter: true, fromTrialEnd: true, track: true } },
+        },
       }),
       prisma.emailMessage.findMany({
         where: { companyId: id },
@@ -277,6 +280,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         currentStage={{ id: company.pipelineStage.id, name: company.pipelineStage.name, outcomeType: company.pipelineStage.outcomeType }}
         steps={processSteps}
         wonStage={wonStage ? { id: wonStage.id, name: wonStage.name } : null}
+        trialWeeks={trialWeeksFor(company.assignedTo)}
         canEdit={canLogVisit}
       />
 

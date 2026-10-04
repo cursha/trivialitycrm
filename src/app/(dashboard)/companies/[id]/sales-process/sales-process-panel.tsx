@@ -8,7 +8,7 @@ import { changeCompanyStage } from "../../actions";
 import { setSalesTrack } from "./actions";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { SALES_TRACK_LABELS, REMOTE_SKIP_TO_TRIAL_FROM, playbookLines } from "@/lib/companies/sales-track";
+import { SALES_TRACK_LABELS, REMOTE_SKIP_TO_TRIAL_FROM, playbookLines, fillTrialWeeks } from "@/lib/companies/sales-track";
 import type { SalesStep, SalesTrack } from "@/generated/prisma/enums";
 
 export type ProcessStepView = {
@@ -18,13 +18,14 @@ export type ProcessStepView = {
   description: string | null;
   playbookLocal: string | null;
   playbookRemote: string | null;
-  followUps: { title: string; daysAfter: number; track: SalesTrack | null }[];
+  followUps: { title: string; daysAfter: number; fromTrialEnd: boolean; track: SalesTrack | null }[];
 };
 
-function describeDue(daysAfter: number): string {
-  if (daysAfter === 0) return "same day";
-  if (daysAfter === 1) return "next day";
-  return `in ${daysAfter} days`;
+function describeDue(task: { daysAfter: number; fromTrialEnd: boolean }): string {
+  if (task.fromTrialEnd) return task.daysAfter === 0 ? "when the trial ends" : `${task.daysAfter} days before the trial ends`;
+  if (task.daysAfter === 0) return "same day";
+  if (task.daysAfter === 1) return "next day";
+  return `in ${task.daysAfter} days`;
 }
 
 /**
@@ -40,6 +41,7 @@ export function SalesProcessPanel({
   currentStage,
   steps,
   wonStage,
+  trialWeeks,
   canEdit,
 }: {
   companyId: string;
@@ -47,6 +49,8 @@ export function SalesProcessPanel({
   currentStage: { id: string; name: string; outcomeType: "WON" | "LOST" | null };
   steps: ProcessStepView[];
   wonStage: { id: string; name: string } | null;
+  /** The bar's rep's trial length, filling {{trialWeeks}} in step text. */
+  trialWeeks: number;
   canEdit: boolean;
 }) {
   const router = useRouter();
@@ -75,7 +79,8 @@ export function SalesProcessPanel({
   const canSkipToTrial =
     track === "REMOTE" && current !== null && trialBooked !== null && trialBooked.id !== next?.id && REMOTE_SKIP_TO_TRIAL_FROM.includes(current.processStep);
 
-  const checklist = current ? playbookLines(track === "REMOTE" ? current.playbookRemote : current.playbookLocal) : [];
+  const fill = (text: string) => fillTrialWeeks(text, trialWeeks);
+  const checklist = current ? playbookLines(track === "REMOTE" ? current.playbookRemote : current.playbookLocal).map(fill) : [];
   const followUpsFor = (step: ProcessStepView | undefined) => (step?.followUps ?? []).filter((task) => task.track === null || task.track === track);
 
   function run(action: () => Promise<{ error?: string } | { success: true } | undefined>) {
@@ -154,7 +159,7 @@ export function SalesProcessPanel({
                 >
                   <span className="absolute -top-1 left-4 h-2 w-2 rotate-45 bg-near-black" aria-hidden="true" />
                   <p className="font-bold">{step.name}</p>
-                  <p className="mt-1">{step.description}</p>
+                  <p className="mt-1">{fill(step.description ?? "")}</p>
                 </div>
               )}
             </li>
@@ -200,7 +205,7 @@ export function SalesProcessPanel({
                 <p className="text-xs text-text-muted">
                   Moving to {nextStep.name} adds follow-ups:{" "}
                   {followUpsFor(nextStep)
-                    .map((task) => `${task.title} (${describeDue(task.daysAfter)})`)
+                    .map((task) => `${fill(task.title)} (${describeDue(task)})`)
                     .join("; ")}
                   .
                 </p>

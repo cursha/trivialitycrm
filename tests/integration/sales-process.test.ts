@@ -202,12 +202,16 @@ describe("saveSalesTarget", () => {
     await loginAs(manager.id);
 
     const form = new FormData();
-    for (const [key, value] of Object.entries({ visits: "8", intros: "0", demosBooked: "2", demosHeld: "2", trialsBooked: "1", timezone: "America/Denver" })) {
+    for (const [key, value] of Object.entries({ visits: "8", intros: "0", demosBooked: "2", demosHeld: "2", trialsBooked: "1", timezone: "America/Denver", trialLengthWeeks: "3" })) {
       form.set(key, value);
     }
     expect(await saveSalesTarget(rep.id, form)).toBeUndefined();
     expect(await testPrisma.salesTarget.findUniqueOrThrow({ where: { userId: rep.id } })).toMatchObject({ visits: 8, trialsBooked: 1 });
-    expect((await testPrisma.user.findUniqueOrThrow({ where: { id: rep.id } })).timezone).toBe("America/Denver");
+    expect(await testPrisma.user.findUniqueOrThrow({ where: { id: rep.id } })).toMatchObject({ timezone: "America/Denver", trialLengthWeeks: 3 });
+
+    form.set("trialLengthWeeks", "5");
+    expect(await saveSalesTarget(rep.id, form)).toEqual({ error: "Trial length must be 1 to 4 weeks." });
+    form.set("trialLengthWeeks", "3");
 
     form.set("visits", "-1");
     expect(await saveSalesTarget(rep.id, form)).toEqual({ error: "Goals must be whole numbers from 0 to 500." });
@@ -257,5 +261,48 @@ describe("step descriptions and trivia history", () => {
     form.set("triviaHistory", "");
     await updateBarIntel(company.id, form);
     expect((await testPrisma.company.findUniqueOrThrow({ where: { id: company.id } })).triviaHistory).toBeNull();
+  });
+});
+
+describe("trial length per rep", () => {
+  async function trialSetup(trialLengthWeeks: number | null) {
+    const ctx = await setup();
+    await testPrisma.user.update({ where: { id: ctx.user.id }, data: { trialLengthWeeks } });
+    await testPrisma.pipelineStageTask.deleteMany({ where: { stageId: ctx.stages.trialLive.id } });
+    await testPrisma.pipelineStageTask.createMany({
+      data: [
+        { stageId: ctx.stages.trialLive.id, title: "Night 1", daysAfter: 0 },
+        { stageId: ctx.stages.trialLive.id, title: "Week 2 check-in", daysAfter: 7 },
+        { stageId: ctx.stages.trialLive.id, title: "Week 3 early yes", daysAfter: 14 },
+        { stageId: ctx.stages.trialLive.id, title: "Conversion ({{trialWeeks}} weeks)", daysAfter: 7, fromTrialEnd: true },
+      ],
+    });
+    await changeCompanyStage(ctx.company.id, ctx.stages.trialLive.id);
+    const tasks = await testPrisma.task.findMany({ where: { companyId: ctx.company.id }, orderBy: [{ dueAt: "asc" }, { title: "asc" }] });
+    return tasks.map((task) => [task.title, Math.round((task.dueAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000)) + 0]);
+  }
+
+  it("defaults to 4 weeks: conversion a week before the end, every check-in kept", async () => {
+    expect(await trialSetup(null)).toEqual([
+      ["Night 1", 0],
+      ["Week 2 check-in", 7],
+      ["Week 3 early yes", 14],
+      ["Conversion (4 weeks)", 21],
+    ]);
+  });
+
+  it("a 2-week rep: conversion a week before the end, and the week-3 ask (after the trial) is skipped", async () => {
+    expect(await trialSetup(2)).toEqual([
+      ["Night 1", 0],
+      ["Conversion (2 weeks)", 7],
+      ["Week 2 check-in", 7],
+    ]);
+  });
+
+  it("a 1-week rep: says '1 week' and never schedules before today", async () => {
+    expect(await trialSetup(1)).toEqual([
+      ["Conversion (1 week)", 0],
+      ["Night 1", 0],
+    ]);
   });
 });

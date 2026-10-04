@@ -33,7 +33,7 @@ export default async function StageProcessPage({ params }: { params: Promise<{ i
         description={stage.description ?? ""}
         playbookLocal={stage.playbookLocal ?? ""}
         playbookRemote={stage.playbookRemote ?? ""}
-        tasks={stage.entryTasks.map((task) => ({ id: task.id, title: task.title, daysAfter: task.daysAfter, track: task.track }))}
+        tasks={stage.entryTasks.map((task) => ({ id: task.id, title: task.title, daysAfter: task.daysAfter, fromTrialEnd: task.fromTrialEnd, track: task.track }))}
       />
     </div>
   );

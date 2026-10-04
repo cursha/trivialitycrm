@@ -13,6 +13,23 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v3.2 — 2026-10-04
+### Improved — trial length per rep, and an updated user manual
+- Managers set each rep's **trial length** (1 to 4 weeks, default 4) on the
+  Manager page, next to their daily goals and timezone (Curt's call: by
+  rep). A bar follows its assigned rep's trial length.
+- The conversion follow-up is now due **a week before the trial ends**
+  instead of a fixed 3 weeks in, and Trial Live check-ins that would land
+  after a shorter trial has ended are skipped.
+- Checklists, step bubbles and follow-up titles say "up to N weeks" using
+  the bar's rep's trial length (`{{trialWeeks}}` in Settings → Pipeline
+  Stages → Checklist & follow-ups), and follow-ups there can be set to
+  "count back from the trial end".
+- User manual (Sales Quick Start and Admin Guide) updated for the sales
+  process: a step-by-step table for Local and Long-distance bars, trial
+  length, the scoreboard, and where to find the version number.
+- Database: migration 20261005030000_rep_trial_length (applies on deploy).
+
 ## v3.1 — 2026-10-04
 ### Improved — step descriptions and trivia history
 - Each step on a company's Sales process card has a description bubble:

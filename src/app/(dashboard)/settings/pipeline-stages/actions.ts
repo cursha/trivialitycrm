@@ -202,9 +202,11 @@ export async function addStageTask(stageId: string, formData: FormData): Promise
   const stage = await prisma.pipelineStage.findUnique({ where: { id: stageId }, select: { id: true } });
   if (!stage) return { error: "That pipeline stage no longer exists." };
 
+  const fromTrialEnd = formString(formData, "fromTrialEnd") === "on";
+
   const highest = await prisma.pipelineStageTask.aggregate({ where: { stageId }, _max: { sortOrder: true } });
   await prisma.pipelineStageTask.create({
-    data: { stageId, title, daysAfter, track, sortOrder: (highest._max.sortOrder ?? -1) + 1 },
+    data: { stageId, title, daysAfter, fromTrialEnd, track, sortOrder: (highest._max.sortOrder ?? -1) + 1 },
   });
   revalidatePath(`${PATH}/${stageId}`);
 }

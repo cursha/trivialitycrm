@@ -63,12 +63,32 @@ The **Sales process** card on every company page shows:
 - **A button to move it to the next step.** Long-distance bars can also
   **skip the demo** and go straight to Trial Booked.
 
-When a bar enters a step, its follow-ups are created for you on My Day.
-That happens however it got there: the card, the pipeline board, the edit
-form, or a visit or call outcome. For example, entering Trial Live sets up
-night 1 (on site for Local; a check-in call for Long-distance), the week-2
-check-in, the week-3 early-yes ask, and the conversion meeting or call
-before the trial ends (trials run up to 4 weeks).
+### What happens at each step
+
+| Step | Local | Long-distance |
+|---|---|---|
+| **Target** | Get the manager's name, phone and email (add them as a contact) and the bar's trivia history (Bar intel card). Plan it into your route. | Same research, then send the intro email with the short video, or call. |
+| **Introduced** | Drop off the flyer and ask for the manager. Goal: book a ~20-minute demo (or demo on the spot). | Follow up the intro. Goal: book a video demo, or skip the demo and start a trial. |
+| **Demo Booked** | Confirm the day before. Demo on the bar's own TVs. End with the trial ask. | Confirm the day before. Demo over video with screen share. End with the trial ask. |
+| **Demo Held** | Ask for the free trial, one night a week. Follow up within 2 days if they want to think. | Same. |
+| **Trial Booked** | Name the champion; agree the trial night, today's headcount, the target and the monthly price. Help them connect online; you're on site for night 1. | Same agreement, then send the sign-up link and quick-start guide and confirm they've connected online. |
+| **Trial Live** | On site night 1, week-2 check-in, week-3 early-yes ask, conversion meeting in person before the trial ends. | Night-1 check-in by phone or text, then the same check-ins and a conversion call. |
+
+### Trial length
+
+Trials are free, one night a week, for **up to 4 weeks**. Your manager
+sets your trial length (1 to 4 weeks), and the checklists and follow-ups
+on your bars use it: "up to 3 weeks free" if yours is 3. A bar follows the
+trial length of the rep it's assigned to.
+
+### Follow-ups are created for you
+
+When a bar enters a step, its follow-ups appear on My Day, however it got
+there: the card, the pipeline board, the edit form, or a visit or call
+outcome. Entering **Trial Live** sets up night 1, the week-2 check-in, the
+week-3 early-yes ask, and the conversion meeting or call **a week before
+the trial ends**. Check-ins that would land after a shorter trial has
+ended are skipped.
 
 Logging a visit moves the bar along automatically (a flyer drop-off moves
 it to Introduced, a booked demo to Demo Booked, and so on), but only
@@ -95,11 +115,11 @@ your My Day list.
   connected (Titan works), you can send a calendar invite to the contact
   and to yourself; otherwise the demo is saved in the CRM only.
 - **Bar intel (optional)**: jot down the slowest night, the typical crowd
-  that night, and what entertainment they run now. The **Bar intel** card
-  also has a **Trivia history** box (do they run trivia now, with whom,
-  and have they tried it before). Only the fields you
-  fill in are saved, so leaving one blank never erases what's on file. The
-  **Bar intel** card on the company page is where you edit or clear these.
+  that night, and what entertainment they run now. Only the fields you
+  fill in are saved, so leaving one blank never erases what's on file.
+  The **Bar intel** card on the company page is where you edit or clear
+  these, and it also has a **Trivia history** box (do they run trivia now,
+  with whom and which night, and have they tried it before).
 - **Contacts**: mark a contact as the **decision-maker** and/or the
   **champion** (the staff member who'll start the game each week), and
   note the best time to reach them.
@@ -120,8 +140,10 @@ On any company's page:
 - **Follow-ups**: schedule, complete, or cancel. Completing one can prompt you
   to schedule the next one right away, so a lead never quietly falls through
   the cracks between visits.
-- Changing the pipeline stage is a dropdown right at the top — no separate
-  page needed.
+- **Sales process** card: where the bar is in the process, what to do
+  now, and the button to move it to the next step (see "The sales
+  process" above). You can also change the stage from the edit form or
+  the pipeline board.
 
 ## Sales Lists
 
@@ -233,6 +255,12 @@ The company list, search results, My Day, login, and every company detail
 page are all designed to work as cards on a narrow screen, not a table you
 have to scroll sideways to read. If something looks cramped or unusable on
 mobile, that's worth flagging — it's not intentional.
+
+## Which version am I on?
+
+The version number is at the foot of the sidebar (for example **v3.2**).
+Each update to the CRM gets a new number; what changed in each one is in
+the changelog your administrator keeps.
 
 ## A few things that are deliberate, not bugs
 

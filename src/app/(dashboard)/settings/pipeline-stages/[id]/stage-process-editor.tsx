@@ -10,7 +10,13 @@ import { Input, Label, Select, Textarea, HelpText, FieldError } from "@/componen
 import { SALES_TRACK_LABELS } from "@/lib/companies/sales-track";
 import type { SalesTrack } from "@/generated/prisma/enums";
 
-type TaskRow = { id: string; title: string; daysAfter: number; track: SalesTrack | null };
+function describeTaskDue(task: { daysAfter: number; fromTrialEnd: boolean }): string {
+  const days = `${task.daysAfter} day${task.daysAfter === 1 ? "" : "s"}`;
+  if (task.fromTrialEnd) return task.daysAfter === 0 ? "when the trial ends" : `${days} before the trial ends`;
+  return task.daysAfter === 0 ? "the same day" : `${days} later`;
+}
+
+type TaskRow = { id: string; title: string; daysAfter: number; fromTrialEnd: boolean; track: SalesTrack | null };
 
 export function StageProcessEditor({
   stageId,
@@ -65,7 +71,9 @@ export function StageProcessEditor({
             <Label htmlFor="playbook-remote">{SALES_TRACK_LABELS.REMOTE} bars</Label>
             <Textarea id="playbook-remote" name="playbookRemote" rows={5} defaultValue={playbookRemote} className="mt-1" />
           </div>
-          <HelpText>Checklists: one item per line.</HelpText>
+          <HelpText>
+            Checklists: one item per line. Write {"{{trialWeeks}}"} for the bar&apos;s rep&apos;s trial length (e.g. &quot;up to {"{{trialWeeks}}"} weeks free&quot;).
+          </HelpText>
           {playbookError && <FieldError>{playbookError}</FieldError>}
           <div className="flex items-center gap-3">
             <Button type="submit" disabled={isPending}>
@@ -91,7 +99,7 @@ export function StageProcessEditor({
                 <div>
                   <p className="font-semibold text-text">{task.title}</p>
                   <p className="text-xs text-text-muted">
-                    Due {task.daysAfter === 0 ? "the same day" : `${task.daysAfter} day${task.daysAfter === 1 ? "" : "s"} later`} ·{" "}
+                    Due {describeTaskDue(task)} ·{" "}
                     {task.track ? `${SALES_TRACK_LABELS[task.track]} bars only` : "All bars"}
                   </p>
                 </div>
@@ -139,8 +147,16 @@ export function StageProcessEditor({
           <Button type="submit" variant="secondary" disabled={isPending}>
             Add
           </Button>
+          <label className="flex items-center gap-2 text-sm text-text sm:col-span-4">
+            <input type="checkbox" name="fromTrialEnd" className="h-4 w-4" />
+            Count back from the trial end (&quot;Days later&quot; becomes days before the trial ends)
+          </label>
         </form>
         {taskError && <FieldError className="mt-2">{taskError}</FieldError>}
+        <HelpText className="mt-2">
+          &quot;Count back from the trial end&quot; times a follow-up from the end of the bar&apos;s trial (its rep&apos;s trial length) instead of from
+          entering this step. On Trial Live, other follow-ups that would land after the trial ends are skipped.
+        </HelpText>
       </Card>
     </div>
   );

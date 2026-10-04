@@ -6,6 +6,7 @@ import { saveSalesTarget } from "./actions";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Select, FieldError } from "@/components/ui/field";
 import { SCOREBOARD_LABELS, SCOREBOARD_METRICS, type ScoreCounts } from "@/lib/sales/scoreboard-metrics";
+import { MAX_TRIAL_WEEKS } from "@/lib/companies/sales-track";
 
 /** The timezones the team works in; anything else already saved is kept
  * as an extra option. */
@@ -17,7 +18,7 @@ const TIMEZONES = [
   ["America/Los_Angeles", "Pacific"],
 ] as const;
 
-export type RepGoals = { userId: string; name: string; timezone: string | null; targets: ScoreCounts };
+export type RepGoals = { userId: string; name: string; timezone: string | null; trialWeeks: number; targets: ScoreCounts };
 
 /** Per-rep daily goals and timezone, edited one rep at a time. */
 export function SalesTargetEditor({ reps }: { reps: RepGoals[] }) {
@@ -55,6 +56,8 @@ export function SalesTargetEditor({ reps }: { reps: RepGoals[] }) {
                     .map((metric) => `${SCOREBOARD_LABELS[metric]} ${rep.targets[metric]}`)
                     .join(" · ") || "No goals"}
                   {" · "}
+                  Trials up to {rep.trialWeeks} week{rep.trialWeeks === 1 ? "" : "s"}
+                  {" · "}
                   {rep.timezone ?? "America/Toronto (default)"}
                 </p>
               </div>
@@ -67,14 +70,14 @@ export function SalesTargetEditor({ reps }: { reps: RepGoals[] }) {
                   }}
                   className="text-sm font-bold text-secondary hover:underline"
                 >
-                  Edit goals
+                  Edit
                 </button>
               )}
             </div>
 
             {editing && (
               <form action={(formData) => save(rep.userId, formData)} className="mt-3 space-y-3">
-                <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-7">
                   {SCOREBOARD_METRICS.map((metric) => (
                     <div key={metric}>
                       <Label htmlFor={`${rep.userId}-${metric}`} className="text-xs">
@@ -93,6 +96,18 @@ export function SalesTargetEditor({ reps }: { reps: RepGoals[] }) {
                     </div>
                   ))}
                   <div>
+                    <Label htmlFor={`${rep.userId}-trial`} className="text-xs">
+                      Trial length (weeks)
+                    </Label>
+                    <Select id={`${rep.userId}-trial`} name="trialLengthWeeks" defaultValue={String(rep.trialWeeks)} className="mt-1 py-1.5">
+                      {Array.from({ length: MAX_TRIAL_WEEKS }, (_, index) => index + 1).map((weeks) => (
+                        <option key={weeks} value={weeks}>
+                          {weeks} week{weeks === 1 ? "" : "s"}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div>
                     <Label htmlFor={`${rep.userId}-timezone`} className="text-xs">
                       Timezone
                     </Label>
@@ -106,7 +121,9 @@ export function SalesTargetEditor({ reps }: { reps: RepGoals[] }) {
                     </Select>
                   </div>
                 </div>
-                <p className="text-xs text-text-muted">Daily goals. 0 hides a number from the rep&apos;s scoreboard unless they do some.</p>
+                <p className="text-xs text-text-muted">
+                  Goals are per day; 0 hides a number from the rep&apos;s scoreboard unless they do some. Trial length applies to this rep&apos;s bars from the next time one enters a step.
+                </p>
                 {error && <FieldError>{error}</FieldError>}
                 <div className="flex gap-2">
                   <Button type="submit" disabled={isPending}>

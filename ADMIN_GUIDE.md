@@ -30,7 +30,10 @@ not to gate.
    its checklist (what reps see on the company page, separately for Local and
    Long-distance bars) and its automatic follow-ups (created when a company
    enters the step, for all bars or one kind only, due a set number of days
-   later). Edits apply from then on; follow-ups already created are left
+   later, or a set number of days **before the trial ends** with "Count back
+   from the trial end"). In any of this text, `{{trialWeeks}}` is replaced
+   with the bar's rep's trial length (e.g. "up to {{trialWeeks}} weeks
+   free"). Edits apply from then on; follow-ups already created are left
    alone. Renaming a step is safe: the process, dashboard counts and
    scoreboard find steps by their role, not their name.
 3. **Competitors** (Competitors, in the main nav): the list your AI research
@@ -89,15 +92,31 @@ not to gate.
   before sending) by someone with a connected mailbox, since they become
   the sender of record — see "Email connections" below.
 
-## Sales scoreboard and daily goals
+## Sales scoreboard, daily goals and trial length
 
 The Manager page shows every rep's scoreboard (anyone whose role can edit
 leads): today's visits, long-distance intros, demos booked, demos held and
-trials booked against their daily goal, plus this week's totals. Under
-**Daily goals**, set each rep's goals and timezone (so a Colorado Springs
-rep's "today" is Mountain time). Reps with no goals saved get the defaults:
-10 visits, 2 demos booked, 2 demos held, 1 trial booked. A goal of 0 hides
-that number from the rep's own scoreboard unless they do some.
+trials booked against their daily goal, plus this week's totals.
+
+Under **Daily goals & trial length**, click **Edit** next to a rep to set:
+
+- **Daily goals.** Reps with none saved get the defaults: 10 visits, 2
+  demos booked, 2 demos held, 1 trial booked. A goal of 0 hides that number
+  from the rep's own scoreboard unless they do some.
+- **Trial length** (1 to 4 weeks; default 4). A bar's trial follows the
+  trial length of the rep it's assigned to: the conversion follow-up is due
+  a week before the trial ends, Trial Live check-ins that would land after
+  the trial are skipped, and the checklists say "up to N weeks". It applies
+  the next time one of the rep's bars enters a step; follow-ups already
+  created don't move.
+- **Timezone**, so a Colorado Springs rep's "today" is Mountain time.
+
+## Versions and the changelog
+
+Every release to production gets a number (`v{release}.{version}`, e.g.
+v3.2), shown at the foot of the sidebar and on Administration → System
+Health. `CHANGELOG.md` lists what changed in each one, and the release
+steps are in `AGENTS.md`.
 
 ## Managing users and roles
 

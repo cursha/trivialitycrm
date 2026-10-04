@@ -236,6 +236,10 @@ model User {
   // IANA timezone for "today" on the sales scoreboard (e.g. a Colorado
   // Springs rep = America/Denver). Null = BUSINESS_TIMEZONE.
   timezone                       String?
+  // Free trial length this rep offers, in weeks (1-4; null = 4). A bar's
+  // trial follows its assigned rep's length — see src/lib/companies/
+  // sales-process.ts. Set on the Manager page with the rep's daily goals.
+  trialLengthWeeks               Int?
   salesTarget                    SalesTarget?
   // Module 8A: set by recordSuccessfulLogin() (src/lib/auth/rate-limit.ts) —
   // never a security control by itself (lockout/failedLoginAttempts already
@@ -457,17 +461,24 @@ model PipelineStage {
  * stage (see createStageEntryTasks in src/lib/companies/sales-process.ts),
  * however it got there — board, edit form, bulk change, call or visit
  * outcome. `track` null = both tracks; otherwise only companies on that
- * track get it. Due `daysAfter` days after entering the stage.
+ * track get it. Due `daysAfter` days after entering the stage, or that
+ * many days before the trial ends when `fromTrialEnd`. Titles (and stage
+ * playbooks/descriptions) may use {{trialWeeks}} for the rep's trial
+ * length.
  */
 model PipelineStageTask {
-  id        String        @id @default(cuid())
-  stageId   String
-  stage     PipelineStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
-  track     SalesTrack?
-  title     String
-  daysAfter Int           @default(0)
-  sortOrder Int           @default(0)
-  createdAt DateTime      @default(now())
+  id           String        @id @default(cuid())
+  stageId      String
+  stage        PipelineStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  track        SalesTrack?
+  title        String
+  daysAfter    Int           @default(0)
+  // When true, daysAfter counts back from the end of the bar's trial
+  // (its rep's trial length) instead of forward from entering the stage,
+  // e.g. "conversion meeting 7 days before the trial ends".
+  fromTrialEnd Boolean       @default(false)
+  sortOrder    Int           @default(0)
+  createdAt    DateTime      @default(now())
 
   @@index([stageId])
 }

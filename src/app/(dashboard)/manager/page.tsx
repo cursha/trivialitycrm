@@ -5,6 +5,7 @@ import { getManagerWorkspaceData } from "./queries";
 import { getRepScores, listSalesReps } from "@/lib/sales/scoreboard";
 import { TeamScoreboard } from "@/components/sales-scoreboard";
 import { SalesTargetEditor } from "./sales-target-editor";
+import { trialWeeksFor } from "@/lib/companies/sales-track";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, SectionHeading } from "@/components/ui/card";
@@ -30,9 +31,9 @@ export default async function ManagerWorkspacePage() {
   const reps = await listSalesReps();
   const [scores, repTimezones] = await Promise.all([
     getRepScores(reps.map((rep) => rep.id)),
-    prisma.user.findMany({ where: { id: { in: reps.map((rep) => rep.id) } }, select: { id: true, timezone: true } }),
+    prisma.user.findMany({ where: { id: { in: reps.map((rep) => rep.id) } }, select: { id: true, timezone: true, trialLengthWeeks: true } }),
   ]);
-  const savedTimezone = new Map(repTimezones.map((rep) => [rep.id, rep.timezone]));
+  const repSettings = new Map(repTimezones.map((rep) => [rep.id, rep]));
 
   const { stats, unassignedCount, overdueBySalesperson, activeTrialsCount, recentlyResolved, territoryCoverage } = data;
 
@@ -75,12 +76,18 @@ export default async function ManagerWorkspacePage() {
       </Card>
 
       <Card>
-        <SectionHeading>Daily goals</SectionHeading>
+        <SectionHeading>Daily goals &amp; trial length</SectionHeading>
         {scores.length === 0 ? (
           <EmptyState>No salespeople yet.</EmptyState>
         ) : (
           <SalesTargetEditor
-            reps={scores.map((score) => ({ userId: score.userId, name: score.name, timezone: savedTimezone.get(score.userId) ?? null, targets: score.targets }))}
+            reps={scores.map((score) => ({
+              userId: score.userId,
+              name: score.name,
+              timezone: repSettings.get(score.userId)?.timezone ?? null,
+              trialWeeks: trialWeeksFor(repSettings.get(score.userId)),
+              targets: score.targets,
+            }))}
           />
         )}
       </Card>

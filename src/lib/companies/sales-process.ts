@@ -1,5 +1,6 @@
 import "server-only";
 import type { Prisma } from "../../generated/prisma/client";
+import { fillTrialWeeks, trialWeeksFor } from "./sales-track";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -10,7 +11,13 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * pipeline board, edit form, bulk change, or a call/visit outcome. Only the
  * tasks for the company's track (or for both tracks) are created, assigned
  * to the company's salesperson, or to whoever moved it when unassigned.
- * Returns how many were created.
+ *
+ * Trial timing follows that same rep's trial length (User.trialLengthWeeks):
+ * a `fromTrialEnd` follow-up is due that many days before the trial ends,
+ * and on the Trial Live step a regular follow-up that would fall on or
+ * after the end of the trial is skipped (e.g. no week-3 ask in a 2-week
+ * trial). {{trialWeeks}} in a title is filled in. Returns how many were
+ * created.
  */
 export async function createStageEntryTasks(
   tx: Prisma.TransactionClient,
@@ -22,22 +29,37 @@ export async function createStageEntryTasks(
   });
   if (!company) return 0;
 
-  const tasks = await tx.pipelineStageTask.findMany({
-    where: { stageId: params.toStageId, OR: [{ track: null }, { track: company.salesTrack }] },
-    orderBy: [{ daysAfter: "asc" }, { sortOrder: "asc" }],
-  });
+  const [stage, tasks] = await Promise.all([
+    tx.pipelineStage.findUnique({ where: { id: params.toStageId }, select: { processStep: true } }),
+    tx.pipelineStageTask.findMany({
+      where: { stageId: params.toStageId, OR: [{ track: null }, { track: company.salesTrack }] },
+      orderBy: [{ daysAfter: "asc" }, { sortOrder: "asc" }],
+    }),
+  ]);
   if (tasks.length === 0) return 0;
 
+  const assigneeId = company.assignedToId ?? params.userId;
+  const rep = await tx.user.findUnique({ where: { id: assigneeId }, select: { trialLengthWeeks: true } });
+  const trialWeeks = trialWeeksFor(rep);
+  const trialDays = trialWeeks * 7;
+  const isTrialLive = stage?.processStep === "TRIAL_LIVE";
+
   const now = params.now ?? new Date();
-  await tx.task.createMany({
-    data: tasks.map((task) => ({
-      companyId: params.companyId,
-      assignedToId: company.assignedToId ?? params.userId,
-      title: task.title,
-      dueAt: new Date(now.getTime() + task.daysAfter * DAY_MS),
-    })),
+  const data = tasks.flatMap((task) => {
+    if (!task.fromTrialEnd && isTrialLive && task.daysAfter > 0 && task.daysAfter >= trialDays) return [];
+    const days = task.fromTrialEnd ? Math.max(0, trialDays - task.daysAfter) : task.daysAfter;
+    return [
+      {
+        companyId: params.companyId,
+        assignedToId: assigneeId,
+        title: fillTrialWeeks(task.title, trialWeeks),
+        dueAt: new Date(now.getTime() + days * DAY_MS),
+      },
+    ];
   });
-  return tasks.length;
+  if (data.length === 0) return 0;
+  await tx.task.createMany({ data });
+  return data.length;
 }
 
 type StageOrder = { sortOrder: number; outcomeType: string | null };
