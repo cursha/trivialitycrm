@@ -74,12 +74,12 @@ const pipelineStages: {
     playbookLocal: [
       "Confirm the demo the day before",
       "Run it on the bar's own TVs (~20 minutes)",
-      "End with the trial ask: 4 weeks free, one night a week",
+      "End with the trial ask: up to 4 weeks free, one night a week",
     ],
     playbookRemote: [
       "Confirm the demo the day before",
       "Run it over a video call with screen share (~20 minutes)",
-      "End with the trial ask: 4 weeks free, one night a week",
+      "End with the trial ask: up to 4 weeks free, one night a week",
     ],
   },
   {
@@ -88,13 +88,13 @@ const pipelineStages: {
     outcomeType: null,
     processStep: "DEMO_HELD",
     description:
-      "They've seen the game. Ask for the trial: 4 weeks free, one night a week. If they want to think it over, follow up within 2 days.",
+      "They've seen the game. Ask for the trial: up to 4 weeks free, one night a week. If they want to think it over, follow up within 2 days.",
     playbookLocal: [
-      "Ask for the trial: 4 weeks free, one night a week",
+      "Ask for the trial: up to 4 weeks free, one night a week",
       "If they want to think it over, follow up within 2 days",
     ],
     playbookRemote: [
-      "Ask for the trial: 4 weeks free, one night a week",
+      "Ask for the trial: up to 4 weeks free, one night a week",
       "If they want to think it over, follow up within 2 days",
     ],
   },
@@ -123,18 +123,18 @@ const pipelineStages: {
     outcomeType: null,
     processStep: "TRIAL_LIVE",
     description:
-      "The 4-week trial is running, one night a week. Support night 1, check in at week 2, ask for an early yes at week 3, and hold the conversion meeting before week 4 ends.",
+      "The trial is running: up to 4 weeks, one night a week. Support night 1, check in at week 2, ask for an early yes at week 3, and hold the conversion meeting before the trial ends.",
     playbookLocal: [
       "Night 1: be on site and help the champion start the game",
       "Week 2: check in with the champion on turnout",
       "Week 3: ask for an early yes",
-      "Before week 4 ends: conversion meeting in person",
+      "Before the trial ends: conversion meeting in person",
     ],
     playbookRemote: [
       "Night 1: check in with the champion by phone or text",
       "Week 2: check in with the champion on turnout",
       "Week 3: ask for an early yes",
-      "Before week 4 ends: conversion call",
+      "Before the trial ends: conversion call",
     ],
   },
   { name: "Won", isDefault: false, outcomeType: "WON", description: "A paying customer." },
@@ -153,8 +153,8 @@ const stageEntryTasks: { step: SalesStep; track?: SalesTrack; title: string; day
   { step: "TRIAL_LIVE", track: "REMOTE", title: "Check in: how did trial night 1 go?", daysAfter: 1 },
   { step: "TRIAL_LIVE", title: "Trial week 2: check in with the champion on turnout", daysAfter: 7 },
   { step: "TRIAL_LIVE", title: "Trial week 3: ask for an early yes", daysAfter: 14 },
-  { step: "TRIAL_LIVE", track: "LOCAL", title: "Trial conversion meeting in person (before week 4 ends)", daysAfter: 21 },
-  { step: "TRIAL_LIVE", track: "REMOTE", title: "Trial conversion call (before week 4 ends)", daysAfter: 21 },
+  { step: "TRIAL_LIVE", track: "LOCAL", title: "Trial conversion meeting in person (before the trial ends)", daysAfter: 21 },
+  { step: "TRIAL_LIVE", track: "REMOTE", title: "Trial conversion call (before the trial ends)", daysAfter: 21 },
 ];
 
 const rejectionReasons = [

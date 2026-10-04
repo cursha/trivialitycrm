@@ -68,7 +68,7 @@ That happens however it got there: the card, the pipeline board, the edit
 form, or a visit or call outcome. For example, entering Trial Live sets up
 night 1 (on site for Local; a check-in call for Long-distance), the week-2
 check-in, the week-3 early-yes ask, and the conversion meeting or call
-before week 4 ends.
+before the trial ends (trials run up to 4 weeks).
 
 Logging a visit moves the bar along automatically (a flyer drop-off moves
 it to Introduced, a booked demo to Demo Booked, and so on), but only

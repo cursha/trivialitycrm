@@ -21,10 +21,15 @@ history.
 - The Target step now starts with getting the manager's name, phone and
   email, and the bar's trivia history (Curt's call). Checklists you've
   already edited are left alone.
+- Trials are offered for **up to 4 weeks** (Curt's call): checklists,
+  descriptions and the conversion follow-up now say "up to 4 weeks" and
+  "before the trial ends". Follow-ups already created are unchanged; the
+  conversion follow-up is still due 3 weeks into Trial Live, so move it
+  earlier for a shorter trial.
 - New **Trivia history** field on the Bar intel card, carried over when
   companies are merged.
-- Database: migration 20261005010000_step_descriptions_trivia_history
-  (applies on deploy).
+- Database: migrations 20261005010000_step_descriptions_trivia_history and
+  20261005020000_trial_up_to_4_weeks (apply on deploy).
 
 ## v3.0 — 2026-10-04
 ### Added — a sales process to follow, for Local and Long-distance bars
