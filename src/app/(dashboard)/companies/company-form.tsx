@@ -38,6 +38,7 @@ export function CompanyForm({
     competitorId?: string;
     assignedToId?: string;
     triviaStatus?: string;
+    salesTrack?: string;
     lossReasonId?: string;
     notes?: string;
     nextFollowUpAt?: string;
@@ -189,6 +190,13 @@ export function CompanyForm({
             <option value="CURRENT_TRIVIA">Current Trivia</option>
             <option value="NO_CURRENT_TRIVIA">No Current Trivia</option>
             <option value="UNCERTAIN">Uncertain</option>
+          </Select>
+        </div>
+        <div>
+          <Label>Sales process</Label>
+          <Select name="salesTrack" defaultValue={defaultValues?.salesTrack ?? "LOCAL"} required className="mt-1">
+            <option value="LOCAL">Local (we visit in person)</option>
+            <option value="REMOTE">Long-distance (phone, email, video)</option>
           </Select>
         </div>
         <div>

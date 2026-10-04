@@ -13,6 +13,40 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v3.0 — unreleased
+### Added — a sales process to follow, for Local and Long-distance bars
+- The pipeline stages are now the sales process: **Target → Introduced →
+  Demo Booked → Demo Held → Trial Booked → Trial Live → Won / Lost**.
+  Existing stages were renamed in place, so every bar keeps its place and
+  history (New → Target, Material Sent → Introduced, Demo Given → Demo
+  Held, Trial → Trial Live). Demo Booked and Trial Booked are new. "Booked"
+  is hidden; bars already in it stay there.
+- Every bar is **Local** (we visit in person) or **Long-distance** (phone,
+  email, video). Same steps, different checklist and follow-ups.
+  Long-distance bars can skip the demo and go straight to a trial, which
+  they start by connecting online (Curt's call). Existing bars are Local.
+- **Sales process card** on each company page: the step the bar is at, what
+  to do now, and a button to move it to the next step.
+- **Automatic follow-ups** when a bar enters a step, however it got there.
+  Trial Live sets up night 1, the week-2 check-in, the week-3 early-yes ask,
+  and the conversion meeting or call before week 4 ends.
+- Visit outcomes move the bar to the matching step, **forward only**. When a
+  move creates the step's follow-ups, they replace the outcome's own
+  follow-up instead of doubling up.
+- **Sales scoreboard**: each rep's visits, long-distance intros, demos
+  booked, demos held and trials booked today against daily goals, on the
+  Dashboard (your own) and the Manager page (everyone, with this week's
+  totals). Managers set each rep's goals and timezone. Defaults: 10 visits,
+  2 demos booked, 2 demos held, 1 trial booked.
+- Settings → Pipeline Stages → **Checklist & follow-ups** to edit each
+  step's checklist and automatic follow-ups.
+
+### Changed
+- Dashboard tiles now show Demos booked, Trials booked, Trials live and Won,
+  found by each stage's role instead of its name. The Manager page's Active
+  trials counts bars in Trial Live.
+- Database: migration 20261005000000_sales_process (applies on deploy).
+
 ## v2.2 — 2026-10-04
 ### Changed — version numbers match the Gr8daybingo scheme
 - Switched from three-part numbers (1.1.1) to `v{release}.{version}`, the

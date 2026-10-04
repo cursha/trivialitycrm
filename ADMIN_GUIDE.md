@@ -23,6 +23,15 @@ not to gate.
    Stages): confirm these match how your team actually sells before anyone
    starts adding real companies — changing them later is fine, but existing
    companies keep whatever they were assigned at the time.
+   The stages are also the **sales process** (Target → Introduced → Demo
+   Booked → Demo Held → Trial Booked → Trial Live → Won / Lost). On the
+   Pipeline Stages page, **Checklist & follow-ups** opens each step's
+   checklist (what reps see on the company page, separately for Local and
+   Long-distance bars) and its automatic follow-ups (created when a company
+   enters the step, for all bars or one kind only, due a set number of days
+   later). Edits apply from then on; follow-ups already created are left
+   alone. Renaming a step is safe: the process, dashboard counts and
+   scoreboard find steps by their role, not their name.
 3. **Competitors** (Competitors, in the main nav): the list your AI research
    and reports can flag/track against.
 4. **Users and roles** (Settings → Users / Roles): the built-in roles ship
@@ -78,6 +87,16 @@ not to gate.
 - A campaign can only be approved (locking in the AI-generated messages
   before sending) by someone with a connected mailbox, since they become
   the sender of record — see "Email connections" below.
+
+## Sales scoreboard and daily goals
+
+The Manager page shows every rep's scoreboard (anyone whose role can edit
+leads): today's visits, long-distance intros, demos booked, demos held and
+trials booked against their daily goal, plus this week's totals. Under
+**Daily goals**, set each rep's goals and timezone (so a Colorado Springs
+rep's "today" is Mountain time). Reps with no goals saved get the defaults:
+10 visits, 2 demos booked, 2 demos held, 1 trial booked. A goal of 0 hides
+that number from the rep's own scoreboard unless they do some.
 
 ## Managing users and roles
 

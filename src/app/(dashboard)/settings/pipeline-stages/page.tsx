@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
@@ -14,6 +15,7 @@ import {
 } from "./actions";
 import { PageHeader } from "@/components/ui/page-header";
 import { Label, Select, HelpText } from "@/components/ui/field";
+import { Card } from "@/components/ui/card";
 
 export const metadata = { title: "Pipeline Stages — Triviality CRM" };
 
@@ -21,7 +23,10 @@ export default async function PipelineStagesPage() {
   const user = await requireUser();
   requirePermission(user, "manage_settings");
 
-  const stages = await prisma.pipelineStage.findMany({ orderBy: { sortOrder: "asc" } });
+  const stages = await prisma.pipelineStage.findMany({
+    orderBy: { sortOrder: "asc" },
+    include: { _count: { select: { entryTasks: true } } },
+  });
 
   return (
     <div className="mx-auto max-w-4xl space-y-6">
@@ -39,6 +44,26 @@ export default async function PipelineStagesPage() {
         setDefault={setDefaultPipelineStage}
         setOutcome={setPipelineStageOutcome}
       />
+
+      <Card>
+        <h2 className="font-bold text-accent">Sales process</h2>
+        <p className="mt-1 text-sm text-text-muted">
+          Each stage&apos;s checklist (shown to reps on the company page) and the follow-ups created automatically when a company enters it.
+        </p>
+        <ul className="mt-3 divide-y divide-border">
+          {stages.map((stage) => (
+            <li key={stage.id} className="flex items-center justify-between gap-3 py-2 text-sm">
+              <span className={stage.active ? "font-semibold text-text" : "text-text-muted"}>
+                {stage.name}
+                {!stage.active && " (inactive)"}
+              </span>
+              <Link href={`/settings/pipeline-stages/${stage.id}`} className="font-bold text-secondary hover:underline">
+                Checklist &amp; follow-ups ({stage._count.entryTasks})
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Card>
 
       <AddLookupForm
         create={createPipelineStage}

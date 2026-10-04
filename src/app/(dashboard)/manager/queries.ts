@@ -28,8 +28,9 @@ export async function getManagerWorkspaceData(user: AuthenticatedUser) {
         AND: [
           scope,
           { status: "ACTIVE" },
-          { pipelineStage: { outcomeType: null } },
-          { activities: { some: { type: "TRIAL" } } },
+          // Sales process: a trial is live while the bar is at the Trial
+          // Live step.
+          { pipelineStage: { processStep: "TRIAL_LIVE" } },
         ],
       },
     }),

@@ -1,5 +1,6 @@
 import "server-only";
 import type { Prisma } from "../../generated/prisma/client";
+import { createStageEntryTasks } from "./sales-process";
 
 /**
  * Logs a PIPELINE_CHANGE activity inside the caller's transaction — shared
@@ -13,11 +14,15 @@ import type { Prisma } from "../../generated/prisma/client";
  * target stage's outcome is actually LOST — passing one for a non-Lost
  * move is silently dropped rather than trusted, so a stale value left over
  * from a prior form state can never be recorded against the wrong stage.
+ *
+ * Also creates the target stage's automatic follow-ups (sales process —
+ * see createStageEntryTasks), since this is the one function every stage
+ * change goes through. Returns how many follow-ups were created.
  */
 export async function logPipelineChange(
   tx: Prisma.TransactionClient,
   params: { companyId: string; userId: string; fromStageId: string; toStageId: string; lossReasonId?: string | null },
-): Promise<void> {
+): Promise<{ entryTaskCount: number }> {
   const [fromStage, toStage] = await Promise.all([
     tx.pipelineStage.findUnique({ where: { id: params.fromStageId } }),
     tx.pipelineStage.findUnique({ where: { id: params.toStageId } }),
@@ -41,6 +46,13 @@ export async function logPipelineChange(
       lossReasonId: toStage?.outcomeType === "LOST" ? (params.lossReasonId ?? null) : null,
     },
   });
+
+  const entryTaskCount = await createStageEntryTasks(tx, {
+    companyId: params.companyId,
+    toStageId: params.toStageId,
+    userId: params.userId,
+  });
+  return { entryTaskCount };
 }
 
 /**

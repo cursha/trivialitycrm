@@ -55,10 +55,11 @@ export async function getDashboardStats(user: AuthenticatedUser) {
   const competitorNameById = new Map(competitors.map((c) => [c.id, c.name]));
   const stageOrderById = new Map(stages.map((s, index) => [s.id, index]));
 
-  function countForStageName(name: string): number {
-    const stage = stages.find((s) => s.name === name);
-    if (!stage) return 0;
-    return pipelineGroups.find((g) => g.pipelineStageId === stage.id)?._count ?? 0;
+  // Counted by the stages' admin-tagged roles (sales-process step, Won
+  // outcome), never by their renameable names.
+  function countForStages(match: (stage: (typeof stages)[number]) => boolean): number {
+    const ids = new Set(stages.filter(match).map((s) => s.id));
+    return pipelineGroups.filter((g) => ids.has(g.pipelineStageId)).reduce((sum, g) => sum + g._count, 0);
   }
 
   return {
@@ -72,10 +73,10 @@ export async function getDashboardStats(user: AuthenticatedUser) {
       .sort((a, b) => (stageOrderById.get(a.stageId) ?? 0) - (stageOrderById.get(b.stageId) ?? 0)),
     followUpsDueToday,
     followUpsOverdue,
-    demos: countForStageName("Demo Given"),
-    trials: countForStageName("Trial"),
-    booked: countForStageName("Booked"),
-    won: countForStageName("Won"),
+    demosBooked: countForStages((s) => s.processStep === "DEMO_BOOKED"),
+    trialsBooked: countForStages((s) => s.processStep === "TRIAL_BOOKED"),
+    trialsLive: countForStages((s) => s.processStep === "TRIAL_LIVE"),
+    won: countForStages((s) => s.outcomeType === "WON"),
     leadTypeBreakdown: leadTypeGroups.map((g) => ({
       leadTypeId: g.leadTypeId,
       leadTypeName: leadTypeNameById.get(g.leadTypeId) ?? "Unknown",

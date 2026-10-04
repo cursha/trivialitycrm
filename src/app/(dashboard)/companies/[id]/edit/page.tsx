@@ -48,6 +48,7 @@ export default async function EditCompanyPage({ params }: { params: Promise<{ id
             competitorId: company.competitorId ?? undefined,
             assignedToId: company.assignedToId ?? undefined,
             triviaStatus: company.triviaStatus,
+            salesTrack: company.salesTrack,
             notes: company.notes ?? undefined,
             nextFollowUpAt: company.nextFollowUpAt ? company.nextFollowUpAt.toISOString().slice(0, 10) : undefined,
           }}

@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { LookupNameSchema } from "@/lib/validation/lookup";
 import { formString } from "@/lib/form-data";
 import { PipelineStageOutcome } from "@/generated/prisma/enums";
+import { SalesTrackValues } from "@/lib/validation/company";
 
 /** Form value is "" (open, the default) | "WON" | "LOST" — anything else is
  * a malformed request, not a real user choice, so it's rejected rather than
@@ -152,4 +153,62 @@ export async function deletePipelineStage(id: string): Promise<ActionResult> {
 
   await prisma.pipelineStage.delete({ where: { id } });
   revalidatePath(PATH);
+}
+
+// ---------------------------------------------------------------------------
+// Sales process: each step's checklist (playbook) and automatic follow-ups.
+
+const PLAYBOOK_MAX = 4000;
+
+export async function updateStagePlaybook(id: string, formData: FormData): Promise<ActionResult> {
+  await requireSettingsManager();
+
+  const playbookLocal = formString(formData, "playbookLocal").trim();
+  const playbookRemote = formString(formData, "playbookRemote").trim();
+  if (playbookLocal.length > PLAYBOOK_MAX || playbookRemote.length > PLAYBOOK_MAX) {
+    return { error: `Keep each checklist under ${PLAYBOOK_MAX} characters.` };
+  }
+
+  await prisma.pipelineStage.update({
+    where: { id },
+    data: { playbookLocal: playbookLocal || null, playbookRemote: playbookRemote || null },
+  });
+  revalidatePath(PATH);
+  revalidatePath(`${PATH}/${id}`);
+}
+
+export async function addStageTask(stageId: string, formData: FormData): Promise<ActionResult> {
+  await requireSettingsManager();
+
+  const title = formString(formData, "title").trim();
+  if (!title) return { error: "Enter what the follow-up is." };
+  if (title.length > 200) return { error: "Keep the follow-up under 200 characters." };
+
+  const daysAfter = Number(formString(formData, "daysAfter"));
+  if (!Number.isInteger(daysAfter) || daysAfter < 0 || daysAfter > 365) {
+    return { error: "Enter the number of days (0 to 365)." };
+  }
+
+  const trackValue = formString(formData, "track");
+  const track = SalesTrackValues.find((value) => value === trackValue) ?? null;
+  if (trackValue !== "" && !track) return { error: "Choose which bars get this follow-up." };
+
+  const stage = await prisma.pipelineStage.findUnique({ where: { id: stageId }, select: { id: true } });
+  if (!stage) return { error: "That pipeline stage no longer exists." };
+
+  const highest = await prisma.pipelineStageTask.aggregate({ where: { stageId }, _max: { sortOrder: true } });
+  await prisma.pipelineStageTask.create({
+    data: { stageId, title, daysAfter, track, sortOrder: (highest._max.sortOrder ?? -1) + 1 },
+  });
+  revalidatePath(`${PATH}/${stageId}`);
+}
+
+export async function deleteStageTask(taskId: string): Promise<ActionResult> {
+  await requireSettingsManager();
+
+  const task = await prisma.pipelineStageTask.findUnique({ where: { id: taskId } });
+  if (!task) return;
+  // Only the template is removed; follow-up tasks it already created stay.
+  await prisma.pipelineStageTask.delete({ where: { id: taskId } });
+  revalidatePath(`${PATH}/${task.stageId}`);
 }

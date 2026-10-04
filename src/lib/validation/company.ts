@@ -13,6 +13,7 @@ const optionalText = (max: number) =>
     .transform((value) => (value ? value : undefined));
 
 export const TriviaStatusValues = ["CURRENT_TRIVIA", "NO_CURRENT_TRIVIA", "UNCERTAIN"] as const;
+export const SalesTrackValues = ["LOCAL", "REMOTE"] as const;
 
 export const CompanySchema = z
   .object({
@@ -44,6 +45,13 @@ export const CompanySchema = z
       .optional()
       .transform((value) => (value ? value : undefined)),
     triviaStatus: z.enum(TriviaStatusValues),
+    // Optional so forms without the field (e.g. Quick Add) still validate:
+    // absent = LOCAL on create, unchanged on update.
+    salesTrack: z
+      .enum(SalesTrackValues)
+      .optional()
+      .or(z.literal(""))
+      .transform((value) => (value ? value : undefined)),
     // Only meaningful when pipelineStageId resolves to a Lost-outcome stage —
     // enforced server-side in the caller, not here, since this schema has no
     // access to PipelineStage.outcomeType.

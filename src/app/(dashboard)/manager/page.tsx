@@ -2,6 +2,10 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
 import { getManagerWorkspaceData } from "./queries";
+import { getRepScores, listSalesReps } from "@/lib/sales/scoreboard";
+import { TeamScoreboard } from "@/components/sales-scoreboard";
+import { SalesTargetEditor } from "./sales-target-editor";
+import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card, SectionHeading } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +26,13 @@ export default async function ManagerWorkspacePage() {
       </div>
     );
   }
+
+  const reps = await listSalesReps();
+  const [scores, repTimezones] = await Promise.all([
+    getRepScores(reps.map((rep) => rep.id)),
+    prisma.user.findMany({ where: { id: { in: reps.map((rep) => rep.id) } }, select: { id: true, timezone: true } }),
+  ]);
+  const savedTimezone = new Map(repTimezones.map((rep) => [rep.id, rep.timezone]));
 
   const { stats, unassignedCount, overdueBySalesperson, activeTrialsCount, recentlyResolved, territoryCoverage } = data;
 
@@ -56,6 +67,23 @@ export default async function ManagerWorkspacePage() {
           <p className="mt-2 text-3xl font-bold text-text">{activeTrialsCount}</p>
         </Card>
       </div>
+
+      <Card>
+        <SectionHeading>Sales scoreboard</SectionHeading>
+        <p className="mt-1 text-sm text-text-muted">Today against each rep&apos;s daily goal (in their own timezone), and this week&apos;s total so far.</p>
+        {scores.length === 0 ? <EmptyState>No salespeople yet.</EmptyState> : <TeamScoreboard scores={scores} />}
+      </Card>
+
+      <Card>
+        <SectionHeading>Daily goals</SectionHeading>
+        {scores.length === 0 ? (
+          <EmptyState>No salespeople yet.</EmptyState>
+        ) : (
+          <SalesTargetEditor
+            reps={scores.map((score) => ({ userId: score.userId, name: score.name, timezone: savedTimezone.get(score.userId) ?? null, targets: score.targets }))}
+          />
+        )}
+      </Card>
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Card>

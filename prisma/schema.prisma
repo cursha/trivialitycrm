@@ -103,6 +103,29 @@ enum PipelineStageOutcome {
   LOST
 }
 
+// How a bar is worked through the sales process: LOCAL = a rep visits in
+// person (flyer drop-off, demo on the bar's own TVs, rep on site for trial
+// night 1); REMOTE = long-distance by phone/email/video, and the bar may
+// skip the demo and go straight to a trial. Same steps either way — each
+// step's playbook and automatic follow-ups differ by track.
+enum SalesTrack {
+  LOCAL
+  REMOTE
+}
+
+// Stable identity of a sales-process step, tagged on the PipelineStage that
+// plays that role (PipelineStage.processStep) — never matched by the
+// admin-renameable stage name, same "admin-tagged, never hardcoded"
+// precedent as PipelineStage.outcomeType. Won/Lost stay on outcomeType.
+enum SalesStep {
+  TARGET
+  INTRODUCED
+  DEMO_BOOKED
+  DEMO_HELD
+  TRIAL_BOOKED
+  TRIAL_LIVE
+}
+
 enum SavedViewVisibility {
   PRIVATE
   SHARED
@@ -210,6 +233,10 @@ model User {
   disabled                       Boolean                 @default(false)
   failedLoginAttempts            Int                     @default(0)
   lockedUntil                    DateTime?
+  // IANA timezone for "today" on the sales scoreboard (e.g. a Colorado
+  // Springs rep = America/Denver). Null = BUSINESS_TIMEZONE.
+  timezone                       String?
+  salesTarget                    SalesTarget?
   // Module 8A: set by recordSuccessfulLogin() (src/lib/auth/rate-limit.ts) —
   // never a security control by itself (lockout/failedLoginAttempts already
   // cover that), just a visibility field for admin account review.
@@ -395,13 +422,21 @@ model LeadType {
 }
 
 model PipelineStage {
-  id          String                @id @default(cuid())
-  name        String                @unique
-  active      Boolean               @default(true)
-  isDefault   Boolean               @default(false)
-  sortOrder   Int                   @default(0)
-  outcomeType PipelineStageOutcome?
-  companies   Company[]
+  id             String                @id @default(cuid())
+  name           String                @unique
+  active         Boolean               @default(true)
+  isDefault      Boolean               @default(false)
+  sortOrder      Int                   @default(0)
+  outcomeType    PipelineStageOutcome?
+  // Which sales-process step this stage is (see SalesStep). At most one
+  // stage per step.
+  processStep    SalesStep?            @unique
+  // What to do at this step, one checklist item per line — shown on the
+  // company page's Sales process card for the bar's track.
+  playbookLocal  String?               @db.Text
+  playbookRemote String?               @db.Text
+  companies      Company[]
+  entryTasks     PipelineStageTask[]
 
   historyFrom       PipelineStageHistory[] @relation("StageHistoryFrom")
   historyTo         PipelineStageHistory[] @relation("StageHistoryTo")
@@ -412,6 +447,42 @@ model PipelineStage {
 
   callOutcomeDefaults CallOutcome[]
   callRecordsApplied  CallRecord[]  @relation("CallRecordAppliedStage")
+}
+
+/**
+ * A follow-up task created automatically when a company enters a pipeline
+ * stage (see createStageEntryTasks in src/lib/companies/sales-process.ts),
+ * however it got there — board, edit form, bulk change, call or visit
+ * outcome. `track` null = both tracks; otherwise only companies on that
+ * track get it. Due `daysAfter` days after entering the stage.
+ */
+model PipelineStageTask {
+  id        String        @id @default(cuid())
+  stageId   String
+  stage     PipelineStage @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  track     SalesTrack?
+  title     String
+  daysAfter Int           @default(0)
+  sortOrder Int           @default(0)
+  createdAt DateTime      @default(now())
+
+  @@index([stageId])
+}
+
+/**
+ * A rep's daily goals for the sales scoreboard (Dashboard and Manager
+ * pages). No row = the defaults below. Counted per the rep's own calendar
+ * day (User.timezone).
+ */
+model SalesTarget {
+  userId       String   @id
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  visits       Int      @default(10)
+  intros       Int      @default(0)
+  demosBooked  Int      @default(2)
+  demosHeld    Int      @default(2)
+  trialsBooked Int      @default(1)
+  updatedAt    DateTime @updatedAt
 }
 
 model RejectionReason {
@@ -477,6 +548,7 @@ model Company {
   leadTypeId           String
   pipelineStageId      String
   competitorId         String?
+  salesTrack           SalesTrack    @default(LOCAL)
   // Nullable: a company can be unassigned (created without an owner, or
   // explicitly unassigned) — Module Four's "Unassigned Leads" view relies on
   // this. Never auto-cleared by any automated process; only an explicit

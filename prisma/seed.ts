@@ -1,6 +1,6 @@
 import { prisma } from "../src/lib/prisma";
 import bcrypt from "bcryptjs";
-import type { PipelineStageOutcome } from "../src/generated/prisma/enums";
+import type { PipelineStageOutcome, SalesStep, SalesTrack } from "../src/generated/prisma/enums";
 import type { Prisma } from "../src/generated/prisma/client";
 
 // Duplicated from src/lib/auth/password.ts rather than imported: that module
@@ -9,14 +9,135 @@ import type { Prisma } from "../src/generated/prisma/client";
 // condition). Keep this cost factor in sync with password.ts's.
 const BCRYPT_COST_FACTOR = 12;
 
-const pipelineStages: { name: string; isDefault: boolean; outcomeType: PipelineStageOutcome | null }[] = [
-  { name: "New", isDefault: true, outcomeType: null },
-  { name: "Material Sent", isDefault: false, outcomeType: null },
-  { name: "Demo Given", isDefault: false, outcomeType: null },
-  { name: "Trial", isDefault: false, outcomeType: null },
-  { name: "Booked", isDefault: false, outcomeType: null },
+// The sales process (see SALES_QUICKSTART.md "The sales process"), in
+// process order. Existing databases had the original stages renamed in
+// place by migration 20261005000000_sales_process (New → Target, Material
+// Sent → Introduced, Demo Given → Demo Held, Trial → Trial Live; Booked
+// hidden). Playbooks are one checklist item per line.
+const pipelineStages: {
+  name: string;
+  isDefault: boolean;
+  outcomeType: PipelineStageOutcome | null;
+  processStep?: SalesStep;
+  playbookLocal?: string[];
+  playbookRemote?: string[];
+}[] = [
+  {
+    name: "Target",
+    isDefault: true,
+    outcomeType: null,
+    processStep: "TARGET",
+    playbookLocal: [
+      "Check the Bar intel card: slow night, typical crowd, current entertainment",
+      "Add the bar to your route plan",
+      "Bring flyers",
+    ],
+    playbookRemote: [
+      "Find the owner or manager's name and the best way to reach them",
+      "Check the Bar intel card: slow night, typical crowd, current entertainment",
+      "Send the intro email with the short video, or call",
+    ],
+  },
+  {
+    name: "Introduced",
+    isDefault: false,
+    outcomeType: null,
+    processStep: "INTRODUCED",
+    playbookLocal: [
+      "Drop off the flyer and ask for the owner or manager",
+      "If they're in and interested, demo on the spot",
+      "Goal: book a ~20-minute demo on the bar's own TVs",
+      "Log the visit",
+    ],
+    playbookRemote: [
+      "Follow up the intro by phone or email",
+      "Goal: book a ~20-minute video demo, or skip the demo and start a trial",
+      "Log the call or email",
+    ],
+  },
+  {
+    name: "Demo Booked",
+    isDefault: false,
+    outcomeType: null,
+    processStep: "DEMO_BOOKED",
+    playbookLocal: [
+      "Confirm the demo the day before",
+      "Run it on the bar's own TVs (~20 minutes)",
+      "End with the trial ask: 4 weeks free, one night a week",
+    ],
+    playbookRemote: [
+      "Confirm the demo the day before",
+      "Run it over a video call with screen share (~20 minutes)",
+      "End with the trial ask: 4 weeks free, one night a week",
+    ],
+  },
+  {
+    name: "Demo Held",
+    isDefault: false,
+    outcomeType: null,
+    processStep: "DEMO_HELD",
+    playbookLocal: [
+      "Ask for the trial: 4 weeks free, one night a week",
+      "If they want to think it over, follow up within 2 days",
+    ],
+    playbookRemote: [
+      "Ask for the trial: 4 weeks free, one night a week",
+      "If they want to think it over, follow up within 2 days",
+    ],
+  },
+  {
+    name: "Trial Booked",
+    isDefault: false,
+    outcomeType: null,
+    processStep: "TRIAL_BOOKED",
+    playbookLocal: [
+      "Name the champion: the staff member who starts the game each week",
+      "Agree the trial night, today's headcount, the target headcount, and the monthly price",
+      "Help them connect online; you'll be on site for night 1",
+    ],
+    playbookRemote: [
+      "Name the champion: the staff member who starts the game each week",
+      "Agree the trial night, today's headcount, the target headcount, and the monthly price",
+      "Send the sign-up link and quick-start guide",
+      "Confirm they've connected online before night 1",
+    ],
+  },
+  {
+    name: "Trial Live",
+    isDefault: false,
+    outcomeType: null,
+    processStep: "TRIAL_LIVE",
+    playbookLocal: [
+      "Night 1: be on site and help the champion start the game",
+      "Week 2: check in with the champion on turnout",
+      "Week 3: ask for an early yes",
+      "Before week 4 ends: conversion meeting in person",
+    ],
+    playbookRemote: [
+      "Night 1: check in with the champion by phone or text",
+      "Week 2: check in with the champion on turnout",
+      "Week 3: ask for an early yes",
+      "Before week 4 ends: conversion call",
+    ],
+  },
   { name: "Won", isDefault: false, outcomeType: "WON" },
   { name: "Lost", isDefault: false, outcomeType: "LOST" },
+];
+
+// Follow-ups created automatically when a company enters a step (see
+// PipelineStageTask). No track = both tracks.
+const stageEntryTasks: { step: SalesStep; track?: SalesTrack; title: string; daysAfter: number }[] = [
+  { step: "INTRODUCED", track: "LOCAL", title: "Follow up to book a demo", daysAfter: 2 },
+  { step: "INTRODUCED", track: "REMOTE", title: "Follow up: book a demo or start a trial", daysAfter: 2 },
+  { step: "DEMO_HELD", title: "Follow up on the trial offer", daysAfter: 2 },
+  { step: "TRIAL_BOOKED", track: "LOCAL", title: "Confirm the trial night and champion (you're on site for night 1)", daysAfter: 1 },
+  { step: "TRIAL_BOOKED", track: "REMOTE", title: "Confirm they've connected online", daysAfter: 2 },
+  { step: "TRIAL_LIVE", track: "LOCAL", title: "Trial night 1: on site with the champion", daysAfter: 0 },
+  { step: "TRIAL_LIVE", track: "REMOTE", title: "Check in: how did trial night 1 go?", daysAfter: 1 },
+  { step: "TRIAL_LIVE", title: "Trial week 2: check in with the champion on turnout", daysAfter: 7 },
+  { step: "TRIAL_LIVE", title: "Trial week 3: ask for an early yes", daysAfter: 14 },
+  { step: "TRIAL_LIVE", track: "LOCAL", title: "Trial conversion meeting in person (before week 4 ends)", daysAfter: 21 },
+  { step: "TRIAL_LIVE", track: "REMOTE", title: "Trial conversion call (before week 4 ends)", daysAfter: 21 },
 ];
 
 const rejectionReasons = [
@@ -199,17 +320,64 @@ const roleGrants: Record<(typeof roles)[number], string[]> = {
 
 async function seedPipelineStages() {
   for (const [index, stage] of pipelineStages.entries()) {
-    await prisma.pipelineStage.upsert({
+    const playbookLocal = stage.playbookLocal?.join("\n") ?? null;
+    const playbookRemote = stage.playbookRemote?.join("\n") ?? null;
+    const row = await prisma.pipelineStage.upsert({
       where: { name: stage.name },
       // outcomeType is a classification of the seed-defined stage itself
       // (like a permission's label), kept in sync on reseed — unlike
       // sortOrder/active, which are operational settings an Administrator
       // may have already changed and must not be silently overwritten.
       update: { outcomeType: stage.outcomeType },
-      create: { name: stage.name, isDefault: stage.isDefault, sortOrder: index, outcomeType: stage.outcomeType },
+      create: {
+        name: stage.name,
+        isDefault: stage.isDefault,
+        sortOrder: index,
+        outcomeType: stage.outcomeType,
+        processStep: stage.processStep ?? null,
+        playbookLocal,
+        playbookRemote,
+      },
     });
+
+    // processStep is a classification too, but unique: only tag this stage
+    // if no other stage already plays that step. Playbooks are only filled
+    // in while empty, so an Administrator's edits are never overwritten.
+    const fill: Prisma.PipelineStageUpdateInput = {};
+    if (stage.processStep && row.processStep !== stage.processStep) {
+      const taken = await prisma.pipelineStage.findUnique({ where: { processStep: stage.processStep } });
+      if (!taken) fill.processStep = stage.processStep;
+    }
+    if (row.playbookLocal === null && playbookLocal) fill.playbookLocal = playbookLocal;
+    if (row.playbookRemote === null && playbookRemote) fill.playbookRemote = playbookRemote;
+    if (Object.keys(fill).length > 0) await prisma.pipelineStage.update({ where: { id: row.id }, data: fill });
   }
   console.log(`Seeded ${pipelineStages.length} pipeline stages.`);
+}
+
+/** Seeds a step's automatic follow-ups only while it has none, so an
+ * Administrator's own list is never overwritten or duplicated on reseed. */
+async function seedStageEntryTasks() {
+  let seeded = 0;
+  for (const step of new Set(stageEntryTasks.map((task) => task.step))) {
+    const stage = await prisma.pipelineStage.findUnique({
+      where: { processStep: step },
+      include: { _count: { select: { entryTasks: true } } },
+    });
+    if (!stage || stage._count.entryTasks > 0) continue;
+    const tasks = stageEntryTasks.filter((task) => task.step === step);
+    await prisma.pipelineStageTask.createMany({
+      data: tasks.map((task, index) => ({
+        stageId: stage.id,
+        track: task.track ?? null,
+        title: task.title,
+        daysAfter: task.daysAfter,
+        sortOrder: index,
+      })),
+    });
+    seeded += tasks.length;
+  }
+  console.log(`Seeded ${seeded} stage follow-ups.`);
 }
 
 async function seedRejectionReasons() {
@@ -238,6 +406,8 @@ const callOutcomes: {
   appliesDoNotContact?: boolean;
   resultCategory?: "UNREACHABLE" | "INTERESTED" | "DEMO_REQUESTED" | "NOT_INTERESTED";
   useLostStage?: boolean;
+  // Moves the company to the stage tagged with this sales-process step.
+  moveToStep?: SalesStep;
   // Channels (default: calls only) — see CallOutcome.appliesToCalls/
   // appliesToVisits/booksDemo in schema.prisma.
   appliesToCalls?: boolean;
@@ -258,18 +428,24 @@ const callOutcomes: {
   // In-person visit outcomes (field-sales walk-ins). Trip 1 is a flyer
   // drop-off whose real goal is booking a demo, so every non-final outcome
   // creates the follow-up that books it.
-  { name: "Flyer Dropped (Owner Not In)", requiresNextAction: true, defaultNextActionDays: 2, defaultNextActionTitle: "Call to book a demo", resultCategory: "UNREACHABLE", appliesToCalls: false, appliesToVisits: true },
-  { name: "Spoke to Staff (Left Flyer)", requiresNextAction: true, defaultNextActionDays: 1, defaultNextActionTitle: "Call the owner to book a demo", resultCategory: "UNREACHABLE", appliesToCalls: false, appliesToVisits: true },
-  { name: "Demo Booked", resultCategory: "DEMO_REQUESTED", appliesToCalls: false, appliesToVisits: true, booksDemo: true },
-  { name: "Demo Given on the Spot", requiresNotes: true, requiresNextAction: true, defaultNextActionDays: 1, defaultNextActionTitle: "Follow up to book the trial", resultCategory: "INTERESTED", appliesToCalls: false, appliesToVisits: true },
-  { name: "Decision-Maker Thinking It Over", requiresNotes: true, requiresNextAction: true, defaultNextActionDays: 2, defaultNextActionTitle: "Follow up on the trial offer", resultCategory: "INTERESTED", appliesToCalls: false, appliesToVisits: true },
-  { name: "Trial Booked", requiresNotes: true, requiresNextAction: true, defaultNextActionDays: 1, defaultNextActionTitle: "Confirm trial start and night-1 setup", resultCategory: "INTERESTED", appliesToCalls: false, appliesToVisits: true },
+  { name: "Flyer Dropped (Owner Not In)", moveToStep: "INTRODUCED", requiresNextAction: true, defaultNextActionDays: 2, defaultNextActionTitle: "Call to book a demo", resultCategory: "UNREACHABLE", appliesToCalls: false, appliesToVisits: true },
+  { name: "Spoke to Staff (Left Flyer)", moveToStep: "INTRODUCED", requiresNextAction: true, defaultNextActionDays: 1, defaultNextActionTitle: "Call the owner to book a demo", resultCategory: "UNREACHABLE", appliesToCalls: false, appliesToVisits: true },
+  { name: "Demo Booked", moveToStep: "DEMO_BOOKED", resultCategory: "DEMO_REQUESTED", appliesToCalls: false, appliesToVisits: true, booksDemo: true },
+  { name: "Demo Given on the Spot", moveToStep: "DEMO_HELD", requiresNotes: true, requiresNextAction: true, defaultNextActionDays: 1, defaultNextActionTitle: "Follow up to book the trial", resultCategory: "INTERESTED", appliesToCalls: false, appliesToVisits: true },
+  { name: "Decision-Maker Thinking It Over", moveToStep: "DEMO_HELD", requiresNotes: true, requiresNextAction: true, defaultNextActionDays: 2, defaultNextActionTitle: "Follow up on the trial offer", resultCategory: "INTERESTED", appliesToCalls: false, appliesToVisits: true },
+  { name: "Trial Booked", moveToStep: "TRIAL_BOOKED", requiresNotes: true, requiresNextAction: true, defaultNextActionDays: 1, defaultNextActionTitle: "Confirm trial start and night-1 setup", resultCategory: "INTERESTED", appliesToCalls: false, appliesToVisits: true },
   { name: "Already Has Trivia", requiresNotes: true, requiresNextAction: true, defaultNextActionDays: 60, defaultNextActionTitle: "Check back on their existing trivia", appliesToCalls: false, appliesToVisits: true },
   { name: "Closed / Not a Fit", requiresNotes: true, requiresRejectionReason: true, resultCategory: "NOT_INTERESTED", useLostStage: true, appliesToCalls: false, appliesToVisits: true },
 ];
 
 async function seedCallOutcomes() {
   const lostStage = await prisma.pipelineStage.findFirst({ where: { outcomeType: "LOST" } });
+  const stepStages = await prisma.pipelineStage.findMany({ where: { processStep: { not: null } } });
+  const stageFor = (outcome: (typeof callOutcomes)[number]): string | null => {
+    if (outcome.useLostStage) return lostStage?.id ?? null;
+    if (outcome.moveToStep) return stepStages.find((stage) => stage.processStep === outcome.moveToStep)?.id ?? null;
+    return null;
+  };
 
   for (const [index, outcome] of callOutcomes.entries()) {
     await prisma.callOutcome.upsert({
@@ -282,7 +458,7 @@ async function seedCallOutcomes() {
         requiresNextAction: outcome.requiresNextAction ?? false,
         defaultNextActionDays: outcome.defaultNextActionDays ?? null,
         defaultNextActionTitle: outcome.defaultNextActionTitle ?? null,
-        defaultPipelineStageId: outcome.useLostStage ? (lostStage?.id ?? null) : null,
+        defaultPipelineStageId: stageFor(outcome),
         opensEmailComposer: outcome.opensEmailComposer ?? false,
         requiresRejectionReason: outcome.requiresRejectionReason ?? false,
         skipRestOfSession: outcome.skipRestOfSession ?? false,
@@ -299,7 +475,7 @@ async function seedCallOutcomes() {
         requiresNextAction: outcome.requiresNextAction ?? false,
         defaultNextActionDays: outcome.defaultNextActionDays ?? null,
         defaultNextActionTitle: outcome.defaultNextActionTitle ?? null,
-        defaultPipelineStageId: outcome.useLostStage ? (lostStage?.id ?? null) : null,
+        defaultPipelineStageId: stageFor(outcome),
         opensEmailComposer: outcome.opensEmailComposer ?? false,
         requiresRejectionReason: outcome.requiresRejectionReason ?? false,
         skipRestOfSession: outcome.skipRestOfSession ?? false,
@@ -524,6 +700,7 @@ async function seedBootstrapAdmin() {
 
 async function main() {
   await seedPipelineStages();
+  await seedStageEntryTasks();
   await seedRejectionReasons();
   await seedCallOutcomes();
   await seedPermissions();

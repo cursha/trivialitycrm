@@ -43,6 +43,44 @@ company, a contact on an existing company, a note, a logged activity, or a
 follow-up — without leaving whatever page you're on. If you need more fields
 than the quick form offers, it always has an "Open full form" link.
 
+## The sales process
+
+Every bar goes through the same steps:
+
+**Target → Introduced → Demo Booked → Demo Held → Trial Booked → Trial
+Live → Won / Lost**
+
+Each bar is either **Local** (you visit in person) or **Long-distance**
+(phone, email and video). The steps are the same; what you do at each one
+is different. New bars start as Local. Switch a bar with the
+Local / Long-distance buttons on its **Sales process** card.
+
+The **Sales process** card on every company page shows:
+
+- **Which step the bar is at.**
+- **What to do now:** a short checklist for that step and that kind of bar.
+- **A button to move it to the next step.** Long-distance bars can also
+  **skip the demo** and go straight to Trial Booked.
+
+When a bar enters a step, its follow-ups are created for you on My Day.
+That happens however it got there: the card, the pipeline board, the edit
+form, or a visit or call outcome. For example, entering Trial Live sets up
+night 1 (on site for Local; a check-in call for Long-distance), the week-2
+check-in, the week-3 early-yes ask, and the conversion meeting or call
+before week 4 ends.
+
+Logging a visit moves the bar along automatically (a flyer drop-off moves
+it to Introduced, a booked demo to Demo Booked, and so on), but only
+**forward**: a flyer drop at a bar that's already mid-trial never moves it
+back.
+
+### Your scoreboard
+
+The Dashboard shows **Today's scoreboard**: your visits, demos booked,
+demos held and trials booked today against your daily goals, plus this
+week's totals. Your manager sets your goals. "Today" is your own day, in
+your timezone.
+
 ## Logging a bar visit
 
 On a company's page, tap **Log visit** (the first button under Quick sales

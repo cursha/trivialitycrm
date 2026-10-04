@@ -70,7 +70,13 @@ export async function createEmailTemplateCategoryFixture(createdById: string, na
 
 export async function createPipelineStageFixture(
   name = `Stage ${crypto.randomUUID().slice(0, 8)}`,
-  opts: { isDefault?: boolean; sortOrder?: number; outcomeType?: "WON" | "LOST" | null; active?: boolean } = {},
+  opts: {
+    isDefault?: boolean;
+    sortOrder?: number;
+    outcomeType?: "WON" | "LOST" | null;
+    active?: boolean;
+    processStep?: "TARGET" | "INTRODUCED" | "DEMO_BOOKED" | "DEMO_HELD" | "TRIAL_BOOKED" | "TRIAL_LIVE";
+  } = {},
 ) {
   return testPrisma.pipelineStage.create({
     data: {
@@ -79,6 +85,7 @@ export async function createPipelineStageFixture(
       sortOrder: opts.sortOrder ?? 0,
       outcomeType: opts.outcomeType ?? null,
       active: opts.active ?? true,
+      processStep: opts.processStep ?? null,
     },
   });
 }

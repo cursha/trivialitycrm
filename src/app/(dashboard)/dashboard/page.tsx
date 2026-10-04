@@ -5,6 +5,8 @@ import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
 import { getAiSettings, getCurrentAiSpend, classifyAiBudgetStatus } from "@/lib/ai/budget";
 import { getDashboardStats } from "./queries";
+import { getRepScores } from "@/lib/sales/scoreboard";
+import { MyScoreboard } from "@/components/sales-scoreboard";
 import { getMyPriorityList, getMyPipelineCounts } from "./priority-data";
 import { PriorityList } from "./priority-list";
 import { Card, SectionHeading } from "@/components/ui/card";
@@ -85,7 +87,8 @@ export default async function DashboardPage() {
     newlyAssignedThresholdDays: workspaceSettings?.newlyAssignedThresholdDays ?? 3,
   };
   const canViewAiUsage = hasPermission(user, "view_administration");
-  const [priorityItems, myPipelineCounts, aiUsage] = await Promise.all([
+  const showScoreboard = hasPermission(user, "edit_leads");
+  const [priorityItems, myPipelineCounts, aiUsage, myScores] = await Promise.all([
     getMyPriorityList(user, thresholds),
     getMyPipelineCounts(user),
     canViewAiUsage
@@ -94,15 +97,16 @@ export default async function DashboardPage() {
           status: classifyAiBudgetStatus(settings, spend),
         }))
       : Promise.resolve(null),
+    showScoreboard ? getRepScores([user.id]) : Promise.resolve([]),
   ]);
 
   const statTiles = [
     { label: "Active leads", value: stats.activeLeads },
     { label: "Follow-ups due today", value: stats.followUpsDueToday },
     { label: "Overdue follow-ups", value: stats.followUpsOverdue, alert: true },
-    { label: "Demos", value: stats.demos },
-    { label: "Trials", value: stats.trials },
-    { label: "Booked", value: stats.booked },
+    { label: "Demos booked", value: stats.demosBooked },
+    { label: "Trials booked", value: stats.trialsBooked },
+    { label: "Trials live", value: stats.trialsLive },
     { label: "Won", value: stats.won },
   ];
 
@@ -142,6 +146,8 @@ export default async function DashboardPage() {
           </div>
         </Card>
       )}
+
+      {myScores[0] && <MyScoreboard score={myScores[0]} />}
 
       <div className="grid gap-6 xl:grid-cols-[2fr_1fr]">
         <Card>

@@ -101,6 +101,8 @@ const TABLES_TO_RESET = [
   "RolePermission",
   "Permission",
   "Role",
+  "PipelineStageTask",
+  "SalesTarget",
   "PipelineStage",
   "LeadType",
   "RejectionReason",

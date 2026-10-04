@@ -21,6 +21,7 @@ import { EmailPanel } from "./email/email-panel";
 import { SequenceEnrollmentPanel } from "./sequences/sequence-enrollment-panel";
 import { AppointmentPanel } from "./appointments/appointment-panel";
 import { BarIntelPanel } from "./bar-intel/bar-intel-panel";
+import { SalesProcessPanel, type ProcessStepView } from "./sales-process/sales-process-panel";
 import type { VisitSetup } from "./activities/activity-panel";
 import { getConnectionStatus } from "@/lib/comms/connections";
 import { AddToRouteToggle } from "./route-plan-toggle";
@@ -84,7 +85,10 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
       prisma.user.findMany({ where: { disabled: false }, orderBy: { name: "asc" } }),
       listCompanyEvidence(user, id),
       listCompanyScoreHistory(user, id),
-      prisma.pipelineStage.findMany({ orderBy: { sortOrder: "asc" } }),
+      prisma.pipelineStage.findMany({
+        orderBy: { sortOrder: "asc" },
+        include: { entryTasks: { orderBy: [{ daysAfter: "asc" }, { sortOrder: "asc" }], select: { title: true, daysAfter: true, track: true } } },
+      }),
       prisma.emailMessage.findMany({
         where: { companyId: id },
         orderBy: { createdAt: "desc" },
@@ -151,6 +155,23 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const hasMailbox = connection?.status === "CONNECTED";
   const canEdit = hasPermission(user, "edit_leads");
   const canLogVisit = canEdit && company.status === "ACTIVE";
+
+  // The sales process: the active stages tagged as process steps, in order.
+  const processSteps: ProcessStepView[] = pipelineStages.flatMap((stage) =>
+    stage.active && stage.processStep
+      ? [
+          {
+            id: stage.id,
+            name: stage.name,
+            processStep: stage.processStep,
+            playbookLocal: stage.playbookLocal,
+            playbookRemote: stage.playbookRemote,
+            followUps: stage.entryTasks,
+          },
+        ]
+      : [],
+  );
+  const wonStage = pipelineStages.find((stage) => stage.active && stage.outcomeType === "WON") ?? null;
   const visitSetup: VisitSetup | null = canLogVisit
     ? {
         outcomes: visitOutcomes.map((o) => ({
@@ -248,6 +269,15 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
       {canRoutePlan && <AddToRouteToggle companyId={company.id} initiallyInRoute={routeCompanyIds.has(company.id)} canManage={canRoutePlan} />}
 
       <NextBestActionPanel items={nextBestActions} canEdit={canEdit} />
+
+      <SalesProcessPanel
+        companyId={company.id}
+        track={company.salesTrack}
+        currentStage={{ id: company.pipelineStage.id, name: company.pipelineStage.name, outcomeType: company.pipelineStage.outcomeType }}
+        steps={processSteps}
+        wonStage={wonStage ? { id: wonStage.id, name: wonStage.name } : null}
+        canEdit={canLogVisit}
+      />
 
       <div className="grid gap-6 lg:grid-cols-[2fr_1fr]">
         <div className="space-y-6">
