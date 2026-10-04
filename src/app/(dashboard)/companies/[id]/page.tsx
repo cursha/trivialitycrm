@@ -164,6 +164,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             id: stage.id,
             name: stage.name,
             processStep: stage.processStep,
+            description: stage.description,
             playbookLocal: stage.playbookLocal,
             playbookRemote: stage.playbookRemote,
             followUps: stage.entryTasks,
@@ -323,7 +324,12 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
 
           <BarIntelPanel
             companyId={company.id}
-            intel={{ slowNight: company.slowNight, slowNightHeadcount: company.slowNightHeadcount, currentEntertainment: company.currentEntertainment }}
+            intel={{
+              slowNight: company.slowNight,
+              slowNightHeadcount: company.slowNightHeadcount,
+              currentEntertainment: company.currentEntertainment,
+              triviaHistory: company.triviaHistory,
+            }}
             canEdit={canLogVisit}
           />
 

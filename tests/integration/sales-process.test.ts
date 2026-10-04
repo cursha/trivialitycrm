@@ -13,6 +13,8 @@ import { changeCompanyStage } from "../../src/app/(dashboard)/companies/actions"
 import { logVisit } from "../../src/app/(dashboard)/companies/[id]/activities/actions";
 import { setSalesTrack } from "../../src/app/(dashboard)/companies/[id]/sales-process/actions";
 import { saveSalesTarget } from "../../src/app/(dashboard)/manager/actions";
+import { updateStagePlaybook } from "../../src/app/(dashboard)/settings/pipeline-stages/actions";
+import { updateBarIntel } from "../../src/app/(dashboard)/companies/[id]/bar-intel/actions";
 import { getRepScores, DEFAULT_TARGETS } from "../../src/lib/sales/scoreboard";
 import { isForwardMove } from "../../src/lib/companies/sales-process";
 
@@ -220,5 +222,40 @@ describe("saveSalesTarget", () => {
     await loginAs(rep.id);
 
     await expect(saveSalesTarget(rep.id, new FormData())).rejects.toThrow();
+  });
+});
+
+describe("step descriptions and trivia history", () => {
+  it("saves a step's description with its checklists", async () => {
+    const adminRole = await createRoleWithPermissions("Admin", ["manage_settings"]);
+    const admin = await createTestUser({ roleId: adminRole.id });
+    const stage = await createPipelineStageFixture("Target", { processStep: "TARGET" });
+    await loginAs(admin.id);
+
+    const form = new FormData();
+    form.set("description", "  A bar we want to sell to.  ");
+    form.set("playbookLocal", "Get the manager's phone and email");
+    form.set("playbookRemote", "");
+    expect(await updateStagePlaybook(stage.id, form)).toBeUndefined();
+    expect(await testPrisma.pipelineStage.findUniqueOrThrow({ where: { id: stage.id } })).toMatchObject({
+      description: "A bar we want to sell to.",
+      playbookLocal: "Get the manager's phone and email",
+      playbookRemote: null,
+    });
+
+    form.set("description", "x".repeat(1001));
+    expect(await updateStagePlaybook(stage.id, form)).toEqual({ error: "Keep the description under 1000 characters." });
+  });
+
+  it("saves and clears trivia history from the Bar intel card", async () => {
+    const { company } = await setup();
+    const form = new FormData();
+    form.set("triviaHistory", "Ran trivia on Tuesdays until spring");
+    expect(await updateBarIntel(company.id, form)).toBeUndefined();
+    expect((await testPrisma.company.findUniqueOrThrow({ where: { id: company.id } })).triviaHistory).toBe("Ran trivia on Tuesdays until spring");
+
+    form.set("triviaHistory", "");
+    await updateBarIntel(company.id, form);
+    expect((await testPrisma.company.findUniqueOrThrow({ where: { id: company.id } })).triviaHistory).toBeNull();
   });
 });

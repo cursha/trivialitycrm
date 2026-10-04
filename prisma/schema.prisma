@@ -435,6 +435,9 @@ model PipelineStage {
   // company page's Sales process card for the bar's track.
   playbookLocal  String?               @db.Text
   playbookRemote String?               @db.Text
+  // What this step means, shown as a bubble on the step in the company
+  // page's Sales process card.
+  description    String?               @db.Text
   companies      Company[]
   entryTasks     PipelineStageTask[]
 
@@ -661,6 +664,10 @@ model Company {
   slowNight            Weekday?
   slowNightHeadcount   Int?
   currentEntertainment String?
+  // Free-text trivia history gathered at the Target step: do they run
+  // trivia now, with whom and which night, have they tried it before and
+  // how it went. Edited on the Bar intel card.
+  triviaHistory        String?  @db.Text
 
   // Set only when an AI opportunity analysis (src/app/(dashboard)/companies/
   // opportunity-analysis.ts) finds something that contradicts existing,

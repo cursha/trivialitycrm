@@ -26,10 +26,11 @@ export default async function StageProcessPage({ params }: { params: Promise<{ i
       </Link>
       <PageHeader
         title={`Sales process: ${stage.name}`}
-        description="The checklist reps see on a company's Sales process card while it's at this step, and the follow-ups created automatically when a company enters it (however it gets here: the card, the pipeline board, the edit form, a bulk change, or a call or visit outcome)."
+        description="The description and checklist reps see on a company's Sales process card while it's at this step, and the follow-ups created automatically when a company enters it (however it gets here: the card, the pipeline board, the edit form, a bulk change, or a call or visit outcome)."
       />
       <StageProcessEditor
         stageId={stage.id}
+        description={stage.description ?? ""}
         playbookLocal={stage.playbookLocal ?? ""}
         playbookRemote={stage.playbookRemote ?? ""}
         tasks={stage.entryTasks.map((task) => ({ id: task.id, title: task.title, daysAfter: task.daysAfter, track: task.track }))}

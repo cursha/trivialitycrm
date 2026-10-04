@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import { Pencil } from "lucide-react";
 import { updateBarIntel } from "./actions";
 import { Card } from "@/components/ui/card";
-import { Input, Label, Select, FieldError } from "@/components/ui/field";
+import { Input, Label, Select, Textarea, FieldError } from "@/components/ui/field";
 import { WEEKDAY_LABEL } from "@/lib/ui/status-tones";
 
 export type BarIntel = {
   slowNight: string | null;
   slowNightHeadcount: number | null;
   currentEntertainment: string | null;
+  triviaHistory: string | null;
 };
 
 export const WEEKDAY_OPTIONS = Object.entries(WEEKDAY_LABEL);
@@ -94,6 +95,20 @@ export function BarIntelPanel({ companyId, intel, canEdit }: { companyId: string
               className="mt-1 py-1.5"
             />
           </div>
+          <div className="sm:col-span-2">
+            <Label htmlFor="bar-intel-trivia-history" className="text-xs">
+              Trivia history
+            </Label>
+            <Textarea
+              id="bar-intel-trivia-history"
+              name="triviaHistory"
+              rows={3}
+              maxLength={2000}
+              defaultValue={intel.triviaHistory ?? ""}
+              placeholder="e.g. Ran trivia with another company on Tuesdays until last spring; stopped because turnout dropped"
+              className="mt-1 py-1.5"
+            />
+          </div>
           {error && <FieldError className="sm:col-span-2">{error}</FieldError>}
           <div className="flex gap-2 sm:col-span-2">
             <button
@@ -130,6 +145,10 @@ export function BarIntelPanel({ companyId, intel, canEdit }: { companyId: string
           <div>
             <dt className="text-xs font-semibold uppercase tracking-wide text-text-muted">Current entertainment</dt>
             <dd className="mt-0.5 text-sm text-text">{intel.currentEntertainment || <span className="text-text-muted">—</span>}</dd>
+          </div>
+          <div className="sm:col-span-3">
+            <dt className="text-xs font-semibold uppercase tracking-wide text-text-muted">Trivia history</dt>
+            <dd className="mt-0.5 whitespace-pre-wrap text-sm text-text">{intel.triviaHistory || <span className="text-text-muted">—</span>}</dd>
           </div>
         </dl>
       )}

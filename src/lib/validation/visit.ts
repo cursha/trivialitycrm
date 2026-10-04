@@ -42,6 +42,7 @@ export const BarIntelSchema = z.object({
   slowNight: optionalWeekday,
   slowNightHeadcount: optionalHeadcount,
   currentEntertainment: optionalText(200),
+  triviaHistory: optionalText(2000),
 });
 
 export const VisitSchema = BarIntelSchema.extend({

@@ -14,11 +14,13 @@ type TaskRow = { id: string; title: string; daysAfter: number; track: SalesTrack
 
 export function StageProcessEditor({
   stageId,
+  description,
   playbookLocal,
   playbookRemote,
   tasks,
 }: {
   stageId: string;
+  description: string;
   playbookLocal: string;
   playbookRemote: string;
   tasks: TaskRow[];
@@ -44,12 +46,17 @@ export function StageProcessEditor({
   return (
     <div className="space-y-6">
       <Card>
-        <h2 className="font-bold text-accent">Checklist</h2>
+        <h2 className="font-bold text-accent">Description &amp; checklist</h2>
         <form
           action={(formData) => run(() => updateStagePlaybook(stageId, formData), setPlaybookError, () => setPlaybookSaved(true))}
           onChange={() => setPlaybookSaved(false)}
           className="mt-3 space-y-4"
         >
+          <div>
+            <Label htmlFor="stage-description">What this step means</Label>
+            <Textarea id="stage-description" name="description" rows={3} maxLength={1000} defaultValue={description} className="mt-1" />
+            <HelpText className="mt-1">Shown as a bubble when a rep hovers over or taps this step on a company&apos;s Sales process card.</HelpText>
+          </div>
           <div>
             <Label htmlFor="playbook-local">{SALES_TRACK_LABELS.LOCAL} bars</Label>
             <Textarea id="playbook-local" name="playbookLocal" rows={5} defaultValue={playbookLocal} className="mt-1" />
@@ -58,11 +65,11 @@ export function StageProcessEditor({
             <Label htmlFor="playbook-remote">{SALES_TRACK_LABELS.REMOTE} bars</Label>
             <Textarea id="playbook-remote" name="playbookRemote" rows={5} defaultValue={playbookRemote} className="mt-1" />
           </div>
-          <HelpText>One checklist item per line.</HelpText>
+          <HelpText>Checklists: one item per line.</HelpText>
           {playbookError && <FieldError>{playbookError}</FieldError>}
           <div className="flex items-center gap-3">
             <Button type="submit" disabled={isPending}>
-              Save checklist
+              Save
             </Button>
             {playbookSaved && <span className="text-sm text-text-muted">Saved.</span>}
           </div>

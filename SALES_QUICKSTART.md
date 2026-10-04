@@ -57,7 +57,8 @@ Local / Long-distance buttons on its **Sales process** card.
 
 The **Sales process** card on every company page shows:
 
-- **Which step the bar is at.**
+- **Which step the bar is at.** Hover over or tap any step to see what
+  it means.
 - **What to do now:** a short checklist for that step and that kind of bar.
 - **A button to move it to the next step.** Long-distance bars can also
   **skip the demo** and go straight to Trial Booked.
@@ -94,7 +95,9 @@ your My Day list.
   connected (Titan works), you can send a calendar invite to the contact
   and to yourself; otherwise the demo is saved in the CRM only.
 - **Bar intel (optional)**: jot down the slowest night, the typical crowd
-  that night, and what entertainment they run now. Only the fields you
+  that night, and what entertainment they run now. The **Bar intel** card
+  also has a **Trivia history** box (do they run trivia now, with whom,
+  and have they tried it before). Only the fields you
   fill in are saved, so leaving one blank never erases what's on file. The
   **Bar intel** card on the company page is where you edit or clear these.
 - **Contacts**: mark a contact as the **decision-maker** and/or the

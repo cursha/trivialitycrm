@@ -13,7 +13,20 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
-## v3.0 — unreleased
+## v3.1 — 2026-10-04
+### Improved — step descriptions and trivia history
+- Each step on a company's Sales process card has a description bubble:
+  hover over it, or tap it on a phone. Edit the wording under Settings →
+  Pipeline Stages → Checklist & follow-ups.
+- The Target step now starts with getting the manager's name, phone and
+  email, and the bar's trivia history (Curt's call). Checklists you've
+  already edited are left alone.
+- New **Trivia history** field on the Bar intel card, carried over when
+  companies are merged.
+- Database: migration 20261005010000_step_descriptions_trivia_history
+  (applies on deploy).
+
+## v3.0 — 2026-10-04
 ### Added — a sales process to follow, for Local and Long-distance bars
 - The pipeline stages are now the sales process: **Target → Introduced →
   Demo Booked → Demo Held → Trial Booked → Trial Live → Won / Lost**.

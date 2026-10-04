@@ -156,22 +156,28 @@ export async function deletePipelineStage(id: string): Promise<ActionResult> {
 }
 
 // ---------------------------------------------------------------------------
-// Sales process: each step's checklist (playbook) and automatic follow-ups.
+// Sales process: each step's description, checklist (playbook) and
+// automatic follow-ups.
 
 const PLAYBOOK_MAX = 4000;
+const DESCRIPTION_MAX = 1000;
 
 export async function updateStagePlaybook(id: string, formData: FormData): Promise<ActionResult> {
   await requireSettingsManager();
 
+  const description = formString(formData, "description").trim();
   const playbookLocal = formString(formData, "playbookLocal").trim();
   const playbookRemote = formString(formData, "playbookRemote").trim();
+  if (description.length > DESCRIPTION_MAX) {
+    return { error: `Keep the description under ${DESCRIPTION_MAX} characters.` };
+  }
   if (playbookLocal.length > PLAYBOOK_MAX || playbookRemote.length > PLAYBOOK_MAX) {
     return { error: `Keep each checklist under ${PLAYBOOK_MAX} characters.` };
   }
 
   await prisma.pipelineStage.update({
     where: { id },
-    data: { playbookLocal: playbookLocal || null, playbookRemote: playbookRemote || null },
+    data: { description: description || null, playbookLocal: playbookLocal || null, playbookRemote: playbookRemote || null },
   });
   revalidatePath(PATH);
   revalidatePath(`${PATH}/${id}`);

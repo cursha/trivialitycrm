@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check } from "lucide-react";
+import { Check, Info } from "lucide-react";
 import clsx from "clsx";
 import { changeCompanyStage } from "../../actions";
 import { setSalesTrack } from "./actions";
@@ -15,6 +15,7 @@ export type ProcessStepView = {
   id: string;
   name: string;
   processStep: SalesStep;
+  description: string | null;
   playbookLocal: string | null;
   playbookRemote: string | null;
   followUps: { title: string; daysAfter: number; track: SalesTrack | null }[];
@@ -51,6 +52,17 @@ export function SalesProcessPanel({
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  // The step whose description bubble is showing: opened by hover or
+  // keyboard focus, or pinned open by a tap/click (for phones), closed by
+  // Escape or tapping it again.
+  const [bubbleStepId, setBubbleStepId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!bubbleStepId) return;
+    const onKey = (event: KeyboardEvent) => event.key === "Escape" && setBubbleStepId(null);
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [bubbleStepId]);
 
   const currentIndex = steps.findIndex((step) => step.id === currentStage.id);
   const current = currentIndex >= 0 ? steps[currentIndex] : null;
@@ -105,19 +117,46 @@ export function SalesProcessPanel({
         {steps.map((step, index) => {
           const done = isWon || (currentIndex >= 0 && index < currentIndex);
           const active = step.id === currentStage.id;
+          const bubbleId = `step-bubble-${step.id}`;
+          const open = bubbleStepId === step.id && Boolean(step.description);
           return (
             <li
               key={step.id}
-              aria-current={active ? "step" : undefined}
-              className={clsx(
-                "flex items-center gap-1 rounded-full border px-3 py-1",
-                active && "border-accent bg-accent text-white",
-                done && !active && "border-accent/40 bg-accent/10 text-accent",
-                !active && !done && "border-border text-text-muted",
-              )}
+              className="relative"
+              onMouseEnter={() => setBubbleStepId(step.id)}
+              onMouseLeave={() => setBubbleStepId((id) => (id === step.id ? null : id))}
             >
-              {done && !active && <Check size={12} aria-hidden="true" />}
-              {index + 1}. {step.name}
+              <button
+                type="button"
+                aria-current={active ? "step" : undefined}
+                aria-describedby={open ? bubbleId : undefined}
+                aria-expanded={step.description ? open : undefined}
+                onClick={() => setBubbleStepId((id) => (id === step.id ? null : step.id))}
+                onFocus={() => setBubbleStepId(step.id)}
+                onBlur={() => setBubbleStepId((id) => (id === step.id ? null : id))}
+                className={clsx(
+                  "flex items-center gap-1 rounded-full border px-3 py-1",
+                  active && "border-accent bg-accent text-white",
+                  done && !active && "border-accent/40 bg-accent/10 text-accent",
+                  !active && !done && "border-border text-text-muted",
+                  step.description ? "cursor-help" : "cursor-default",
+                )}
+              >
+                {done && !active && <Check size={12} aria-hidden="true" />}
+                {index + 1}. {step.name}
+                {step.description && <Info size={12} aria-hidden="true" className="opacity-70" />}
+              </button>
+              {open && (
+                <div
+                  id={bubbleId}
+                  role="tooltip"
+                  className="absolute left-0 top-full z-20 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-lg bg-near-black p-3 text-xs font-normal leading-relaxed text-white shadow-lg"
+                >
+                  <span className="absolute -top-1 left-4 h-2 w-2 rotate-45 bg-near-black" aria-hidden="true" />
+                  <p className="font-bold">{step.name}</p>
+                  <p className="mt-1">{step.description}</p>
+                </div>
+              )}
             </li>
           );
         })}

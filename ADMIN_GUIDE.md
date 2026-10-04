@@ -26,7 +26,8 @@ not to gate.
    The stages are also the **sales process** (Target → Introduced → Demo
    Booked → Demo Held → Trial Booked → Trial Live → Won / Lost). On the
    Pipeline Stages page, **Checklist & follow-ups** opens each step's
-   checklist (what reps see on the company page, separately for Local and
+   description (the bubble reps see when they hover over or tap the step),
+   its checklist (what reps see on the company page, separately for Local and
    Long-distance bars) and its automatic follow-ups (created when a company
    enters the step, for all bars or one kind only, due a set number of days
    later). Edits apply from then on; follow-ups already created are left

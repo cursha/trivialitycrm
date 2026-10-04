@@ -13,12 +13,14 @@ const BCRYPT_COST_FACTOR = 12;
 // process order. Existing databases had the original stages renamed in
 // place by migration 20261005000000_sales_process (New → Target, Material
 // Sent → Introduced, Demo Given → Demo Held, Trial → Trial Live; Booked
-// hidden). Playbooks are one checklist item per line.
+// hidden). Playbooks are one checklist item per line; description is the
+// step's explainer bubble.
 const pipelineStages: {
   name: string;
   isDefault: boolean;
   outcomeType: PipelineStageOutcome | null;
   processStep?: SalesStep;
+  description?: string;
   playbookLocal?: string[];
   playbookRemote?: string[];
 }[] = [
@@ -27,13 +29,18 @@ const pipelineStages: {
     isDefault: true,
     outcomeType: null,
     processStep: "TARGET",
+    description:
+      "A bar we want to sell to but haven't reached yet. First, get the manager's name, phone and email, and find out the bar's trivia history (do they run trivia now, with whom, and have they tried it before). Then plan it into your route (Local) or send the intro (Long-distance).",
     playbookLocal: [
+      "Get the manager's name, phone and email, and add them as a contact",
+      "Find out their trivia history: do they run trivia now, with whom and which night, and have they tried it before? Note it on the Bar intel card",
       "Check the Bar intel card: slow night, typical crowd, current entertainment",
       "Add the bar to your route plan",
       "Bring flyers",
     ],
     playbookRemote: [
-      "Find the owner or manager's name and the best way to reach them",
+      "Get the manager's name, phone and email, and add them as a contact",
+      "Find out their trivia history: do they run trivia now, with whom and which night, and have they tried it before? Note it on the Bar intel card",
       "Check the Bar intel card: slow night, typical crowd, current entertainment",
       "Send the intro email with the short video, or call",
     ],
@@ -43,6 +50,8 @@ const pipelineStages: {
     isDefault: false,
     outcomeType: null,
     processStep: "INTRODUCED",
+    description:
+      "First contact is made: a flyer dropped off in person (Local), or an intro call or email (Long-distance). The goal now is to book a demo, or for Long-distance bars, to start a trial straight away.",
     playbookLocal: [
       "Drop off the flyer and ask for the owner or manager",
       "If they're in and interested, demo on the spot",
@@ -60,6 +69,8 @@ const pipelineStages: {
     isDefault: false,
     outcomeType: null,
     processStep: "DEMO_BOOKED",
+    description:
+      "A ~20-minute demo is on the calendar: on the bar's own TVs (Local) or over a video call (Long-distance). Confirm it the day before.",
     playbookLocal: [
       "Confirm the demo the day before",
       "Run it on the bar's own TVs (~20 minutes)",
@@ -76,6 +87,8 @@ const pipelineStages: {
     isDefault: false,
     outcomeType: null,
     processStep: "DEMO_HELD",
+    description:
+      "They've seen the game. Ask for the trial: 4 weeks free, one night a week. If they want to think it over, follow up within 2 days.",
     playbookLocal: [
       "Ask for the trial: 4 weeks free, one night a week",
       "If they want to think it over, follow up within 2 days",
@@ -90,6 +103,8 @@ const pipelineStages: {
     isDefault: false,
     outcomeType: null,
     processStep: "TRIAL_BOOKED",
+    description:
+      "They said yes to a trial. Agree on the champion, the trial night, today's headcount and the target, and the monthly price, then get them connected online before night 1.",
     playbookLocal: [
       "Name the champion: the staff member who starts the game each week",
       "Agree the trial night, today's headcount, the target headcount, and the monthly price",
@@ -107,6 +122,8 @@ const pipelineStages: {
     isDefault: false,
     outcomeType: null,
     processStep: "TRIAL_LIVE",
+    description:
+      "The 4-week trial is running, one night a week. Support night 1, check in at week 2, ask for an early yes at week 3, and hold the conversion meeting before week 4 ends.",
     playbookLocal: [
       "Night 1: be on site and help the champion start the game",
       "Week 2: check in with the champion on turnout",
@@ -120,8 +137,8 @@ const pipelineStages: {
       "Before week 4 ends: conversion call",
     ],
   },
-  { name: "Won", isDefault: false, outcomeType: "WON" },
-  { name: "Lost", isDefault: false, outcomeType: "LOST" },
+  { name: "Won", isDefault: false, outcomeType: "WON", description: "A paying customer." },
+  { name: "Lost", isDefault: false, outcomeType: "LOST", description: "Not moving forward. Record why, and move it back to a step if it re-engages." },
 ];
 
 // Follow-ups created automatically when a company enters a step (see
@@ -335,19 +352,22 @@ async function seedPipelineStages() {
         sortOrder: index,
         outcomeType: stage.outcomeType,
         processStep: stage.processStep ?? null,
+        description: stage.description ?? null,
         playbookLocal,
         playbookRemote,
       },
     });
 
     // processStep is a classification too, but unique: only tag this stage
-    // if no other stage already plays that step. Playbooks are only filled
-    // in while empty, so an Administrator's edits are never overwritten.
+    // if no other stage already plays that step. Descriptions and playbooks
+    // are only filled in while empty, so an Administrator's edits are never
+    // overwritten.
     const fill: Prisma.PipelineStageUpdateInput = {};
     if (stage.processStep && row.processStep !== stage.processStep) {
       const taken = await prisma.pipelineStage.findUnique({ where: { processStep: stage.processStep } });
       if (!taken) fill.processStep = stage.processStep;
     }
+    if (row.description === null && stage.description) fill.description = stage.description;
     if (row.playbookLocal === null && playbookLocal) fill.playbookLocal = playbookLocal;
     if (row.playbookRemote === null && playbookRemote) fill.playbookRemote = playbookRemote;
     if (Object.keys(fill).length > 0) await prisma.pipelineStage.update({ where: { id: row.id }, data: fill });

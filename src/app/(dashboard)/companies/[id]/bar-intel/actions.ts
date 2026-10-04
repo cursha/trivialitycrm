@@ -28,6 +28,7 @@ export async function updateBarIntel(companyId: string, formData: FormData): Pro
     slowNight: formString(formData, "slowNight"),
     slowNightHeadcount: formString(formData, "slowNightHeadcount"),
     currentEntertainment: formString(formData, "currentEntertainment"),
+    triviaHistory: formString(formData, "triviaHistory"),
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Please correct the highlighted fields." };
@@ -39,6 +40,7 @@ export async function updateBarIntel(companyId: string, formData: FormData): Pro
       slowNight: parsed.data.slowNight ?? null,
       slowNightHeadcount: parsed.data.slowNightHeadcount ?? null,
       currentEntertainment: parsed.data.currentEntertainment ?? null,
+      triviaHistory: parsed.data.triviaHistory ?? null,
       updatedById: user.id,
     },
   });
