@@ -18,4 +18,14 @@ export const ContactSchema = z.object({
     .union([z.email({ error: "Enter a valid email." }), z.literal("")])
     .optional()
     .transform((value) => (value ? value : undefined)),
+  bestTimeToReach: optionalText(120),
+  // Checkbox semantics: "on" when ticked, absent (empty string) otherwise.
+  isDecisionMaker: z
+    .string()
+    .optional()
+    .transform((value) => value === "on"),
+  isChampion: z
+    .string()
+    .optional()
+    .transform((value) => value === "on"),
 });

@@ -15,7 +15,7 @@ export type FollowUpFilter = "overdue" | "today" | "upcoming" | "none";
 // the system-generated types (PIPELINE_CHANGE/ASSIGNMENT_CHANGE/
 // LEAD_TRANSFERRED/COMPANY_MERGED), which never represent reaching out to
 // the company itself.
-const CONTACT_ACTIVITY_TYPES = ["PHONE", "EMAIL", "MEETING", "MATERIAL_SENT", "DEMO", "TRIAL"] as const;
+const CONTACT_ACTIVITY_TYPES = ["PHONE", "EMAIL", "MEETING", "VISIT", "MATERIAL_SENT", "DEMO", "TRIAL"] as const;
 
 export type CompanyListParams = {
   q?: string;

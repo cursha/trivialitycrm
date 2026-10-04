@@ -210,6 +210,7 @@ export class GoogleProvider implements EmailProvider {
       start: { dateTime: input.startAt.toISOString(), timeZone: input.timezone },
       end: { dateTime: input.endAt.toISOString(), timeZone: input.timezone },
       attendees: input.attendeeEmails.map((email) => ({ email })),
+      ...(input.location ? { location: input.location } : {}),
     };
   }
 

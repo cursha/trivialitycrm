@@ -26,14 +26,36 @@ export function CallOutcomeConfigForm({
     skipRestOfSession: boolean;
     appliesDoNotContact: boolean;
     resultCategory: string | null;
+    appliesToCalls: boolean;
+    appliesToVisits: boolean;
+    booksDemo: boolean;
   };
 }) {
   const action = updateCallOutcomeConfig.bind(null, outcomeId);
   const [state, formAction, pending] = useActionState<ActionResult, FormData>((_prev, formData) => action(formData), undefined);
   const [requiresNextAction, setRequiresNextAction] = useState(initial.requiresNextAction);
+  const [appliesToVisits, setAppliesToVisits] = useState(initial.appliesToVisits);
 
   return (
     <form action={formAction} className="space-y-5">
+      <fieldset className="space-y-2">
+        <legend className="text-sm font-semibold text-text">Offered when</legend>
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" name="appliesToCalls" defaultChecked={initial.appliesToCalls} />
+          Recording a call in a calling session
+        </label>
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" name="appliesToVisits" checked={appliesToVisits} onChange={(e) => setAppliesToVisits(e.target.checked)} />
+          Logging an in-person visit
+        </label>
+        {appliesToVisits && (
+          <label className="ml-6 flex items-center gap-2 text-sm font-medium">
+            <input type="checkbox" name="booksDemo" defaultChecked={initial.booksDemo} />
+            Book a demo appointment (the visit form asks for the date and time)
+          </label>
+        )}
+      </fieldset>
+
       <label className="flex items-center gap-2 text-sm font-medium">
         <input type="checkbox" name="requiresNotes" defaultChecked={initial.requiresNotes} />
         Notes are required before saving this outcome

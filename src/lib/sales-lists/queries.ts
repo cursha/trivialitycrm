@@ -11,7 +11,7 @@ import type { SalesListPurpose } from "@/generated/prisma/enums";
 
 const SORTABLE_FIELDS = new Set<string>(SORTABLE_FIELDS_LIST);
 
-const CONTACT_ACTIVITY_TYPES = ["PHONE", "EMAIL", "MEETING", "MATERIAL_SENT", "DEMO", "TRIAL"] as const;
+const CONTACT_ACTIVITY_TYPES = ["PHONE", "EMAIL", "MEETING", "VISIT", "MATERIAL_SENT", "DEMO", "TRIAL"] as const;
 
 /** Most recent contact-type Activity date per company, for the List
  * detail page's "Last Contact" column — one DISTINCT ON query rather than

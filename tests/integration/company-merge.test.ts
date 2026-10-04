@@ -23,6 +23,23 @@ async function twoCompanies() {
 }
 
 describe("mergeCompanies", () => {
+  it("fills the survivor's blank bar intel from the merged company without overwriting what it already has", async () => {
+    const { admin, surviving, merged } = await twoCompanies();
+    await testPrisma.company.update({ where: { id: surviving.id }, data: { slowNight: "TUESDAY" } });
+    await testPrisma.company.update({
+      where: { id: merged.id },
+      data: { slowNight: "MONDAY", slowNightHeadcount: 15, currentEntertainment: "Karaoke Thursdays" },
+    });
+
+    await mergeCompanies({ survivingCompanyId: surviving.id, mergedCompanyId: merged.id, fieldDecisions: {}, actorId: admin.id });
+
+    expect(await testPrisma.company.findUniqueOrThrow({ where: { id: surviving.id } })).toMatchObject({
+      slowNight: "TUESDAY",
+      slowNightHeadcount: 15,
+      currentEntertainment: "Karaoke Thursdays",
+    });
+  });
+
   it("reassigns every related record type onto the surviving company", async () => {
     const { admin, surviving, merged } = await twoCompanies();
 

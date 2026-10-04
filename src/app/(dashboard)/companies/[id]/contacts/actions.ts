@@ -35,6 +35,9 @@ function parseContactForm(formData: FormData) {
     title: formString(formData, "title"),
     phone: formString(formData, "phone"),
     email: formString(formData, "email"),
+    bestTimeToReach: formString(formData, "bestTimeToReach"),
+    isDecisionMaker: formString(formData, "isDecisionMaker"),
+    isChampion: formString(formData, "isChampion"),
   });
 }
 
@@ -58,6 +61,9 @@ export async function createContact(
       title: parsed.data.title ?? null,
       phone: parsed.data.phone ?? null,
       email: parsed.data.email ?? null,
+      bestTimeToReach: parsed.data.bestTimeToReach ?? null,
+      isDecisionMaker: parsed.data.isDecisionMaker,
+      isChampion: parsed.data.isChampion,
       ...computeContactNormalizedFields(parsed.data),
     },
   });
@@ -86,6 +92,9 @@ export async function updateContact(companyId: string, contactId: string, formDa
       title: parsed.data.title ?? null,
       phone: parsed.data.phone ?? null,
       email: parsed.data.email ?? null,
+      bestTimeToReach: parsed.data.bestTimeToReach ?? null,
+      isDecisionMaker: parsed.data.isDecisionMaker,
+      isChampion: parsed.data.isChampion,
       ...computeContactNormalizedFields(parsed.data),
     },
   });

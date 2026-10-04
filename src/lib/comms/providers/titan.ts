@@ -1,11 +1,14 @@
 import nodemailer from "nodemailer";
 import { callEmailProvider } from "./http";
+import { buildIcsEvent, icsSequence } from "../ics";
+import { escapeHtml } from "../sanitize-html";
 import type {
   EmailProvider,
   OAuthTokens,
   ConnectedAccount,
   SendEmailInput,
   SendEmailResult,
+  CalendarEventInput,
   CalendarEventResult,
   InboundSubscription,
   ParsedInboundNotification,
@@ -113,23 +116,67 @@ export class TitanProvider implements EmailProvider {
   }
 
   /**
-   * Titan exposes no calendar API at all (confirmed — it's a mailbox-
-   * hosting product, not a groupware suite with a programmatic surface).
-   * Thrown clearly rather than silently no-op, same reasoning as Google's
-   * inbound-sync stubs below — a Titan-connected user simply can't use the
-   * Appointments panel; the UI is expected to hide/disable it for a TITAN
-   * connection rather than let this throw surface as a raw error.
+   * Titan exposes no calendar API (it's a mailbox-hosting product, not a
+   * groupware suite), so "creating a calendar event" here means sending a
+   * standard iCalendar invite email (iMIP, RFC 6047) over SMTP: every
+   * mainstream calendar client turns a METHOD:REQUEST message into an "add
+   * to calendar" event. The organizer (the rep's own mailbox) is always a
+   * recipient too, so the demo also lands on the rep's phone calendar.
+   *
+   * There is no server-side event to look up later — providerEventId is
+   * the iCalendar UID this method generates, and update/cancel re-send
+   * under that same UID with a higher SEQUENCE (see icsSequence).
    */
-  async createCalendarEvent(): Promise<CalendarEventResult> {
-    throw new Error("Titan Email has no calendar API — calendar scheduling is unavailable for a Titan-connected mailbox.");
+  async createCalendarEvent(account: ConnectedAccount, input: CalendarEventInput): Promise<CalendarEventResult> {
+    const uid = `${crypto.randomUUID()}@trivialitycrm`;
+    await this.sendInvite(account, uid, "REQUEST", input);
+    return { providerEventId: uid };
   }
 
-  async updateCalendarEvent(): Promise<void> {
-    throw new Error("Titan Email has no calendar API — calendar scheduling is unavailable for a Titan-connected mailbox.");
+  async updateCalendarEvent(account: ConnectedAccount, providerEventId: string, input: CalendarEventInput): Promise<void> {
+    await this.sendInvite(account, providerEventId, "REQUEST", input);
   }
 
-  async cancelCalendarEvent(): Promise<void> {
-    throw new Error("Titan Email has no calendar API — calendar scheduling is unavailable for a Titan-connected mailbox.");
+  async cancelCalendarEvent(account: ConnectedAccount, providerEventId: string, input?: CalendarEventInput): Promise<void> {
+    if (!input) {
+      throw new Error("Titan calendar invites need the event details to send a cancellation — none were provided.");
+    }
+    await this.sendInvite(account, providerEventId, "CANCEL", input);
+  }
+
+  private async sendInvite(account: ConnectedAccount, uid: string, method: "REQUEST" | "CANCEL", input: CalendarEventInput): Promise<void> {
+    const transport = transportFor(account);
+    const organizerEmail = account.accountEmail as string;
+    const recipients = [...new Set([...input.attendeeEmails, organizerEmail].map((address) => address.trim().toLowerCase()).filter(Boolean))];
+
+    const ics = buildIcsEvent({
+      method,
+      uid,
+      sequence: icsSequence(),
+      startAt: input.startAt,
+      endAt: input.endAt,
+      summary: input.title,
+      location: input.location,
+      organizer: { email: organizerEmail, name: input.organizerName },
+      attendeeEmails: input.attendeeEmails,
+    });
+
+    const when = input.startAt.toLocaleString("en-US", { timeZone: input.timezone, dateStyle: "full", timeStyle: "short" });
+    const subject = method === "CANCEL" ? `Cancelled: ${input.title}` : `Invitation: ${input.title}`;
+    const bodyHtml =
+      `<p>${method === "CANCEL" ? "This appointment has been cancelled." : "You're invited:"} <strong>${escapeHtml(input.title)}</strong></p>` +
+      `<p>When: ${escapeHtml(when)} (${escapeHtml(input.timezone)})</p>` +
+      (input.location ? `<p>Where: ${escapeHtml(input.location)}</p>` : "");
+
+    await callEmailProvider({ providerName: "titan", connectionId: account.connectionId }, async () => {
+      return transport.sendMail({
+        from: input.organizerName ? { name: encodeHeaderValue(input.organizerName), address: organizerEmail } : organizerEmail,
+        to: recipients.map(encodeHeaderValue).join(", "),
+        subject: encodeHeaderValue(subject),
+        html: bodyHtml,
+        icalEvent: { method, filename: "invite.ics", content: ics },
+      });
+    });
   }
 
   /**

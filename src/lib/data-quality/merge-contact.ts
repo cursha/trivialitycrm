@@ -103,6 +103,12 @@ export async function mergeContacts(params: ContactMergeParams): Promise<void> {
     for (const [field, value] of Object.entries(fieldDecisions)) {
       updateData[field] = value;
     }
+    // Field-sales roles aren't a per-field merge decision: a role known on
+    // either record stays known on the survivor, and a best time to reach
+    // only fills a blank — merging never loses what a rep learned in person.
+    if (merged.isDecisionMaker) updateData.isDecisionMaker = true;
+    if (merged.isChampion) updateData.isChampion = true;
+    if (!surviving.bestTimeToReach && merged.bestTimeToReach) updateData.bestTimeToReach = merged.bestTimeToReach;
 
     const updatedSurvivor = await tx.contact.update({ where: { id: survivingContactId }, data: updateData });
 

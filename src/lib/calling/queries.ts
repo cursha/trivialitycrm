@@ -114,7 +114,7 @@ export async function getSessionProgress(sessionId: string) {
 }
 
 export async function getActiveCallOutcomes() {
-  return prisma.callOutcome.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" }, include: { defaultPipelineStage: true } });
+  return prisma.callOutcome.findMany({ where: { active: true, appliesToCalls: true }, orderBy: { sortOrder: "asc" }, include: { defaultPipelineStage: true } });
 }
 
 /** Every entry in a session, in position order, with its company name and

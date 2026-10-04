@@ -41,6 +41,7 @@ describe("Call Outcome admin CRUD", () => {
     await updateCallOutcomeConfig(
       outcome.id,
       fd({
+        appliesToCalls: "on",
         requiresNotes: "on",
         requiresNextAction: "on",
         defaultNextActionDays: "3",
@@ -71,8 +72,53 @@ describe("Call Outcome admin CRUD", () => {
     await createCallOutcome(undefined, fd({ name: "Needs Days" }));
     const outcome = await testPrisma.callOutcome.findFirstOrThrow({ where: { name: "Needs Days" } });
 
-    const result = await updateCallOutcomeConfig(outcome.id, fd({ requiresNextAction: "on" }));
+    const result = await updateCallOutcomeConfig(outcome.id, fd({ appliesToCalls: "on", requiresNextAction: "on" }));
     expect(result).toHaveProperty("error");
+  });
+
+  it("configures which channels offer an outcome, and only lets a visit outcome book a demo", async () => {
+    const role = await createRoleWithPermissions("OutcomeAdminChannels", ["manage_call_outcomes"]);
+    const user = await createTestUser({ roleId: role.id });
+    await loginAs(user.id);
+    await createCallOutcome(undefined, fd({ name: "Channel Outcome" }));
+    const outcome = await testPrisma.callOutcome.findFirstOrThrow({ where: { name: "Channel Outcome" } });
+    expect(outcome).toMatchObject({ appliesToCalls: true, appliesToVisits: false, booksDemo: false });
+
+    expect(await updateCallOutcomeConfig(outcome.id, fd({}))).toEqual({
+      error: "Choose at least one place this outcome is offered (calls, visits, or both).",
+    });
+
+    await updateCallOutcomeConfig(outcome.id, fd({ appliesToVisits: "on", booksDemo: "on" }));
+    expect(await testPrisma.callOutcome.findUniqueOrThrow({ where: { id: outcome.id } })).toMatchObject({
+      appliesToCalls: false,
+      appliesToVisits: true,
+      booksDemo: true,
+    });
+
+    // booksDemo only means something on the visit form — it's dropped for a
+    // calls-only outcome rather than stored as a dormant flag.
+    await updateCallOutcomeConfig(outcome.id, fd({ appliesToCalls: "on", booksDemo: "on" }));
+    expect(await testPrisma.callOutcome.findUniqueOrThrow({ where: { id: outcome.id } })).toMatchObject({
+      appliesToCalls: true,
+      appliesToVisits: false,
+      booksDemo: false,
+    });
+  });
+
+  it("refuses to delete an outcome that has been used to log a visit", async () => {
+    const role = await createRoleWithPermissions("OutcomeAdminVisits", ["manage_call_outcomes"]);
+    const user = await createTestUser({ roleId: role.id });
+    await loginAs(user.id);
+    await createCallOutcome(undefined, fd({ name: "Visit Outcome" }));
+    const outcome = await testPrisma.callOutcome.findFirstOrThrow({ where: { name: "Visit Outcome" } });
+    const leadType = await createLeadTypeFixture();
+    const companyStage = await createPipelineStageFixture();
+    const company = await createCompanyFixture({ leadTypeId: leadType.id, pipelineStageId: companyStage.id, assignedToId: null, createdById: user.id });
+    await testPrisma.activity.create({ data: { companyId: company.id, userId: user.id, type: "VISIT", outcome: outcome.name, callOutcomeId: outcome.id } });
+
+    const result = await deleteCallOutcome(outcome.id);
+    expect(result).toHaveProperty("error");
+    expect(await testPrisma.callOutcome.findUnique({ where: { id: outcome.id } })).not.toBeNull();
   });
 
   it("refuses to delete an outcome that has been used to record a call", async () => {

@@ -238,6 +238,11 @@ const callOutcomes: {
   appliesDoNotContact?: boolean;
   resultCategory?: "UNREACHABLE" | "INTERESTED" | "DEMO_REQUESTED" | "NOT_INTERESTED";
   useLostStage?: boolean;
+  // Channels (default: calls only) — see CallOutcome.appliesToCalls/
+  // appliesToVisits/booksDemo in schema.prisma.
+  appliesToCalls?: boolean;
+  appliesToVisits?: boolean;
+  booksDemo?: boolean;
 }[] = [
   { name: "No Answer", requiresNextAction: true, defaultNextActionDays: 2, defaultNextActionTitle: "Follow up call", resultCategory: "UNREACHABLE" },
   { name: "Left Message", requiresNextAction: true, defaultNextActionDays: 3, defaultNextActionTitle: "Follow up on voicemail", resultCategory: "UNREACHABLE" },
@@ -247,9 +252,20 @@ const callOutcomes: {
   { name: "Interested", requiresNotes: true, requiresNextAction: true, defaultNextActionDays: 2, defaultNextActionTitle: "Follow up with interested lead", resultCategory: "INTERESTED" },
   { name: "Demo Requested", requiresNotes: true, requiresNextAction: true, defaultNextActionDays: 1, defaultNextActionTitle: "Schedule demo", resultCategory: "DEMO_REQUESTED" },
   { name: "Call Back Later", requiresNextAction: true, defaultNextActionDays: 7, defaultNextActionTitle: "Call back" },
-  { name: "Not Interested", requiresNotes: true, requiresRejectionReason: true, skipRestOfSession: true, resultCategory: "NOT_INTERESTED", useLostStage: true },
-  { name: "Do Not Contact", requiresNotes: true, skipRestOfSession: true, appliesDoNotContact: true, resultCategory: "NOT_INTERESTED" },
+  { name: "Not Interested", requiresNotes: true, requiresRejectionReason: true, skipRestOfSession: true, resultCategory: "NOT_INTERESTED", useLostStage: true, appliesToVisits: true },
+  { name: "Do Not Contact", requiresNotes: true, skipRestOfSession: true, appliesDoNotContact: true, resultCategory: "NOT_INTERESTED", appliesToVisits: true },
   { name: "Invalid Number", skipRestOfSession: true, resultCategory: "UNREACHABLE" },
+  // In-person visit outcomes (field-sales walk-ins). Trip 1 is a flyer
+  // drop-off whose real goal is booking a demo, so every non-final outcome
+  // creates the follow-up that books it.
+  { name: "Flyer Dropped (Owner Not In)", requiresNextAction: true, defaultNextActionDays: 2, defaultNextActionTitle: "Call to book a demo", resultCategory: "UNREACHABLE", appliesToCalls: false, appliesToVisits: true },
+  { name: "Spoke to Staff (Left Flyer)", requiresNextAction: true, defaultNextActionDays: 1, defaultNextActionTitle: "Call the owner to book a demo", resultCategory: "UNREACHABLE", appliesToCalls: false, appliesToVisits: true },
+  { name: "Demo Booked", resultCategory: "DEMO_REQUESTED", appliesToCalls: false, appliesToVisits: true, booksDemo: true },
+  { name: "Demo Given on the Spot", requiresNotes: true, requiresNextAction: true, defaultNextActionDays: 1, defaultNextActionTitle: "Follow up to book the trial", resultCategory: "INTERESTED", appliesToCalls: false, appliesToVisits: true },
+  { name: "Decision-Maker Thinking It Over", requiresNotes: true, requiresNextAction: true, defaultNextActionDays: 2, defaultNextActionTitle: "Follow up on the trial offer", resultCategory: "INTERESTED", appliesToCalls: false, appliesToVisits: true },
+  { name: "Trial Booked", requiresNotes: true, requiresNextAction: true, defaultNextActionDays: 1, defaultNextActionTitle: "Confirm trial start and night-1 setup", resultCategory: "INTERESTED", appliesToCalls: false, appliesToVisits: true },
+  { name: "Already Has Trivia", requiresNotes: true, requiresNextAction: true, defaultNextActionDays: 60, defaultNextActionTitle: "Check back on their existing trivia", appliesToCalls: false, appliesToVisits: true },
+  { name: "Closed / Not a Fit", requiresNotes: true, requiresRejectionReason: true, resultCategory: "NOT_INTERESTED", useLostStage: true, appliesToCalls: false, appliesToVisits: true },
 ];
 
 async function seedCallOutcomes() {
@@ -272,6 +288,9 @@ async function seedCallOutcomes() {
         skipRestOfSession: outcome.skipRestOfSession ?? false,
         appliesDoNotContact: outcome.appliesDoNotContact ?? false,
         resultCategory: outcome.resultCategory ?? null,
+        appliesToCalls: outcome.appliesToCalls ?? true,
+        appliesToVisits: outcome.appliesToVisits ?? false,
+        booksDemo: outcome.booksDemo ?? false,
       },
       create: {
         name: outcome.name,
@@ -286,6 +305,9 @@ async function seedCallOutcomes() {
         skipRestOfSession: outcome.skipRestOfSession ?? false,
         appliesDoNotContact: outcome.appliesDoNotContact ?? false,
         resultCategory: outcome.resultCategory ?? null,
+        appliesToCalls: outcome.appliesToCalls ?? true,
+        appliesToVisits: outcome.appliesToVisits ?? false,
+        booksDemo: outcome.booksDemo ?? false,
       },
     });
   }

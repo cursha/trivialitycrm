@@ -240,15 +240,8 @@ describe("TitanProvider", () => {
     await expect(provider.refreshAccessToken("refresh")).rejects.toThrow(/password authentication/);
   });
 
-  it("throws a clear error for every calendar method — Titan has no calendar API", async () => {
-    const provider: EmailProvider = new TitanProvider();
-    const account = { accessToken: "pw", refreshToken: "", accountEmail: "sales@example.test" };
-    const input = { title: "Demo", startAt: new Date(), endAt: new Date(), timezone: "America/Toronto", attendeeEmails: [] };
-
-    await expect(provider.createCalendarEvent(account, input)).rejects.toThrow(/no calendar API/);
-    await expect(provider.updateCalendarEvent(account, "event-1", input)).rejects.toThrow(/no calendar API/);
-    await expect(provider.cancelCalendarEvent(account, "event-1")).rejects.toThrow(/no calendar API/);
-  });
+  // Titan's calendar methods send iCalendar invite emails rather than
+  // throwing — covered in titan-calendar.test.ts (nodemailer mocked there).
 
   it("throws a clear 'no API' error for every inbound method — a permanent limitation, not a scoped-out phase", async () => {
     const provider: EmailProvider = new TitanProvider();

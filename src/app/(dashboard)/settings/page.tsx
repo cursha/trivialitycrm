@@ -53,8 +53,8 @@ export default async function SettingsPage() {
     },
     {
       href: "/settings/call-outcomes",
-      label: "Call Outcomes",
-      description: "Outcomes available in a guided calling session, and their default actions.",
+      label: "Call & Visit Outcomes",
+      description: "Outcomes available in a guided calling session or when logging an in-person visit, and their default actions.",
       icon: PhoneCall,
       visible: hasPermission(user, "manage_call_outcomes"),
     },

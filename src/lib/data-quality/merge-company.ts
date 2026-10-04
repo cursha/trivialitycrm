@@ -133,6 +133,11 @@ export async function mergeCompanies(params: CompanyMergeParams): Promise<void> 
     for (const [field, value] of Object.entries(fieldDecisions)) {
       updateData[field] = value;
     }
+    // Bar intel isn't a per-field merge decision — the merged company's
+    // in-person findings only fill the survivor's blanks, never overwrite.
+    if (surviving.slowNight === null && merged.slowNight !== null) updateData.slowNight = merged.slowNight;
+    if (surviving.slowNightHeadcount === null && merged.slowNightHeadcount !== null) updateData.slowNightHeadcount = merged.slowNightHeadcount;
+    if (!surviving.currentEntertainment && merged.currentEntertainment) updateData.currentEntertainment = merged.currentEntertainment;
 
     // --- Conflict #4: EOS is a whole-record decision, never per-category.
     if (eosChoice === "merged" && merged.currentHistoricalScoreId) {

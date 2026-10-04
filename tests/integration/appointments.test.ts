@@ -70,7 +70,7 @@ describe("createAppointment", () => {
     expect(await testPrisma.appointment.count()).toBe(0);
   });
 
-  it("requires a connected mailbox", async () => {
+  it("saves a CRM-only appointment when no mailbox is connected", async () => {
     const { user, company } = await baseFixtures();
     const { startAt, endAt } = slot();
 
@@ -82,10 +82,37 @@ describe("createAppointment", () => {
       startAt,
       endAt,
       timezone: "America/Toronto",
-      attendeeEmails: [],
+      attendeeEmails: ["owner@example.com"],
+      location: "123 Main St",
     });
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error).toMatch(/Connect a mailbox/);
+    expect(result).toMatchObject({ ok: true, inviteSent: false });
+
+    const appointment = await testPrisma.appointment.findFirstOrThrow({ where: { companyId: company.id } });
+    expect(appointment.status).toBe("SCHEDULED");
+    expect(appointment.providerConnectionId).toBeNull();
+    expect(appointment.providerEventId).toBeNull();
+    expect(appointment.location).toBe("123 Main St");
+  });
+
+  it("never touches the calendar when the caller opts out of an invite, even with a mailbox connected", async () => {
+    const { user, company } = await baseFixtures();
+    await connectMailbox(user.id);
+    const { startAt, endAt } = slot();
+
+    const result = await createAppointment({
+      userId: user.id,
+      companyId: company.id,
+      type: "DEMO",
+      title: "Demo",
+      startAt,
+      endAt,
+      timezone: "America/Toronto",
+      attendeeEmails: [],
+      sendInvite: false,
+    });
+    expect(result).toMatchObject({ ok: true, inviteSent: false });
+    const appointment = await testPrisma.appointment.findFirstOrThrow({ where: { companyId: company.id } });
+    expect(appointment.providerEventId).toBeNull();
   });
 
   it("creates the appointment and stores a real providerEventId on success", async () => {
@@ -139,6 +166,31 @@ describe("updateAppointment", () => {
   it("updates the stored fields and sets status UPDATED on success", async () => {
     const { user, company } = await baseFixtures();
     await connectMailbox(user.id);
+    const { startAt, endAt } = slot();
+    const created = await createAppointment({
+      userId: user.id,
+      companyId: company.id,
+      type: "DEMO",
+      title: "Demo",
+      startAt,
+      endAt,
+      timezone: "America/Toronto",
+      attendeeEmails: [],
+    });
+    if (!created.ok) throw new Error("create failed");
+
+    const newStart = new Date(startAt.getTime() + 24 * 60 * 60 * 1000);
+    const newEnd = new Date(endAt.getTime() + 24 * 60 * 60 * 1000);
+    const result = await updateAppointment(created.appointmentId, { startAt: newStart, endAt: newEnd });
+    expect(result.ok).toBe(true);
+
+    const appointment = await testPrisma.appointment.findUniqueOrThrow({ where: { id: created.appointmentId } });
+    expect(appointment.status).toBe("UPDATED");
+    expect(appointment.startAt.getTime()).toBe(newStart.getTime());
+  });
+
+  it("reschedules a CRM-only appointment in place", async () => {
+    const { user, company } = await baseFixtures();
     const { startAt, endAt } = slot();
     const created = await createAppointment({
       userId: user.id,

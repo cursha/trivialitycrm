@@ -13,7 +13,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { getEligibleCompaniesForCalling, getActiveSessionForUser, getOwnedSession, getNextEntry } from "@/lib/calling/queries";
 import { sortCompaniesForCalling } from "@/lib/calling/order";
 import { logCallActivity } from "@/lib/calling/activity-log";
-import { logPipelineChange } from "@/lib/companies/activity-log";
+import { applyOutcomeEffects } from "@/lib/companies/outcome-effects";
 
 export type CallingSessionActionResult = { error: string } | { success: true; id: string };
 
@@ -184,7 +184,7 @@ export async function recordCallOutcome(
   }
   if (entry.status !== "PENDING") return { error: "This company has already been handled this session." };
 
-  const outcome = await prisma.callOutcome.findFirst({ where: { id: input.outcomeId, active: true } });
+  const outcome = await prisma.callOutcome.findFirst({ where: { id: input.outcomeId, active: true, appliesToCalls: true } });
   if (!outcome) return { error: "Choose a valid call outcome." };
   if (outcome.requiresNotes && !input.notes.trim()) return { error: "Notes are required for this outcome." };
   if (outcome.requiresRejectionReason && !input.rejectionReasonId) return { error: "Choose a reason for this outcome." };
@@ -195,39 +195,18 @@ export async function recordCallOutcome(
   if (!company) return { error: "You do not have access to this company." };
 
   const notes = input.notes.trim() || null;
-  const canChangeStage = outcome.defaultPipelineStageId && hasPermission(user, "edit_leads");
+  const canChangeStage = hasPermission(user, "edit_leads");
 
   await prisma.$transaction(async (tx) => {
-    const activity = await logCallActivity(tx, { companyId: company.id, userId: user.id, outcomeName: outcome.name, notes });
+    const activity = await logCallActivity(tx, { companyId: company.id, userId: user.id, outcomeId: outcome.id, outcomeName: outcome.name, notes });
 
-    let taskId: string | null = null;
-    if (outcome.requiresNextAction && outcome.defaultNextActionDays !== null) {
-      const dueAt = new Date(Date.now() + outcome.defaultNextActionDays * 24 * 60 * 60 * 1000);
-      const task = await tx.task.create({
-        data: {
-          companyId: company.id,
-          assignedToId: company.assignedToId ?? user.id,
-          title: outcome.defaultNextActionTitle ?? outcome.name,
-          dueAt,
-        },
-      });
-      taskId = task.id;
-    }
-
-    if (canChangeStage && outcome.defaultPipelineStageId && outcome.defaultPipelineStageId !== company.pipelineStageId) {
-      await logPipelineChange(tx, {
-        companyId: company.id,
-        userId: user.id,
-        fromStageId: company.pipelineStageId,
-        toStageId: outcome.defaultPipelineStageId,
-        lossReasonId: input.rejectionReasonId ?? null,
-      });
-      await tx.company.update({ where: { id: company.id }, data: { pipelineStageId: outcome.defaultPipelineStageId } });
-    }
-
-    if (outcome.appliesDoNotContact) {
-      await tx.company.update({ where: { id: company.id }, data: { doNotContact: true } });
-    }
+    const { taskId, appliedPipelineStageId } = await applyOutcomeEffects(tx, {
+      company,
+      userId: user.id,
+      outcome,
+      canChangeStage,
+      rejectionReasonId: input.rejectionReasonId ?? null,
+    });
 
     await tx.callRecord.create({
       data: {
@@ -239,7 +218,7 @@ export async function recordCallOutcome(
         recordedById: user.id,
         activityId: activity.id,
         taskId,
-        appliedPipelineStageId: canChangeStage ? outcome.defaultPipelineStageId : null,
+        appliedPipelineStageId,
         rejectionReasonId: input.rejectionReasonId ?? null,
       },
     });

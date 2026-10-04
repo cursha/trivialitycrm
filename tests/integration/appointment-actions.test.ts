@@ -4,7 +4,7 @@ import { createRoleWithPermissions, createTestUser, createLeadTypeFixture, creat
 import { resetFakeCookies } from "../setup/mock-next";
 import { resetEnvCacheForTests } from "../../src/lib/env";
 import { encryptToken } from "../../src/lib/comms/token-crypto";
-import { scheduleAppointmentAction, cancelAppointmentAction } from "../../src/app/(dashboard)/companies/[id]/appointments/actions";
+import { scheduleAppointmentAction, cancelAppointmentAction, updateAppointmentAction } from "../../src/app/(dashboard)/companies/[id]/appointments/actions";
 
 const TEST_KEY = "SRvbw8Ualx2XC/Ekfrk0RWORk0fg8/dcL1kL5krkqbk=";
 const mutableEnv = process.env as Record<string, string | undefined>;
@@ -102,7 +102,7 @@ describe("scheduleAppointmentAction", () => {
     formData.set("attendeeEmails", "lead@example.com, manager@example.com");
 
     const result = await scheduleAppointmentAction(company.id, undefined, formData);
-    expect(result).toBeUndefined();
+    expect(result).toEqual({ inviteSent: true });
 
     const appointment = await testPrisma.appointment.findFirstOrThrow({ where: { companyId: company.id } });
     expect(appointment.type).toBe("TRIAL_REVIEW");
@@ -132,5 +132,80 @@ describe("cancelAppointmentAction", () => {
     await loginAs(outsider.id);
 
     await expect(cancelAppointmentAction(company.id, appointment.id)).rejects.toThrow(/Forbidden/);
+  });
+});
+
+describe("appointment action time handling", () => {
+  it("reads the form's start/end as wall-clock time in the chosen timezone, not the server's", async () => {
+    const { user, company } = await baseFixtures();
+    await connectMailbox(user.id);
+    await loginAs(user.id);
+
+    const formData = new FormData();
+    formData.set("type", "DEMO");
+    formData.set("title", "Demo");
+    formData.set("startAt", "2026-10-06T14:00");
+    formData.set("endAt", "2026-10-06T14:20");
+    formData.set("timezone", "America/Denver");
+
+    const result = await scheduleAppointmentAction(company.id, undefined, formData);
+    expect(result?.error).toBeUndefined();
+
+    const appointment = await testPrisma.appointment.findFirstOrThrow({ where: { companyId: company.id } });
+    // 2pm MDT (UTC-6) is 20:00 UTC.
+    expect(appointment.startAt.toISOString()).toBe("2026-10-06T20:00:00.000Z");
+    expect(appointment.endAt.toISOString()).toBe("2026-10-06T20:20:00.000Z");
+    expect(appointment.timezone).toBe("America/Denver");
+  });
+
+  it("saves a CRM-only appointment when the form's invite box is left unticked", async () => {
+    const { user, company } = await baseFixtures();
+    await connectMailbox(user.id);
+    await loginAs(user.id);
+
+    const formData = new FormData();
+    formData.set("type", "DEMO");
+    formData.set("title", "Demo");
+    formData.set("startAt", "2026-10-06T14:00");
+    formData.set("endAt", "2026-10-06T14:20");
+    formData.set("timezone", "America/Denver");
+    formData.set("sendInviteChoice", "1");
+
+    const result = await scheduleAppointmentAction(company.id, undefined, formData);
+    expect(result).toMatchObject({ inviteSent: false });
+    const appointment = await testPrisma.appointment.findFirstOrThrow({ where: { companyId: company.id } });
+    expect(appointment.providerEventId).toBeNull();
+  });
+});
+
+describe("appointment ownership checks", () => {
+  it("refuses to cancel or reschedule an appointment that belongs to a different company", async () => {
+    const { user, company } = await baseFixtures();
+    await connectMailbox(user.id);
+    await loginAs(user.id);
+    const otherCompany = await createCompanyFixture({
+      leadTypeId: company.leadTypeId,
+      pipelineStageId: company.pipelineStageId,
+      assignedToId: user.id,
+      createdById: user.id,
+    });
+
+    const formData = new FormData();
+    formData.set("type", "DEMO");
+    formData.set("title", "Demo");
+    formData.set("startAt", "2026-10-06T14:00");
+    formData.set("endAt", "2026-10-06T14:20");
+    formData.set("timezone", "America/Toronto");
+    await scheduleAppointmentAction(otherCompany.id, undefined, formData);
+    const appointment = await testPrisma.appointment.findFirstOrThrow({ where: { companyId: otherCompany.id } });
+
+    expect(await cancelAppointmentAction(company.id, appointment.id)).toEqual({ error: "Appointment not found." });
+    const reschedule = new FormData();
+    reschedule.set("startAt", "2026-10-07T14:00");
+    reschedule.set("endAt", "2026-10-07T14:20");
+    expect(await updateAppointmentAction(company.id, appointment.id, reschedule)).toEqual({ error: "Appointment not found." });
+
+    const unchanged = await testPrisma.appointment.findUniqueOrThrow({ where: { id: appointment.id } });
+    expect(unchanged.status).toBe("SCHEDULED");
   });
 });

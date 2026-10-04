@@ -128,9 +128,24 @@ describe("recordCallOutcome", () => {
     const activity = await testPrisma.activity.findFirstOrThrow({ where: { companyId: companies[0].id, type: "PHONE" } });
     expect(activity.outcome).toBe("Spoke to Contact");
     expect(activity.notes).toBe("Had a great chat.");
+    expect(activity.callOutcomeId).toBe(outcome.id);
 
     const updatedEntry = await testPrisma.callingSessionEntry.findUniqueOrThrow({ where: { id: entry.id } });
     expect(updatedEntry.status).toBe("COMPLETED");
+  });
+
+  it("refuses an outcome that is only offered for in-person visits", async () => {
+    const { user, leadType, stage } = await baseFixtures();
+    await loginAs(user.id);
+    const { listId } = await callingListWithCompanies(user, leadType, stage, 1);
+    const started = await startCallingSession(listId);
+    if (!("success" in started)) throw new Error("unreachable");
+    const entry = await testPrisma.callingSessionEntry.findFirstOrThrow({ where: { sessionId: started.id } });
+    const visitOnly = await outcomeFixture({ name: "Flyer Dropped", appliesToCalls: false, appliesToVisits: true });
+
+    const result = await recordCallOutcome(started.id, entry.id, { outcomeId: visitOnly.id, notes: "" });
+    expect(result).toEqual({ error: "Choose a valid call outcome." });
+    expect(await testPrisma.activity.count()).toBe(0);
   });
 
   it("creates the configured default follow-up task", async () => {

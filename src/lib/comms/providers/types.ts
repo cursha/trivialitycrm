@@ -49,6 +49,11 @@ export type CalendarEventInput = {
    * display these times, not merely metadata; see calendar-time.ts. */
   timezone: string;
   attendeeEmails: string[];
+  /** Free-text place (e.g. the venue's address for an in-person demo). */
+  location?: string | null;
+  /** Display name of the organizer — only an invite-email provider
+   * (Titan) needs it; an API provider knows its own account's name. */
+  organizerName?: string | null;
 };
 
 export type CalendarEventResult = {
@@ -119,8 +124,11 @@ export interface EmailProvider {
   updateCalendarEvent(account: ConnectedAccount, providerEventId: string, input: CalendarEventInput): Promise<void>;
 
   /** Cancels an event, notifying attendees — the provider's own
-   * notification, this app never sends a competing cancellation email. */
-  cancelCalendarEvent(account: ConnectedAccount, providerEventId: string): Promise<void>;
+   * notification, this app never sends a competing cancellation email.
+   * `input` is the event as it last stood: an API provider ignores it, but
+   * an invite-email provider (Titan) has no server-side event to look up
+   * and needs it to address and describe the cancellation. */
+  cancelCalendarEvent(account: ConnectedAccount, providerEventId: string, input?: CalendarEventInput): Promise<void>;
 
   /** Creates a push subscription so new inbox mail triggers a webhook POST
    * to notificationUrl. clientState is a per-connection secret this app

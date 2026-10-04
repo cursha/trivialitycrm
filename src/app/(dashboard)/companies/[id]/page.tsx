@@ -20,6 +20,8 @@ import { EvidencePanel } from "./eos/evidence-panel";
 import { EmailPanel } from "./email/email-panel";
 import { SequenceEnrollmentPanel } from "./sequences/sequence-enrollment-panel";
 import { AppointmentPanel } from "./appointments/appointment-panel";
+import { BarIntelPanel } from "./bar-intel/bar-intel-panel";
+import type { VisitSetup } from "./activities/activity-panel";
 import { getConnectionStatus } from "@/lib/comms/connections";
 import { AddToRouteToggle } from "./route-plan-toggle";
 import { getRouteCompanyIds } from "@/lib/route-plan/service";
@@ -29,6 +31,7 @@ import { parseStoredLinks } from "@/lib/comms/links";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TRIVIA_STATUS_LABEL, WEEKDAY_LABEL } from "@/lib/ui/status-tones";
+import { formatRouteAddress } from "@/lib/route-plan/validation";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -73,6 +76,8 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     pendingDuplicateCount,
     routeCompanyIds,
     connection,
+    visitOutcomes,
+    rejectionReasons,
   ] = await Promise.all([
       listCompanyActivities(user, id),
       listCompanyTasks(user, id),
@@ -136,9 +141,38 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
       }),
       hasPermission(user, "manage_route_plan") ? getRouteCompanyIds(user.id) : Promise.resolve(new Set<string>()),
       getConnectionStatus(user.id),
+      prisma.callOutcome.findMany({
+        where: { active: true, appliesToVisits: true },
+        orderBy: { sortOrder: "asc" },
+        include: { defaultPipelineStage: { select: { name: true } } },
+      }),
+      prisma.rejectionReason.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" }, select: { id: true, name: true } }),
     ]);
-  const calendarAvailable = connection?.provider !== "titan";
+  const hasMailbox = connection?.status === "CONNECTED";
   const canEdit = hasPermission(user, "edit_leads");
+  const canLogVisit = canEdit && company.status === "ACTIVE";
+  const visitSetup: VisitSetup | null = canLogVisit
+    ? {
+        outcomes: visitOutcomes.map((o) => ({
+          id: o.id,
+          name: o.name,
+          requiresNotes: o.requiresNotes,
+          requiresNextAction: o.requiresNextAction,
+          defaultNextActionDays: o.defaultNextActionDays,
+          defaultNextActionTitle: o.defaultNextActionTitle,
+          defaultPipelineStageName: o.defaultPipelineStage?.name ?? null,
+          requiresRejectionReason: o.requiresRejectionReason,
+          appliesDoNotContact: o.appliesDoNotContact,
+          // Booking needs the appointment permission; without it the
+          // outcome is still offered, and logVisit explains the refusal.
+          booksDemo: o.booksDemo,
+        })),
+        rejectionReasons,
+        contacts: company.contacts.map((c) => ({ id: c.id, name: `${c.firstName} ${c.lastName}`, email: c.email, isDecisionMaker: c.isDecisionMaker })),
+        intel: { slowNight: company.slowNight, slowNightHeadcount: company.slowNightHeadcount, currentEntertainment: company.currentEntertainment },
+        hasMailbox,
+      }
+    : null;
   const canRoutePlan = hasPermission(user, "manage_route_plan");
   // Mirrors the permission checks inside runOpportunityAnalysis() itself
   // (src/lib/companies/analyze-opportunity.ts) — shown here only when all
@@ -204,6 +238,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         currentStageId={company.pipelineStageId}
         stages={pipelineStages.map((s) => ({ id: s.id, name: s.name, active: s.active }))}
         canEdit={canEdit}
+        canLogVisit={canLogVisit}
         canAnalyze={canAnalyzeOpportunity}
         websiteUrl={company.websiteUrl}
         canSendEmail={canSendCompanyEmail}
@@ -256,6 +291,12 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             )}
           </Card>
 
+          <BarIntelPanel
+            companyId={company.id}
+            intel={{ slowNight: company.slowNight, slowNightHeadcount: company.slowNightHeadcount, currentEntertainment: company.currentEntertainment }}
+            canEdit={canLogVisit}
+          />
+
           <div id="eos-panel">
             <ScorePanel
               companyId={company.id}
@@ -283,7 +324,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
           </div>
 
           <div id="activity-panel">
-            <ActivityPanel companyId={company.id} activities={activities} canLog={canEdit} />
+            <ActivityPanel companyId={company.id} activities={activities} canLog={canEdit} visit={visitSetup} />
           </div>
 
           <div id="email-panel">
@@ -354,12 +395,15 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               timezone: appointment.timezone,
               status: appointment.status,
               lastError: appointment.lastError,
+              location: appointment.location,
+              linkedToCalendar: Boolean(appointment.providerEventId),
             }))}
             contacts={company.contacts
               .filter((c) => c.email)
               .map((c) => ({ id: c.id, name: `${c.firstName} ${c.lastName}`, email: c.email as string }))}
             canManage={hasPermission(user, "manage_calendar_connections")}
-            calendarAvailable={calendarAvailable}
+            hasMailbox={hasMailbox}
+            defaultLocation={formatRouteAddress(company)}
           />
         </div>
 

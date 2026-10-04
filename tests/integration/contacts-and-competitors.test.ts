@@ -106,6 +106,36 @@ describe("multiple contacts per company", () => {
   });
 });
 
+describe("contact field-sales roles", () => {
+  it("saves decision-maker/champion flags and best time to reach, and clears them on edit", async () => {
+    const { admin, leadType, stage } = await baseFixtures();
+    await loginAs(admin.id);
+    const company = await createCompanyFixture({ leadTypeId: leadType.id, pipelineStageId: stage.id, assignedToId: admin.id, createdById: admin.id });
+
+    const create = new FormData();
+    create.set("firstName", "Sam");
+    create.set("lastName", "Owner");
+    create.set("isDecisionMaker", "on");
+    create.set("isChampion", "on");
+    create.set("bestTimeToReach", "Weekdays after 2pm");
+    await createContact(company.id, undefined, create);
+    const contact = await testPrisma.contact.findFirstOrThrow({ where: { companyId: company.id } });
+    expect(contact).toMatchObject({ isDecisionMaker: true, isChampion: true, bestTimeToReach: "Weekdays after 2pm" });
+
+    // An unticked checkbox is simply absent from a real form submission.
+    const edit = new FormData();
+    edit.set("firstName", "Sam");
+    edit.set("lastName", "Owner");
+    edit.set("isChampion", "on");
+    await updateContact(company.id, contact.id, edit);
+    expect(await testPrisma.contact.findUniqueOrThrow({ where: { id: contact.id } })).toMatchObject({
+      isDecisionMaker: false,
+      isChampion: true,
+      bestTimeToReach: null,
+    });
+  });
+});
+
 describe("setPrimaryContact", () => {
   it("sets the primary contact and can clear it again", async () => {
     const { admin, leadType, stage } = await baseFixtures();

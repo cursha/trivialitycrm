@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Phone, Mail, Users, FileText, Presentation, FlaskConical, StickyNote, CalendarClock, Sparkles, Globe, Send } from "lucide-react";
+import { Phone, Mail, Users, FileText, Presentation, FlaskConical, StickyNote, CalendarClock, Sparkles, Globe, Send, MapPin } from "lucide-react";
 import { changeCompanyStage } from "../actions";
 import { useQuickActions } from "./quick-action-context";
 import { SendCompanyEmailModal } from "./send-company-email-modal";
@@ -26,6 +26,7 @@ export function QuickActionsBar({
   currentStageId,
   stages,
   canEdit,
+  canLogVisit,
   canAnalyze,
   websiteUrl,
   canSendEmail,
@@ -35,6 +36,9 @@ export function QuickActionsBar({
   currentStageId: string;
   stages: StageOption[];
   canEdit: boolean;
+  /** Edit permission on an ACTIVE company — the visit form isn't offered on
+   * an archived one. */
+  canLogVisit: boolean;
   canAnalyze: boolean;
   websiteUrl: string | null;
   canSendEmail: boolean;
@@ -69,6 +73,16 @@ export function QuickActionsBar({
     <Card>
       <h2 className="font-bold text-accent">Quick sales actions</h2>
       <div className="mt-3 flex flex-wrap gap-2">
+        {canLogVisit && (
+          <button
+            type="button"
+            onClick={() => requestActivity("VISIT")}
+            className="flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-white hover:bg-primary-hover"
+          >
+            <MapPin size={15} />
+            Log visit
+          </button>
+        )}
         {websiteUrl && (
           <a
             href={websiteUrl}

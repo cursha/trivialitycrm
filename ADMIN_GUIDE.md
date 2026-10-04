@@ -48,15 +48,21 @@ not to gate.
 
 ## Sales Lists, Calling Sessions, and Campaigns
 
-- **Call outcomes** (Settings → Call Outcomes, `manage_call_outcomes`): the
-  set of outcomes salespeople choose from after a call. For each one you
+- **Call & visit outcomes** (Settings → Call & Visit Outcomes,
+  `manage_call_outcomes`): the set of outcomes salespeople choose from after
+  a call in a calling session or an in-person visit. Each outcome says where
+  it's offered (calls, visits, or both); a visit outcome can also **book a
+  demo**, which makes the visit form ask for the demo date and time. The
+  seed ships a starting set of visit outcomes (Flyer Dropped, Spoke to
+  Staff, Demo Booked, Trial Booked, Already Has Trivia, Closed / Not a Fit,
+  plus Not Interested and Do Not Contact shared with calls). For each one you
   control whether notes or a rejection reason are required, whether it
   auto-creates a follow-up (with a default title and days-out), moves the
   pipeline stage, applies do-not-contact, opens the email composer, or
   permanently removes the company from that calling session — plus which
   progress category it counts toward (Unreachable / Interested / Demo
   Requested / Not Interested). Outcomes can be reordered or deactivated
-  without deleting call history that already used them.
+  without deleting call or visit history that already used them.
 - **Reusable campaign instructions** (Settings → Campaign Instructions,
   `manage_campaign_instructions`): house-wide tone/guidance text any
   campaign creator can apply on top of, or instead of, their own

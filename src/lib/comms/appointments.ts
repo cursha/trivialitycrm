@@ -9,6 +9,11 @@ import { providerSlugFromKind } from "@/lib/comms/provider-kind";
 
 export type AppointmentOutcome = { ok: true; appointmentId: string } | { ok: false; error: string };
 
+/** createAppointment's result additionally says whether a calendar event /
+ * invite actually went out — false for a CRM-only appointment (no mailbox
+ * connected, or the caller chose not to send one). */
+export type CreateAppointmentOutcome = { ok: true; appointmentId: string; inviteSent: boolean } | { ok: false; error: string };
+
 export type CreateAppointmentParams = {
   userId: string;
   companyId: string;
@@ -19,7 +24,16 @@ export type CreateAppointmentParams = {
   endAt: Date;
   timezone: string;
   attendeeEmails: string[];
+  location?: string | null;
+  /** Defaults true. False saves a CRM-only appointment and never touches
+   * the mailbox/calendar, even if one is connected. */
+  sendInvite?: boolean;
 };
+
+async function organizerName(userId: string): Promise<string | null> {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+  return user?.name ?? null;
+}
 
 /**
  * Creates the Appointment row first (so a provider failure still leaves an
@@ -28,14 +42,35 @@ export type CreateAppointmentParams = {
  * `status` becomes `ERROR` if the provider call fails — never claim a real
  * event exists when it doesn't.
  */
-export async function createAppointment(params: CreateAppointmentParams): Promise<AppointmentOutcome> {
+export async function createAppointment(params: CreateAppointmentParams): Promise<CreateAppointmentOutcome> {
   if (params.endAt.getTime() <= params.startAt.getTime()) {
     return { ok: false, error: "End time must be after the start time." };
   }
 
   const connection = await prisma.providerConnection.findUnique({ where: { userId: params.userId } });
-  if (!connection || connection.status !== "CONNECTED") {
-    return { ok: false, error: "Connect a mailbox before scheduling an appointment." };
+  const wantsInvite = params.sendInvite ?? true;
+
+  // The CRM itself is the system of record for the schedule — an
+  // appointment is saved even with no mailbox connected (or when the caller
+  // opts out of an invite); it just has no linked calendar event. The
+  // mailbox is only needed to put it on someone's calendar.
+  if (!wantsInvite || !connection || connection.status !== "CONNECTED") {
+    const appointment = await prisma.appointment.create({
+      data: {
+        companyId: params.companyId,
+        contactId: params.contactId ?? null,
+        type: params.type,
+        title: params.title,
+        startAt: params.startAt,
+        endAt: params.endAt,
+        timezone: params.timezone,
+        location: params.location ?? null,
+        attendeeEmails: params.attendeeEmails,
+        status: "SCHEDULED",
+        createdById: params.userId,
+      },
+    });
+    return { ok: true, appointmentId: appointment.id, inviteSent: false };
   }
 
   const appointment = await prisma.appointment.create({
@@ -47,6 +82,7 @@ export async function createAppointment(params: CreateAppointmentParams): Promis
       startAt: params.startAt,
       endAt: params.endAt,
       timezone: params.timezone,
+      location: params.location ?? null,
       attendeeEmails: params.attendeeEmails,
       providerConnectionId: connection.id,
       status: "SCHEDULED",
@@ -63,9 +99,11 @@ export async function createAppointment(params: CreateAppointmentParams): Promis
       endAt: params.endAt,
       timezone: params.timezone,
       attendeeEmails: params.attendeeEmails,
+      location: params.location ?? null,
+      organizerName: await organizerName(params.userId),
     });
     await prisma.appointment.update({ where: { id: appointment.id }, data: { providerEventId: result.providerEventId } });
-    return { ok: true, appointmentId: appointment.id };
+    return { ok: true, appointmentId: appointment.id, inviteSent: true };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to create the calendar event.";
     await prisma.appointment.update({ where: { id: appointment.id }, data: { status: "ERROR", lastError: message } });
@@ -101,8 +139,11 @@ export async function updateAppointment(appointmentId: string, params: UpdateApp
   if (merged.endAt.getTime() <= merged.startAt.getTime()) {
     return { ok: false, error: "End time must be after the start time." };
   }
+  // A CRM-only appointment (never had a calendar event) is simply
+  // rescheduled in place — there's nothing remote to keep in sync.
   if (!appointment.providerConnectionId || !appointment.providerEventId) {
-    return { ok: false, error: "This appointment has no linked calendar event to update." };
+    await prisma.appointment.update({ where: { id: appointmentId }, data: { ...merged, status: "UPDATED", lastError: null } });
+    return { ok: true, appointmentId };
   }
 
   const connection = await prisma.providerConnection.findUnique({ where: { id: appointment.providerConnectionId } });
@@ -113,7 +154,11 @@ export async function updateAppointment(appointmentId: string, params: UpdateApp
   try {
     const account = await getUsableAccessToken(connection.userId);
     const provider = getEmailProvider(providerSlugFromKind(connection.provider));
-    await provider.updateCalendarEvent(account, appointment.providerEventId, merged);
+    await provider.updateCalendarEvent(account, appointment.providerEventId, {
+      ...merged,
+      location: appointment.location,
+      organizerName: await organizerName(connection.userId),
+    });
     await prisma.appointment.update({ where: { id: appointmentId }, data: { ...merged, status: "UPDATED", lastError: null } });
     return { ok: true, appointmentId };
   } catch (error) {
@@ -145,7 +190,15 @@ export async function cancelAppointment(appointmentId: string): Promise<Appointm
   try {
     const account = await getUsableAccessToken(connection.userId);
     const provider = getEmailProvider(providerSlugFromKind(connection.provider));
-    await provider.cancelCalendarEvent(account, appointment.providerEventId);
+    await provider.cancelCalendarEvent(account, appointment.providerEventId, {
+      title: appointment.title,
+      startAt: appointment.startAt,
+      endAt: appointment.endAt,
+      timezone: appointment.timezone,
+      attendeeEmails: appointment.attendeeEmails,
+      location: appointment.location,
+      organizerName: await organizerName(connection.userId),
+    });
     await prisma.appointment.update({ where: { id: appointmentId }, data: { status: "CANCELLED", lastError: null } });
     return { ok: true, appointmentId };
   } catch (error) {

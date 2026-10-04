@@ -88,9 +88,12 @@ export async function moveCallOutcome(id: string, direction: "up" | "down"): Pro
 export async function deleteCallOutcome(id: string): Promise<ActionResult> {
   await requireCallOutcomeManager();
 
-  const usageCount = await prisma.callRecord.count({ where: { outcomeId: id } });
-  if (usageCount > 0) {
-    return { error: "This call outcome has been used to record calls — deactivate it instead of deleting." };
+  const [callUsage, activityUsage] = await Promise.all([
+    prisma.callRecord.count({ where: { outcomeId: id } }),
+    prisma.activity.count({ where: { callOutcomeId: id } }),
+  ]);
+  if (callUsage > 0 || activityUsage > 0) {
+    return { error: "This outcome has been used to record calls or visits — deactivate it instead of deleting." };
   }
 
   await prisma.callOutcome.delete({ where: { id } });
@@ -107,6 +110,12 @@ export async function updateCallOutcomeConfig(id: string, formData: FormData): P
     return { error: "Enter how many days from now the default follow-up should be due." };
   }
 
+  const appliesToCalls = formData.get("appliesToCalls") === "on";
+  const appliesToVisits = formData.get("appliesToVisits") === "on";
+  if (!appliesToCalls && !appliesToVisits) {
+    return { error: "Choose at least one place this outcome is offered (calls, visits, or both)." };
+  }
+
   const resultCategoryRaw = formString(formData, "resultCategory");
   const resultCategory = resultCategoryRaw ? (resultCategoryRaw as CallOutcomeResultCategory) : null;
 
@@ -120,6 +129,9 @@ export async function updateCallOutcomeConfig(id: string, formData: FormData): P
     skipRestOfSession: formData.get("skipRestOfSession") === "on",
     appliesDoNotContact: formData.get("appliesDoNotContact") === "on",
     resultCategory,
+    appliesToCalls,
+    appliesToVisits,
+    booksDemo: appliesToVisits && formData.get("booksDemo") === "on",
   };
 
   const defaultPipelineStageId = formString(formData, "defaultPipelineStageId");

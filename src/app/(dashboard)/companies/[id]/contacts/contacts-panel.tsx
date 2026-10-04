@@ -19,7 +19,36 @@ export type ContactRow = {
   email: string | null;
   emailPermitted: boolean;
   doNotContact: boolean;
+  isDecisionMaker: boolean;
+  isChampion: boolean;
+  bestTimeToReach: string | null;
 };
+
+/** Field-sales role checkboxes + best time to reach, shared by the add and
+ * edit forms. */
+function RoleFields({ contact }: { contact?: ContactRow }) {
+  return (
+    <>
+      <Input
+        name="bestTimeToReach"
+        defaultValue={contact?.bestTimeToReach ?? ""}
+        placeholder="Best time to reach (e.g. weekdays after 2pm)"
+        maxLength={120}
+        className="py-1.5 sm:col-span-2"
+      />
+      <div className="flex flex-wrap gap-4 text-sm sm:col-span-2">
+        <label className="flex items-center gap-2">
+          <input type="checkbox" name="isDecisionMaker" defaultChecked={contact?.isDecisionMaker ?? false} />
+          Decision-maker
+        </label>
+        <label className="flex items-center gap-2">
+          <input type="checkbox" name="isChampion" defaultChecked={contact?.isChampion ?? false} />
+          Champion (runs the game night)
+        </label>
+      </div>
+    </>
+  );
+}
 
 function consentBadge(contact: ContactRow) {
   if (contact.doNotContact) return <Badge tone="danger">Do Not Contact</Badge>;
@@ -129,6 +158,7 @@ export function ContactsPanel({
                 <Input name="title" defaultValue={contact.title ?? ""} placeholder="Title" className="py-1.5" />
                 <Input name="phone" defaultValue={contact.phone ?? ""} placeholder="Phone" className="py-1.5" />
                 <Input name="email" defaultValue={contact.email ?? ""} placeholder="Email" className="py-1.5 sm:col-span-2" />
+                <RoleFields contact={contact} />
                 <div className="flex gap-2 sm:col-span-2">
                   <button type="submit" disabled={isPending} className="rounded bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-50">
                     Save
@@ -154,8 +184,19 @@ export function ContactsPanel({
                       Primary
                     </Badge>
                   )}
+                  {contact.isDecisionMaker && (
+                    <Badge tone="success" className="ml-2">
+                      Decision-maker
+                    </Badge>
+                  )}
+                  {contact.isChampion && (
+                    <Badge tone="accent" className="ml-2">
+                      Champion
+                    </Badge>
+                  )}
                 </p>
                 <p className="text-text-muted">{[contact.phone, contact.email].filter(Boolean).join(" · ")}</p>
+                {contact.bestTimeToReach && <p className="text-xs text-text-muted">Best time: {contact.bestTimeToReach}</p>}
                 <div className="mt-1 flex items-center gap-2">
                   {consentBadge(contact)}
                   {canManageCompliance && (
@@ -228,6 +269,7 @@ export function ContactsPanel({
           <Input name="title" placeholder="Title" className="py-1.5" />
           <Input name="phone" placeholder="Phone" className="py-1.5" />
           <Input name="email" placeholder="Email" className="py-1.5 sm:col-span-2" />
+          <RoleFields />
           <div className="flex gap-2 sm:col-span-2">
             <button type="submit" disabled={isPending} className="rounded bg-primary px-3 py-1.5 text-xs font-bold text-white hover:bg-primary-hover disabled:pointer-events-none disabled:opacity-50">
               {isPending ? "Saving..." : "Add"}

@@ -43,6 +43,26 @@ company, a contact on an existing company, a note, a logged activity, or a
 follow-up — without leaving whatever page you're on. If you need more fields
 than the quick form offers, it always has an "Open full form" link.
 
+## Logging a bar visit
+
+On a company's page, tap **Log visit** (the first button under Quick sales
+actions). Pick what happened (flyer dropped, spoke to staff, demo booked,
+trial booked, and so on), add a note, and save. The outcome you pick
+creates the right follow-up automatically, so the next step is always on
+your My Day list.
+
+- **Demo booked**: the form asks for the demo's date, time and length, and
+  who it's with. Times are in your own timezone. If your mailbox is
+  connected (Titan works), you can send a calendar invite to the contact
+  and to yourself; otherwise the demo is saved in the CRM only.
+- **Bar intel (optional)**: jot down the slowest night, the typical crowd
+  that night, and what entertainment they run now. Only the fields you
+  fill in are saved, so leaving one blank never erases what's on file. The
+  **Bar intel** card on the company page is where you edit or clear these.
+- **Contacts**: mark a contact as the **decision-maker** and/or the
+  **champion** (the staff member who'll start the game each week), and
+  note the best time to reach them.
+
 ## Working a company
 
 On any company's page:
@@ -141,9 +161,10 @@ inbox:
   exception: the CRM stores an encrypted copy of your actual mailbox
   password to send through Titan's servers. Only use it if you're
   comfortable with that trade-off; Microsoft/Google are preferred when
-  available. Titan also has no calendar API, so scheduling appointments from
-  a company page isn't available while a Titan mailbox is connected — the
-  Schedule button is hidden and existing appointments are read-only.
+  available. Titan has no calendar API, so appointments scheduled with a
+  Titan mailbox connected go out as standard calendar invite emails
+  instead. Google, Outlook and Apple calendars all offer "add to calendar"
+  for them, and rescheduling or cancelling sends an updated invite.
 - Once connected, use the **Send test email** button on that page any time
   you want to confirm the connection is actually working before relying on
   it for a real send.

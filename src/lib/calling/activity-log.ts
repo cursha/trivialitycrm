@@ -11,9 +11,16 @@ import type { Prisma } from "../../generated/prisma/client";
  */
 export async function logCallActivity(
   tx: Prisma.TransactionClient,
-  params: { companyId: string; userId: string; outcomeName: string; notes: string | null },
+  params: { companyId: string; userId: string; outcomeId: string; outcomeName: string; notes: string | null },
 ) {
   return tx.activity.create({
-    data: { companyId: params.companyId, userId: params.userId, type: "PHONE", outcome: params.outcomeName, notes: params.notes },
+    data: {
+      companyId: params.companyId,
+      userId: params.userId,
+      type: "PHONE",
+      outcome: params.outcomeName,
+      callOutcomeId: params.outcomeId,
+      notes: params.notes,
+    },
   });
 }

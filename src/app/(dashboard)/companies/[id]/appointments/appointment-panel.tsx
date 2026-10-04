@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CirclePlus, CalendarClock } from "lucide-react";
 import { Card, SectionHeading } from "@/components/ui/card";
-import { Label, Input, Select, FieldError } from "@/components/ui/field";
+import { Label, Input, Select, FieldError, HelpText } from "@/components/ui/field";
 import { Badge } from "@/components/ui/badge";
 import { toneFor } from "@/lib/ui/status-tones";
 import type { BadgeTone } from "@/lib/ui/status-tones";
@@ -32,9 +32,20 @@ export type AppointmentRow = {
   timezone: string;
   status: string;
   lastError: string | null;
+  location: string | null;
+  /** False for a CRM-only appointment (no calendar event / invite). */
+  linkedToCalendar: boolean;
 };
 
 export type ContactOption = { id: string; name: string; email: string };
+
+function browserTimeZone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "America/Toronto";
+  } catch {
+    return "America/Toronto";
+  }
+}
 
 function formatInTimezone(iso: string, timezone: string): string {
   return new Date(iso).toLocaleString("en-US", { timeZone: timezone, dateStyle: "medium", timeStyle: "short" });
@@ -45,18 +56,18 @@ export function AppointmentPanel({
   appointments,
   contacts,
   canManage,
-  calendarAvailable,
+  hasMailbox,
+  defaultLocation,
 }: {
   companyId: string;
   appointments: AppointmentRow[];
   contacts: ContactOption[];
   canManage: boolean;
-  /** False when the caller's connected mailbox has no calendar API at all
-   * (Titan) — scheduling/rescheduling/cancelling are hidden rather than
-   * left to throw "Titan Email has no calendar API" from the provider
-   * call. Past appointments (from before switching providers, say) still
-   * display read-only. */
-  calendarAvailable: boolean;
+  /** Whether the caller has a connected mailbox to send invites through.
+   * Without one, appointments are still saved — CRM-only, no invite. */
+  hasMailbox: boolean;
+  /** Pre-fills the location (the venue's address). */
+  defaultLocation: string;
 }) {
   const router = useRouter();
   const [scheduling, setScheduling] = useState(false);
@@ -64,6 +75,8 @@ export function AppointmentPanel({
   const [isPending, startTransition] = useTransition();
   const [contactId, setContactId] = useState("");
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [timezone] = useState(browserTimeZone);
 
   function handleSchedule(formData: FormData) {
     startTransition(async () => {
@@ -74,6 +87,7 @@ export function AppointmentPanel({
         setError(null);
         setScheduling(false);
         setContactId("");
+        setNotice(result?.inviteSent ? "Appointment saved and calendar invite sent." : "Appointment saved in the CRM (no calendar invite sent).");
         router.refresh();
       }
     });
@@ -104,10 +118,13 @@ export function AppointmentPanel({
     <Card>
       <div className="flex items-center justify-between">
         <SectionHeading>Appointments</SectionHeading>
-        {canManage && calendarAvailable && !scheduling && (
+        {canManage && !scheduling && (
           <button
             type="button"
-            onClick={() => setScheduling(true)}
+            onClick={() => {
+              setScheduling(true);
+              setNotice(null);
+            }}
             className="flex items-center gap-1 text-sm font-bold text-secondary hover:underline"
           >
             <CirclePlus size={15} />
@@ -116,12 +133,7 @@ export function AppointmentPanel({
         )}
       </div>
 
-      {canManage && !calendarAvailable && (
-        <p className="mt-2 text-xs text-text-muted">
-          Your connected mailbox has no calendar API, so scheduling isn&apos;t available — connect Microsoft 365 or Google Workspace instead if
-          you need this.
-        </p>
-      )}
+      {notice && <p className="mt-2 text-xs font-semibold text-text">{notice}</p>}
 
       {scheduling && (
         <form action={handleSchedule} className="mt-3 space-y-2 rounded-lg border border-dashed border-border-strong bg-black/[0.02] p-3">
@@ -152,7 +164,12 @@ export function AppointmentPanel({
 
           <div>
             <Label className="text-xs">Title</Label>
-            <Input name="title" required className="mt-1 py-1.5" placeholder="Product demo with Acme Trivia" />
+            <Input name="title" required className="mt-1 py-1.5" placeholder="Triviality demo" />
+          </div>
+
+          <div>
+            <Label className="text-xs">Location (optional)</Label>
+            <Input name="location" defaultValue={defaultLocation} maxLength={300} className="mt-1 py-1.5" />
           </div>
 
           <div className="grid gap-2 sm:grid-cols-2">
@@ -168,13 +185,24 @@ export function AppointmentPanel({
 
           <div>
             <Label className="text-xs">Timezone</Label>
-            <Input name="timezone" required defaultValue="America/Toronto" className="mt-1 py-1.5" />
+            <Input name="timezone" required defaultValue={timezone} className="mt-1 py-1.5" />
+            <HelpText className="mt-1">Start and end are in this timezone.</HelpText>
           </div>
 
           <div>
             <Label className="text-xs">Attendees (comma or newline separated emails, optional)</Label>
             <Input name="attendeeEmails" className="mt-1 py-1.5" placeholder="lead@example.com" />
           </div>
+
+          <input type="hidden" name="sendInviteChoice" value="1" />
+          {hasMailbox ? (
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="sendInvite" defaultChecked />
+              Send a calendar invite to the attendees and to you
+            </label>
+          ) : (
+            <HelpText>No mailbox connected, so this is saved in the CRM only (no calendar invite).</HelpText>
+          )}
 
           {error && <FieldError>{error}</FieldError>}
 
@@ -216,8 +244,10 @@ export function AppointmentPanel({
                 {formatInTimezone(appointment.startAt, appointment.timezone)} – {formatInTimezone(appointment.endAt, appointment.timezone)} (
                 {appointment.timezone})
               </p>
+              {appointment.location && <p className="text-xs text-text-muted">{appointment.location}</p>}
+              {!appointment.linkedToCalendar && <p className="text-xs text-text-muted">CRM only, no calendar invite</p>}
               {appointment.lastError && <p className="mt-1 text-xs font-semibold text-danger">{appointment.lastError}</p>}
-              {canManage && calendarAvailable && appointment.status !== "CANCELLED" && (
+              {canManage && appointment.status !== "CANCELLED" && (
                 <div className="mt-1 flex gap-3">
                   <button
                     type="button"

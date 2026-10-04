@@ -193,6 +193,7 @@ export class MicrosoftGraphProvider implements EmailProvider {
       start: { dateTime: formatWallClock(input.startAt, input.timezone), timeZone: input.timezone },
       end: { dateTime: formatWallClock(input.endAt, input.timezone), timeZone: input.timezone },
       attendees: input.attendeeEmails.map((address) => ({ emailAddress: { address }, type: "required" })),
+      ...(input.location ? { location: { displayName: input.location } } : {}),
     };
   }
 

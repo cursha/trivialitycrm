@@ -17,6 +17,22 @@ async function baseFixtures() {
 }
 
 describe("mergeContacts", () => {
+  it("keeps a field-sales role known on either contact, and only fills a blank best time to reach", async () => {
+    const { admin, company } = await baseFixtures();
+    const surviving = await testPrisma.contact.create({ data: { companyId: company.id, firstName: "Sam", lastName: "Owner", isChampion: true } });
+    const merged = await testPrisma.contact.create({
+      data: { companyId: company.id, firstName: "Samuel", lastName: "Owner", isDecisionMaker: true, bestTimeToReach: "Tuesdays after 2" },
+    });
+
+    await mergeContacts({ survivingContactId: surviving.id, mergedContactId: merged.id, fieldDecisions: {}, actorId: admin.id });
+
+    expect(await testPrisma.contact.findUniqueOrThrow({ where: { id: surviving.id } })).toMatchObject({
+      isDecisionMaker: true,
+      isChampion: true,
+      bestTimeToReach: "Tuesdays after 2",
+    });
+  });
+
   it("reassigns EmailMessage/Appointment/ConsentRecord/SequenceEnrollment onto the surviving contact", async () => {
     const { admin, company } = await baseFixtures();
     const surviving = await testPrisma.contact.create({ data: { companyId: company.id, firstName: "Jane", lastName: "Doe" } });

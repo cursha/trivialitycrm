@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CirclePlus, Phone, Mail, Users, FileText, Presentation, FlaskConical, StickyNote, GitBranch } from "lucide-react";
+import { CirclePlus, Phone, Mail, Users, FileText, Presentation, FlaskConical, StickyNote, GitBranch, MapPin } from "lucide-react";
 import { createActivity } from "./actions";
+import { VisitForm, type VisitOutcomeOption, type VisitContactOption, type VisitIntel } from "./visit-form";
 import { useQuickActions } from "../quick-action-context";
 import { Card } from "@/components/ui/card";
 import { Input, Select, Textarea } from "@/components/ui/field";
@@ -22,6 +23,7 @@ const TYPE_LABELS: Record<string, string> = {
   PHONE: "Phone call",
   EMAIL: "Email",
   MEETING: "Meeting",
+  VISIT: "Visit",
   MATERIAL_SENT: "Material sent",
   DEMO: "Demo",
   TRIAL: "Trial",
@@ -33,6 +35,7 @@ const TYPE_ICONS: Record<string, typeof Phone> = {
   PHONE: Phone,
   EMAIL: Mail,
   MEETING: Users,
+  VISIT: MapPin,
   MATERIAL_SENT: FileText,
   DEMO: Presentation,
   TRIAL: FlaskConical,
@@ -40,13 +43,34 @@ const TYPE_ICONS: Record<string, typeof Phone> = {
   PIPELINE_CHANGE: GitBranch,
 };
 
-export function ActivityPanel({ companyId, activities, canLog }: { companyId: string; activities: ActivityRow[]; canLog: boolean }) {
+/** Everything the in-person visit form needs; null hides the Visit option
+ * entirely (e.g. on an archived company). */
+export type VisitSetup = {
+  outcomes: VisitOutcomeOption[];
+  rejectionReasons: { id: string; name: string }[];
+  contacts: VisitContactOption[];
+  intel: VisitIntel;
+  hasMailbox: boolean;
+};
+
+export function ActivityPanel({
+  companyId,
+  activities,
+  canLog,
+  visit,
+}: {
+  companyId: string;
+  activities: ActivityRow[];
+  canLog: boolean;
+  visit: VisitSetup | null;
+}) {
   const router = useRouter();
   const { registerActivityHandler, requestFollowUp } = useQuickActions();
   const [logging, setLogging] = useState(false);
   const [type, setType] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [justLogged, setJustLogged] = useState(false);
+  const [visitMessage, setVisitMessage] = useState<{ text: string; warning: boolean } | null>(null);
   const [isPending, startTransition] = useTransition();
   const [now] = useState(() => toDateTimeInputValue());
 
@@ -56,6 +80,7 @@ export function ActivityPanel({ companyId, activities, canLog }: { companyId: st
       setLogging(true);
       setType(requestedType);
       setJustLogged(false);
+      setVisitMessage(null);
     });
   }, [canLog, registerActivityHandler]);
 
@@ -84,6 +109,7 @@ export function ActivityPanel({ companyId, activities, canLog }: { companyId: st
               setLogging(true);
               setType("");
               setJustLogged(false);
+              setVisitMessage(null);
             }}
             className="flex items-center gap-1 text-sm font-bold text-secondary hover:underline"
           >
@@ -95,7 +121,29 @@ export function ActivityPanel({ companyId, activities, canLog }: { companyId: st
 
       {error && <p className="mt-2 text-xs font-semibold text-danger">{error}</p>}
 
-      {logging && (
+      {logging && type === "VISIT" && visit && (
+        <VisitForm
+          companyId={companyId}
+          {...visit}
+          onCancel={() => setLogging(false)}
+          onDone={(result) => {
+            setLogging(false);
+            setVisitMessage(
+              result.warning
+                ? { text: result.warning, warning: true }
+                : {
+                    text: result.demoBooked
+                      ? `Visit logged and demo booked${result.inviteSent ? " — calendar invite sent" : ""}.`
+                      : "Visit logged.",
+                    warning: false,
+                  },
+            );
+            router.refresh();
+          }}
+        />
+      )}
+
+      {logging && type !== "VISIT" && (
         <form action={handleCreate} className="mt-3 space-y-2 rounded-lg border border-dashed border-border-strong bg-black/[0.02] p-3">
           <Select name="type" required value={type} onChange={(e) => setType(e.target.value)} className="py-1.5">
             <option value="" disabled>
@@ -104,6 +152,7 @@ export function ActivityPanel({ companyId, activities, canLog }: { companyId: st
             <option value="PHONE">Phone call</option>
             <option value="EMAIL">Email</option>
             <option value="MEETING">Meeting</option>
+            {visit && <option value="VISIT">In-person visit</option>}
             <option value="MATERIAL_SENT">Material sent</option>
             <option value="DEMO">Demo</option>
             <option value="TRIAL">Trial</option>
@@ -125,6 +174,12 @@ export function ActivityPanel({ companyId, activities, canLog }: { companyId: st
             </button>
           </div>
         </form>
+      )}
+
+      {visitMessage && (
+        <p className={`mt-3 rounded-lg border p-3 text-sm ${visitMessage.warning ? "border-danger/40 text-danger" : "border-border-strong text-text"}`}>
+          {visitMessage.text}
+        </p>
       )}
 
       {justLogged && canLog && (

@@ -58,6 +58,11 @@ enum ActivityType {
   PHONE
   EMAIL
   MEETING
+  // An in-person walk-in at the venue (flyer drop-off, lucky on-the-spot
+  // demo, owner-not-in). Always carries a structured outcome
+  // (Activity.callOutcomeId → a CallOutcome with appliesToVisits) — see
+  // logVisit() in companies/[id]/activities/actions.ts.
+  VISIT
   MATERIAL_SENT
   DEMO
   TRIAL
@@ -575,6 +580,16 @@ model Company {
   // model to have applied its own prompt instructions correctly every time.
   hasTvs Boolean? @default(true)
 
+  // Field-sales "bar intel" — facts a rep learns in person at the door,
+  // kept as structured columns (not buried in notes) so they can drive the
+  // pitch ("which night is quietest?") and later the trial baseline. All
+  // human-entered only (company page Bar intel card or the visit form);
+  // no AI path writes these. slowNightHeadcount is the rep's rough
+  // estimate of a typical crowd on that night, not a measured count.
+  slowNight            Weekday?
+  slowNightHeadcount   Int?
+  currentEntertainment String?
+
   // Set only when an AI opportunity analysis (src/app/(dashboard)/companies/
   // opportunity-analysis.ts) finds something that contradicts existing,
   // trusted CRM data (e.g. the business appears closed, name doesn't
@@ -900,8 +915,16 @@ model Contact {
   email         String?
   company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   emailMessages EmailMessage[]
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+
+  // Field-sales roles. Independent flags, not an enum — at a small bar the
+  // owner is often both the decision-maker and the person who'll start the
+  // game each week (the "champion"). bestTimeToReach is free text from the
+  // door ("weekdays after 2pm", "Tuesdays only").
+  isDecisionMaker Boolean  @default(false)
+  isChampion      Boolean  @default(false)
+  bestTimeToReach String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   // Module Six Phase B: CASL-safe default-deny — a contact cannot receive
   // automated/composer email until a ConsentRecord establishes permission.
@@ -1040,6 +1063,18 @@ model Activity {
   createdAt  DateTime     @default(now())
 
   callRecord CallRecord?
+
+  // Structured outcome for a logged touch (currently: VISIT activities).
+  // `outcome` above stays the human-readable name snapshot shown on the
+  // timeline; this is its reportable twin, by id rather than by
+  // admin-renameable name — same split CallRecord.outcomeId already makes
+  // for calling-session calls. SetNull rather than Cascade so deleting an
+  // outcome can never delete history (deleteCallOutcome also refuses to
+  // delete one that's referenced).
+  callOutcomeId String?
+  callOutcome   CallOutcome? @relation(fields: [callOutcomeId], references: [id], onDelete: SetNull)
+
+  @@index([callOutcomeId])
 }
 
 model Task {
@@ -1072,11 +1107,11 @@ model PromptTemplate {
 }
 
 model LeadSearch {
-  id             String            @id @default(cuid())
-  promptId       String?
-  createdById    String
-  leadTypeId     String
-  competitorId   String?
+  id              String            @id @default(cuid())
+  promptId        String?
+  createdById     String
+  leadTypeId      String
+  competitorId    String?
   // PUB_RADIUS only. originCompanyId is the existing Lead-Type="Pub" Company
   // the search was centered on; originLat/originLng are that company's
   // address geocoded once at search-creation time (startPubRadiusSearch) —
@@ -1088,20 +1123,20 @@ model LeadSearch {
   radiusUnit      DistanceUnit?
   originLat       Float?
   originLng       Float?
-  country        String
-  region         String
-  cities         Json
-  minimumScore   Int               @default(80)
-  mode           LeadSearchMode    @default(GENERAL)
-  promptSnapshot String            @db.Text
-  prompt         PromptTemplate?   @relation(fields: [promptId], references: [id], onDelete: SetNull)
-  createdBy      User              @relation(fields: [createdById], references: [id])
-  leadType       LeadType          @relation(fields: [leadTypeId], references: [id])
-  competitor     Competitor?       @relation(fields: [competitorId], references: [id], onDelete: SetNull)
-  originCompany  Company?          @relation("LeadSearchOriginCompany", fields: [originCompanyId], references: [id], onDelete: SetNull)
-  results        SearchResult[]
-  candidates     SearchCandidate[]
-  usageRecords   AiUsageRecord[]
+  country         String
+  region          String
+  cities          Json
+  minimumScore    Int               @default(80)
+  mode            LeadSearchMode    @default(GENERAL)
+  promptSnapshot  String            @db.Text
+  prompt          PromptTemplate?   @relation(fields: [promptId], references: [id], onDelete: SetNull)
+  createdBy       User              @relation(fields: [createdById], references: [id])
+  leadType        LeadType          @relation(fields: [leadTypeId], references: [id])
+  competitor      Competitor?       @relation(fields: [competitorId], references: [id], onDelete: SetNull)
+  originCompany   Company?          @relation("LeadSearchOriginCompany", fields: [originCompanyId], references: [id], onDelete: SetNull)
+  results         SearchResult[]
+  candidates      SearchCandidate[]
+  usageRecords    AiUsageRecord[]
 
   // Durable job tracking — executed by the worker via a pg-boss job
   // (providerJobId), not inline in the web process. See run-search.ts and
@@ -1243,9 +1278,9 @@ model SearchResult {
   // the top match's Company already has a different, non-null competitorId
   // than the one being searched for — routed to a distinct review bucket
   // rather than silently left alone or auto-overwritten.
-  duplicateMatches   Json?
+  duplicateMatches    Json?
   duplicateConfidence ConfidenceLevel?
-  competitorConflict Boolean          @default(false)
+  competitorConflict  Boolean          @default(false)
 
   @@index([searchId, score])
   @@index([normalizedName])
@@ -1835,6 +1870,9 @@ model Appointment {
   startAt   DateTime
   endAt     DateTime
   timezone  String
+  // Free-text place, e.g. the venue's street address for an in-person
+  // demo. Carried into the calendar invite.
+  location  String?
 
   attendeeEmails String[]
 
@@ -2722,7 +2760,18 @@ model CallOutcome {
   appliesDoNotContact     Boolean                    @default(false)
   resultCategory          CallOutcomeResultCategory?
 
+  // Which touch channels offer this outcome. Calling sessions only offer
+  // appliesToCalls outcomes; the in-person visit form only offers
+  // appliesToVisits ones. An outcome may apply to both.
+  appliesToCalls  Boolean @default(true)
+  appliesToVisits Boolean @default(false)
+  // When true, choosing this outcome on the visit form also books a demo
+  // appointment (date/time captured on the same form). Ignored by calling
+  // sessions, whose call screen has no appointment fields.
+  booksDemo       Boolean @default(false)
+
   callRecords CallRecord[]
+  activities  Activity[]
 
   @@index([active, sortOrder])
 }

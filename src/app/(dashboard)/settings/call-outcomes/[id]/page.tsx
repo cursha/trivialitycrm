@@ -21,7 +21,7 @@ export default async function CallOutcomeConfigPage({ params }: { params: Promis
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <PageHeader title={`Configure "${outcome.name}"`} description="What happens automatically when a salesperson selects this outcome during a guided calling session." />
+      <PageHeader title={`Configure "${outcome.name}"`} description="Where this outcome is offered, and what happens automatically when a salesperson records it." />
       <Card>
         <CallOutcomeConfigForm
           outcomeId={outcome.id}
@@ -37,6 +37,9 @@ export default async function CallOutcomeConfigPage({ params }: { params: Promis
             skipRestOfSession: outcome.skipRestOfSession,
             appliesDoNotContact: outcome.appliesDoNotContact,
             resultCategory: outcome.resultCategory,
+            appliesToCalls: outcome.appliesToCalls,
+            appliesToVisits: outcome.appliesToVisits,
+            booksDemo: outcome.booksDemo,
           }}
         />
       </Card>
