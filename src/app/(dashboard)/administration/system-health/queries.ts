@@ -4,7 +4,7 @@ import { getQueueSummary, getRecentFailedJobs } from "@/lib/jobs/observability";
 import { isAiApiKeyConfigured } from "@/lib/ai/budget";
 import { getEnv } from "@/lib/env";
 import { isHeartbeatStale } from "@/lib/ops/worker-heartbeat";
-import packageJson from "../../../../../package.json";
+import { APP_VERSION, getBuildId } from "@/lib/version";
 
 export type SystemHealth = {
   webStatus: "up";
@@ -66,8 +66,8 @@ export async function getSystemHealth(): Promise<SystemHealth> {
     migrationsClean,
     queueSummary,
     failedJobs,
-    appVersion: packageJson.version,
-    buildId: process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 8) ?? null,
+    appVersion: APP_VERSION,
+    buildId: getBuildId(),
     aiProviderMode: env.AI_PROVIDER,
     aiApiKeyConfigured: isAiApiKeyConfigured(),
     microsoftConfigured: Boolean(env.MICROSOFT_CLIENT_ID),

@@ -37,6 +37,8 @@ export function DashboardShell({
   canEditLeads,
   onboardingRemaining,
   routePlanCount,
+  appVersion,
+  buildId,
   children,
 }: {
   navItems: NavItem[];
@@ -51,6 +53,9 @@ export function DashboardShell({
    * gate on visibility only, never the actual security boundary; every
    * Route Plan action/query enforces it server-side independently. */
   routePlanCount: number | null;
+  /** Release version shown at the foot of the sidebar (see src/lib/version.ts). */
+  appVersion: string;
+  buildId: string | null;
   children: React.ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -69,11 +74,11 @@ export function DashboardShell({
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-72 border-r border-border-strong bg-surface transition-transform lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-30 flex w-72 flex-col border-r border-border-strong bg-surface transition-transform lg:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex h-40 items-center justify-between border-b border-border px-6">
+        <div className="flex h-40 shrink-0 items-center justify-between border-b border-border px-6">
           <Logo size="full" className="h-32" priority />
           <button
             className="rounded-lg p-2 text-text hover:bg-black/5 lg:hidden"
@@ -83,7 +88,7 @@ export function DashboardShell({
             <X size={20} />
           </button>
         </div>
-        <nav className="space-y-1 p-3">
+        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
           {navItems.map((item) => {
             const Icon = ICONS[item.icon];
             const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -102,6 +107,9 @@ export function DashboardShell({
             );
           })}
         </nav>
+        <p className="shrink-0 border-t border-border px-6 py-3 text-xs text-text-muted" title={buildId ? `Build ${buildId}` : undefined}>
+          Version {appVersion}
+        </p>
       </aside>
 
       <section className="lg:pl-72">

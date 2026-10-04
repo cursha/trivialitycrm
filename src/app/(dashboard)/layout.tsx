@@ -6,6 +6,7 @@ import { describeNotification } from "@/lib/notifications";
 import { visibleOnboardingSteps } from "@/lib/onboarding/steps";
 import { getRouteSummary } from "@/lib/route-plan/service";
 import { DashboardShell } from "@/components/dashboard-shell";
+import { APP_VERSION, getBuildId } from "@/lib/version";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // requireUser() itself now redirects to /change-password when the flag is
@@ -74,6 +75,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
       canEditLeads={hasPermission(user, "edit_leads")}
       onboardingRemaining={onboardingRemaining}
       routePlanCount={canViewRoutePlan ? (routeSummary?.count ?? 0) : null}
+      appVersion={APP_VERSION}
+      buildId={getBuildId()}
     >
       {children}
     </DashboardShell>

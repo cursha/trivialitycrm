@@ -38,3 +38,18 @@ approved actions, but on this repo they are the same action.
 
 Pushing to any other branch does not trigger a deploy — only `main` is wired
 to Railway's watched branch.
+
+# Every release gets a version number
+
+Each merge to `main` is a production release (see above), and every release
+is versioned. Before merging:
+1. Bump `version` in `package.json` (and the two matching root `version`
+   lines in `package-lock.json`): minor for features/workflow changes
+   (1.2.0), patch for fixes/small tweaks (1.1.1).
+2. Add a plain-English entry for that version at the top of `CHANGELOG.md`
+   (date = the day it ships).
+3. After the push to `main` succeeds, tag the deployed commit `vX.Y.Z` and
+   push the tag (`git push origin vX.Y.Z` — tags don't trigger a deploy).
+
+The version is read from `package.json` by `src/lib/version.ts` and shown at
+the foot of the sidebar and on Administration → System Health.
