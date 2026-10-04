@@ -41,15 +41,28 @@ to Railway's watched branch.
 
 # Every release gets a version number
 
-Each merge to `main` is a production release (see above), and every release
-is versioned. Before merging:
-1. Bump `version` in `package.json` (and the two matching root `version`
-   lines in `package-lock.json`): minor for features/workflow changes
-   (1.2.0), patch for fixes/small tweaks (1.1.1).
-2. Add a plain-English entry for that version at the top of `CHANGELOG.md`
-   (date = the day it ships).
-3. After the push to `main` succeeds, tag the deployed commit `vX.Y.Z` and
-   push the tag (`git push origin vX.Y.Z` — tags don't trigger a deploy).
+Same scheme as the Gr8daybingo project (its Constitution §10).
 
-The version is read from `package.json` by `src/lib/version.ts` and shown at
-the foot of the sidebar and on Administration → System Health.
+- **Every push to `main` gets a new number.** No update goes live without
+  one — code, text-only changes and fixes alike.
+- **Format: `v{release}.{version}`** (e.g. `v2.1` = release 2, version 1).
+  - **The release number goes up when there is new functionality**, and the
+    version resets to 0 (`v2.1` → `v3.0`).
+  - **The version number goes up when something is fixed or improved**
+    (`v2.1` → `v2.2`).
+- **One number per push.** Several changes pushed together share one
+  number; if any of them is new functionality, the release number goes up.
+- **The version lives in `src/lib/version.ts`** (`APP_VERSION`) and shows at
+  the foot of the sidebar and on Administration → System Health.
+  `package.json`'s `version` is unused.
+- **`CHANGELOG.md` gets an entry for every number**, newest at the top: the
+  version, the date it ships, and in plain words what changed and why,
+  including "Curt's call" where it was his decision.
+- **The commit message names the version**, e.g.
+  `Add walk-in pipeline stages (v3.0)`.
+- **Tag the deployed commit** `v{release}.{version}` after the push to
+  `main` succeeds, and push the tag (`git push origin v3.0`; tags don't
+  trigger a deploy).
+- **Documentation-only changes** that don't touch the app (AGENTS.md, guides)
+  don't need a version bump, but note they still deploy when pushed to
+  `main`.

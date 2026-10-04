@@ -1,26 +1,32 @@
 # Changelog
 
-Every release to production (a merge to `main`, which auto-deploys via
-Railway) gets a version number here, in `package.json`, and as a git tag
-(`vX.Y.Z`). The running version shows at the foot of the sidebar and on
-Administration → System Health.
+Format: `v{release}.{version}`, bumped once per push to `main` (every push
+is a production deploy). The release number goes up (and the version resets
+to 0) when a push adds new functionality; the version number goes up when
+something is fixed or improved. Same scheme as Gr8daybingo. See "Every
+release gets a version number" in AGENTS.md.
 
-- **Minor** (1.**2**.0): new features or workflow changes.
-- **Patch** (1.1.**1**): fixes and small tweaks.
+The running version shows at the foot of the sidebar and on
+Administration → System Health. Each release is tagged in git with its
+number (`v2.1`).
 
-Versioning started with 1.1.1. Earlier entries were backfilled from git
-history; their tags point at the deployed commit, but the `package.json` in
-those commits still says `0.1.0`.
+Versioning started on 2026-10-04. Earlier entries were backfilled from git
+history.
 
-## 1.1.1 (unreleased)
+## v2.2 — 2026-10-04
+### Changed — version numbers match the Gr8daybingo scheme
+- Switched from three-part numbers (1.1.1) to `v{release}.{version}`, the
+  same scheme as Gr8daybingo (Curt's call). Renumbered: 1.0.0 → v1.0,
+  1.1.0 → v2.0, 1.1.1 → v2.1, with the git tags renamed to match.
+- The sidebar now shows just the number (`v2.2`).
 
-- The release version now shows at the foot of the sidebar for everyone
-  (hover it for the exact build).
-- Started this changelog and version tags.
+## v2.1 — 2026-10-04
+### Added — version number in the app
+- The release version shows at the foot of the sidebar for everyone (hover
+  it for the exact build). Started this changelog and version tags.
 
-## 1.1.0 (2026-10-04)
-
-Field sales: in-person bar visits.
+## v2.0 — 2026-10-04
+### Added — field sales: in-person bar visits
 
 - **Log visit** quick action on the company page, with visit outcomes
   (Flyer Dropped, Spoke to Staff, Demo Booked, Demo Given on the Spot,
@@ -38,7 +44,7 @@ Field sales: in-person bar visits.
 - Settings → Call & Visit Outcomes: each outcome says whether it's offered
   for calls, visits or both, and whether it books a demo.
 
-## 1.0.x post-launch updates (2026-07-24 to 2026-09-22)
+## v1.x post-launch updates — 2026-07-24 to 2026-09-22
 
 Shipped continuously after launch, before version numbers were in use.
 Highlights:
@@ -62,7 +68,7 @@ Highlights:
   formatting, full addresses on lead search results and the company list,
   and a show/hide password toggle on login.
 
-## 1.0.0 (2026-07-24)
+## v1.0 — 2026-07-24
 
 Version 1 launch: Modules One through Ten. CRM foundation, AI lead
 discovery, sales workspace and pipeline, reporting and scheduled reports,

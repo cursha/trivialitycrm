@@ -108,7 +108,7 @@ export function DashboardShell({
           })}
         </nav>
         <p className="shrink-0 border-t border-border px-6 py-3 text-xs text-text-muted" title={buildId ? `Build ${buildId}` : undefined}>
-          Version {appVersion}
+          {appVersion}
         </p>
       </aside>
 
