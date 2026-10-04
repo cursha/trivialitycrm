@@ -4,6 +4,9 @@ node_modules
 tests
 *.md
 !README.md
+# The in-app User Manual (Administration → User Manual) reads these two.
+!SALES_QUICKSTART.md
+!ADMIN_GUIDE.md
 .env
 .env.*
 !.env.example

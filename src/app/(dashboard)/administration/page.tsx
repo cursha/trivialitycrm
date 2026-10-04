@@ -33,6 +33,7 @@ export default async function AdministrationPage() {
     { href: "/administration/integrations", label: "Integrations", description: "AI and email provider status, usage, and safe controlled test actions.", permission: "view_integrations" },
     { href: "/administration/audit-log", label: "Audit Log", description: "A redacted, read-only record of administrative actions.", permission: "view_audit_log" },
     { href: "/administration/system-health", label: "System Health", description: "Web, database, worker, and queue status.", permission: "view_system_health" },
+    { href: "/administration/user-manual", label: "User Manual", description: "The Sales Quick Start and Admin Guide: how to use the CRM, updated with each release.", permission: "view_administration" },
   ].filter((section) => hasPermission(user, section.permission));
 
   return (

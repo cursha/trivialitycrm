@@ -111,6 +111,12 @@ Under **Daily goals & trial length**, click **Edit** next to a rep to set:
   created don't move.
 - **Timezone**, so a Colorado Springs rep's "today" is Mountain time.
 
+## User manual
+
+Administration → **User Manual** shows this guide and the Sales Quick
+Start in the app. They're the `ADMIN_GUIDE.md` and `SALES_QUICKSTART.md`
+files in the repo, so editing those (and releasing) updates the page.
+
 ## Versions and the changelog
 
 Every release to production gets a number (`v{release}.{version}`, e.g.

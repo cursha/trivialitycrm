@@ -77,6 +77,8 @@ COPY --from=builder /app/package.json ./package.json
 # build testing that failed with MODULE_NOT_FOUND on next.config.ts's
 # relative import of ./src/lib/security/headers until src/ was copied here.
 COPY --from=builder /app/src ./src
+# Read at request time by the in-app User Manual (src/lib/docs/manuals.ts).
+COPY --from=builder /app/SALES_QUICKSTART.md /app/ADMIN_GUIDE.md ./
 RUN chown -R nextjs:nodejs /app/.next
 USER nextjs
 EXPOSE 3000

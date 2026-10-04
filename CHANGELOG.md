@@ -13,6 +13,12 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v3.3 — 2026-10-04
+### Improved — the user manual is in the app
+- **Administration → User Manual** shows the Sales Quick Start and the
+  Admin Guide, with a tab for each. It reads the same files kept in the
+  repo, so it's current with every release.
+
 ## v3.2 — 2026-10-04
 ### Improved — trial length per rep, and an updated user manual
 - Managers set each rep's **trial length** (1 to 4 weeks, default 4) on the
