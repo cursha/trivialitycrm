@@ -252,3 +252,33 @@ export async function createTeam(_prevState: ActionResult, formData: FormData): 
 
   revalidatePath(PATH);
 }
+
+/**
+ * Renames a user (e.g. the bootstrap account the seed creates as
+ * "Administrator"). The name is only a display label — companies, tasks and
+ * history point at the user by id, so everything assigned to them shows the
+ * new name at once.
+ */
+export async function renameUser(id: string, name: string): Promise<ActionResult> {
+  const actor = await requireUserManager();
+
+  const parsed = CreateUserSchema.shape.name.safeParse(name);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter a name." };
+
+  const existing = await prisma.user.findUnique({ where: { id }, select: { name: true } });
+  if (!existing) return { error: "That user no longer exists." };
+  if (existing.name === parsed.data) return;
+
+  await prisma.user.update({ where: { id }, data: { name: parsed.data } });
+  await writeAuditEvent({
+    actorId: actor.id,
+    module: "users",
+    action: "user.renamed",
+    entityType: "User",
+    entityId: id,
+    beforeData: { name: existing.name },
+    afterData: { name: parsed.data },
+  });
+
+  revalidatePath(PATH);
+}

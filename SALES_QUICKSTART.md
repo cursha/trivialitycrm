@@ -271,7 +271,7 @@ mobile, that's worth flagging — it's not intentional.
 
 ## Which version am I on?
 
-The version number is at the foot of the sidebar (for example **v3.7**).
+The version number is at the foot of the sidebar (for example **v3.8**).
 Each update to the CRM gets a new number; what changed in each one is in
 the changelog your administrator keeps.
 

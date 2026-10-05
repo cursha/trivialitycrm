@@ -13,6 +13,13 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v3.8 — 2026-10-05
+### Added — rename users
+- Settings → Users has a pencil next to each name to rename the user. The
+  first account the CRM creates is named "Administrator", so companies
+  assigned to Curt showed "Administrator"; renaming the account fixes that
+  everywhere at once. Renames are recorded in the audit log.
+
 ## v3.7 — 2026-10-05
 ### Added — My Day
 - **My Day** (first in the menu) walks reps through the day as the sales

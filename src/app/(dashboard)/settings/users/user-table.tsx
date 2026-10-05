@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { setUserRole, setUserTeam, setUserDisabled, unlockUserAccount, revokeUserSessions, fetchOwnershipSummary, transferUserOwnership } from "./actions";
+import { setUserRole, setUserTeam, setUserDisabled, unlockUserAccount, revokeUserSessions, fetchOwnershipSummary, transferUserOwnership, renameUser } from "./actions";
+import { Pencil } from "lucide-react";
 import { ResetPasswordControl } from "./reset-password-control";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Select, FieldError } from "@/components/ui/field";
+import { Input, Select, FieldError } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 
 export type UserRow = {
@@ -95,6 +96,7 @@ export function UserTable({
   const [isPending, startTransition] = useTransition();
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
 
   function setError(userId: string, message: string | null) {
     setRowErrors((prev) => {
@@ -127,7 +129,42 @@ export function UserTable({
               <>
                 <tr key={user.id} className="border-t border-border align-top">
                   <td className="px-5 py-4">
-                    <span className="font-semibold text-text">{user.name}</span>
+                    {renamingId === user.id ? (
+                      <form
+                        className="flex flex-wrap items-center gap-2"
+                        action={(formData) =>
+                          startTransition(async () => {
+                            const result = await renameUser(user.id, String(formData.get("name") ?? ""));
+                            setError(user.id, result?.error ?? null);
+                            if (!result?.error) setRenamingId(null);
+                          })
+                        }
+                      >
+                        <Input name="name" defaultValue={user.name} maxLength={120} required autoFocus aria-label={`New name for ${user.name}`} className="w-44 py-1" />
+                        <Button type="submit" disabled={isPending} className="px-3 py-1 text-xs">
+                          Save
+                        </Button>
+                        <Button type="button" variant="ghost" disabled={isPending} onClick={() => setRenamingId(null)} className="px-3 py-1 text-xs">
+                          Cancel
+                        </Button>
+                      </form>
+                    ) : (
+                      <>
+                        <span className="font-semibold text-text">{user.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setError(user.id, null);
+                            setRenamingId(user.id);
+                          }}
+                          className="ml-1 rounded p-1 align-middle text-text-muted hover:bg-black/5 hover:text-text"
+                          aria-label={`Rename ${user.name}`}
+                          title="Rename"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                      </>
+                    )}
                     {user.mustChangePassword && (
                       <Badge tone="warning" className="ml-2">
                         Must change password

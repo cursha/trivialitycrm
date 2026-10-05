@@ -129,6 +129,10 @@ steps are in `AGENTS.md`.
 - Settings → Users: create/deactivate accounts, assign role and territory,
   generate a password-reset link for someone who's locked out (never ask them
   to email or message you their password — you generate a reset link instead).
+- **Rename a user** with the pencil next to their name on Settings → Users.
+  The first account the CRM creates is named "Administrator"; rename it to
+  the person's real name. Everything assigned to that user shows the new
+  name right away.
 - Settings → Roles: each role is a named set of permission grants. Duplicate
   an existing role as a starting point rather than building one from scratch.
 - The system prevents removing the last active Administrator — you cannot
