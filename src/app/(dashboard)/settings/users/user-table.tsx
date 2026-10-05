@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Fragment, useEffect, useState, useTransition } from "react";
 import { setUserRole, setUserTeam, setUserDisabled, unlockUserAccount, revokeUserSessions, fetchOwnershipSummary, transferUserOwnership, renameUser } from "./actions";
 import { Pencil } from "lucide-react";
 import { ResetPasswordControl } from "./reset-password-control";
@@ -30,11 +30,25 @@ function TransferPanel({ user, otherUsers, onDone }: { user: UserRow; otherUsers
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
+  // Load once when the panel opens. (This used to start the fetch during
+  // render, which re-ran on every re-render and could leave the panel stuck
+  // on "Loading ownership…".)
+  useEffect(() => {
+    let cancelled = false;
+    fetchOwnershipSummary(user.id)
+      .then((result) => {
+        if (!cancelled) setSummary(result);
+      })
+      .catch(() => {
+        if (!cancelled) setError("Couldn't load what this user owns. Reload the page and try again.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user.id]);
+
   if (summary === null) {
-    startTransition(async () => {
-      setSummary(await fetchOwnershipSummary(user.id));
-    });
-    return <p className="text-xs text-text-muted">Loading ownership…</p>;
+    return error ? <FieldError>{error}</FieldError> : <p className="text-xs text-text-muted">Loading ownership…</p>;
   }
 
   if (summary.companyCount === 0 && summary.openTaskCount === 0) {
@@ -126,8 +140,8 @@ export function UserTable({
           {users.map((user) => {
             const lockedOut = isCurrentlyLockedOut(user.lockedUntil);
             return (
-              <>
-                <tr key={user.id} className="border-t border-border align-top">
+              <Fragment key={user.id}>
+                <tr className="border-t border-border align-top">
                   <td className="px-5 py-4">
                     {renamingId === user.id ? (
                       <form
@@ -238,14 +252,14 @@ export function UserTable({
                   </td>
                 </tr>
                 {rowErrors[user.id] && (
-                  <tr key={`${user.id}-error`} className="border-t-0">
+                  <tr className="border-t-0">
                     <td colSpan={8} className="bg-danger/5 px-5 py-2">
                       <FieldError>{rowErrors[user.id]}</FieldError>
                     </td>
                   </tr>
                 )}
                 {expandedId === user.id && (
-                  <tr key={`${user.id}-manage`} className="border-t-0">
+                  <tr className="border-t-0">
                     <td colSpan={8} className="space-y-3 bg-black/5 px-5 py-4">
                       <div className="flex flex-wrap gap-2">
                         {lockedOut && (
@@ -280,7 +294,7 @@ export function UserTable({
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             );
           })}
           {users.length === 0 && (

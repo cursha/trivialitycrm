@@ -13,6 +13,13 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v3.9 — 2026-10-05
+### Fixed — Manage on Settings → Users
+- **Manage** next to a user didn't open properly, so the ownership
+  transfer (move a user's companies and open follow-ups to someone else)
+  couldn't be reached. The panel now opens under the right user and loads
+  what they own once.
+
 ## v3.8 — 2026-10-05
 ### Added — rename users
 - Settings → Users has a pencil next to each name to rename the user. The
