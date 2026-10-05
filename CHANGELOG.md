@@ -13,6 +13,21 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v3.7 — 2026-10-05
+### Added — My Day
+- **My Day** (first in the menu) walks reps through the day as the sales
+  process in seven steps: add new bars, fill in the info, plan the route
+  and drop off flyers, follow up and book demos, run today's demos, look
+  after trials, and check the scoreboard. Each step expands to show every
+  way to do it (only what the rep is allowed to do) and the rep's bars
+  waiting on it (Curt's call). The first step with work left opens on its
+  own; a step shows a green check when nothing's left.
+- Step 1 lists every way to add bars: Quick Add, the company form, Pub Lead
+  Finder, Quick Search, AI research, Competition Locator, spreadsheet
+  import, and reviewing search results.
+- Step 3 lets reps add Local Target bars to their route without leaving the
+  page.
+
 ## v3.6 — 2026-10-05
 ### Added — delete research prompts
 - Leads → Research Prompts has a garbage-can icon to **delete** a prompt,

@@ -2,6 +2,7 @@
 // both the server layout (for permission filtering) and the client shell
 // (for rendering) without crossing a function-serialization boundary.
 export type NavIconKey =
+  | "myDay"
   | "dashboard"
   | "building"
   | "calendar"
@@ -25,6 +26,7 @@ export type NavItem = {
 const LEAD_VIEW_PERMISSIONS = ["view_all_leads", "view_team_leads", "view_assigned_leads"];
 
 export const NAV_ITEMS: NavItem[] = [
+  { label: "My Day", href: "/my-day", icon: "myDay", requiresAnyPermission: LEAD_VIEW_PERMISSIONS },
   { label: "Dashboard", href: "/dashboard", icon: "dashboard" },
   { label: "Pipeline", href: "/pipeline", icon: "pipeline", requiresAnyPermission: LEAD_VIEW_PERMISSIONS },
   { label: "Companies", href: "/companies", icon: "building", requiresAnyPermission: LEAD_VIEW_PERMISSIONS },

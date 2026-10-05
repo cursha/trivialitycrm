@@ -19,16 +19,27 @@ you go, or ignore it entirely; nothing in the CRM is blocked by it.
 
 ## Where to start every day: My Day
 
-Your dashboard's My Day view is built to answer "what should I do right now?"
-without you having to go hunting:
+**My Day** (first in the menu) walks you through your day as the sales
+process, one step at a time. Tap a step to open it: each one shows every
+way to do that step and the bars of yours waiting on it. The first step
+with work left opens on its own, and a step turns green when there's
+nothing left in it.
 
-- Follow-ups that are overdue or due today
-- Leads newly assigned to you that you haven't contacted yet
-- Leads with no activity logged in a while
-- A quick summary of your pipeline
+1. **Add new bars**: every way to add them (Quick Add, the full form, Pub
+   Lead Finder, Quick Search, AI research, Competition Locator, spreadsheet
+   import, and reviewing search results).
+2. **Fill in the info**: your Target bars missing the manager's contact
+   info or trivia history.
+3. **Plan your route and drop off flyers**: Local Target bars not on your
+   route yet (add them right there), your route, and visits logged today.
+4. **Follow up and book demos**: follow-ups due today or overdue, and
+   Introduced bars waiting for a demo.
+5. **Run today's demos**: today's demos and the demo checklist.
+6. **Look after your trials**: your Trial Booked and Trial Live bars.
+7. **Check your scoreboard**: today against your goals.
 
-Every item links straight to the company or the action it's about — there's
-nothing here that's just a number for its own sake.
+The Dashboard still has "What should I do next?": overdue follow-ups, newly
+assigned leads you haven't contacted, and leads gone quiet.
 
 ## Finding something
 
@@ -260,7 +271,7 @@ mobile, that's worth flagging — it's not intentional.
 
 ## Which version am I on?
 
-The version number is at the foot of the sidebar (for example **v3.6**).
+The version number is at the foot of the sidebar (for example **v3.7**).
 Each update to the CRM gets a new number; what changed in each one is in
 the changelog your administrator keeps.
 
