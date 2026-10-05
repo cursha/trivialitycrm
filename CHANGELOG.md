@@ -13,6 +13,16 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v3.4 — 2026-10-04
+### Improved — trial wording: a new game each week
+- A trial gives the bar **a new game each week**, which they can run as
+  often as they like that week, one game at a time (Curt's call). It's no
+  longer described as "one night a week": checklists, step bubbles,
+  follow-up titles and the Sales Quick Start now say so, and reps agree
+  which nights the bar will run it instead of a single trial night.
+- Database: migration 20261005040000_trial_weekly_game (rewords existing
+  text; applies on deploy).
+
 ## v3.3 — 2026-10-04
 ### Improved — the user manual is in the app
 - **Administration → User Manual** shows the Sales Quick Start and the

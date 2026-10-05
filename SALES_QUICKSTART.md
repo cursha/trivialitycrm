@@ -70,13 +70,15 @@ The **Sales process** card on every company page shows:
 | **Target** | Get the manager's name, phone and email (add them as a contact) and the bar's trivia history (Bar intel card). Plan it into your route. | Same research, then send the intro email with the short video, or call. |
 | **Introduced** | Drop off the flyer and ask for the manager. Goal: book a ~20-minute demo (or demo on the spot). | Follow up the intro. Goal: book a video demo, or skip the demo and start a trial. |
 | **Demo Booked** | Confirm the day before. Demo on the bar's own TVs. End with the trial ask. | Confirm the day before. Demo over video with screen share. End with the trial ask. |
-| **Demo Held** | Ask for the free trial, one night a week. Follow up within 2 days if they want to think. | Same. |
-| **Trial Booked** | Name the champion; agree the trial night, today's headcount, the target and the monthly price. Help them connect online; you're on site for night 1. | Same agreement, then send the sign-up link and quick-start guide and confirm they've connected online. |
+| **Demo Held** | Ask for the free trial: a new game each week, to run as often as they like. Follow up within 2 days if they want to think. | Same. |
+| **Trial Booked** | Name the champion; agree which nights they'll run it, today's headcount, the target and the monthly price. Help them connect online; you're on site for night 1. | Same agreement, then send the sign-up link and quick-start guide and confirm they've connected online. |
 | **Trial Live** | On site night 1, week-2 check-in, week-3 early-yes ask, conversion meeting in person before the trial ends. | Night-1 check-in by phone or text, then the same check-ins and a conversion call. |
 
 ### Trial length
 
-Trials are free, one night a week, for **up to 4 weeks**. Your manager
+Trials are free for **up to 4 weeks**. Each week of the trial the bar
+gets **a new game**, which they can run as often as they like that week.
+They have **one game at a time**: each new week's game replaces the last. Your manager
 sets your trial length (1 to 4 weeks), and the checklists and follow-ups
 on your bars use it: "up to 3 weeks free" if yours is 3. A bar follows the
 trial length of the rep it's assigned to.
@@ -121,7 +123,7 @@ your My Day list.
   these, and it also has a **Trivia history** box (do they run trivia now,
   with whom and which night, and have they tried it before).
 - **Contacts**: mark a contact as the **decision-maker** and/or the
-  **champion** (the staff member who'll start the game each week), and
+  **champion** (the staff member who'll start the game each time they run it), and
   note the best time to reach them.
 
 ## Working a company
@@ -258,7 +260,7 @@ mobile, that's worth flagging — it's not intentional.
 
 ## Which version am I on?
 
-The version number is at the foot of the sidebar (for example **v3.3**).
+The version number is at the foot of the sidebar (for example **v3.4**).
 Each update to the CRM gets a new number; what changed in each one is in
 the changelog your administrator keeps.
 

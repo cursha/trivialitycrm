@@ -74,12 +74,12 @@ const pipelineStages: {
     playbookLocal: [
       "Confirm the demo the day before",
       "Run it on the bar's own TVs (~20 minutes)",
-      "End with the trial ask: up to {{trialWeeks}} weeks free, one night a week",
+      "End with the trial ask: up to {{trialWeeks}} weeks free, with a new game each week to run as often as they like",
     ],
     playbookRemote: [
       "Confirm the demo the day before",
       "Run it over a video call with screen share (~20 minutes)",
-      "End with the trial ask: up to {{trialWeeks}} weeks free, one night a week",
+      "End with the trial ask: up to {{trialWeeks}} weeks free, with a new game each week to run as often as they like",
     ],
   },
   {
@@ -88,13 +88,13 @@ const pipelineStages: {
     outcomeType: null,
     processStep: "DEMO_HELD",
     description:
-      "They've seen the game. Ask for the trial: up to {{trialWeeks}} weeks free, one night a week. If they want to think it over, follow up within 2 days.",
+      "They've seen the game. Ask for the trial: up to {{trialWeeks}} weeks free, with a new game each week to run as often as they like. If they want to think it over, follow up within 2 days.",
     playbookLocal: [
-      "Ask for the trial: up to {{trialWeeks}} weeks free, one night a week",
+      "Ask for the trial: up to {{trialWeeks}} weeks free, with a new game each week to run as often as they like",
       "If they want to think it over, follow up within 2 days",
     ],
     playbookRemote: [
-      "Ask for the trial: up to {{trialWeeks}} weeks free, one night a week",
+      "Ask for the trial: up to {{trialWeeks}} weeks free, with a new game each week to run as often as they like",
       "If they want to think it over, follow up within 2 days",
     ],
   },
@@ -104,15 +104,15 @@ const pipelineStages: {
     outcomeType: null,
     processStep: "TRIAL_BOOKED",
     description:
-      "They said yes to a trial. Agree on the champion, the trial night, today's headcount and the target, and the monthly price, then get them connected online before night 1.",
+      "They said yes to a trial. Agree on the champion, which nights they'll run it, today's headcount and the target, and the monthly price, then get them connected online before night 1.",
     playbookLocal: [
-      "Name the champion: the staff member who starts the game each week",
-      "Agree the trial night, today's headcount, the target headcount, and the monthly price",
+      "Name the champion: the staff member who starts the game each time they run it",
+      "Agree which nights they'll run it, today's headcount, the target headcount, and the monthly price",
       "Help them connect online; you'll be on site for night 1",
     ],
     playbookRemote: [
-      "Name the champion: the staff member who starts the game each week",
-      "Agree the trial night, today's headcount, the target headcount, and the monthly price",
+      "Name the champion: the staff member who starts the game each time they run it",
+      "Agree which nights they'll run it, today's headcount, the target headcount, and the monthly price",
       "Send the sign-up link and quick-start guide",
       "Confirm they've connected online before night 1",
     ],
@@ -123,7 +123,7 @@ const pipelineStages: {
     outcomeType: null,
     processStep: "TRIAL_LIVE",
     description:
-      "The trial is running: up to {{trialWeeks}} weeks, one night a week. Support night 1, check in at week 2, ask for an early yes at week 3, and hold the conversion meeting before the trial ends.",
+      "The trial is running: up to {{trialWeeks}} weeks, with a new game each week that they can run as often as they like (one game at a time). Support night 1, check in at week 2, ask for an early yes at week 3, and hold the conversion meeting before the trial ends.",
     playbookLocal: [
       "Night 1: be on site and help the champion start the game",
       "Week 2: check in with the champion on turnout",
@@ -148,7 +148,7 @@ const stageEntryTasks: { step: SalesStep; track?: SalesTrack; title: string; day
   { step: "INTRODUCED", track: "LOCAL", title: "Follow up to book a demo", daysAfter: 2 },
   { step: "INTRODUCED", track: "REMOTE", title: "Follow up: book a demo or start a trial", daysAfter: 2 },
   { step: "DEMO_HELD", title: "Follow up on the trial offer", daysAfter: 2 },
-  { step: "TRIAL_BOOKED", track: "LOCAL", title: "Confirm the trial night and champion (you're on site for night 1)", daysAfter: 1 },
+  { step: "TRIAL_BOOKED", track: "LOCAL", title: "Confirm the trial nights and champion (you're on site for night 1)", daysAfter: 1 },
   { step: "TRIAL_BOOKED", track: "REMOTE", title: "Confirm they've connected online", daysAfter: 2 },
   { step: "TRIAL_LIVE", track: "LOCAL", title: "Trial night 1: on site with the champion", daysAfter: 0 },
   { step: "TRIAL_LIVE", track: "REMOTE", title: "Check in: how did trial night 1 go?", daysAfter: 1 },
