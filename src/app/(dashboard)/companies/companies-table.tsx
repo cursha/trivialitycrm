@@ -99,7 +99,7 @@ export function CompaniesTable({
                 <th className="px-5 py-3">Stage</th>
                 <th className="px-5 py-3">Salesperson</th>
                 <th className="px-5 py-3">Trivia Status</th>
-                <th className="px-5 py-3">EOS Grade</th>
+                <th className="px-5 py-3" title="Entertainment Opportunity Score grade">EOS Grade</th>
                 <th className="px-5 py-3">Follow-up</th>
               </tr>
             </thead>

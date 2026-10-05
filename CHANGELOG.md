@@ -13,6 +13,14 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v4.1 — 2026-10-05
+### Added — EOS spelled out
+- EOS now reads as the **Entertainment Opportunity Score** (Curt's call):
+  the company page's score card is titled "Entertainment Opportunity Score
+  (EOS)", the Dashboard card says so, and hovering "EOS" in tables and
+  badges shows the full name.
+- Sales Quick Start: new "What's the EOS?" section.
+
 ## v4.0 — 2026-10-05
 ### Added — multiple route plans
 - Each person can keep **several named routes**, one per day or area

@@ -214,7 +214,7 @@ export default async function DashboardPage() {
           emptyLabel="No companies linked to a competitor."
         />
         <BreakdownList
-          title="EOS Grades"
+          title="EOS Grades (Entertainment Opportunity Score)"
           icon={CalendarClock}
           items={stats.eosGradeBreakdown.map((g) => ({ label: GRADE_LABELS[g.grade] ?? g.grade, count: g.count }))}
           emptyLabel="No companies scored yet."

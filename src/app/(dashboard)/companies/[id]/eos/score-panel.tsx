@@ -139,7 +139,7 @@ export function ScorePanel({
   return (
     <Card>
       <div className="flex items-center justify-between">
-        <h2 className="font-bold text-accent">EOS-1.0 Score</h2>
+        <h2 className="font-bold text-accent">Entertainment Opportunity Score (EOS)</h2>
         {canEdit && !recording && (
           <button type="button" onClick={() => setRecording(true)} className="flex items-center gap-1 text-sm font-bold text-secondary hover:underline">
             <CirclePlus size={15} />

@@ -164,7 +164,7 @@ export function CallScreen({
           {company.confidenceLevel && <Badge tone={CONFIDENCE_TONE[company.confidenceLevel]}>{CONFIDENCE_LABEL[company.confidenceLevel]}</Badge>}
           <Badge tone="neutral">{TRIVIA_STATUS_LABEL[company.triviaStatus]}</Badge>
           {company.competitor && <Badge tone="warning">Competitor: {company.competitor.name}</Badge>}
-          {company.eosScore !== null && <Badge tone="focus">EOS {company.eosScore}</Badge>}
+          {company.eosScore !== null && <Badge tone="focus" title="Entertainment Opportunity Score">EOS {company.eosScore}</Badge>}
         </div>
 
         {company.recommendedNextAction && (

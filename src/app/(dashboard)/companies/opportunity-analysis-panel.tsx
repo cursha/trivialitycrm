@@ -278,7 +278,7 @@ export function OpportunityAnalysisPanel({
                       <span className="w-5 text-text-muted">{index + 1}.</span>
                       <span className="font-semibold text-text">{row.name}</span>
                       <Badge tone={GRADE_TONE[row.result.opportunityGrade]}>{GRADE_LABEL[row.result.opportunityGrade]}</Badge>
-                      <span className="text-text-muted">EOS {row.result.eosTotal}</span>
+                      <span className="text-text-muted" title="Entertainment Opportunity Score">EOS {row.result.eosTotal}</span>
                       {row.result.salesPriorityScore !== null && <span className="text-text-muted">· Priority {row.result.salesPriorityScore}</span>}
                       {row.result.hasTvs === false && <Badge tone="danger">No TVs</Badge>}
                       <CompetitorBadge result={row.result} />

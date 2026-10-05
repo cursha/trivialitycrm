@@ -71,7 +71,7 @@ export function ListDetailTable({
               <th className="px-4 py-3">Email</th>
               <th className="px-4 py-3">Lead Type</th>
               <th className="px-4 py-3">Stage</th>
-              <th className="px-4 py-3">EOS</th>
+              <th className="px-4 py-3" title="Entertainment Opportunity Score">EOS</th>
               <th className="px-4 py-3">Confidence</th>
               <th className="px-4 py-3">Competitor</th>
               <th className="px-4 py-3">Trivia Status</th>

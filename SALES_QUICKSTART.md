@@ -116,6 +116,23 @@ demos held and trials booked today against your daily goals, plus this
 week's totals. Your manager sets your goals. "Today" is your own day, in
 your timezone.
 
+## What's the EOS?
+
+**EOS** is the **Entertainment Opportunity Score**: a score from 0 to 100
+(with a letter grade) of how good an opportunity a bar is for Triviality.
+It adds up 10 categories, such as existing competition, marketing
+presence, and how ready the bar is to run trivia.
+
+- **Where it comes from:** the AI opportunity analysis (it researches the
+  bar online and links its evidence for each category), or entered by hand
+  on the company's Entertainment Opportunity Score card.
+- **Where you'll see it:** that card on the company page, the EOS grade on
+  the Companies list and Sales Lists, the Dashboard's EOS Grades card, and
+  "Highest EOS" as a calling-session order. Hover over "EOS" in a table
+  for the full name.
+- **History is kept:** a new score never replaces the old one, so you can
+  see how a bar's score has changed.
+
 ## Route plans
 
 Keep a route for each day or area, for example **Mississauga** today,
@@ -291,7 +308,7 @@ mobile, that's worth flagging — it's not intentional.
 
 ## Which version am I on?
 
-The version number is at the foot of the sidebar (for example **v4.0**).
+The version number is at the foot of the sidebar (for example **v4.1**).
 Each update to the CRM gets a new number; what changed in each one is in
 the changelog your administrator keeps.
 

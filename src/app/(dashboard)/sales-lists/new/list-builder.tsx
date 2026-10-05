@@ -161,7 +161,7 @@ export function ListBuilder({
                 <th className="px-5 py-3">Company</th>
                 <th className="px-5 py-3">Owner</th>
                 <th className="px-5 py-3">Primary Contact</th>
-                <th className="px-5 py-3">EOS</th>
+                <th className="px-5 py-3" title="Entertainment Opportunity Score">EOS</th>
                 <th className="px-5 py-3">Eligibility</th>
               </tr>
             </thead>
