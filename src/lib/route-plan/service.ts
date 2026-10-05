@@ -10,23 +10,90 @@ import { Prisma } from "@/generated/prisma/client";
 import { resolveRouteAddOutcome, sortRouteCompanies, normalizeCountry, formatRouteAddress, missingRouteAddressFields, buildRoutePlanFilename, type RouteAddOutcome } from "./validation";
 
 export type RouteSummary = {
+  /** The current route; null until the user's first route exists. */
+  id: string | null;
+  name: string | null;
+  /** YYYY-MM-DD, when the route has a planned day. */
+  plannedDate: string | null;
   count: number;
   leadTypeId: string | null;
   leadTypeName: string | null;
   country: string | null;
 };
 
+const EMPTY_SUMMARY: RouteSummary = { id: null, name: null, plannedDate: null, count: 0, leadTypeId: null, leadTypeName: null, country: null };
+export const DEFAULT_ROUTE_NAME = "My route";
+
+type Db = Prisma.TransactionClient | typeof prisma;
+
+function isoDate(date: Date | null): string | null {
+  return date ? date.toISOString().slice(0, 10) : null;
+}
+
+/**
+ * A user can keep several named routes; User.activeRoutePlanId is the
+ * current one, which every add/remove/clear/review/export below works on.
+ * Only ever resolves to a route the user owns.
+ */
+async function activeRouteId(db: Db, userId: string): Promise<string | null> {
+  const user = await db.user.findUnique({ where: { id: userId }, select: { activeRoutePlanId: true } });
+  if (!user?.activeRoutePlanId) return null;
+  const owned = await db.routePlan.findFirst({ where: { id: user.activeRoutePlanId, userId }, select: { id: true } });
+  return owned?.id ?? null;
+}
+
+/** The current route, creating "My route" (and making it current) when the
+ * user has none yet — the first "Add to route" just works. */
+async function ensureActiveRoute(tx: Prisma.TransactionClient, userId: string) {
+  const id = await activeRouteId(tx, userId);
+  if (id) return tx.routePlan.findUniqueOrThrow({ where: { id } });
+  const route = await tx.routePlan.create({ data: { userId, name: DEFAULT_ROUTE_NAME } });
+  await tx.user.update({ where: { id: userId }, data: { activeRoutePlanId: route.id } });
+  return route;
+}
+
+/** A route the user picked by id (must be theirs), or their current route
+ * (created if they have none) when no id is given. */
+async function resolveTargetRoute(tx: Prisma.TransactionClient, userId: string, routeId?: string | null) {
+  if (!routeId) return ensureActiveRoute(tx, userId);
+  return tx.routePlan.findFirst({ where: { id: routeId, userId } });
+}
+
+/** Company ids on ANY of the user's routes — My Day's "not on a route yet". */
+export async function getAllRoutedCompanyIds(userId: string): Promise<Set<string>> {
+  const entries = await prisma.routePlanCompany.findMany({ where: { routePlan: { userId } }, select: { companyId: true } });
+  return new Set(entries.map((entry) => entry.companyId));
+}
+
+export type CompanyRouteOption = { id: string; name: string; plannedDate: string | null; isActive: boolean; inRoute: boolean };
+
+/** The user's routes with whether each already includes this company — for
+ * the "Add to route" picker on a company. */
+export async function getCompanyRouteOptions(userId: string, companyId: string): Promise<CompanyRouteOption[]> {
+  const [routes, memberships] = await Promise.all([
+    listRoutes(userId),
+    prisma.routePlanCompany.findMany({ where: { companyId, routePlan: { userId } }, select: { routePlanId: true } }),
+  ]);
+  const inRoute = new Set(memberships.map((m) => m.routePlanId));
+  return routes.map((route) => ({ id: route.id, name: route.name, plannedDate: route.plannedDate, isActive: route.isActive, inRoute: inRoute.has(route.id) }));
+}
+
 /** The header badge count and page title need this on effectively every
- * page load — cheap (one row + a count), so no caching beyond Next's own
- * per-request dedup. Creates nothing: an empty summary for a user who has
- * never opened Route Plan is just zeros, not a DB write. */
+ * page load — cheap (a couple of small reads), so no caching beyond Next's
+ * own per-request dedup. Creates nothing: an empty summary for a user who
+ * has never opened Route Plan is just zeros, not a DB write. */
 export async function getRouteSummary(userId: string): Promise<RouteSummary> {
+  const id = await activeRouteId(prisma, userId);
+  if (!id) return EMPTY_SUMMARY;
   const route = await prisma.routePlan.findUnique({
-    where: { userId },
+    where: { id },
     include: { leadType: true, _count: { select: { companies: true } } },
   });
-  if (!route) return { count: 0, leadTypeId: null, leadTypeName: null, country: null };
+  if (!route) return EMPTY_SUMMARY;
   return {
+    id: route.id,
+    name: route.name,
+    plannedDate: isoDate(route.plannedDate),
     count: route._count.companies,
     leadTypeId: route.leadTypeId,
     leadTypeName: route.leadType?.name ?? null,
@@ -34,12 +101,116 @@ export async function getRouteSummary(userId: string): Promise<RouteSummary> {
   };
 }
 
-/** Set of company IDs currently in the user's active route — used to render
- * "already in route" state on the company profile and list, distinct from
- * (and never confused with) a bulk-action page-selection checkbox. */
+/** Set of company IDs currently in the user's current route — used to
+ * render "already in route" state on the company profile and list,
+ * distinct from (and never confused with) a bulk-action page-selection
+ * checkbox. */
 export async function getRouteCompanyIds(userId: string): Promise<Set<string>> {
-  const route = await prisma.routePlan.findUnique({ where: { userId }, select: { companies: { select: { companyId: true } } } });
-  return new Set(route?.companies.map((c) => c.companyId) ?? []);
+  const id = await activeRouteId(prisma, userId);
+  if (!id) return new Set();
+  const entries = await prisma.routePlanCompany.findMany({ where: { routePlanId: id }, select: { companyId: true } });
+  return new Set(entries.map((c) => c.companyId));
+}
+
+export type RouteListItem = { id: string; name: string; plannedDate: string | null; count: number; isActive: boolean };
+
+/** All of the user's routes for the Route Plan page's picker: dated routes
+ * first (soonest first), then undated ones by name. */
+export async function listRoutes(userId: string): Promise<RouteListItem[]> {
+  const [routes, activeId] = await Promise.all([
+    prisma.routePlan.findMany({
+      where: { userId },
+      include: { _count: { select: { companies: true } } },
+      orderBy: [{ plannedDate: { sort: "asc", nulls: "last" } }, { name: "asc" }],
+    }),
+    activeRouteId(prisma, userId),
+  ]);
+  return routes.map((route) => ({
+    id: route.id,
+    name: route.name,
+    plannedDate: isoDate(route.plannedDate),
+    count: route._count.companies,
+    isActive: route.id === activeId,
+  }));
+}
+
+export type RouteMutationResult = { ok: true } | { ok: false; error: string };
+
+function parseRouteFields(name: string, plannedDate: string | null): { ok: true; name: string; plannedDate: Date | null } | { ok: false; error: string } {
+  const trimmed = name.trim();
+  if (!trimmed) return { ok: false, error: "Give the route a name, e.g. Mississauga." };
+  if (trimmed.length > 80) return { ok: false, error: "Keep the route name under 80 characters." };
+  if (!plannedDate) return { ok: true, name: trimmed, plannedDate: null };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(plannedDate)) return { ok: false, error: "Enter a valid date." };
+  const date = new Date(`${plannedDate}T00:00:00Z`);
+  if (Number.isNaN(date.getTime()) || isoDate(date) !== plannedDate) return { ok: false, error: "Enter a valid date." };
+  return { ok: true, name: trimmed, plannedDate: date };
+}
+
+/** Creates a new, empty route and makes it the current one. */
+export async function createRoute(user: AuthenticatedUser, name: string, plannedDate: string | null): Promise<RouteMutationResult> {
+  requirePermission(user, "manage_route_plan");
+  const fields = parseRouteFields(name, plannedDate);
+  if (!fields.ok) return fields;
+
+  const route = await prisma.$transaction(async (tx) => {
+    const created = await tx.routePlan.create({ data: { userId: user.id, name: fields.name, plannedDate: fields.plannedDate } });
+    await tx.user.update({ where: { id: user.id }, data: { activeRoutePlanId: created.id } });
+    return created;
+  });
+  await writeAuditEvent({ actorId: user.id, module: "route-plan", action: "route_plan.created", entityType: "RoutePlan", entityId: route.id, metadata: { name: route.name } });
+  return { ok: true };
+}
+
+/** Renames a route and/or changes its planned day. */
+export async function updateRoute(user: AuthenticatedUser, routeId: string, name: string, plannedDate: string | null): Promise<RouteMutationResult> {
+  requirePermission(user, "manage_route_plan");
+  const fields = parseRouteFields(name, plannedDate);
+  if (!fields.ok) return fields;
+
+  const { count } = await prisma.routePlan.updateMany({ where: { id: routeId, userId: user.id }, data: { name: fields.name, plannedDate: fields.plannedDate } });
+  if (count === 0) return { ok: false, error: "That route no longer exists." };
+  return { ok: true };
+}
+
+/** Makes one of the user's routes the current one. */
+export async function selectRoute(user: AuthenticatedUser, routeId: string): Promise<RouteMutationResult> {
+  requirePermission(user, "view_route_plan");
+  const owned = await prisma.routePlan.findFirst({ where: { id: routeId, userId: user.id }, select: { id: true } });
+  if (!owned) return { ok: false, error: "That route no longer exists." };
+  await prisma.user.update({ where: { id: user.id }, data: { activeRoutePlanId: owned.id } });
+  return { ok: true };
+}
+
+/** Deletes one of the user's routes (its stops go with it; the companies
+ * themselves are untouched). If it was current, the next route in the list
+ * becomes current. */
+export async function deleteRoute(user: AuthenticatedUser, routeId: string): Promise<RouteMutationResult> {
+  requirePermission(user, "manage_route_plan");
+  const route = await prisma.routePlan.findFirst({ where: { id: routeId, userId: user.id }, include: { _count: { select: { companies: true } } } });
+  if (!route) return { ok: false, error: "That route no longer exists." };
+
+  await prisma.$transaction(async (tx) => {
+    const wasActive = (await activeRouteId(tx, user.id)) === route.id;
+    await tx.routePlan.delete({ where: { id: route.id } });
+    if (wasActive) {
+      const next = await tx.routePlan.findFirst({
+        where: { userId: user.id },
+        orderBy: [{ plannedDate: { sort: "asc", nulls: "last" } }, { name: "asc" }],
+        select: { id: true },
+      });
+      await tx.user.update({ where: { id: user.id }, data: { activeRoutePlanId: next?.id ?? null } });
+    }
+  });
+  await writeAuditEvent({
+    actorId: user.id,
+    module: "route-plan",
+    action: "route_plan.deleted",
+    entityType: "RoutePlan",
+    entityId: route.id,
+    metadata: { name: route.name, companyCount: route._count.companies },
+  });
+  return { ok: true };
 }
 
 export type RouteConflictDetail =
@@ -47,7 +218,14 @@ export type RouteConflictDetail =
   | { type: "lead_type_conflict"; currentLeadTypeName: string; newLeadTypeName: string }
   | { type: "country_conflict"; currentCountry: string; newCountry: string };
 
-export type AddToRouteResult = { ok: true; count: number; alreadyInRoute: boolean } | { ok: false; error: string } | { ok: false; conflict: RouteConflictDetail };
+export type AddToRouteResult =
+  | { ok: true; count: number; alreadyInRoute: boolean; routeName: string }
+  | { ok: false; error: string }
+  | { ok: false; conflict: RouteConflictDetail };
+
+/** Which route to add to: one of the user's routes by id, a brand-new route
+ * created on the spot, or (when omitted) their current route. */
+export type RouteTarget = { routeId: string } | { newRoute: { name: string; plannedDate: string | null } };
 
 async function loadEligibleCompany(user: AuthenticatedUser, companyId: string) {
   const scope = companyScope(user);
@@ -81,16 +259,34 @@ function conflictDetail(outcome: RouteAddOutcome, currentLeadTypeName: string | 
  * still race — same idempotency-via-DB-constraint pattern this codebase
  * already established for GeneratedReport, see MODULE_10_REPORT.md).
  */
-export async function addCompanyToRoute(user: AuthenticatedUser, companyId: string): Promise<AddToRouteResult> {
+export async function addCompanyToRoute(user: AuthenticatedUser, companyId: string, target?: RouteTarget): Promise<AddToRouteResult> {
   requirePermission(user, "manage_route_plan");
 
   const loaded = await loadEligibleCompany(user, companyId);
   if (!loaded.ok) return { ok: false, error: loaded.error };
   const { company } = loaded;
 
+  let newRoute: { name: string; plannedDate: Date | null } | null = null;
+  if (target && "newRoute" in target) {
+    const fields = parseRouteFields(target.newRoute.name, target.newRoute.plannedDate);
+    if (!fields.ok) return fields;
+    newRoute = { name: fields.name, plannedDate: fields.plannedDate };
+  }
+  const targetRouteId = target && "routeId" in target ? target.routeId : null;
+  let resolvedRouteId: string | null = null;
+
   try {
     const result = await prisma.$transaction(async (tx) => {
-      const route = await tx.routePlan.upsert({ where: { userId: user.id }, create: { userId: user.id }, update: {} });
+      let route;
+      if (newRoute) {
+        route = await tx.routePlan.create({ data: { userId: user.id, name: newRoute.name, plannedDate: newRoute.plannedDate } });
+        // A user's very first route becomes their current one.
+        if (!(await activeRouteId(tx, user.id))) await tx.user.update({ where: { id: user.id }, data: { activeRoutePlanId: route.id } });
+      } else {
+        route = await resolveTargetRoute(tx, user.id, targetRouteId);
+        if (!route) return { ok: false as const, error: "That route no longer exists." };
+      }
+      resolvedRouteId = route.id;
       const currentLeadType = route.leadTypeId ? await tx.leadType.findUnique({ where: { id: route.leadTypeId } }) : null;
 
       const outcome = resolveRouteAddOutcome(
@@ -107,27 +303,39 @@ export async function addCompanyToRoute(user: AuthenticatedUser, companyId: stri
       }
       await tx.routePlanCompany.create({ data: { routePlanId: route.id, companyId, addedById: user.id } });
       const count = await tx.routePlanCompany.count({ where: { routePlanId: route.id } });
-      return { ok: true as const, count, alreadyInRoute: false };
+      return { ok: true as const, count, alreadyInRoute: false, routeName: route.name };
     });
 
     if (result.ok) {
-      await writeAuditEvent({ actorId: user.id, module: "route-plan", action: "route_plan.company_added", entityType: "Company", entityId: companyId, metadata: { count: result.count } });
+      await writeAuditEvent({
+        actorId: user.id,
+        module: "route-plan",
+        action: "route_plan.company_added",
+        entityType: "Company",
+        entityId: companyId,
+        metadata: { count: result.count, routeId: resolvedRouteId, routeName: result.routeName },
+      });
     }
     return result;
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
-      const count = await prisma.routePlanCompany.count({ where: { routePlan: { userId: user.id } } });
-      return { ok: true, count, alreadyInRoute: true };
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002" && resolvedRouteId) {
+      const route = await prisma.routePlan.findUnique({ where: { id: resolvedRouteId }, include: { _count: { select: { companies: true } } } });
+      return { ok: true, count: route?._count.companies ?? 0, alreadyInRoute: true, routeName: route?.name ?? "" };
     }
     throw error;
   }
 }
 
-export async function removeCompanyFromRoute(user: AuthenticatedUser, companyId: string): Promise<{ count: number }> {
+/** Removes a company from one of the user's routes (by id), or from their
+ * current route when no id is given. */
+export async function removeCompanyFromRoute(user: AuthenticatedUser, companyId: string, routeId?: string | null): Promise<{ count: number }> {
   requirePermission(user, "manage_route_plan");
 
-  const route = await prisma.routePlan.findUnique({ where: { userId: user.id } });
-  if (!route) return { count: 0 };
+  const resolvedId = routeId
+    ? ((await prisma.routePlan.findFirst({ where: { id: routeId, userId: user.id }, select: { id: true } }))?.id ?? null)
+    : await activeRouteId(prisma, user.id);
+  if (!resolvedId) return { count: 0 };
+  const route = { id: resolvedId };
 
   // deleteMany (not delete) so removing a company that's already gone from
   // the route — e.g. a duplicate click, or another tab already removed it —
@@ -140,18 +348,17 @@ export async function removeCompanyFromRoute(user: AuthenticatedUser, companyId:
 }
 
 /**
- * Clears every company from the active route and resets its established
+ * Clears every company from the current route and resets its established
  * lead type/country back to null (so the *next* company added — of any
- * eligible lead type/country — establishes it fresh), but keeps the
- * RoutePlan row itself rather than deleting it (userId stays @unique-bound
- * to exactly one row for the life of the user, simpler than recreating it
- * on every next add).
+ * eligible lead type/country — establishes it fresh), but keeps the route
+ * itself (its name and date) — deleteRoute() removes a route entirely.
  */
 export async function clearRoute(user: AuthenticatedUser): Promise<void> {
   requirePermission(user, "manage_route_plan");
 
-  const route = await prisma.routePlan.findUnique({ where: { userId: user.id } });
-  if (!route) return;
+  const routeId = await activeRouteId(prisma, user.id);
+  if (!routeId) return;
+  const route = { id: routeId };
 
   const clearedCount = await prisma.routePlanCompany.count({ where: { routePlanId: route.id } });
   await prisma.$transaction([
@@ -194,7 +401,7 @@ export async function bulkAddCompaniesToRoute(user: AuthenticatedUser, companyId
   }
 
   const result = await prisma.$transaction(async (tx) => {
-    const route = await tx.routePlan.upsert({ where: { userId: user.id }, create: { userId: user.id }, update: {} });
+    const route = await ensureActiveRoute(tx, user.id);
     const existingCompanyIds = new Set((await tx.routePlanCompany.findMany({ where: { routePlanId: route.id }, select: { companyId: true } })).map((r) => r.companyId));
 
     let routeLeadTypeId = route.leadTypeId;
@@ -275,10 +482,12 @@ export type RouteDetail = {
  * company was added. */
 export async function getRouteDetail(user: AuthenticatedUser): Promise<RouteDetail> {
   const scope = companyScope(user);
-  if (!scope) return { route: { count: 0, leadTypeId: null, leadTypeName: null, country: null }, companies: [], exportFilename: null };
+  if (!scope) return { route: EMPTY_SUMMARY, companies: [], exportFilename: null };
 
+  const routeId = await activeRouteId(prisma, user.id);
+  if (!routeId) return { route: EMPTY_SUMMARY, companies: [], exportFilename: null };
   const route = await prisma.routePlan.findUnique({
-    where: { userId: user.id },
+    where: { id: routeId },
     include: {
       leadType: true,
       // Filtered through the real companyScope() WHERE clause, not a
@@ -289,7 +498,7 @@ export async function getRouteDetail(user: AuthenticatedUser): Promise<RouteDeta
       companies: { where: { company: scope }, include: { company: { include: { leadType: true } } } },
     },
   });
-  if (!route) return { route: { count: 0, leadTypeId: null, leadTypeName: null, country: null }, companies: [], exportFilename: null };
+  if (!route) return { route: EMPTY_SUMMARY, companies: [], exportFilename: null };
 
   const rows: RouteCompanyRow[] = route.companies.map((entry) => ({
     id: entry.company.id,
@@ -300,10 +509,27 @@ export async function getRouteDetail(user: AuthenticatedUser): Promise<RouteDeta
   }));
 
   return {
-    route: { count: rows.length, leadTypeId: route.leadTypeId, leadTypeName: route.leadType?.name ?? null, country: route.country },
+    route: {
+      id: route.id,
+      name: route.name,
+      plannedDate: isoDate(route.plannedDate),
+      count: rows.length,
+      leadTypeId: route.leadTypeId,
+      leadTypeName: route.leadType?.name ?? null,
+      country: route.country,
+    },
     companies: sortRouteCompanies(rows),
-    exportFilename: route.leadType?.routePlanSlug ? buildRoutePlanFilename(route.leadType.routePlanSlug, zonedCalendarDate(new Date())) : null,
+    // Dated by the route's planned day when it has one (e.g. Friday's
+    // Hamilton route), else today; the route name goes in too, so several
+    // exported routes don't overwrite each other in Downloads.
+    exportFilename: route.leadType?.routePlanSlug
+      ? buildRoutePlanFilename(route.leadType.routePlanSlug, route.plannedDate ? utcCalendarDate(route.plannedDate) : zonedCalendarDate(new Date()), route.name)
+      : null,
   };
+}
+
+function utcCalendarDate(date: Date) {
+  return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1, day: date.getUTCDate() };
 }
 
 export type ExportRoutePlanResult = { ok: true; csv: string; filename: string; count: number } | { ok: false; error: string };
@@ -332,14 +558,14 @@ export async function exportRoutePlanCsv(user: AuthenticatedUser): Promise<Expor
 
   const detail = await getRouteDetail(user);
   if (detail.companies.length === 0) {
-    return { ok: false, error: "Your Route Plan is empty — add companies before exporting." };
+    return { ok: false, error: "This route is empty — add companies before exporting." };
   }
 
   const invalidRows = detail.companies.filter((c) => !c.stillValid);
   if (invalidRows.length > 0) {
     return {
       ok: false,
-      error: `${invalidRows.length} compan${invalidRows.length === 1 ? "y" : "ies"} in your Route Plan no longer match its lead type or country — remove ${invalidRows.length === 1 ? "it" : "them"} before exporting.`,
+      error: `${invalidRows.length} compan${invalidRows.length === 1 ? "y" : "ies"} in this route no longer match its lead type or country — remove ${invalidRows.length === 1 ? "it" : "them"} before exporting.`,
     };
   }
 
@@ -355,7 +581,8 @@ export async function exportRoutePlanCsv(user: AuthenticatedUser): Promise<Expor
     module: "route-plan",
     action: "route_plan.exported",
     entityType: "RoutePlan",
-    metadata: { count: detail.companies.length, leadTypeName: detail.route.leadTypeName, country: detail.route.country, filename: detail.exportFilename },
+    entityId: detail.route.id ?? undefined,
+    metadata: { count: detail.companies.length, routeName: detail.route.name, leadTypeName: detail.route.leadTypeName, country: detail.route.country, filename: detail.exportFilename },
   });
 
   return { ok: true, csv, filename: detail.exportFilename, count: detail.companies.length };

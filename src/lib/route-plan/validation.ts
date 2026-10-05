@@ -153,8 +153,17 @@ export function resolveRouteAddOutcome(
  * already be resolved in the business timezone (see zonedCalendarDate in
  * src/lib/timezone.ts), not computed here, so this function stays pure and
  * doesn't need a Date/timezone parameter. */
-export function buildRoutePlanFilename(leadTypeSlug: string, date: { year: number; month: number; day: number }): string {
+export function buildRoutePlanFilename(leadTypeSlug: string, date: { year: number; month: number; day: number }, routeName?: string | null): string {
   const mm = String(date.month).padStart(2, "0");
   const dd = String(date.day).padStart(2, "0");
-  return `${leadTypeSlug}-route-${date.year}-${mm}-${dd}.csv`;
+  // The route's name (e.g. "Mississauga"), slugged, so several routes'
+  // exports don't collide. The default "My route" adds nothing.
+  const nameSlug = (routeName ?? "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  const middle = nameSlug && nameSlug !== "my-route" ? `-${nameSlug}` : "";
+  return `${leadTypeSlug}${middle}-route-${date.year}-${mm}-${dd}.csv`;
 }

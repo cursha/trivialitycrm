@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import type { AuthenticatedUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
 import { companyScope, taskScope } from "@/lib/companies/scope";
-import { getRouteCompanyIds, getRouteSummary } from "@/lib/route-plan/service";
+import { getAllRoutedCompanyIds, getRouteSummary, listRoutes, type RouteListItem } from "@/lib/route-plan/service";
 import { getRepScores, repTimeZone, type RepScore } from "@/lib/sales/scoreboard";
 import { zonedDayRange } from "@/lib/timezone";
 import type { SalesStep, SalesTrack } from "@/generated/prisma/enums";
@@ -21,7 +21,10 @@ export type MyDayData = {
   timezone: string;
   needInfo: { companies: MyDayCompany[]; total: number };
   readyToVisit: { companies: MyDayCompany[]; total: number } | null;
+  /** The rep's routes, for adding bars to one from Step 3. */
+  routes: RouteListItem[];
   routeCount: number | null;
+  routeName: string | null;
   visitsToday: number;
   introduced: { companies: MyDayCompany[]; total: number };
   tasks: { items: MyDayTask[]; total: number };
@@ -53,7 +56,7 @@ export async function getMyDay(user: AuthenticatedUser & { timezone?: string | n
 
   const canRoute = hasPermission(user, "view_route_plan");
 
-  const [targets, routeIds, routeSummary, visitsToday, introducedTotal, introduced, tasksTotal, tasks, demos, trialsBooked, trialsLive, scores] =
+  const [targets, routeIds, routeSummary, routes, visitsToday, introducedTotal, introduced, tasksTotal, tasks, demos, trialsBooked, trialsLive, scores] =
     await Promise.all([
       prisma.company.findMany({
         where: atStep("TARGET"),
@@ -65,8 +68,9 @@ export async function getMyDay(user: AuthenticatedUser & { timezone?: string | n
           contacts: { where: { status: "ACTIVE" }, select: { phone: true, email: true } },
         },
       }),
-      canRoute ? getRouteCompanyIds(user.id) : Promise.resolve(new Set<string>()),
+      canRoute ? getAllRoutedCompanyIds(user.id) : Promise.resolve(new Set<string>()),
       canRoute ? getRouteSummary(user.id) : Promise.resolve(null),
+      canRoute ? listRoutes(user.id) : Promise.resolve([] as RouteListItem[]),
       prisma.activity.count({ where: { userId: user.id, type: "VISIT", occurredAt: { gte: today.start, lt: today.end } } }),
       prisma.company.count({ where: atStep("INTRODUCED") }),
       prisma.company.findMany({ where: atStep("INTRODUCED"), orderBy: { updatedAt: "asc" }, take: LIST_LIMIT, select: companySelect }),
@@ -107,7 +111,9 @@ export async function getMyDay(user: AuthenticatedUser & { timezone?: string | n
     readyToVisit: canRoute
       ? { companies: readyAll.slice(0, LIST_LIMIT).map(({ id, name, city, region, salesTrack }) => ({ id, name, city, region, salesTrack })), total: readyAll.length }
       : null,
+    routes,
     routeCount: routeSummary?.count ?? null,
+    routeName: routeSummary?.name ?? null,
     visitsToday,
     introduced: { companies: introduced, total: introducedTotal },
     tasks: { items: tasks.map((task) => ({ ...task, overdue: task.dueAt < today.start })), total: tasksTotal },

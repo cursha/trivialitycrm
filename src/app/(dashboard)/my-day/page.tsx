@@ -9,6 +9,7 @@ import { MyScoreboard } from "@/components/sales-scoreboard";
 import { SALES_TRACK_LABELS } from "@/lib/companies/sales-track";
 import { AddToRouteToggle } from "../companies/[id]/route-plan-toggle";
 import { getMyDay, type MyDayCompany } from "./queries";
+import type { RouteListItem } from "@/lib/route-plan/service";
 
 export const metadata = { title: "My Day — Triviality CRM" };
 
@@ -58,7 +59,7 @@ function CompanyList({
   companies: MyDayCompany[];
   total: number;
   empty: string;
-  routeToggle?: { canManage: boolean };
+  routeToggle?: { canManage: boolean; routes: RouteListItem[] };
 }) {
   if (companies.length === 0) return <p className="text-sm text-text-muted">{empty}</p>;
   return (
@@ -76,7 +77,14 @@ function CompanyList({
               </span>
               {company.note && <p className="text-xs text-amber-700">{company.note}</p>}
             </div>
-            {routeToggle && <AddToRouteToggle companyId={company.id} initiallyInRoute={false} canManage={routeToggle.canManage} />}
+            {routeToggle && (
+              <AddToRouteToggle
+                compact
+                companyId={company.id}
+                routes={routeToggle.routes.map((route) => ({ id: route.id, name: route.name, plannedDate: route.plannedDate, isActive: route.isActive, inRoute: false }))}
+                canManage={routeToggle.canManage}
+              />
+            )}
           </li>
         ))}
       </ul>
@@ -211,31 +219,31 @@ export default async function MyDayPage() {
       <Step
         number={3}
         title="Plan your route and drop off flyers"
-        status={`${data.routeCount !== null ? `${plural(data.routeCount, "stop")} on your route · ` : ""}${plural(data.visitsToday, "visit")} logged today`}
+        status={`${data.routeCount !== null && data.routeName ? `${plural(data.routeCount, "stop")} on your ${data.routeName} route · ` : ""}${plural(data.visitsToday, "visit")} logged today`}
         done={!work.route && data.visitsToday > 0}
         open={firstOpen === 3}
       >
         <Checklist
           items={[
-            "Add Local Target bars to your route, then export it to EZRoutePlanner to order the stops",
+            "Add Local Target bars to a route (one per day or area, e.g. Mississauga, Milton), then export it to EZRoutePlanner to order the stops",
             "At each bar: drop off the flyer and ask for the owner or manager. Goal: book a ~20-minute demo (or demo on the spot)",
             "Log every visit (Log visit on the company page) so the follow-up is created and the bar moves to Introduced",
           ]}
         />
         {data.readyToVisit && (
           <div className="space-y-1">
-            <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Local Target bars not on your route yet</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Local Target bars not on any of your routes yet</p>
             <CompanyList
               companies={data.readyToVisit.companies}
               total={data.readyToVisit.total}
-              empty="All your Local Target bars are on your route."
-              routeToggle={{ canManage: can("manage_route_plan") }}
+              empty="All your Local Target bars are on a route."
+              routeToggle={{ canManage: can("manage_route_plan"), routes: data.routes }}
             />
           </div>
         )}
         <Options
           options={[
-            { label: "Route Plan", description: "Review your stops and export the CSV for EZRoutePlanner.", href: "/route-plan", show: can("view_route_plan") },
+            { label: "Route Plan", description: "Switch between your routes, create new ones, review stops and export the CSV for EZRoutePlanner.", href: "/route-plan", show: can("view_route_plan") },
             { label: "Log a visit", description: "Open the bar and tap Log visit (first quick action). Pick what happened: flyer dropped, demo booked, and so on.", show: can("edit_leads") },
           ]}
         />

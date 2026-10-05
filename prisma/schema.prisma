@@ -318,7 +318,11 @@ model User {
   // audit trail of which entries they personally added (a route can only
   // ever have one owner, but companies within it were each added by
   // whoever clicked "Add to Route" at the time).
-  routePlan               RoutePlan?
+  // A user can have several named routes (e.g. Mississauga today, Milton
+  // tomorrow); "Add to route" everywhere adds to the current one.
+  routePlans              RoutePlan[]        @relation("UserRoutePlans")
+  activeRoutePlanId       String?            @unique
+  activeRoutePlan         RoutePlan?         @relation("ActiveRoutePlan", fields: [activeRoutePlanId], references: [id], onDelete: SetNull)
   routePlanCompaniesAdded RoutePlanCompany[]
 
   // Campaign and Calling Lists.
@@ -832,27 +836,36 @@ model SavedView {
   @@index([ownerId])
 }
 
-// Route Plan: a private, per-user, single-active list of companies the user
-// intends to visit in person, exported as an EZRoutePlanner-compatible CSV
-// (Name,Address). userId is @unique — "one active Route Plan per user" is
-// enforced at the schema level, not just in application code. No
+// Route Plan: a private, per-user list of companies the user intends to
+// visit in person, exported as an EZRoutePlanner-compatible CSV
+// (Name,Address). A user can keep several named routes (one per day or
+// area — Curt's call); User.activeRoutePlanId is the current one that "Add
+// to route" adds to, and the @unique on it means a route is current for at
+// most one user. Every route operation is scoped to routes the signed-in
+// user owns (userId). No
 // organizationId: this app has no multi-tenant Organization model (only
 // Team/Role/assignment-based scoping via companyScope()), so per-user
 // isolation via userId is the entire privacy boundary — confirmed with the
 // account holder before building this.
 model RoutePlan {
-  id         String             @id @default(cuid())
-  userId     String             @unique
-  user       User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String             @id @default(cuid())
+  userId      String
+  user        User               @relation("UserRoutePlans", fields: [userId], references: [id], onDelete: Cascade)
+  name        String             @default("My route")
+  // Optional day the route is for; also dates the exported CSV's filename.
+  plannedDate DateTime?          @db.Date
+  activeFor   User?              @relation("ActiveRoutePlan")
   // Both null while the route is empty — the first company added
   // establishes both, per spec. Never inferred from display text: compared
   // by ID (leadTypeId) and a normalized country string, never by name.
-  leadTypeId String?
-  leadType   LeadType?          @relation(fields: [leadTypeId], references: [id])
-  country    String?
-  companies  RoutePlanCompany[]
-  createdAt  DateTime           @default(now())
-  updatedAt  DateTime           @updatedAt
+  leadTypeId  String?
+  leadType    LeadType?          @relation(fields: [leadTypeId], references: [id])
+  country     String?
+  companies   RoutePlanCompany[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([userId])
 }
 
 model RoutePlanCompany {

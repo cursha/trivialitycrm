@@ -30,8 +30,9 @@ nothing left in it.
    import, and reviewing search results).
 2. **Fill in the info**: your Target bars missing the manager's contact
    info or trivia history.
-3. **Plan your route and drop off flyers**: Local Target bars not on your
-   route yet (add them right there), your route, and visits logged today.
+3. **Plan your route and drop off flyers**: Local Target bars not on any
+   of your routes yet (add them to a route right there), and visits logged
+   today.
 4. **Follow up and book demos**: follow-ups due today or overdue, and
    Introduced bars waiting for a demo.
 5. **Run today's demos**: today's demos and the demo checklist.
@@ -114,6 +115,25 @@ The Dashboard shows **Today's scoreboard**: your visits, demos booked,
 demos held and trials booked today against your daily goals, plus this
 week's totals. Your manager sets your goals. "Today" is your own day, in
 your timezone.
+
+## Route plans
+
+Keep a route for each day or area, for example **Mississauga** today,
+**Milton** tomorrow and **Hamilton** on Friday. Your routes are yours
+alone; nobody else sees or changes them.
+
+- **Add a bar to a route** from its company page (the Route plan card) or
+  from My Day: pick the route from **Add to route…**, or choose
+  **+ New route…** to name a new one (with an optional day) on the spot.
+  A bar can be on more than one route; remove it from one with the × on
+  that route's tag.
+- **Route Plan** (in the menu) shows one route at a time. Click a route to
+  switch to it, use **New route** to start another, and rename, change the
+  day of, or delete the route you're looking at.
+- **Export** the route you're looking at to EZRoutePlanner to put the stops
+  in order. The file is named after the route and its day.
+- Adding several bars at once from the Companies list adds them to the
+  route you're currently looking at on Route Plan.
 
 ## Logging a bar visit
 
@@ -271,7 +291,7 @@ mobile, that's worth flagging — it's not intentional.
 
 ## Which version am I on?
 
-The version number is at the foot of the sidebar (for example **v3.9**).
+The version number is at the foot of the sidebar (for example **v4.0**).
 Each update to the CRM gets a new number; what changed in each one is in
 the changelog your administrator keeps.
 

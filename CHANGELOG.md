@@ -13,6 +13,27 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v4.0 — 2026-10-05
+### Added — multiple route plans
+- Each person can keep **several named routes**, one per day or area
+  (Mississauga today, Milton tomorrow, Hamilton on Friday), each with an
+  optional day (Curt's call). Routes stay private to their owner.
+- **Add a bar to a specific route** from its company page or My Day ("add
+  this to my Burlington route"), or start a new route right there. A bar
+  can be on more than one route, and each route tag has a × to remove it.
+- **Route Plan** shows one route at a time with a switcher to change
+  routes, create one, rename or re-date it, or delete it. The export is
+  named after the route and dated by its day.
+- My Day's Step 3 lists Local Target bars that aren't on any of your
+  routes yet.
+- Everyone's existing route is kept as "My route".
+- Database: migration 20261005050000_multiple_route_plans (applies on
+  deploy).
+
+Version note: from here on, new functionality bumps the release number
+(v4.0) as the versioning rule says; v3.6 to v3.8 added features but only
+bumped the version number.
+
 ## v3.9 — 2026-10-05
 ### Fixed — Manage on Settings → Users
 - **Manage** next to a user didn't open properly, so the ownership

@@ -26,7 +26,7 @@ import { trialWeeksFor } from "@/lib/companies/sales-track";
 import type { VisitSetup } from "./activities/activity-panel";
 import { getConnectionStatus } from "@/lib/comms/connections";
 import { AddToRouteToggle } from "./route-plan-toggle";
-import { getRouteCompanyIds } from "@/lib/route-plan/service";
+import { getCompanyRouteOptions } from "@/lib/route-plan/service";
 import { previewSteps } from "@/lib/comms/sequences";
 import { resolveCompanyPageDefault } from "@/lib/comms/recipient";
 import { parseStoredLinks } from "@/lib/comms/links";
@@ -76,7 +76,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     appointments,
     workspaceSettings,
     pendingDuplicateCount,
-    routeCompanyIds,
+    routeOptions,
     connection,
     visitOutcomes,
     rejectionReasons,
@@ -146,7 +146,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
       prisma.potentialDuplicate.count({
         where: { status: "PENDING", OR: [{ companyAId: id }, { companyBId: id }] },
       }),
-      hasPermission(user, "manage_route_plan") ? getRouteCompanyIds(user.id) : Promise.resolve(new Set<string>()),
+      hasPermission(user, "manage_route_plan") ? getCompanyRouteOptions(user.id, id) : Promise.resolve([]),
       getConnectionStatus(user.id),
       prisma.callOutcome.findMany({
         where: { active: true, appliesToVisits: true },
@@ -270,7 +270,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         companyEmail={validCompanyEmail}
       />
 
-      {canRoutePlan && <AddToRouteToggle companyId={company.id} initiallyInRoute={routeCompanyIds.has(company.id)} canManage={canRoutePlan} />}
+      {canRoutePlan && <AddToRouteToggle companyId={company.id} routes={routeOptions} canManage={canRoutePlan} />}
 
       <NextBestActionPanel items={nextBestActions} canEdit={canEdit} />
 

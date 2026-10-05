@@ -32,7 +32,7 @@ export function RoutePlanView({ detail, canManage, canExport }: { detail: RouteD
   }
 
   function handleClear() {
-    if (!window.confirm(`Clear all ${detail.route.count} compan${detail.route.count === 1 ? "y" : "ies"} from your Route Plan? This cannot be undone.`)) return;
+    if (!window.confirm(`Clear all ${detail.route.count} compan${detail.route.count === 1 ? "y" : "ies"} from your ${detail.route.name ?? ""} route? This cannot be undone.`)) return;
     startTransition(async () => {
       await clearRouteAction();
       setExportStep("idle");
@@ -65,7 +65,7 @@ export function RoutePlanView({ detail, canManage, canExport }: { detail: RouteD
   if (detail.companies.length === 0) {
     return (
       <Card>
-        <p className="text-sm text-text-muted">Your Route Plan is empty.</p>
+        <p className="text-sm text-text-muted">{detail.route.name ? `Your ${detail.route.name} route is empty.` : "No route selected."}</p>
       </Card>
     );
   }

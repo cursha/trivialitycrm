@@ -10,6 +10,13 @@ import {
   bulkAddCompaniesToRoute,
   getRouteDetail,
   exportRoutePlanCsv,
+  createRoute,
+  updateRoute,
+  selectRoute,
+  deleteRoute,
+  listRoutes,
+  getCompanyRouteOptions,
+  getAllRoutedCompanyIds,
 } from "../../src/lib/route-plan/service";
 
 beforeEach(async () => {
@@ -17,7 +24,7 @@ beforeEach(async () => {
 });
 
 async function baseFixtures() {
-  const role = await createRoleWithPermissions("Salesperson", ["view_all_leads", "manage_route_plan", "bulk_update_leads", "export_route_plan"]);
+  const role = await createRoleWithPermissions("Salesperson", ["view_all_leads", "view_route_plan", "manage_route_plan", "bulk_update_leads", "export_route_plan"]);
   const user = await fetchAuthenticatedUser((await createTestUser({ roleId: role.id })).id);
   const stage = await createPipelineStageFixture();
   const pubType = await createLeadTypeFixture("Pub Trivia", { routePlanEnabled: true, routePlanSlug: "pub" });
@@ -98,7 +105,7 @@ describe("addCompanyToRoute", () => {
 
     await addCompanyToRoute(f.user, company.id);
     const second = await addCompanyToRoute(f.user, company.id);
-    expect(second).toEqual({ ok: true, count: 1, alreadyInRoute: true });
+    expect(second).toEqual({ ok: true, count: 1, alreadyInRoute: true, routeName: "My route" });
 
     const rows = await testPrisma.routePlanCompany.findMany({ where: { company: { id: company.id } } });
     expect(rows).toHaveLength(1);
@@ -176,7 +183,7 @@ describe("clearRoute", () => {
     await addCompanyToRoute(f.user, company.id);
 
     await clearRoute(f.user);
-    expect(await getRouteSummary(f.user.id)).toEqual({ count: 0, leadTypeId: null, leadTypeName: null, country: null });
+    expect(await getRouteSummary(f.user.id)).toMatchObject({ name: "My route", count: 0, leadTypeId: null, leadTypeName: null, country: null });
 
     // A different lead type/country can now start a fresh route.
     const seniorHome = await makeCompany(f, { leadTypeId: f.seniorHomeType.id, country: "USA" });
@@ -366,7 +373,7 @@ describe("exportRoutePlanCsv", () => {
   it("refuses to export an empty route", async () => {
     const f = await baseFixtures();
     const result = await exportRoutePlanCsv(f.user);
-    expect(result).toEqual({ ok: false, error: "Your Route Plan is empty — add companies before exporting." });
+    expect(result).toEqual({ ok: false, error: "This route is empty — add companies before exporting." });
   });
 
   it("refuses to export while a company no longer matches the route's lead type/country", async () => {
@@ -376,7 +383,7 @@ describe("exportRoutePlanCsv", () => {
     await testPrisma.company.update({ where: { id: company.id }, data: { country: "USA" } });
 
     const result = await exportRoutePlanCsv(f.user);
-    expect(result).toEqual({ ok: false, error: "1 company in your Route Plan no longer match its lead type or country — remove it before exporting." });
+    expect(result).toEqual({ ok: false, error: "1 company in this route no longer match its lead type or country — remove it before exporting." });
   });
 
   it("refuses to export when the lead type has no routePlanSlug configured", async () => {
@@ -409,5 +416,78 @@ describe("exportRoutePlanCsv", () => {
     await addCompanyToRoute(f.user, company.id);
 
     await expect(exportRoutePlanCsv(user)).rejects.toThrow();
+  });
+});
+
+describe("multiple routes per user", () => {
+  it("adds a bar to a chosen route, or to a new route made on the spot, without changing the current route", async () => {
+    const f = await baseFixtures();
+    const bar = await makeCompany(f, { name: "Bar A" });
+    const other = await makeCompany(f, { name: "Bar B" });
+
+    expect(await createRoute(f.user, "Mississauga", "2026-10-06")).toEqual({ ok: true });
+    expect(await createRoute(f.user, "Burlington", null)).toEqual({ ok: true }); // now current
+    const mississauga = (await listRoutes(f.user.id)).find((r) => r.name === "Mississauga")!;
+
+    expect(await addCompanyToRoute(f.user, bar.id, { routeId: mississauga.id })).toMatchObject({ ok: true, routeName: "Mississauga", count: 1 });
+    expect(await addCompanyToRoute(f.user, bar.id, { newRoute: { name: "Oakville", plannedDate: "2026-10-09" } })).toMatchObject({ ok: true, routeName: "Oakville" });
+    expect(await addCompanyToRoute(f.user, other.id)).toMatchObject({ ok: true, routeName: "Burlington" }); // no target = current
+
+    const options = await getCompanyRouteOptions(f.user.id, bar.id);
+    expect(options.filter((o) => o.inRoute).map((o) => o.name).sort()).toEqual(["Mississauga", "Oakville"]);
+    expect(options.find((o) => o.isActive)?.name).toBe("Burlington");
+    expect([...(await getAllRoutedCompanyIds(f.user.id))].sort()).toEqual([bar.id, other.id].sort());
+
+    // Dated routes first, soonest first, then undated by name.
+    expect((await listRoutes(f.user.id)).map((r) => [r.name, r.plannedDate, r.count])).toEqual([
+      ["Mississauga", "2026-10-06", 1],
+      ["Oakville", "2026-10-09", 1],
+      ["Burlington", null, 1],
+    ]);
+
+    // Removing from one route leaves the others alone.
+    await removeCompanyFromRoute(f.user, bar.id, mississauga.id);
+    expect((await getCompanyRouteOptions(f.user.id, bar.id)).filter((o) => o.inRoute).map((o) => o.name)).toEqual(["Oakville"]);
+  });
+
+  it("switches, renames, re-dates and deletes routes; the export is named and dated by the route", async () => {
+    const f = await baseFixtures();
+    const bar = await makeCompany(f);
+    await createRoute(f.user, "Hamilton", "2026-10-09");
+    await addCompanyToRoute(f.user, bar.id);
+    const hamilton = (await listRoutes(f.user.id))[0];
+
+    expect((await getRouteDetail(f.user)).exportFilename).toBe("pub-hamilton-route-2026-10-09.csv");
+
+    expect(await updateRoute(f.user, hamilton.id, "Hamilton East", "2026-10-10")).toEqual({ ok: true });
+    expect(await updateRoute(f.user, hamilton.id, "  ", null)).toEqual({ ok: false, error: "Give the route a name, e.g. Mississauga." });
+    expect(await updateRoute(f.user, hamilton.id, "X", "2026-02-30")).toEqual({ ok: false, error: "Enter a valid date." });
+    expect((await getRouteSummary(f.user.id))).toMatchObject({ name: "Hamilton East", plannedDate: "2026-10-10", count: 1 });
+
+    await createRoute(f.user, "Milton", null);
+    expect((await getRouteSummary(f.user.id)).name).toBe("Milton");
+    expect(await selectRoute(f.user, hamilton.id)).toEqual({ ok: true });
+    expect((await getRouteSummary(f.user.id)).name).toBe("Hamilton East");
+
+    // Deleting the current route makes the next one current; the bar itself stays.
+    expect(await deleteRoute(f.user, hamilton.id)).toEqual({ ok: true });
+    expect((await getRouteSummary(f.user.id)).name).toBe("Milton");
+    expect(await testPrisma.company.findUnique({ where: { id: bar.id } })).not.toBeNull();
+  });
+
+  it("never lets one user touch another user's route", async () => {
+    const f = await baseFixtures();
+    const role = await createRoleWithPermissions("Joe", ["view_all_leads", "view_route_plan", "manage_route_plan"]);
+    const joe = await fetchAuthenticatedUser((await createTestUser({ roleId: role.id })).id);
+    const bar = await makeCompany(f);
+    await createRoute(joe, "Joe's Oakville", null);
+    const joesRoute = (await listRoutes(joe.id))[0];
+
+    expect(await addCompanyToRoute(f.user, bar.id, { routeId: joesRoute.id })).toEqual({ ok: false, error: "That route no longer exists." });
+    expect(await selectRoute(f.user, joesRoute.id)).toEqual({ ok: false, error: "That route no longer exists." });
+    expect(await updateRoute(f.user, joesRoute.id, "Mine now", null)).toEqual({ ok: false, error: "That route no longer exists." });
+    expect(await deleteRoute(f.user, joesRoute.id)).toEqual({ ok: false, error: "That route no longer exists." });
+    expect(await listRoutes(f.user.id)).toEqual([]);
+    expect((await listRoutes(joe.id)).map((r) => r.name)).toEqual(["Joe's Oakville"]);
   });
 });
