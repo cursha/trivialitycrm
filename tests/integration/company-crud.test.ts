@@ -112,6 +112,34 @@ describe("company create", () => {
     expect(await testPrisma.company.count()).toBe(1);
   });
 
+  it("doesn't flag a same-name company in another city, or at another street address in the same city", async () => {
+    const { admin, leadType, stageNew } = await baseFixtures();
+    await loginAs(admin.id);
+    const base = { name: "Boston Pizza", leadTypeId: leadType.id, pipelineStageId: stageNew.id, assignedToId: admin.id };
+
+    await expect(createCompany(undefined, companyFormData({ ...base, address1: "100 Main St" }))).rejects.toThrow(); // redirect = created
+    // Another city: a different location of the chain.
+    await expect(createCompany(undefined, companyFormData({ ...base, city: "Oakville", address1: "100 Main St" }))).rejects.toThrow();
+    // Same city, different street: also a different location.
+    await expect(createCompany(undefined, companyFormData({ ...base, address1: "900 Queen St" }))).rejects.toThrow();
+    expect(await testPrisma.company.count()).toBe(3);
+
+    // Same name, city and province with no street address given: flagged.
+    const result = await createCompany(undefined, companyFormData(base));
+    expect(result?.duplicates?.map((d) => d.matchedOn)).toEqual([["name"], ["name"]]);
+    expect(await testPrisma.company.count()).toBe(3);
+  });
+
+  it("flags a matching phone number even when the name and city differ", async () => {
+    const { admin, leadType, stageNew } = await baseFixtures();
+    await loginAs(admin.id);
+    const base = { leadTypeId: leadType.id, pipelineStageId: stageNew.id, assignedToId: admin.id };
+
+    await expect(createCompany(undefined, companyFormData({ ...base, phone: "905-555-0134" }))).rejects.toThrow();
+    const result = await createCompany(undefined, companyFormData({ ...base, name: "Copper Kettle Pub", city: "Oakville", phone: "(905) 555-0134" }));
+    expect(result?.duplicates?.[0].matchedOn).toEqual(["phone"]);
+  });
+
   it("lets an Administrator override a duplicate with explicit confirmation", async () => {
     const { admin, leadType, stageNew } = await baseFixtures();
     await loginAs(admin.id);

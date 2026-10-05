@@ -1,6 +1,7 @@
 import type { PrismaClient } from "../../generated/prisma/client";
 import type { CompanyStatus } from "../../generated/prisma/enums";
 import { normalizeCompanyName, normalizePhone, normalizeEmail, extractWebsiteDomain, normalizeAddressLine } from "./normalize";
+import { locationCorroborates } from "./location";
 
 export type DuplicateCandidateInput = {
   name: string;
@@ -41,10 +42,15 @@ export function computeNormalizedFields(input: DuplicateCandidateInput) {
 
 /**
  * Finds companies that are likely duplicates of the given candidate, based
- * on normalized name, address, website domain, phone, and email. Reusable
- * by manual company creation, future AI-research transfer, and future
- * spreadsheet import — none of those flows should silently insert a company
- * that matches here.
+ * on normalized name, address, website domain, phone, and email. Used by
+ * manual company creation/editing, AI-research transfer, and spreadsheet
+ * import — none of those flows should silently insert a company that
+ * matches here.
+ *
+ * A name or website match only counts when the location corroborates it:
+ * same city and province/state, and no conflicting street address (see
+ * ./location.ts). Phone, email and an exact street address + postal code
+ * count on their own.
  */
 export async function findPotentialDuplicates(
   prisma: Pick<PrismaClient, "company">,
@@ -85,8 +91,9 @@ export async function findPotentialDuplicates(
     .map((candidate) => {
       const matchedOn: DuplicateMatchReason[] = [];
 
-      if (candidate.normalizedName === normalizedName) matchedOn.push("name");
-      if (websiteDomain && candidate.websiteDomain === websiteDomain) matchedOn.push("websiteDomain");
+      const located = locationCorroborates(input, candidate);
+      if (located && candidate.normalizedName === normalizedName) matchedOn.push("name");
+      if (located && websiteDomain && candidate.websiteDomain === websiteDomain) matchedOn.push("websiteDomain");
       if (normalizedPhone && candidate.normalizedPhone === normalizedPhone) matchedOn.push("phone");
       if (normalizedEmail && candidate.normalizedEmail === normalizedEmail) matchedOn.push("email");
       if (

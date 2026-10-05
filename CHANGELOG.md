@@ -13,6 +13,22 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v3.5 — 2026-10-04
+### Fixed — duplicate companies matched on name alone
+- A company was flagged as a possible duplicate just because another
+  company had the same name, even in a different city. Now a **name** (or
+  website) match only counts when the **city and province/state match**
+  and the **street addresses don't conflict**. Two locations of the same
+  chain (Boston Pizza in Oakville and Mississauga, or two on different
+  streets in one city) are no longer flagged. A matching **phone**,
+  **email**, or **street address + postal code** still flags on its own
+  (Curt's call).
+- Applies everywhere duplicates are checked: adding or editing a company,
+  importing leads, transferring research results, Competition Locator,
+  Pub Lead Finder, and the Data Quality scan.
+- Pairs the Data Quality scan already flagged on name alone stay in its
+  review list until dismissed; future scans won't flag them again.
+
 ## v3.4 — 2026-10-04
 ### Improved — trial wording: a new game each week
 - A trial gives the bar **a new game each week**, which they can run as

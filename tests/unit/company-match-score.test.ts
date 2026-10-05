@@ -265,3 +265,38 @@ describe("scoreCompanyMatch", () => {
     expect(result.confidence).not.toBe("HIGH");
   });
 });
+
+describe("scoreCompanyMatch: name and website need the location to agree", () => {
+  const chain = { name: "Boston Pizza", normalizedName: "boston pizza", websiteUrl: "https://bostonpizza.com", websiteDomain: "bostonpizza.com", email: null, normalizedEmail: null };
+
+  it("ignores a same-name, same-website company in a different city (a chain's other location)", () => {
+    const a = company({ id: "1", ...chain, normalizedCity: "oakville", city: "Oakville", address1: null, phone: "9055550001", normalizedPhone: "9055550001" });
+    const b = company({ id: "2", ...chain, normalizedCity: "mississauga", city: "Mississauga", address1: null, phone: "9055550002", normalizedPhone: "9055550002" });
+    const result = scoreCompanyMatch(a, b);
+    expect(result.score).toBe(0);
+    expect(result.matchedFields).toEqual([]);
+    expect(result.conflictingFields).toContain("city");
+  });
+
+  it("ignores a same-name company in the same city at a different street address", () => {
+    const a = company({ id: "1", ...chain, address1: "100 Main St", phone: "9055550001", normalizedPhone: "9055550001" });
+    const b = company({ id: "2", ...chain, address1: "900 Queen St", phone: "9055550002", normalizedPhone: "9055550002" });
+    const result = scoreCompanyMatch(a, b);
+    expect(result.score).toBe(0);
+    expect(result.conflictingFields).toContain("address1");
+  });
+
+  it("matches the same name in the same city and province when one has no street address yet", () => {
+    const a = company({ id: "1", ...chain, address1: "100 Main St", phone: null, normalizedPhone: null });
+    const b = company({ id: "2", ...chain, address1: null, phone: null, normalizedPhone: null });
+    const result = scoreCompanyMatch(a, b);
+    expect(result.matchedFields).toEqual(expect.arrayContaining(["name", "websiteUrl", "city"]));
+  });
+
+  it("still matches on phone alone, wherever the company is", () => {
+    const a = company({ id: "1", ...chain, normalizedCity: "oakville", city: "Oakville", address1: null });
+    const b = company({ id: "2", ...chain, normalizedCity: "mississauga", city: "Mississauga", address1: null });
+    const result = scoreCompanyMatch(a, b);
+    expect(result.matchedFields).toEqual(["phone"]);
+  });
+});

@@ -161,8 +161,10 @@ describe("saveCompetitionLocatorResults", () => {
       country: "Canada",
     });
     expect(matches[0].companyId).toBe(oakville.id);
-    const mississaugaMatch = matches.find((m) => m.companyId === mississauga.id);
-    expect(mississaugaMatch?.conflictingFields).toContain("city");
+    // Same chain name in a different city isn't a match at all: a name
+    // only counts when the city and province agree (src/lib/duplicates/
+    // location.ts).
+    expect(matches.find((m) => m.companyId === mississauga.id)).toBeUndefined();
   });
 
   it("merges into the matched existing company using per-field decisions", async () => {

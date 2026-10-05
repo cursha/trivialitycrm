@@ -24,7 +24,7 @@ describe("import preview and commit", () => {
   it("previews rows with validation errors and duplicate flags", async () => {
     const { user, leadType, stage } = await baseFixtures();
     await loginAs(user.id);
-    await createCompanyFixture({ name: "The Copper Kettle", leadTypeId: leadType.id, pipelineStageId: stage.id, assignedToId: user.id, createdById: user.id });
+    await createCompanyFixture({ name: "The Copper Kettle", city: "Milton", leadTypeId: leadType.id, pipelineStageId: stage.id, assignedToId: user.id, createdById: user.id });
 
     const sessionId = await putUpload(user.id, "leads.csv", {
       headers: ["Name", "City", "Region", "Country", "First", "Last"],
@@ -49,6 +49,7 @@ describe("import preview and commit", () => {
     await loginAs(user.id);
     const existing = await createCompanyFixture({
       name: "The Copper Kettle",
+      city: "Milton",
       leadTypeId: leadType.id,
       pipelineStageId: stage.id,
       assignedToId: user.id,

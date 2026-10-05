@@ -5,6 +5,7 @@
 // auto-merge — a human always reviews a PotentialDuplicate row before any
 // merge happens (src/lib/data-quality/merge-company.ts).
 import { normalizeAddressLine } from "../duplicates/normalize";
+import { locationCorroborates, streetAddressesConflict } from "../duplicates/location";
 import { similarityScore } from "./similarity";
 
 export type CompanyMatchInput = {
@@ -42,6 +43,10 @@ export type MatchScoreResult = {
  * email/phone/website/normalized-name/address signal) is structurally
  * capped at LOW confidence, regardless of score — "fuzzy name similarity
  * alone must not automatically merge anything."
+ *
+ * A name or website match only counts when the location corroborates it
+ * (same city and province/state, no conflicting street address — see
+ * src/lib/duplicates/location.ts): two locations of a chain share both.
  */
 export function scoreCompanyMatch(a: CompanyMatchInput, b: CompanyMatchInput, minFuzzySimilarity = 85): MatchScoreResult {
   let score = 0;
@@ -49,6 +54,9 @@ export function scoreCompanyMatch(a: CompanyMatchInput, b: CompanyMatchInput, mi
   const matchedFields: string[] = [];
   const conflictingFields: string[] = [];
   let hasStrongSignal = false;
+  const locationA = { city: a.normalizedCity ?? a.city, region: a.normalizedRegion ?? a.region, address1: a.address1 };
+  const locationB = { city: b.normalizedCity ?? b.city, region: b.normalizedRegion ?? b.region, address1: b.address1 };
+  const located = locationCorroborates(locationA, locationB);
 
   if (a.normalizedEmail && b.normalizedEmail && a.normalizedEmail === b.normalizedEmail) {
     score += 35;
@@ -64,20 +72,20 @@ export function scoreCompanyMatch(a: CompanyMatchInput, b: CompanyMatchInput, mi
     hasStrongSignal = true;
   }
 
-  if (a.websiteDomain && b.websiteDomain && a.websiteDomain === b.websiteDomain) {
+  if (located && a.websiteDomain && b.websiteDomain && a.websiteDomain === b.websiteDomain) {
     score += 25;
     reasons.push("Website domains match.");
     matchedFields.push("websiteUrl");
     hasStrongSignal = true;
   }
 
-  const exactNameMatch = a.normalizedName === b.normalizedName;
+  const exactNameMatch = located && a.normalizedName === b.normalizedName;
   if (exactNameMatch) {
     score += 20;
     reasons.push("Company names match after normalization.");
     matchedFields.push("name");
     hasStrongSignal = true;
-  } else {
+  } else if (located) {
     const similarity = similarityScore(a.normalizedName, b.normalizedName);
     if (similarity >= minFuzzySimilarity) {
       // Scaled so a threshold-grazing match contributes little and a
@@ -131,6 +139,7 @@ export function scoreCompanyMatch(a: CompanyMatchInput, b: CompanyMatchInput, mi
     conflictingFields.push("city");
   }
 
+  if (streetAddressesConflict(locationA, locationB)) conflictingFields.push("address1");
   if (a.email && b.email && a.normalizedEmail !== b.normalizedEmail) conflictingFields.push("email");
   if (a.phone && b.phone && a.normalizedPhone !== b.normalizedPhone) conflictingFields.push("phone");
   if (a.websiteDomain && b.websiteDomain && a.websiteDomain !== b.websiteDomain) conflictingFields.push("websiteUrl");

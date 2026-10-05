@@ -87,6 +87,7 @@ describe("transferSearchResults", () => {
 
     await createCompanyFixture({
       name: "The Copper Kettle",
+      city: "Milton",
       leadTypeId: leadType.id,
       pipelineStageId: stage.id,
       assignedToId: salesperson.id,
@@ -113,6 +114,7 @@ describe("transferSearchResults", () => {
 
     await createCompanyFixture({
       name: "The Copper Kettle",
+      city: "Milton",
       leadTypeId: leadType.id,
       pipelineStageId: stage.id,
       assignedToId: salesperson.id,
@@ -135,6 +137,7 @@ describe("transferSearchResults", () => {
 
     const existing = await createCompanyFixture({
       name: "The Copper Kettle",
+      city: "Milton",
       leadTypeId: leadType.id,
       pipelineStageId: stage.id,
       assignedToId: user.id,
@@ -170,6 +173,7 @@ describe("transferSearchResults", () => {
 
     const existing = await createCompanyFixture({
       name: "The Copper Kettle",
+      city: "Milton",
       leadTypeId: leadType.id,
       pipelineStageId: stage.id,
       assignedToId: user.id,
@@ -211,6 +215,7 @@ describe("transferSearchResults", () => {
 
     await createCompanyFixture({
       name: "The Copper Kettle",
+      city: "Milton",
       leadTypeId: leadType.id,
       pipelineStageId: stage.id,
       assignedToId: user.id,
