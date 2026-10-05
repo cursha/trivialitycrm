@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { resetDatabase, testPrisma } from "../helpers/db";
 import { createRoleWithPermissions, createTestUser, createPromptTemplateFixture, loginAs } from "../helpers/fixtures";
 import { resetFakeCookies, RedirectSignal } from "../setup/mock-next";
-import { createPrompt, updatePrompt, duplicatePrompt, archivePrompt, restorePrompt, refinePrompt } from "../../src/app/(dashboard)/leads/prompts/actions";
+import { createPrompt, updatePrompt, duplicatePrompt, archivePrompt, restorePrompt, deletePrompt, refinePrompt } from "../../src/app/(dashboard)/leads/prompts/actions";
 
 beforeEach(async () => {
   await resetDatabase();
@@ -87,6 +87,23 @@ describe("prompt management", () => {
 
     await restorePrompt(prompt.id);
     expect((await testPrisma.promptTemplate.findUniqueOrThrow({ where: { id: prompt.id } })).archived).toBe(false);
+  });
+
+  it("deletes a prompt, leaving past searches with their own copy of the prompt", async () => {
+    const { manager } = await baseFixtures();
+    await loginAs(manager.id);
+    const prompt = await createPromptTemplateFixture({ createdById: manager.id });
+    const leadType = await testPrisma.leadType.create({ data: { name: "Pub" } });
+    const search = await testPrisma.leadSearch.create({
+      data: { promptId: prompt.id, createdById: manager.id, leadTypeId: leadType.id, country: "Canada", region: "ON", cities: ["Milton"], promptSnapshot: prompt.qualificationPrompt },
+    });
+
+    await deletePrompt(prompt.id);
+
+    expect(await testPrisma.promptTemplate.findUnique({ where: { id: prompt.id } })).toBeNull();
+    const after = await testPrisma.leadSearch.findUniqueOrThrow({ where: { id: search.id } });
+    expect(after.promptId).toBeNull();
+    expect(after.promptSnapshot).toBe(prompt.qualificationPrompt);
   });
 
   it("refines a prompt via the mock AI provider", async () => {

@@ -119,3 +119,15 @@ export async function refinePrompt(_prevState: PromptRefineState, formData: Form
     return { error: classified.safeMessage };
   }
 }
+
+/**
+ * Permanently deletes a prompt (after the table's confirmation). Safe for
+ * history: every search keeps its own copy of the prompt text
+ * (LeadSearch.promptSnapshot), and its link to the prompt is cleared
+ * (onDelete: SetNull) rather than the search being touched.
+ */
+export async function deletePrompt(id: string): Promise<void> {
+  await requirePromptManager();
+  await prisma.promptTemplate.deleteMany({ where: { id } });
+  revalidatePath(PATH);
+}

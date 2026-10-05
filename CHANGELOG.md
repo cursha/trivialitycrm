@@ -13,6 +13,13 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v3.6 — 2026-10-05
+### Added — delete research prompts
+- Leads → Research Prompts has a garbage-can icon to **delete** a prompt,
+  next to edit, duplicate and archive/restore. It asks you to confirm
+  first. Past searches keep their own copy of the prompt they used, so
+  deleting one doesn't change any search history.
+
 ## v3.5 — 2026-10-04
 ### Fixed — duplicate companies matched on name alone
 - A company was flagged as a possible duplicate just because another

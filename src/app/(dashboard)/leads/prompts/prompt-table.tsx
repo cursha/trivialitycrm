@@ -2,8 +2,8 @@
 
 import { useTransition } from "react";
 import Link from "next/link";
-import { Pencil, Copy, Archive, ArchiveRestore } from "lucide-react";
-import { duplicatePrompt, archivePrompt, restorePrompt } from "./actions";
+import { Pencil, Copy, Archive, ArchiveRestore, Trash2 } from "lucide-react";
+import { duplicatePrompt, archivePrompt, restorePrompt, deletePrompt } from "./actions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ACTIVE_TONE } from "@/lib/ui/status-tones";
@@ -82,6 +82,20 @@ export function PromptTable({ prompts, canManage }: { prompts: PromptRow[]; canM
                         <Archive size={16} />
                       </button>
                     )}
+                    <button
+                      type="button"
+                      disabled={isPending}
+                      onClick={() => {
+                        if (window.confirm(`Delete "${prompt.name}"? This can't be undone. Past searches keep their own copy of the prompt.`)) {
+                          startTransition(() => deletePrompt(prompt.id));
+                        }
+                      }}
+                      className="rounded p-1.5 text-text-muted hover:bg-danger/10 hover:text-danger"
+                      aria-label={`Delete ${prompt.name}`}
+                      title="Delete"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 </td>
               )}
