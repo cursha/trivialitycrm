@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Phone, Mail, Users, FileText, Presentation, FlaskConical, StickyNote, CalendarClock, Sparkles, Globe, Send, MapPin } from "lucide-react";
+import { Phone, Mail, Users, FileText, Presentation, FlaskConical, StickyNote, CalendarClock, Sparkles, Globe, Send, MapPin, Search } from "lucide-react";
 import { changeCompanyStage } from "../actions";
 import { useQuickActions } from "./quick-action-context";
 import { SendCompanyEmailModal } from "./send-company-email-modal";
@@ -28,7 +28,8 @@ export function QuickActionsBar({
   canEdit,
   canLogVisit,
   canAnalyze,
-  websiteUrl,
+  websiteHref,
+  findWebsiteHref,
   canSendEmail,
   companyEmail,
 }: {
@@ -40,7 +41,10 @@ export function QuickActionsBar({
    * an archived one. */
   canLogVisit: boolean;
   canAnalyze: boolean;
-  websiteUrl: string | null;
+  /** Safe-to-open link (see websiteHref), or null when none is on file. */
+  websiteHref: string | null;
+  /** A web search for the bar, offered when there's no website. */
+  findWebsiteHref: string;
   canSendEmail: boolean;
   /** Already validated server-side (see page.tsx) — null when the company
    * has no email on file, or it doesn't pass validateEmailAddress(). The
@@ -83,15 +87,26 @@ export function QuickActionsBar({
             Log visit
           </button>
         )}
-        {websiteUrl && (
+        {websiteHref ? (
           <a
-            href={websiteUrl}
+            href={websiteHref}
             target="_blank"
             rel="noreferrer noopener"
             className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white hover:bg-primary-hover"
           >
             <Globe size={14} />
-            View website
+            Visit website
+          </a>
+        ) : (
+          <a
+            href={findWebsiteHref}
+            target="_blank"
+            rel="noreferrer noopener"
+            title="No website on file: search the web for this bar"
+            className="flex items-center gap-1.5 rounded-lg border border-border-strong px-3 py-2 text-xs font-semibold text-text hover:bg-black/5"
+          >
+            <Search size={14} />
+            Find website
           </a>
         )}
         {canSendEmail && companyEmail && (

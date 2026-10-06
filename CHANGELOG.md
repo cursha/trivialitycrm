@@ -23,6 +23,13 @@ history.
   cancelled. Follow-ups created by visit and call outcomes show there too.
   Follow-ups made before this release aren't linked, so older entries don't
   show one.
+### Added — Visit website quick action
+- The company page's quick actions always have a website button: **Visit
+  website** when one is on file, or **Find website** (a web search for the
+  bar's name and city) when not. It used to be hidden without a website.
+- Websites saved without `https://` (common from AI research and imports)
+  now open properly instead of going nowhere, and anything that isn't a
+  web address is never turned into a link.
 ### Fixed — follow-up dates showed a day early
 - A follow-up picked for Oct 9 was saved as midnight UTC, which is the
   evening of Oct 8 in Toronto and Colorado Springs, so it showed as Oct 8.

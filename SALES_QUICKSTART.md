@@ -221,7 +221,9 @@ On any company's page:
 
 - **Quick sales actions** at the top: one click each to log a call, email,
   meeting, demo, trial, a general note, or schedule a follow-up — no need to
-  scroll down and find the right form first.
+  scroll down and find the right form first. **Visit website** opens the
+  bar's website in a new tab; when there's no website on file it says
+  **Find website** and searches the web for the bar by name and city.
 - **Next best action**: a short, plain-language list of what this company
   specifically needs next (e.g. "no contact on file," "a follow-up is
   overdue," "no activity in a while") — never an opaque score, and it never

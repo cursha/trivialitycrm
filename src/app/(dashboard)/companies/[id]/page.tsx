@@ -35,6 +35,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TRIVIA_STATUS_LABEL, WEEKDAY_LABEL } from "@/lib/ui/status-tones";
 import { formatRouteAddress } from "@/lib/route-plan/validation";
+import { websiteHref, findWebsiteHref } from "@/lib/companies/website";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -267,7 +268,8 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         canEdit={canEdit}
         canLogVisit={canLogVisit}
         canAnalyze={canAnalyzeOpportunity}
-        websiteUrl={company.websiteUrl}
+        websiteHref={websiteHref(company.websiteUrl)}
+        findWebsiteHref={findWebsiteHref(company)}
         canSendEmail={canSendCompanyEmail}
         companyEmail={validCompanyEmail}
       />
@@ -302,9 +304,13 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                 label="Website"
                 value={
                   company.websiteUrl ? (
-                    <a href={company.websiteUrl} target="_blank" rel="noreferrer noopener" className="text-secondary hover:underline">
-                      {company.websiteUrl}
-                    </a>
+                    websiteHref(company.websiteUrl) ? (
+                      <a href={websiteHref(company.websiteUrl)!} target="_blank" rel="noreferrer noopener" className="text-secondary hover:underline">
+                        {company.websiteUrl}
+                      </a>
+                    ) : (
+                      company.websiteUrl
+                    )
                   ) : null
                 }
               />
