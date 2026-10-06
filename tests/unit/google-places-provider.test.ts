@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { GooglePlacesDiscoveryProvider } from "../../src/lib/research/providers/google-places";
+import { GooglePlacesDiscoveryProvider, placesTextQueries } from "../../src/lib/research/providers/google-places";
 import { resetEnvCacheForTests } from "../../src/lib/env";
 import type { DiscoverParams } from "../../src/lib/research/providers/types";
 
@@ -253,5 +253,31 @@ describe("GooglePlacesDiscoveryProvider", () => {
 
     const [, init] = fetchMock.mock.calls[0];
     expect(init.headers["X-Goog-FieldMask"]).toContain("nextPageToken");
+  });
+});
+
+describe("Quick Search trivia / karaoke", () => {
+  it("builds one query per ticked entertainment, or the plain query when none", () => {
+    expect(placesTextQueries(baseParams, "Milton")).toEqual(["Pub in Milton, ON, Canada"]);
+    expect(placesTextQueries({ ...baseParams, entertainment: ["TRIVIA"] }, "Milton")).toEqual(["Pub with trivia night in Milton, ON, Canada"]);
+    expect(placesTextQueries({ ...baseParams, entertainment: ["TRIVIA", "KARAOKE"] }, "Milton")).toEqual([
+      "Pub with trivia night in Milton, ON, Canada",
+      "Pub with karaoke in Milton, ON, Canada",
+    ]);
+  });
+
+  it("runs both queries for each city and returns what each found (run-search dedupes the overlap)", async () => {
+    const place = (name: string) => ({ displayName: { text: name }, addressComponents: [], businessStatus: "OPERATIONAL" });
+    const fetchMock = vi.fn().mockImplementation(async (_url: string, init: { body: string }) => {
+      const { textQuery } = JSON.parse(init.body) as { textQuery: string };
+      return { ok: true, json: async () => ({ places: textQuery.includes("trivia") ? [place("Quiz Pub"), place("Both Pub")] : [place("Both Pub")] }) };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const candidates = await new GooglePlacesDiscoveryProvider().discover({ ...baseParams, entertainment: ["TRIVIA", "KARAOKE"] });
+
+    const queries = fetchMock.mock.calls.map(([, init]) => (JSON.parse((init as { body: string }).body) as { textQuery: string }).textQuery);
+    expect(queries).toEqual(["Pub with trivia night in Milton, ON, Canada", "Pub with karaoke in Milton, ON, Canada"]);
+    expect(candidates.map((c) => c.name)).toEqual(["Quiz Pub", "Both Pub", "Both Pub"]);
   });
 });

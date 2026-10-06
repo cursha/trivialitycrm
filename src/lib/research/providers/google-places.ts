@@ -10,6 +10,7 @@
 // allowance that very likely covers this app's actual usage entirely.
 import { getEnv } from "../../env";
 import type { CandidateDiscoveryProvider, DiscoverParams, DiscoveryProgressUpdate, ResearchCandidate } from "./types";
+import type { SearchEntertainment } from "../../../generated/prisma/enums";
 
 // Exported: geocoder.ts reuses this same Text Search endpoint to resolve a
 // known address to coordinates (see that file for why a separate Geocoding
@@ -105,6 +106,25 @@ export function extractStreetAddress(addressComponents: PlaceAddressComponent[] 
 // duplicating it.
 export type GooglePlace = NonNullable<PlacesTextSearchResult["places"]>[number];
 
+const ENTERTAINMENT_PHRASES: Record<SearchEntertainment, string> = {
+  TRIVIA: "with trivia night",
+  KARAOKE: "with karaoke",
+};
+
+/**
+ * The Text Search queries for one city: "Bar in Oakville, ON, Canada", or
+ * one query per entertainment ticked on Quick Search ("Bar with trivia
+ * night in …", "Bar with karaoke in …") — "and/or" by running each and
+ * letting run-search's dedupeWithinRun merge the overlap. Google matches
+ * these from listings and reviews, so it's a best guess, not confirmation.
+ */
+export function placesTextQueries(params: Pick<DiscoverParams, "leadTypeName" | "region" | "country" | "entertainment">, city: string): string[] {
+  const place = `in ${city}, ${params.region}, ${params.country}`;
+  const entertainment = params.entertainment ?? [];
+  if (entertainment.length === 0) return [`${params.leadTypeName} ${place}`];
+  return entertainment.map((kind) => `${params.leadTypeName} ${ENTERTAINMENT_PHRASES[kind]} ${place}`);
+}
+
 export function candidateFromPlace(place: GooglePlace, params: DiscoverParams, queryCity: string): ResearchCandidate {
   return {
     name: place.displayName?.text ?? "Unknown business",
@@ -147,39 +167,40 @@ export class GooglePlacesDiscoveryProvider implements CandidateDiscoveryProvider
     const results: ResearchCandidate[] = [];
 
     for (const [cityIndex, city] of cities.entries()) {
-      const query = `${params.leadTypeName} in ${city}, ${params.region}, ${params.country}`;
-      let pageToken: string | undefined;
+      for (const query of placesTextQueries(params, city)) {
+        let pageToken: string | undefined;
 
-      for (let page = 0; page < MAX_PAGES_PER_CITY; page++) {
-        // Per Google's docs, every field besides maxResultCount/pageSize/
-        // pageToken must stay identical across pages of the same search.
-        const body: { textQuery: string; pageToken?: string } = { textQuery: query };
-        if (pageToken) body.pageToken = pageToken;
+        for (let page = 0; page < MAX_PAGES_PER_CITY; page++) {
+          // Per Google's docs, every field besides maxResultCount/pageSize/
+          // pageToken must stay identical across pages of the same search.
+          const body: { textQuery: string; pageToken?: string } = { textQuery: query };
+          if (pageToken) body.pageToken = pageToken;
 
-        const response = await fetch(TEXT_SEARCH_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
-            "X-Goog-FieldMask": FIELD_MASK,
-          },
-          body: JSON.stringify(body),
-        });
+          const response = await fetch(TEXT_SEARCH_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY,
+              "X-Goog-FieldMask": FIELD_MASK,
+            },
+            body: JSON.stringify(body),
+          });
 
-        if (!response.ok) {
-          const errorBody = await response.text().catch(() => "");
-          throw new Error(`Google Places Text Search failed (${response.status}) for "${city}": ${errorBody.slice(0, 300)}`);
+          if (!response.ok) {
+            const errorBody = await response.text().catch(() => "");
+            throw new Error(`Google Places Text Search failed (${response.status}) for "${city}": ${errorBody.slice(0, 300)}`);
+          }
+
+          const data = (await response.json()) as PlacesTextSearchResult;
+          for (const place of data.places ?? []) {
+            if (place.businessStatus === "CLOSED_PERMANENTLY" || place.businessStatus === "CLOSED_TEMPORARILY") continue;
+            results.push(candidateFromPlace(place, params, city));
+          }
+
+          if (!data.nextPageToken) break;
+          pageToken = data.nextPageToken;
+          if (page < MAX_PAGES_PER_CITY - 1 && this.pageDelayMs > 0) await sleep(this.pageDelayMs);
         }
-
-        const data = (await response.json()) as PlacesTextSearchResult;
-        for (const place of data.places ?? []) {
-          if (place.businessStatus === "CLOSED_PERMANENTLY" || place.businessStatus === "CLOSED_TEMPORARILY") continue;
-          results.push(candidateFromPlace(place, params, city));
-        }
-
-        if (!data.nextPageToken) break;
-        pageToken = data.nextPageToken;
-        if (page < MAX_PAGES_PER_CITY - 1 && this.pageDelayMs > 0) await sleep(this.pageDelayMs);
       }
 
       await onProgress?.({ kind: "city", city, cityIndex, totalCities: cities.length, foundSoFar: results.length });

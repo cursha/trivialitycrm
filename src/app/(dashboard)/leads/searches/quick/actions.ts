@@ -9,6 +9,7 @@ import { formString } from "@/lib/form-data";
 import { enqueueSearchJob } from "@/lib/jobs/enqueue";
 import { checkAiBudget, getAiSettings } from "@/lib/ai/budget";
 import { checkRateLimit } from "@/lib/rate-limit/postgres-bucket";
+import { describeEntertainment } from "@/lib/research/entertainment";
 
 export type QuickSearchFormState = { error?: string } | undefined;
 
@@ -46,6 +47,7 @@ export async function startQuickSearch(_prevState: QuickSearchFormState, formDat
       .getAll("cities")
       .map((value) => String(value).trim())
       .filter(Boolean),
+    entertainment: formData.getAll("entertainment").map((value) => String(value)),
   });
 
   if (!parsed.success) {
@@ -61,6 +63,9 @@ export async function startQuickSearch(_prevState: QuickSearchFormState, formDat
     return { error: "One or more selected Lead Types no longer exist." };
   }
 
+  const { entertainment } = parsed.data;
+  const offering = entertainment.length === 0 ? "" : ` offering ${describeEntertainment(entertainment)}`;
+
   const searchIds: string[] = [];
   for (const leadType of leadTypes) {
     const search = await prisma.leadSearch.create({
@@ -73,7 +78,8 @@ export async function startQuickSearch(_prevState: QuickSearchFormState, formDat
         cities: parsed.data.cities,
         minimumScore: 0,
         mode: "GENERAL",
-        promptSnapshot: `Quick search — list every "${leadType.name}" match in ${parsed.data.region}, ${parsed.data.country}. No AI qualification prompt used.`,
+        entertainment,
+        promptSnapshot: `Quick search — list every "${leadType.name}"${offering} match in ${parsed.data.region}, ${parsed.data.country}. No AI qualification prompt used.`,
       },
     });
     const providerJobId = await enqueueSearchJob(search.id);

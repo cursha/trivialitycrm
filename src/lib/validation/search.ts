@@ -36,11 +36,18 @@ export type SearchSetupValues = z.infer<typeof SearchSetupSchema>;
 // be checked at once; each becomes its own LeadSearch since a LeadSearch (and
 // the Company a result later transfers into) is always tied to exactly one
 // Lead Type.
+export const SearchEntertainmentValues = ["TRIVIA", "KARAOKE"] as const;
+
 export const QuickSearchSetupSchema = z.object({
   leadTypeIds: z.array(z.string().min(1)).min(1, { error: "Choose at least one Lead Type." }),
   country: z.enum(CountryValues, { error: "Choose Canada or United States." }),
   region: RegionCodeSchema,
   cities: CitiesSchema,
+  // Only find venues offering these; empty = every venue of the type.
+  entertainment: z
+    .array(z.enum(SearchEntertainmentValues, { error: "Choose trivia or karaoke." }))
+    .default([])
+    .transform((values) => [...new Set(values)]),
 });
 
 export type QuickSearchSetupValues = z.infer<typeof QuickSearchSetupSchema>;

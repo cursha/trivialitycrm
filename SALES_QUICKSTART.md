@@ -335,6 +335,17 @@ inbox:
   your message doesn't already include one — you don't need to add it
   yourself.
 
+## Quick Search (if you have access)
+
+Leads → **Quick Search** lists businesses from the directory, with no AI
+scoring. Tick the venue types you want (Bar, Pub…) and the area.
+
+To find venues that already put on entertainment, tick **Trivia**,
+**Karaoke**, or both under "Only venues that offer". Both means trivia
+and/or karaoke. Leave them blank to list every venue. It's the directory's
+best guess from listings and reviews, so check before you rely on it, and
+a bar found this way isn't marked as running trivia.
+
 ## AI lead research (if you have access)
 
 1. Under Leads, review or create a research prompt — this is what tells the

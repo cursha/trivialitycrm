@@ -35,6 +35,24 @@ export function QuickSearchForm({ leadTypes }: QuickSearchFormOptions) {
           {leadTypes.length === 0 && <p className="text-sm text-text-muted">No active Lead Types configured yet.</p>}
         </div>
 
+        <div>
+          <Label className="mb-1 block text-xs uppercase">Only venues that offer (optional)</Label>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <label className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm text-text">
+              <input type="checkbox" name="entertainment" value="TRIVIA" />
+              Trivia
+            </label>
+            <label className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm text-text">
+              <input type="checkbox" name="entertainment" value="KARAOKE" />
+              Karaoke
+            </label>
+          </div>
+          <p className="mt-1 text-xs text-text-muted">
+            Tick both to find venues with trivia and/or karaoke. Leave both blank to list every venue. This is the directory&apos;s best guess from
+            listings and reviews, not a confirmed fact.
+          </p>
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label className="mb-1 block text-xs uppercase">Country</Label>

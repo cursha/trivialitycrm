@@ -3,7 +3,7 @@
 // mock/demo provider implement these same shapes, so run-search.ts and the
 // prompt-assist action never depend on a specific vendor. See getProviders()
 // in factory.ts for how AI_PROVIDER/SEARCH_PROVIDER selects an implementation.
-import type { LeadSearchMode, TriviaStatus, ConfidenceLevel, PrimaryClassification, SecondaryTag, ScoringCategory, EvidenceVerificationStatus, EvidenceReliability, Weekday } from "../../../generated/prisma/enums";
+import type { LeadSearchMode, SearchEntertainment, TriviaStatus, ConfidenceLevel, PrimaryClassification, SecondaryTag, ScoringCategory, EvidenceVerificationStatus, EvidenceReliability, Weekday } from "../../../generated/prisma/enums";
 import type { EosCategoryScores } from "../../eos/constants";
 
 export type EvidenceEntry = {
@@ -74,6 +74,9 @@ export type DiscoverParams = {
   leadTypeName: string;
   mode: LeadSearchMode;
   competitorName?: string;
+  // GENERAL (Quick Search) only: find venues offering these. Empty or
+  // absent = every venue of the Lead Type. See placesTextQueries().
+  entertainment?: SearchEntertainment[];
   // PUB_RADIUS mode only — the origin Company's geocoded coordinates and the
   // user's chosen radius (already converted to meters via
   // src/lib/geo/distance.ts). Populated only by run-search.ts when

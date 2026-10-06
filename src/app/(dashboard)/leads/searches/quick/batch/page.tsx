@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
+import { describeEntertainment } from "@/lib/research/entertainment";
 
 export const metadata = { title: "Quick Search — Triviality CRM" };
 
@@ -28,7 +29,10 @@ export default async function QuickSearchBatchPage({ searchParams }: { searchPar
       <Card className="divide-y divide-border p-0">
         {searches.map((search) => (
           <Link key={search.id} href={`/leads/searches/${search.id}`} className="flex items-center justify-between px-4 py-3 hover:bg-black/5">
-            <span className="font-semibold text-text">{search.leadType.name}</span>
+            <span className="font-semibold text-text">
+              {search.leadType.name}
+              {search.entertainment.length > 0 && <span className="font-normal text-text-muted"> offering {describeEntertainment(search.entertainment)}</span>}
+            </span>
             <span className="text-sm text-text-muted">
               {search.region}, {search.country} — {search.status}
             </span>

@@ -1222,6 +1222,11 @@ model PromptTemplate {
   updatedAt           DateTime     @updatedAt
 }
 
+enum SearchEntertainment {
+  TRIVIA
+  KARAOKE
+}
+
 model LeadSearch {
   id              String            @id @default(cuid())
   promptId        String?
@@ -1288,6 +1293,13 @@ model LeadSearch {
   // exceeding budget for, so every other concurrent or future search still
   // enforces the configured limit normally.
   budgetOverride Boolean @default(false)
+
+  // Quick Search: only find venues that offer these (trivia and/or
+  // karaoke). Empty = every venue of the Lead Type, as before. Each one
+  // becomes its own directory query per city; results are merged and
+  // deduped. Shapes the search only; it never marks a found company as
+  // running trivia, since a directory match isn't confirmation.
+  entertainment SearchEntertainment[] @default([])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

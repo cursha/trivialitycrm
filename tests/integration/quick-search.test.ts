@@ -74,3 +74,50 @@ describe("startQuickSearch", () => {
     expect(redirectUrl).toBe(`/leads/searches/${search.id}`);
   });
 });
+
+describe("startQuickSearch with trivia / karaoke", () => {
+  async function run(fd: FormData) {
+    try {
+      return await startQuickSearch(undefined, fd);
+    } catch (error) {
+      if (error instanceof RedirectSignal) return undefined;
+      throw error;
+    }
+  }
+
+  it("saves what's ticked on each search, and describes it", async () => {
+    const { user } = await baseFixtures();
+    const pubs = await createLeadTypeFixture("Pubs");
+    await loginAs(user.id);
+
+    const fd = quickSearchFormData([pubs.id]);
+    fd.append("entertainment", "TRIVIA");
+    fd.append("entertainment", "KARAOKE");
+    expect(await run(fd)).toBeUndefined();
+
+    const search = await testPrisma.leadSearch.findFirstOrThrow();
+    expect(search.entertainment).toEqual(["TRIVIA", "KARAOKE"]);
+    expect(search.promptSnapshot).toContain('"Pubs" offering trivia and/or karaoke');
+  });
+
+  it("lists every venue when nothing is ticked", async () => {
+    const { user } = await baseFixtures();
+    const pubs = await createLeadTypeFixture("Pubs");
+    await loginAs(user.id);
+
+    await run(quickSearchFormData([pubs.id]));
+    expect((await testPrisma.leadSearch.findFirstOrThrow()).entertainment).toEqual([]);
+  });
+
+  it("refuses anything other than trivia or karaoke", async () => {
+    const { user } = await baseFixtures();
+    const pubs = await createLeadTypeFixture("Pubs");
+    await loginAs(user.id);
+
+    const fd = quickSearchFormData([pubs.id]);
+    fd.append("entertainment", "BINGO");
+    expect((await run(fd))?.error).toBe("Choose trivia or karaoke.");
+    expect(await testPrisma.leadSearch.count()).toBe(0);
+  });
+});
+

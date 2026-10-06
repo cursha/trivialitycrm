@@ -13,6 +13,21 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v7.0 — 2026-10-06
+### Added — find venues with trivia or karaoke on Quick Search
+- Quick Search has **Trivia** and **Karaoke** checkboxes under "Only venues
+  that offer" (Curt's call). Tick one to find venues offering it, or both
+  for trivia and/or karaoke; leave both blank to list every venue as
+  before. Each ticked box is its own directory search per city, and the
+  results are merged without duplicates.
+- It's the directory's best guess from listings and reviews, so a venue
+  found this way isn't marked as running trivia.
+- The search's page and the Quick Search summary show what it was
+  narrowed to.
+- Sales Quick Start: new Quick Search section.
+- Database: migration 20261006104701_quick_search_entertainment (adds the
+  ticked options to each search; applies on deploy).
+
 ## v6.0 — 2026-10-06
 ### Added — follow-up date when logging an activity
 - **Log activity** on a company page has an optional **Follow up on** date
