@@ -71,6 +71,10 @@ The search icon in the header searches companies, contacts, and competitors
 at once — type at least 2 characters. Results are grouped by type; use the
 arrow keys and Enter to jump straight to one without touching the mouse.
 
+On the **Companies** list, any filter that's narrowing the list has a blue
+outline, so you can see at a glance which ones are on. Set it back to
+"All…" or "Any…" to turn it off.
+
 ## Adding something quickly
 
 The **Quick Add** button (header) is a fast path for a short form — a new
@@ -190,8 +194,10 @@ alone; nobody else sees or changes them.
   day of, or delete the route you're looking at.
 - **Export** the route you're looking at to EZRoutePlanner to put the stops
   in order. The file is named after the route and its day.
-- Adding several bars at once from the Companies list adds them to the
-  route you're currently looking at on Route Plan.
+- **Add several bars at once** from the Companies list or a Pipeline list:
+  tick them, click **Add Selected to Route**, then pick the route (your
+  current one is chosen for you) or **+ New route…**, and click **Add**.
+  Adding to another route doesn't change which one is current.
 
 ## Logging a bar visit
 

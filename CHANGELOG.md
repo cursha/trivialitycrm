@@ -13,6 +13,13 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v7.3 — 2026-10-06
+### Improved — User Manual catches up with v7.1 and v7.2
+- Sales Quick Start: "Route plans" now explains that **Add Selected to
+  Route** asks which route (it still said bars went to the current route),
+  and "Finding something" explains the blue outline on Companies filters
+  that are on.
+
 ## v7.2 — 2026-10-06
 ### Improved — Companies filters show which ones are on
 - On the Companies page, any filter that's narrowing the list (lead type,
