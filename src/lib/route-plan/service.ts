@@ -603,7 +603,9 @@ const CSV_COLUMNS = [
  * that acknowledgment is a client-side confirmation step, not something
  * this stateless server call can itself verify happened).
  */
-export async function exportRoutePlanCsv(user: AuthenticatedUser): Promise<ExportRoutePlanResult> {
+/** `checkOnly` runs every check but builds no CSV and writes no audit
+ * event — the browser checks first, then downloads (see download-client). */
+export async function exportRoutePlanCsv(user: AuthenticatedUser, options: { checkOnly?: boolean } = {}): Promise<ExportRoutePlanResult> {
   requirePermission(user, "export_route_plan");
 
   const detail = await getRouteDetail(user);
@@ -622,6 +624,8 @@ export async function exportRoutePlanCsv(user: AuthenticatedUser): Promise<Expor
   if (!detail.exportFilename) {
     return { ok: false, error: "This lead type has no Route Plan filename configured yet — ask an administrator to set one in Settings > Lead Types." };
   }
+
+  if (options.checkOnly) return { ok: true, csv: "", filename: detail.exportFilename, count: detail.companies.length };
 
   const rows = detail.companies.map((c) => ({ name: c.name, address: c.formattedAddress }));
   const csv = buildCsv(CSV_COLUMNS, rows);

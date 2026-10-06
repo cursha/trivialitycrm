@@ -62,6 +62,7 @@ export function BulkToolbar({
   const [newRouteName, setNewRouteName] = useState("");
   const [newRouteDate, setNewRouteDate] = useState("");
   const [routeError, setRouteError] = useState<string | null>(null);
+  const [exportedCurrentRoute, setExportedCurrentRoute] = useState(false);
 
   if (!canBulk || selectedIds.length === 0) return null;
 
@@ -96,6 +97,7 @@ export function BulkToolbar({
     setRouteConflict(null);
     setExportError(null);
     setRouteError(null);
+    setExportedCurrentRoute(false);
     setRouteChoice(currentRoute?.id ?? NEW_ROUTE);
     setNewRouteName("");
     setNewRouteDate("");
@@ -116,13 +118,12 @@ export function BulkToolbar({
         setExportError(download.error);
         return;
       }
-      // Only after the server confirmed success does clearing the old
-      // route and adding the pending selection happen — never automatic,
-      // per spec 9 ("do not clear automatically") and 5.2 ("clear the
-      // route and add the pending company only after explicit
-      // confirmation" once export succeeds).
-      await clearRouteAction();
-      await attemptAddToRoute();
+      // Never cleared automatically, per spec 9 ("do not clear
+      // automatically") and 5.2 ("clear the route and add the pending
+      // company only after explicit confirmation" once export succeeds) —
+      // and the browser fetches the file itself after this returns, so
+      // clearing straight away could empty the route before it's saved.
+      setExportedCurrentRoute(true);
     });
   }
 
@@ -376,6 +377,18 @@ export function BulkToolbar({
                   <Button type="button" variant="ghost" onClick={() => setActive(null)}>
                     Cancel
                   </Button>
+                </div>
+              ) : exportedCurrentRoute ? (
+                <div className="space-y-2">
+                  <p className="text-sm text-text">Your current route is downloading. Once it&apos;s saved, clear it and add the selected bars?</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" disabled={isPending} variant="destructive" onClick={handleClearAndStartNew}>
+                      Clear current route and add
+                    </Button>
+                    <Button type="button" variant="ghost" onClick={() => setActive(null)}>
+                      Keep current route
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">

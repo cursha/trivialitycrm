@@ -360,6 +360,18 @@ describe("getRouteDetail", () => {
 });
 
 describe("exportRoutePlanCsv", () => {
+  it("check-only runs the same checks but builds no file and writes no audit entry", async () => {
+    const f = await baseFixtures();
+    expect(await exportRoutePlanCsv(f.user, { checkOnly: true })).toEqual({ ok: false, error: "This route is empty — add companies before exporting." });
+
+    await addCompanyToRoute(f.user, (await makeCompany(f)).id);
+    expect(await exportRoutePlanCsv(f.user, { checkOnly: true })).toMatchObject({ ok: true, csv: "", count: 1 });
+    expect(await testPrisma.auditEvent.count({ where: { action: "route_plan.exported" } })).toBe(0);
+
+    await exportRoutePlanCsv(f.user);
+    expect(await testPrisma.auditEvent.count({ where: { action: "route_plan.exported" } })).toBe(1);
+  });
+
   it("produces exactly the Name,Address header with correctly quoted rows, alphabetical, no country column", async () => {
     const f = await baseFixtures();
     const zed = await makeCompany(f, { name: "Zed Pub" });

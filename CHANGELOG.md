@@ -13,6 +13,19 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v8.2 — 2026-10-06
+### Fixed — route export on Android, take two
+- v8.1 didn't fix it: the route file still downloaded greyed out on
+  Android (Curt). The app built the file inside the page and handed that
+  over, which Chrome on Android doesn't save properly. Now the app checks
+  the route can be exported, then lets the phone's browser download the
+  file straight from the server, the same way Companies "Export CSV" does.
+  The check writes no audit entry, so each export is still logged once.
+- "Add Selected to Route" → "Export current route first" no longer clears
+  the route the moment the download starts (it could have emptied the
+  route before the file was saved). It now asks: "Clear current route and
+  add" or "Keep current route".
+
 ## v8.1 — 2026-10-06
 ### Fixed — route export download on phones
 - Exporting a route on an Android phone left a greyed-out download that
