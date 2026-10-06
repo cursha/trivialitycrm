@@ -7,7 +7,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { listCompanies, PAGE_SIZE } from "./queries";
 import { CompaniesFilters } from "./companies-filters";
 import { CompaniesTable } from "./companies-table";
-import { getRouteCompanyIds } from "@/lib/route-plan/service";
+import { getRouteCompanyIds, listRoutes, type RouteListItem } from "@/lib/route-plan/service";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
 
@@ -35,7 +35,7 @@ export default async function CompaniesPage({
   const chainNames = await getChainNames();
   const sweetSpotOnly = toSingle(params.sweetSpot) === "1";
 
-  const [{ companies, total, pageCount }, leadTypes, pipelineStages, allPipelineStages, competitors, salespeople, territories, routeCompanyIds] =
+  const [{ companies, total, pageCount }, leadTypes, pipelineStages, allPipelineStages, competitors, salespeople, territories, routeCompanyIds, routes] =
     await Promise.all([
       listCompanies(user, {
         q: toSingle(params.q),
@@ -64,6 +64,7 @@ export default async function CompaniesPage({
       prisma.user.findMany({ where: { disabled: false }, orderBy: { name: "asc" } }),
       prisma.territory.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
       canRoutePlan ? getRouteCompanyIds(user.id) : Promise.resolve(new Set<string>()),
+      canRoutePlan ? listRoutes(user.id) : Promise.resolve([] as RouteListItem[]),
     ]);
 
   const canAdd = hasPermission(user, "add_leads");
@@ -123,6 +124,7 @@ export default async function CompaniesPage({
         stages={allPipelineStages.map((s) => ({ id: s.id, name: s.name, active: s.active }))}
         salespeople={salespeople}
         territories={territories.map((t) => ({ id: t.id, name: t.name ?? [t.city, t.region, t.country].filter(Boolean).join(", ") }))}
+        routes={routes}
         canBulk={canBulk}
         canRoutePlan={canRoutePlan}
         sweetSpotIds={companies.filter((company) => assessLikelihood(company, chainNames).sweetSpot).map((company) => company.id)}

@@ -228,6 +228,50 @@ export type AddToRouteResult =
  * created on the spot, or (when omitted) their current route. */
 export type RouteTarget = { routeId: string } | { newRoute: { name: string; plannedDate: string | null } };
 
+type ParsedRouteTarget = { ok: true; routeId: string | null; newRoute: { name: string; plannedDate: Date | null } | null };
+
+/** Validates a new route's name/date up front, before any transaction. */
+function parseRouteTarget(target?: RouteTarget): ParsedRouteTarget | { ok: false; error: string } {
+  if (target && "newRoute" in target) {
+    const fields = parseRouteFields(target.newRoute.name, target.newRoute.plannedDate);
+    if (!fields.ok) return fields;
+    return { ok: true, routeId: null, newRoute: { name: fields.name, plannedDate: fields.plannedDate } };
+  }
+  return { ok: true, routeId: target && "routeId" in target ? target.routeId : null, newRoute: null };
+}
+
+/** Carries a rejected add's result out of its transaction, so the throw
+ * rolls back anything written first — e.g. a new route made for the add. */
+class RejectedAdd<T> extends Error {
+  constructor(readonly result: T) {
+    super("route add rejected");
+  }
+}
+
+/** Runs an add in one transaction, rolling it back when it's rejected. */
+async function addTransaction<T extends { ok: boolean }>(work: (tx: AppTransactionClient) => Promise<T>): Promise<T> {
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const result = await work(tx);
+      if (!result.ok) throw new RejectedAdd(result);
+      return result;
+    });
+  } catch (error) {
+    if (error instanceof RejectedAdd) return error.result as T;
+    throw error;
+  }
+}
+
+/** The route an add writes to: a new one created here, the picked one (null
+ * if it's gone or not the user's), or the current one. */
+async function openTargetRoute(tx: AppTransactionClient, userId: string, target: ParsedRouteTarget) {
+  if (!target.newRoute) return resolveTargetRoute(tx, userId, target.routeId);
+  const route = await tx.routePlan.create({ data: { userId, name: target.newRoute.name, plannedDate: target.newRoute.plannedDate } });
+  // A user's very first route becomes their current one.
+  if (!(await activeRouteId(tx, userId))) await tx.user.update({ where: { id: userId }, data: { activeRoutePlanId: route.id } });
+  return route;
+}
+
 async function loadEligibleCompany(user: AuthenticatedUser, companyId: string) {
   const scope = companyScope(user);
   if (!scope) return { ok: false as const, error: "You do not have access to this company." };
@@ -267,26 +311,14 @@ export async function addCompanyToRoute(user: AuthenticatedUser, companyId: stri
   if (!loaded.ok) return { ok: false, error: loaded.error };
   const { company } = loaded;
 
-  let newRoute: { name: string; plannedDate: Date | null } | null = null;
-  if (target && "newRoute" in target) {
-    const fields = parseRouteFields(target.newRoute.name, target.newRoute.plannedDate);
-    if (!fields.ok) return fields;
-    newRoute = { name: fields.name, plannedDate: fields.plannedDate };
-  }
-  const targetRouteId = target && "routeId" in target ? target.routeId : null;
+  const parsed = parseRouteTarget(target);
+  if (!parsed.ok) return parsed;
   let resolvedRouteId: string | null = null;
 
   try {
-    const result = await prisma.$transaction(async (tx) => {
-      let route;
-      if (newRoute) {
-        route = await tx.routePlan.create({ data: { userId: user.id, name: newRoute.name, plannedDate: newRoute.plannedDate } });
-        // A user's very first route becomes their current one.
-        if (!(await activeRouteId(tx, user.id))) await tx.user.update({ where: { id: user.id }, data: { activeRoutePlanId: route.id } });
-      } else {
-        route = await resolveTargetRoute(tx, user.id, targetRouteId);
-        if (!route) return { ok: false as const, error: "That route no longer exists." };
-      }
+    const result = await addTransaction(async (tx) => {
+      const route = await openTargetRoute(tx, user.id, parsed);
+      if (!route) return { ok: false as const, error: "That route no longer exists." };
       resolvedRouteId = route.id;
       const currentLeadType = route.leadTypeId ? await tx.leadType.findUnique({ where: { id: route.leadTypeId } }) : null;
 
@@ -371,7 +403,8 @@ export async function clearRoute(user: AuthenticatedUser): Promise<void> {
 }
 
 export type BulkAddResult =
-  | { ok: true; addedCount: number; alreadyInRouteCount: number }
+  | { ok: true; addedCount: number; alreadyInRouteCount: number; routeName: string }
+  | { ok: false; error: string }
   | { ok: false; conflict: RouteConflictDetail }
   | { ok: false; perCompanyErrors: Record<string, string> };
 
@@ -385,11 +418,17 @@ export type BulkAddResult =
  * nothing does. A per-company scope/not-found failure is reported back
  * per-company rather than blocking the whole batch on a single bad id —
  * that's a different failure class from a route-level conflict, which by
- * definition affects the entire batch identically.
+ * definition affects the entire batch identically. Takes the same route
+ * choice as a single add (a picked route, a new one, or the current one); a
+ * new route is created inside the transaction, so a rejected batch leaves
+ * no empty route behind.
  */
-export async function bulkAddCompaniesToRoute(user: AuthenticatedUser, companyIds: string[]): Promise<BulkAddResult> {
+export async function bulkAddCompaniesToRoute(user: AuthenticatedUser, companyIds: string[], target?: RouteTarget): Promise<BulkAddResult> {
   requirePermission(user, "manage_route_plan");
   requirePermission(user, "bulk_update_leads");
+
+  const parsed = parseRouteTarget(target);
+  if (!parsed.ok) return parsed;
 
   const scope = companyScope(user);
   if (!scope) return { ok: false, perCompanyErrors: Object.fromEntries(companyIds.map((id) => [id, "You do not have access to this company."])) };
@@ -401,8 +440,9 @@ export async function bulkAddCompaniesToRoute(user: AuthenticatedUser, companyId
     if (!foundIds.has(id)) perCompanyErrors[id] = "Company not found or access denied.";
   }
 
-  const result = await prisma.$transaction(async (tx) => {
-    const route = await ensureActiveRoute(tx, user.id);
+  const result = await addTransaction(async (tx) => {
+    const route = await openTargetRoute(tx, user.id, parsed);
+    if (!route) return { ok: false as const, error: "That route no longer exists." };
     const existingCompanyIds = new Set((await tx.routePlanCompany.findMany({ where: { routePlanId: route.id }, select: { companyId: true } })).map((r) => r.companyId));
 
     let routeLeadTypeId = route.leadTypeId;
@@ -440,14 +480,23 @@ export async function bulkAddCompaniesToRoute(user: AuthenticatedUser, companyId
     if (toAdd.length > 0) {
       await tx.routePlanCompany.createMany({ data: toAdd.map((companyId) => ({ routePlanId: route.id, companyId, addedById: user.id })) });
     }
-    return { ok: true as const, addedCount: toAdd.length, alreadyInRouteCount };
+    return { ok: true as const, addedCount: toAdd.length, alreadyInRouteCount, routeId: route.id, routeName: route.name };
   });
 
   if (result.ok) {
-    await writeAuditEvent({ actorId: user.id, module: "route-plan", action: "route_plan.bulk_added", entityType: "RoutePlan", metadata: { addedCount: result.addedCount, alreadyInRouteCount: result.alreadyInRouteCount } });
+    const { routeId, ...added } = result;
+    await writeAuditEvent({
+      actorId: user.id,
+      module: "route-plan",
+      action: "route_plan.bulk_added",
+      entityType: "RoutePlan",
+      entityId: routeId,
+      metadata: { addedCount: added.addedCount, alreadyInRouteCount: added.alreadyInRouteCount, routeName: added.routeName },
+    });
     if (Object.keys(perCompanyErrors).length > 0) {
       return { ok: false, perCompanyErrors };
     }
+    return added;
   }
   return result;
 }

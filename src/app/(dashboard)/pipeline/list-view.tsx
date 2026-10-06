@@ -7,6 +7,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { CompanyCard, type StageOption } from "./company-card";
 import { BulkToolbar } from "./bulk-toolbar";
 import type { PipelineCardData } from "./queries";
+import type { RouteListItem } from "@/lib/route-plan/service";
 
 type Option = { id: string; name: string };
 
@@ -18,6 +19,7 @@ export function ListView({
   canRoutePlan,
   salespeople,
   territories,
+  routes,
   page,
   pageCount,
 }: {
@@ -28,6 +30,7 @@ export function ListView({
   canRoutePlan: boolean;
   salespeople: Option[];
   territories: Option[];
+  routes: RouteListItem[];
   page?: number;
   pageCount?: number;
 }) {
@@ -63,6 +66,7 @@ export function ListView({
         stages={stages}
         salespeople={salespeople}
         territories={territories}
+        routes={routes}
         canBulk={canBulk}
         canRoutePlan={canRoutePlan}
         onClear={() => setSelected(new Set())}

@@ -199,7 +199,7 @@ describe("bulkAddCompaniesToRoute", () => {
     const b = await makeCompany(f);
 
     const result = await bulkAddCompaniesToRoute(f.user, [a.id, b.id]);
-    expect(result).toEqual({ ok: true, addedCount: 2, alreadyInRouteCount: 0 });
+    expect(result).toEqual({ ok: true, addedCount: 2, alreadyInRouteCount: 0, routeName: "My route" });
     expect((await getRouteSummary(f.user.id)).count).toBe(2);
   });
 
@@ -239,7 +239,7 @@ describe("bulkAddCompaniesToRoute", () => {
     await addCompanyToRoute(f.user, a.id);
 
     const result = await bulkAddCompaniesToRoute(f.user, [a.id, b.id]);
-    expect(result).toEqual({ ok: true, addedCount: 1, alreadyInRouteCount: 1 });
+    expect(result).toEqual({ ok: true, addedCount: 1, alreadyInRouteCount: 1, routeName: "My route" });
   });
 
   it("reports per-company errors for ids outside the user's scope without blocking valid ones", async () => {
@@ -254,6 +254,47 @@ describe("bulkAddCompaniesToRoute", () => {
     // The valid one was still added — a scope failure on one id doesn't
     // block the rest of a legitimately mixed-validity batch.
     expect((await getRouteSummary(userA.id)).count).toBe(1);
+  });
+
+  it("bulk-adds to a chosen route, or to a new route made on the spot, without changing the current route", async () => {
+    const f = await baseFixtures();
+    const a = await makeCompany(f);
+    const b = await makeCompany(f);
+    await createRoute(f.user, "Mississauga", null);
+    await createRoute(f.user, "Burlington", null); // now current
+    const mississauga = (await listRoutes(f.user.id)).find((r) => r.name === "Mississauga")!;
+
+    expect(await bulkAddCompaniesToRoute(f.user, [a.id, b.id], { routeId: mississauga.id })).toEqual({ ok: true, addedCount: 2, alreadyInRouteCount: 0, routeName: "Mississauga" });
+    expect(await bulkAddCompaniesToRoute(f.user, [a.id], { newRoute: { name: "Oakville", plannedDate: "2026-10-09" } })).toEqual({ ok: true, addedCount: 1, alreadyInRouteCount: 0, routeName: "Oakville" });
+
+    expect((await listRoutes(f.user.id)).map((r) => [r.name, r.count, r.isActive])).toEqual([
+      ["Oakville", 1, false],
+      ["Burlington", 0, true],
+      ["Mississauga", 2, false],
+    ]);
+  });
+
+  it("leaves no new route behind when a batch for a new route is rejected", async () => {
+    const f = await baseFixtures();
+    const pub = await makeCompany(f, { leadTypeId: f.pubType.id });
+    const seniorHome = await makeCompany(f, { leadTypeId: f.seniorHomeType.id });
+
+    const result = await bulkAddCompaniesToRoute(f.user, [pub.id, seniorHome.id], { newRoute: { name: "Oakville", plannedDate: null } });
+    expect(result).toMatchObject({ ok: false, conflict: { type: "lead_type_conflict" } });
+    expect(await listRoutes(f.user.id)).toEqual([]);
+    expect(await bulkAddCompaniesToRoute(f.user, [pub.id], { newRoute: { name: "  ", plannedDate: null } })).toEqual({ ok: false, error: "Give the route a name, e.g. Mississauga." });
+  });
+
+  it("refuses to bulk-add to another user's route", async () => {
+    const f = await baseFixtures();
+    const role = await createRoleWithPermissions("Joe2", ["view_all_leads", "view_route_plan", "manage_route_plan"]);
+    const joe = await fetchAuthenticatedUser((await createTestUser({ roleId: role.id })).id);
+    const bar = await makeCompany(f);
+    await createRoute(joe, "Joe's Oakville", null);
+    const joesRoute = (await listRoutes(joe.id))[0];
+
+    expect(await bulkAddCompaniesToRoute(f.user, [bar.id], { routeId: joesRoute.id })).toEqual({ ok: false, error: "That route no longer exists." });
+    expect((await listRoutes(joe.id))[0].count).toBe(0);
   });
 
   it("requires bulk_update_leads in addition to manage_route_plan", async () => {
@@ -473,6 +514,14 @@ describe("multiple routes per user", () => {
     expect(await deleteRoute(f.user, hamilton.id)).toEqual({ ok: true });
     expect((await getRouteSummary(f.user.id)).name).toBe("Milton");
     expect(await testPrisma.company.findUnique({ where: { id: bar.id } })).not.toBeNull();
+  });
+
+  it("leaves no new route behind when adding a bar to it is rejected", async () => {
+    const f = await baseFixtures();
+    const ineligible = await makeCompany(f, { leadTypeId: f.ineligibleType.id });
+
+    expect(await addCompanyToRoute(f.user, ineligible.id, { newRoute: { name: "Oakville", plannedDate: null } })).toMatchObject({ ok: false, conflict: { type: "ineligible" } });
+    expect(await listRoutes(f.user.id)).toEqual([]);
   });
 
   it("never lets one user touch another user's route", async () => {

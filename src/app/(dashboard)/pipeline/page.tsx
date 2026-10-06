@@ -8,6 +8,7 @@ import { ListView } from "./list-view";
 import { ViewTabs } from "./view-tabs";
 import { FilterBar } from "./filter-bar";
 import { SavedViewsPanel } from "./saved-views-panel";
+import { listRoutes, type RouteListItem } from "@/lib/route-plan/service";
 
 export const metadata = { title: "Pipeline — Triviality CRM" };
 
@@ -67,12 +68,13 @@ export default async function PipelinePage({
     territoryId: toSingle(params.territoryId),
   };
 
-  const [leadTypes, salespeople, competitors, territories, workspaceSettings] = await Promise.all([
+  const [leadTypes, salespeople, competitors, territories, workspaceSettings, routes] = await Promise.all([
     prisma.leadType.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
     prisma.user.findMany({ where: { disabled: false }, orderBy: { name: "asc" } }),
     prisma.competitor.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
     prisma.territory.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
     prisma.workspaceSettings.findUnique({ where: { id: 1 } }),
+    canRoutePlan ? listRoutes(user.id) : Promise.resolve([] as RouteListItem[]),
   ]);
 
   const territoryOptions = territories.map((t) => ({
@@ -110,6 +112,7 @@ export default async function PipelinePage({
           canRoutePlan={canRoutePlan}
           salespeople={salespeople}
           territoryOptions={territoryOptions}
+          routes={routes}
           thresholdDays={workspaceSettings?.noActivityThresholdDays ?? 14}
         />
       ) : (
@@ -123,6 +126,7 @@ export default async function PipelinePage({
           canRoutePlan={canRoutePlan}
           salespeople={salespeople}
           territoryOptions={territoryOptions}
+          routes={routes}
         />
       )}
     </div>
@@ -153,6 +157,7 @@ async function ListSection({
   canRoutePlan,
   salespeople,
   territoryOptions,
+  routes,
 }: {
   user: Awaited<ReturnType<typeof requireUser>>;
   view: PipelineViewKey;
@@ -163,6 +168,7 @@ async function ListSection({
   canRoutePlan: boolean;
   salespeople: { id: string; name: string }[];
   territoryOptions: { id: string; name: string }[];
+  routes: RouteListItem[];
 }) {
   const viewParams = paramsForView(view, user.id);
   const data = await getPipelineListView(user, { ...viewParams, ...filters, page });
@@ -179,6 +185,7 @@ async function ListSection({
       canRoutePlan={canRoutePlan}
       salespeople={salespeople}
       territories={territoryOptions}
+      routes={routes}
       page={data.page}
       pageCount={data.pageCount}
     />
@@ -193,6 +200,7 @@ async function StaleSection({
   canRoutePlan,
   salespeople,
   territoryOptions,
+  routes,
   thresholdDays,
 }: {
   user: Awaited<ReturnType<typeof requireUser>>;
@@ -202,6 +210,7 @@ async function StaleSection({
   canRoutePlan: boolean;
   salespeople: { id: string; name: string }[];
   territoryOptions: { id: string; name: string }[];
+  routes: RouteListItem[];
   thresholdDays: number;
 }) {
   const data = await getStaleCompanies(user, filters, thresholdDays);
@@ -218,6 +227,7 @@ async function StaleSection({
       canRoutePlan={canRoutePlan}
       salespeople={salespeople}
       territories={territoryOptions}
+      routes={routes}
     />
   );
 }

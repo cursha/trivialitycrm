@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { GRADE_TONE, GRADE_LABEL, TRIVIA_STATUS_LABEL } from "@/lib/ui/status-tones";
 import { BulkToolbar } from "@/app/(dashboard)/pipeline/bulk-toolbar";
 import type { StageOption } from "@/app/(dashboard)/pipeline/company-card";
+import type { RouteListItem } from "@/lib/route-plan/service";
 
 type Option = { id: string; name: string };
 
@@ -37,6 +38,7 @@ export function CompaniesTable({
   stages,
   salespeople,
   territories,
+  routes,
   canBulk,
   canRoutePlan,
   routeCompanyIds,
@@ -46,6 +48,7 @@ export function CompaniesTable({
   stages: StageOption[];
   salespeople: Option[];
   territories: Option[];
+  routes: RouteListItem[];
   canBulk: boolean;
   canRoutePlan: boolean;
   /** Companies already in the signed-in user's active Route Plan — a
@@ -82,6 +85,7 @@ export function CompaniesTable({
           stages={stages}
           salespeople={salespeople}
           territories={territories}
+          routes={routes}
           canBulk={canBulk}
           canRoutePlan={canRoutePlan}
           onClear={() => setSelected(new Set())}

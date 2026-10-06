@@ -13,6 +13,20 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v7.1 — 2026-10-06
+### Fixed — "Add Selected to Route" now asks which route
+- Bulk-adding from Companies or a Pipeline list used to put every selected
+  bar on your current route without asking (Curt spotted it). It now opens
+  the same picker as a single bar: one of your routes, or a new route named
+  on the spot (with an optional day). The current route is picked by
+  default, and adding elsewhere doesn't change which route is current.
+- If the chosen route can't take the selection (wrong lead type or
+  country), nothing changes. The "Export current route first" / "Clear
+  current route and start new" choices are only offered when the conflict
+  is with your current route; otherwise you pick another route.
+- A rejected add to a new route no longer leaves an empty route behind
+  (bulk or single bar).
+
 ## v7.0 — 2026-10-06
 ### Added — find venues with trivia or karaoke on Quick Search
 - Quick Search has **Trivia** and **Karaoke** checkboxes under "Only venues

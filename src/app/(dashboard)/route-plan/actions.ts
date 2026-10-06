@@ -75,11 +75,12 @@ export async function deleteRouteAction(routeId: string): Promise<RouteMutationR
   return result;
 }
 
-export async function bulkAddToRoute(companyIds: string[]): Promise<BulkAddResult> {
+/** Adds the selected companies to a chosen route (by id, or a new one), or
+ * to the current route when no target is given. */
+export async function bulkAddToRoute(companyIds: string[], target?: RouteTarget): Promise<BulkAddResult> {
   const user = await requireUser();
-  const result = await bulkAddCompaniesToRoute(user, companyIds);
-  revalidatePath(ROUTE_PLAN_PATH);
-  revalidatePath("/companies");
+  const result = await bulkAddCompaniesToRoute(user, companyIds, target);
+  revalidateRoutes();
   return result;
 }
 

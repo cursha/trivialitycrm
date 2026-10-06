@@ -15,7 +15,8 @@ import {
 import { bulkAddToRoute, clearRouteAction } from "@/app/(dashboard)/route-plan/actions";
 import { downloadRoutePlanCsv } from "@/lib/route-plan/download-client";
 import { routeConflictMessage } from "@/lib/route-plan/conflict-message";
-import type { BulkAddResult, RouteConflictDetail } from "@/lib/route-plan/service";
+import type { BulkAddResult, RouteConflictDetail, RouteListItem, RouteTarget } from "@/lib/route-plan/service";
+import { routeLabel } from "@/lib/route-plan/format";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -26,12 +27,15 @@ import { OpportunityAnalysisPanel } from "@/app/(dashboard)/companies/opportunit
 type Option = { id: string; name: string };
 type BulkActionKind = "stage" | "assign" | "territory" | "followup" | "note" | "archive" | "restore" | "analyze" | "route";
 
+const NEW_ROUTE = "__new__";
+
 export function BulkToolbar({
   selectedIds,
   selectedCompanies,
   stages,
   salespeople,
   territories,
+  routes,
   canBulk,
   canRoutePlan,
   onClear,
@@ -41,6 +45,8 @@ export function BulkToolbar({
   stages: StageOption[];
   salespeople: Option[];
   territories: Option[];
+  /** The signed-in user's routes, for the "Add Selected to Route" picker. */
+  routes: RouteListItem[];
   canBulk: boolean;
   canRoutePlan: boolean;
   onClear: () => void;
@@ -52,20 +58,55 @@ export function BulkToolbar({
   const [routeResult, setRouteResult] = useState<BulkAddResult | null>(null);
   const [routeConflict, setRouteConflict] = useState<RouteConflictDetail | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [routeChoice, setRouteChoice] = useState("");
+  const [newRouteName, setNewRouteName] = useState("");
+  const [newRouteDate, setNewRouteDate] = useState("");
+  const [routeError, setRouteError] = useState<string | null>(null);
 
   if (!canBulk || selectedIds.length === 0) return null;
 
+  const currentRoute = routes.find((route) => route.isActive) ?? null;
+  // Export/clear work on the current route, so they're only offered when
+  // that's the route the conflict is with.
+  const conflictIsWithCurrentRoute = !!currentRoute && routeChoice === currentRoute.id;
+
+  function routeTarget(): RouteTarget {
+    return routeChoice === NEW_ROUTE ? { newRoute: { name: newRouteName, plannedDate: newRouteDate || null } } : { routeId: routeChoice };
+  }
+
   async function attemptAddToRoute() {
     setExportError(null);
-    const outcome = await bulkAddToRoute(selectedIds);
+    setRouteError(null);
+    const outcome = await bulkAddToRoute(selectedIds, routeTarget());
     if (!outcome.ok && "conflict" in outcome) {
       setRouteConflict(outcome.conflict);
       setRouteResult(null);
+    } else if (!outcome.ok && "error" in outcome) {
+      setRouteError(outcome.error);
     } else {
       setRouteConflict(null);
       setRouteResult(outcome);
       if (outcome.ok) router.refresh();
     }
+  }
+
+  function openRoutePicker() {
+    setActive("route");
+    setRouteResult(null);
+    setRouteConflict(null);
+    setExportError(null);
+    setRouteError(null);
+    setRouteChoice(currentRoute?.id ?? NEW_ROUTE);
+    setNewRouteName("");
+    setNewRouteDate("");
+  }
+
+  function confirmAddToRoute() {
+    if (routeChoice === NEW_ROUTE && !newRouteName.trim()) {
+      setRouteError("Name the new route, e.g. Burlington.");
+      return;
+    }
+    startTransition(attemptAddToRoute);
   }
 
   function handleExportCurrentRouteFirst() {
@@ -127,17 +168,7 @@ export function BulkToolbar({
             Analyze for opportunities
           </Button>
           {canRoutePlan && (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                setActive("route");
-                setRouteResult(null);
-                setRouteConflict(null);
-                setExportError(null);
-                startTransition(attemptAddToRoute);
-              }}
-            >
+            <Button type="button" variant="ghost" onClick={openRoutePicker}>
               Add Selected to Route
             </Button>
           )}
@@ -335,6 +366,17 @@ export function BulkToolbar({
                 <Button type="button" variant="ghost" onClick={() => setActive(null)}>
                   Close
                 </Button>
+              ) : !conflictIsWithCurrentRoute ? (
+                // A picked (non-current) or brand-new route: nothing was
+                // changed, so the way forward is a different route.
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="primary" onClick={() => setRouteConflict(null)}>
+                    Choose another route
+                  </Button>
+                  <Button type="button" variant="ghost" onClick={() => setActive(null)}>
+                    Cancel
+                  </Button>
+                </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" disabled={isPending} variant="primary" onClick={handleExportCurrentRouteFirst}>
@@ -352,7 +394,7 @@ export function BulkToolbar({
           ) : routeResult ? (
             "ok" in routeResult && routeResult.ok ? (
               <Alert tone="success">
-                Added {routeResult.addedCount} compan{routeResult.addedCount === 1 ? "y" : "ies"} to your Route Plan
+                Added {routeResult.addedCount} compan{routeResult.addedCount === 1 ? "y" : "ies"} to your {routeResult.routeName} route
                 {routeResult.alreadyInRouteCount > 0 ? ` (${routeResult.alreadyInRouteCount} already there)` : ""}.
               </Alert>
             ) : (
@@ -361,7 +403,47 @@ export function BulkToolbar({
               )
             )
           ) : (
-            <p className="text-sm text-text-muted">Adding to your Route Plan…</p>
+            <div className="space-y-2">
+              <div className="flex flex-wrap items-end gap-3">
+                <div>
+                  <Label>Add to route</Label>
+                  <Select value={routeChoice} disabled={isPending} onChange={(event) => setRouteChoice(event.target.value)} className="mt-1 w-auto">
+                    {routes.map((route) => (
+                      <option key={route.id} value={route.id}>
+                        {routeLabel(route)}
+                        {route.isActive ? " (current)" : ""}
+                      </option>
+                    ))}
+                    <option value={NEW_ROUTE}>+ New route…</option>
+                  </Select>
+                </div>
+                {routeChoice === NEW_ROUTE && (
+                  <>
+                    <div>
+                      <Label>Route name</Label>
+                      <Input
+                        value={newRouteName}
+                        onChange={(event) => setNewRouteName(event.target.value)}
+                        placeholder="e.g. Burlington"
+                        maxLength={80}
+                        className="mt-1 w-48"
+                      />
+                    </div>
+                    <div>
+                      <Label>Day (optional)</Label>
+                      <Input type="date" value={newRouteDate} onChange={(event) => setNewRouteDate(event.target.value)} className="mt-1 w-auto" />
+                    </div>
+                  </>
+                )}
+                <Button type="button" disabled={isPending} variant="primary" onClick={confirmAddToRoute}>
+                  {isPending ? "Adding…" : `Add ${selectedIds.length} to route`}
+                </Button>
+                <Button type="button" variant="ghost" onClick={() => setActive(null)}>
+                  Cancel
+                </Button>
+              </div>
+              {routeError && <Alert tone="danger">{routeError}</Alert>}
+            </div>
           )}
         </div>
       )}
