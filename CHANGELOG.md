@@ -13,6 +13,17 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v8.3 — 2026-10-06
+### Fixed — route export on Android, found the cause
+- Curt tested on his phone: opening the export address directly downloaded
+  a file that opened fine, but the app's **Download CSV** still gave a
+  greyed-out file. So the phone and the file were fine; the problem was the
+  app starting the download from code after a check had finished, which
+  Chrome on Android doesn't treat as your tap.
+- Now the check runs when you tap **Export CSV** (problems show in the
+  app as before), and **Download CSV** is a plain link your tap downloads
+  from. Same for "Export current route first" in Add Selected to Route.
+
 ## v8.2 — 2026-10-06
 ### Fixed — route export on Android, take two
 - v8.1 didn't fix it: the route file still downloaded greyed out on

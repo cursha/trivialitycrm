@@ -21,20 +21,20 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
 }
 
+/** Button styling, for a link that should look like a button (e.g. a
+ * download the browser must start from the tap itself). */
+export function buttonClasses(variant: ButtonVariant = "primary", className?: string): string {
+  return clsx(
+    "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold transition-colors",
+    "disabled:pointer-events-none disabled:opacity-50",
+    VARIANT_CLASSES[variant],
+    className,
+  );
+}
+
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
   { variant = "primary", className, ...props },
   ref,
 ) {
-  return (
-    <button
-      ref={ref}
-      className={clsx(
-        "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold transition-colors",
-        "disabled:pointer-events-none disabled:opacity-50",
-        VARIANT_CLASSES[variant],
-        className,
-      )}
-      {...props}
-    />
-  );
+  return <button ref={ref} className={buttonClasses(variant, className)} {...props} />;
 });

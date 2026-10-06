@@ -13,13 +13,13 @@ import {
   type BulkActionOutcome,
 } from "@/app/(dashboard)/companies/bulk-actions";
 import { bulkAddToRoute, clearRouteAction } from "@/app/(dashboard)/route-plan/actions";
-import { downloadRoutePlanCsv } from "@/lib/route-plan/download-client";
+import { checkRoutePlanExport, ROUTE_PLAN_EXPORT_URL } from "@/lib/route-plan/download-client";
 import { routeConflictMessage } from "@/lib/route-plan/conflict-message";
 import type { BulkAddResult, RouteConflictDetail, RouteListItem, RouteTarget } from "@/lib/route-plan/service";
 import { routeLabel } from "@/lib/route-plan/format";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { Label, Select, Input, Textarea } from "@/components/ui/field";
 import type { StageOption } from "./company-card";
 import { OpportunityAnalysisPanel } from "@/app/(dashboard)/companies/opportunity-analysis-panel";
@@ -82,6 +82,12 @@ export function BulkToolbar({
     if (!outcome.ok && "conflict" in outcome) {
       setRouteConflict(outcome.conflict);
       setRouteResult(null);
+      // Checked now, so "Export current route first" can be a plain link
+      // the tap downloads from (see download-client.ts).
+      if (conflictIsWithCurrentRoute && outcome.conflict.type !== "ineligible") {
+        const check = await checkRoutePlanExport();
+        setExportError(check.ok ? null : check.error);
+      }
     } else if (!outcome.ok && "error" in outcome) {
       setRouteError(outcome.error);
     } else {
@@ -109,22 +115,6 @@ export function BulkToolbar({
       return;
     }
     startTransition(attemptAddToRoute);
-  }
-
-  function handleExportCurrentRouteFirst() {
-    startTransition(async () => {
-      const download = await downloadRoutePlanCsv();
-      if (!download.ok) {
-        setExportError(download.error);
-        return;
-      }
-      // Never cleared automatically, per spec 9 ("do not clear
-      // automatically") and 5.2 ("clear the route and add the pending
-      // company only after explicit confirmation" once export succeeds) —
-      // and the browser fetches the file itself after this returns, so
-      // clearing straight away could empty the route before it's saved.
-      setExportedCurrentRoute(true);
-    });
   }
 
   function handleClearAndStartNew() {
@@ -392,9 +382,14 @@ export function BulkToolbar({
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  <Button type="button" disabled={isPending} variant="primary" onClick={handleExportCurrentRouteFirst}>
-                    Export current route first
-                  </Button>
+                  {!exportError && (
+                    // A plain link the tap downloads from. Never cleared
+                    // automatically, per spec 9 and 5.2 — the next step asks
+                    // (the browser is still saving the file at this point).
+                    <a href={ROUTE_PLAN_EXPORT_URL} className={buttonClasses("primary", isPending ? "pointer-events-none opacity-50" : undefined)} onClick={() => setExportedCurrentRoute(true)}>
+                      Export current route first
+                    </a>
+                  )}
                   <Button type="button" disabled={isPending} variant="destructive" onClick={handleClearAndStartNew}>
                     Clear current route and start new
                   </Button>

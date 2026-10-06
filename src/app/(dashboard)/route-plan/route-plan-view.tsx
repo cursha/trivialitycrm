@@ -5,12 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TriangleAlert, X } from "lucide-react";
 import { removeFromRoute, clearRouteAction } from "./actions";
-import { downloadRoutePlanCsv } from "@/lib/route-plan/download-client";
+import { checkRoutePlanExport, ROUTE_PLAN_EXPORT_URL } from "@/lib/route-plan/download-client";
 import type { RouteDetail } from "@/lib/route-plan/service";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
+import { Button, buttonClasses } from "@/components/ui/button";
 
 type ExportStep = "idle" | "confirming" | "post-download";
 
@@ -40,27 +40,24 @@ export function RoutePlanView({ detail, canManage, canExport }: { detail: RouteD
     });
   }
 
+  // The server check runs here, before the confirmation shows, so the
+  // Download link below can start the download straight from the tap (see
+  // download-client.ts for why that matters on Android).
   function openExportConfirmation() {
     setExportError(null);
     setAcknowledgedIncomplete(false);
-    setExportStep("confirming");
-  }
-
-  function handleDownload() {
     startTransition(async () => {
-      const result = await downloadRoutePlanCsv();
-      if (!result.ok) {
-        setExportError(result.error);
+      const check = await checkRoutePlanExport();
+      if (!check.ok) {
+        setExportError(check.error);
         setExportStep("idle");
         return;
       }
-      // "Successful" is defined as the server having generated and returned
-      // the CSV response — browsers don't reliably report whether the user
-      // actually saved the file, so that's deliberately not what this
-      // gates on (spec 9).
-      setExportStep("post-download");
+      setExportStep("confirming");
     });
   }
+
+  const canDownload = !!detail.exportFilename && (incompleteRows.length === 0 || acknowledgedIncomplete);
 
   if (detail.companies.length === 0) {
     return (
@@ -181,14 +178,18 @@ export function RoutePlanView({ detail, canManage, canExport }: { detail: RouteD
           )}
 
           <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="primary"
-              disabled={isPending || !detail.exportFilename || (incompleteRows.length > 0 && !acknowledgedIncomplete)}
-              onClick={handleDownload}
-            >
-              Download CSV
-            </Button>
+            {canDownload ? (
+              // A real link, not a button that downloads from code: the
+              // browser saves the file itself (Content-Disposition:
+              // attachment), so the page stays put.
+              <a href={ROUTE_PLAN_EXPORT_URL} className={buttonClasses("primary")} onClick={() => setExportStep("post-download")}>
+                Download CSV
+              </a>
+            ) : (
+              <Button type="button" variant="primary" disabled>
+                Download CSV
+              </Button>
+            )}
             <Button type="button" variant="ghost" onClick={() => setExportStep("idle")}>
               Cancel
             </Button>
