@@ -1,5 +1,5 @@
 import "server-only";
-import type { Prisma } from "../../generated/prisma/client";
+import type { AppTransactionClient } from "../prisma";
 import { createStageEntryTasks } from "./sales-process";
 
 /**
@@ -20,7 +20,7 @@ import { createStageEntryTasks } from "./sales-process";
  * change goes through. Returns how many follow-ups were created.
  */
 export async function logPipelineChange(
-  tx: Prisma.TransactionClient,
+  tx: AppTransactionClient,
   params: { companyId: string; userId: string; fromStageId: string; toStageId: string; lossReasonId?: string | null },
 ): Promise<{ entryTaskCount: number }> {
   const [fromStage, toStage] = await Promise.all([
@@ -64,7 +64,7 @@ export async function logPipelineChange(
  * worth narrating the way an actual stage transition is.
  */
 export async function logInitialPipelineStage(
-  tx: Prisma.TransactionClient,
+  tx: AppTransactionClient,
   params: { companyId: string; userId: string; toStageId: string },
 ): Promise<void> {
   await tx.pipelineStageHistory.create({
@@ -85,7 +85,7 @@ export async function logInitialPipelineStage(
  * the existing inline PIPELINE_CHANGE pattern in companies/actions.ts.
  */
 export async function logAssignmentChange(
-  tx: Prisma.TransactionClient,
+  tx: AppTransactionClient,
   params: { companyId: string; userId: string; fromUserId: string | null; toUserId: string | null },
 ): Promise<void> {
   const [fromUser, toUser] = await Promise.all([

@@ -6,7 +6,7 @@
 // src/lib/research/competition-locator-buckets.ts). Computed once at
 // discovery time (run-search.ts) and persisted on SearchResult.duplicateMatches,
 // not recomputed on every review-page load of a long-lived review session.
-import type { PrismaClient } from "../../generated/prisma/client";
+import type { AppPrismaClient } from "../prisma";
 import { normalizeCompanyName, normalizePhone, normalizeEmail, extractWebsiteDomain } from "./normalize";
 import { computeAddressNormalizedFields } from "../data-quality/normalize";
 import { scoreCompanyMatch, type CompanyMatchInput, type MatchScoreResult } from "../data-quality/company-match";
@@ -42,7 +42,7 @@ const MAX_MATCHES = 5;
  * top 5 matches by score, highest first; empty when nothing matched at all.
  */
 export async function findScoredDuplicateMatches(
-  prisma: Pick<PrismaClient, "company">,
+  prisma: Pick<AppPrismaClient, "company">,
   input: ScoredDuplicateInput,
   options?: { excludeCompanyId?: string },
 ): Promise<ScoredDuplicateMatch[]> {

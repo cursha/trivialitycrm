@@ -41,7 +41,7 @@ export async function login(_prevState: LoginState, formData: FormData): Promise
   }
 
   const { email, password } = parsed.data;
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await prisma.user.findUnique({ where: { email }, omit: { passwordHash: false } });
 
   if (!user || user.disabled) {
     await verifyPassword(password, null);

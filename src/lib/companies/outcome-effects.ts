@@ -1,5 +1,5 @@
 import "server-only";
-import type { Prisma } from "../../generated/prisma/client";
+import type { AppTransactionClient } from "../prisma";
 import { logPipelineChange } from "./activity-log";
 import { isForwardMove } from "./sales-process";
 
@@ -29,7 +29,7 @@ type OutcomeConfig = {
  * stage actually applied.
  */
 export async function applyOutcomeEffects(
-  tx: Prisma.TransactionClient,
+  tx: AppTransactionClient,
   params: {
     company: { id: string; assignedToId: string | null; pipelineStageId: string };
     userId: string;

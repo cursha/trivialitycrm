@@ -124,7 +124,7 @@ describe("completePasswordReset", () => {
     const result = await completePasswordReset(token, "Brand-New-Passw0rd!");
     expect(result.ok).toBe(true);
 
-    const updated = await testPrisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    const updated = await testPrisma.user.findUniqueOrThrow({ where: { id: user.id }, omit: { passwordHash: false } });
     expect(updated.mustChangePassword).toBe(false);
     expect(updated.failedLoginAttempts).toBe(0);
     expect(updated.lockedUntil).toBeNull();

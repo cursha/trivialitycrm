@@ -5,6 +5,7 @@
 // context (web Server Actions/pages, or the worker process). Same
 // reasoning as src/lib/prisma.ts's identical omission.
 import type { AuthenticatedUser } from "@/lib/auth/current-user";
+import type { AppTransactionClient } from "../prisma";
 import { hasPermission } from "@/lib/auth/permissions";
 import type { Prisma } from "../../generated/prisma/client";
 
@@ -52,7 +53,7 @@ export function taskScope(user: AuthenticatedUser): Prisma.TaskWhereInput | null
  * question, not whether the user may reassign at all.
  */
 export async function canAssignTo(
-  client: Prisma.TransactionClient,
+  client: AppTransactionClient,
   user: AuthenticatedUser,
   targetUserId: string | null,
 ): Promise<boolean> {

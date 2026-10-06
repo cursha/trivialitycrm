@@ -13,6 +13,20 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v5.1 — 2026-10-06
+### Fixed — password hashes no longer reach the browser
+- Company pages loaded the full user record of whoever logged an activity
+  or owned a follow-up, including their password hash, and passed it to
+  the browser in the page data. It wasn't shown on screen but anyone
+  signed in could read it with developer tools. Other pages load full user
+  records the same way and may have done the same.
+- The database client now never returns a password hash unless the code
+  explicitly asks for it (only login and change password do), so this is
+  closed everywhere at once, including pages not yet audited.
+- The company timeline, follow-ups, pipeline cards and sales lists now load
+  only the user's name.
+- A new test fails if a password hash is ever returned by default.
+
 ## v5.0 — 2026-10-05
 ### Added — the sweet spot
 - A green **Sweet spot** badge marks the bars most likely to buy: an

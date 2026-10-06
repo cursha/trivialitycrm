@@ -1,5 +1,5 @@
 import "server-only";
-import type { Prisma } from "../../generated/prisma/client";
+import type { AppTransactionClient } from "../prisma";
 import { fillTrialWeeks, trialWeeksFor } from "./sales-track";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -20,7 +20,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * created.
  */
 export async function createStageEntryTasks(
-  tx: Prisma.TransactionClient,
+  tx: AppTransactionClient,
   params: { companyId: string; toStageId: string; userId: string; now?: Date },
 ): Promise<number> {
   const company = await tx.company.findUnique({

@@ -251,7 +251,7 @@ export async function listCompanyTasks(user: AuthenticatedUser, companyId: strin
 
   return prisma.task.findMany({
     where: { companyId },
-    include: { assignedTo: true },
+    include: { assignedTo: { select: { id: true, name: true } } },
     orderBy: { dueAt: "asc" },
   });
 }
@@ -293,7 +293,7 @@ export async function listCompanyActivities(user: AuthenticatedUser, companyId: 
 
   return prisma.activity.findMany({
     where: { companyId },
-    include: { user: true },
+    include: { user: { select: { name: true } } },
     orderBy: { occurredAt: "desc" },
   });
 }

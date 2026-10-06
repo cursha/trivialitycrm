@@ -3,6 +3,7 @@
 // send-campaign-tick.ts), same reasoning as every other worker-reachable
 // module in this tree.
 import type { Prisma } from "@/generated/prisma/client";
+import type { AppTransactionClient } from "@/lib/prisma";
 import type { CampaignEventType } from "@/generated/prisma/enums";
 
 /**
@@ -14,7 +15,7 @@ import type { CampaignEventType } from "@/generated/prisma/enums";
  * logPipelineChange).
  */
 export async function recordCampaignEvent(
-  db: Prisma.TransactionClient | { campaignEvent: Prisma.TransactionClient["campaignEvent"] },
+  db: AppTransactionClient | { campaignEvent: AppTransactionClient["campaignEvent"] },
   params: {
     campaignId: string;
     recipientId?: string;

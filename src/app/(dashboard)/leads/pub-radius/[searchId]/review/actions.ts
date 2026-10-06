@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { AppTransactionClient } from "@/lib/prisma";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
@@ -12,7 +13,6 @@ import { readContactDataEntries } from "@/lib/research/contact-data";
 import { logInitialPipelineStage } from "@/lib/companies/activity-log";
 import { writeAuditEvent } from "@/lib/audit/log";
 import type { ScoredDuplicateMatch } from "@/lib/duplicates/scored-match";
-import type { Prisma } from "@/generated/prisma/client";
 
 export type PubRadiusSaveResult = { error: string } | { createdCount: number; updatedCount: number; skippedContactCount: number; ignoredCount: number };
 
@@ -158,7 +158,7 @@ export async function savePubRadiusResults(rawPayload: unknown): Promise<PubRadi
 }
 
 async function createCompany(
-  tx: Prisma.TransactionClient,
+  tx: AppTransactionClient,
   userId: string,
   result: {
     triviaStatus: "CURRENT_TRIVIA" | "NO_CURRENT_TRIVIA" | "UNCERTAIN";
@@ -187,7 +187,7 @@ async function createCompany(
 /** Identical to Competition Locator's own createContacts — skips a contact
  * that normalized-matches one already on the target company. */
 async function createContacts(
-  tx: Prisma.TransactionClient,
+  tx: AppTransactionClient,
   companyId: string,
   row: PubRadiusRowDecision,
   existingCompanyId: string | null,

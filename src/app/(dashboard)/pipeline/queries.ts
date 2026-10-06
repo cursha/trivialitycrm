@@ -96,7 +96,7 @@ export type PipelineCardData = {
 
 const CARD_INCLUDE = {
   leadType: true,
-  assignedTo: true,
+  assignedTo: { select: { id: true, name: true } },
   competitor: true,
   contacts: { where: { status: "ACTIVE" as const }, orderBy: { lastName: "asc" as const }, take: 1 },
   activities: { orderBy: { occurredAt: "desc" as const }, take: 1 },

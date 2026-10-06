@@ -1,4 +1,4 @@
-import type { PrismaClient } from "../../generated/prisma/client";
+import type { AppPrismaClient } from "../prisma";
 import type { CompanyStatus } from "../../generated/prisma/enums";
 import { normalizeCompanyName, normalizePhone, normalizeEmail, extractWebsiteDomain, normalizeAddressLine } from "./normalize";
 import { locationCorroborates } from "./location";
@@ -53,7 +53,7 @@ export function computeNormalizedFields(input: DuplicateCandidateInput) {
  * count on their own.
  */
 export async function findPotentialDuplicates(
-  prisma: Pick<PrismaClient, "company">,
+  prisma: Pick<AppPrismaClient, "company">,
   input: DuplicateCandidateInput,
   options?: { excludeCompanyId?: string },
 ): Promise<DuplicateMatch[]> {
@@ -130,7 +130,7 @@ export type RejectedMatch = {
  * still find and restore it via the existing restore_rejected permission.
  */
 export async function findPriorRejectedMatches(
-  prisma: Pick<PrismaClient, "searchResult">,
+  prisma: Pick<AppPrismaClient, "searchResult">,
   input: DuplicateCandidateInput,
 ): Promise<RejectedMatch[]> {
   const { normalizedName, normalizedPhone, normalizedEmail, websiteDomain } = computeNormalizedFields(input);

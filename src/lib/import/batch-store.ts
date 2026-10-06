@@ -1,4 +1,5 @@
 import "server-only";
+import type { AppTransactionClient } from "../prisma";
 import { Prisma } from "../../generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getEnv } from "@/lib/env";
@@ -56,7 +57,7 @@ export async function recordMapping(batchId: string, mapping: Record<string, str
 /** Wipes the staged payload and marks a batch imported. Must be called with the
  * transaction client, inside the same transaction as the Company/Contact rows it produced —
  * so a crash between creating those rows and clearing the payload can't happen silently. */
-export async function markImported(tx: Prisma.TransactionClient, batchId: string): Promise<void> {
+export async function markImported(tx: AppTransactionClient, batchId: string): Promise<void> {
   await tx.importBatch.update({ where: { id: batchId }, data: { payload: Prisma.DbNull, status: "IMPORTED" } });
 }
 

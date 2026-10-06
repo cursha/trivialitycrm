@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import type { AppTransactionClient } from "@/lib/prisma";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
@@ -12,7 +13,6 @@ import { readContactDataEntries } from "@/lib/research/contact-data";
 import { logInitialPipelineStage } from "@/lib/companies/activity-log";
 import { writeAuditEvent } from "@/lib/audit/log";
 import type { ScoredDuplicateMatch } from "@/lib/duplicates/scored-match";
-import type { Prisma } from "@/generated/prisma/client";
 import type { Weekday } from "@/generated/prisma/enums";
 
 export type CompetitionLocatorSaveResult =
@@ -188,7 +188,7 @@ export async function saveCompetitionLocatorResults(rawPayload: unknown): Promis
 }
 
 async function createCompany(
-  tx: Prisma.TransactionClient,
+  tx: AppTransactionClient,
   userId: string,
   result: {
     competitorId: string | null;
@@ -231,7 +231,7 @@ async function createCompany(
  * existing match). Returns how many were skipped as duplicates.
  */
 async function createContacts(
-  tx: Prisma.TransactionClient,
+  tx: AppTransactionClient,
   companyId: string,
   row: CompetitionLocatorRowDecision,
   existingCompanyId: string | null,

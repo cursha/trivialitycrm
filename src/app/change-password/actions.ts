@@ -29,7 +29,10 @@ export async function changePassword(
 
   const { currentPassword, newPassword } = parsed.data;
 
-  const currentValid = await verifyPassword(currentPassword, user.passwordHash);
+  // requireUser's record never carries the hash (see src/lib/prisma.ts), so
+  // fetch it here, the one place it's needed.
+  const { passwordHash } = await prisma.user.findUniqueOrThrow({ where: { id: user.id }, select: { passwordHash: true } });
+  const currentValid = await verifyPassword(currentPassword, passwordHash);
   if (!currentValid) {
     return { error: "Current password is incorrect." };
   }

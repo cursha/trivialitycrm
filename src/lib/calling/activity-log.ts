@@ -1,5 +1,5 @@
 import "server-only";
-import type { Prisma } from "../../generated/prisma/client";
+import type { AppTransactionClient } from "../prisma";
 
 /**
  * Logs the completed-call Activity inside the caller's transaction —
@@ -10,7 +10,7 @@ import type { Prisma } from "../../generated/prisma/client";
  * has an outcome the way a manual note usually doesn't.
  */
 export async function logCallActivity(
-  tx: Prisma.TransactionClient,
+  tx: AppTransactionClient,
   params: { companyId: string; userId: string; outcomeId: string; outcomeName: string; notes: string | null },
 ) {
   return tx.activity.create({

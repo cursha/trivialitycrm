@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient } from "@/generated/prisma/client";
+import type { AppTransactionClient, AppPrismaClient } from "@/lib/prisma";
 
 /**
  * Resolves a raw provider name (as found by AI research/analysis) to a
@@ -13,7 +13,7 @@ import type { Prisma, PrismaClient } from "@/generated/prisma/client";
  * caught here (Prisma error code P2002) by re-reading the row the other
  * request just inserted, rather than surfacing a spurious failure.
  */
-export async function findOrCreateCompetitor(client: PrismaClient | Prisma.TransactionClient, name: string): Promise<{ id: string; name: string }> {
+export async function findOrCreateCompetitor(client: AppPrismaClient | AppTransactionClient, name: string): Promise<{ id: string; name: string }> {
   const trimmed = name.trim();
   const existing = await client.competitor.findFirst({ where: { name: { equals: trimmed, mode: "insensitive" } } });
   if (existing) return existing;

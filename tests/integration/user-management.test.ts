@@ -125,12 +125,12 @@ describe("resetUserPassword (Reset password)", () => {
     await loginAs(admin.id);
     const targetRole = await createRoleWithPermissions("Salesperson 4", []);
     const target = await createTestUser({ roleId: targetRole.id });
-    const originalHash = target.passwordHash;
+    const { passwordHash: originalHash } = await testPrisma.user.findUniqueOrThrow({ where: { id: target.id }, omit: { passwordHash: false } });
 
     const result = await resetUserPassword(undefined, formDataFrom({ userId: target.id, newPassword: "weak" }));
     expect(result?.error).toBeTruthy();
 
-    const unchanged = await testPrisma.user.findUniqueOrThrow({ where: { id: target.id } });
+    const unchanged = await testPrisma.user.findUniqueOrThrow({ where: { id: target.id }, omit: { passwordHash: false } });
     expect(unchanged.passwordHash).toBe(originalHash);
   });
 

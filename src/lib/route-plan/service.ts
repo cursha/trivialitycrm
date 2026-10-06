@@ -1,4 +1,5 @@
 import "server-only";
+import type { AppTransactionClient } from "@/lib/prisma";
 import { prisma } from "@/lib/prisma";
 import { companyScope } from "@/lib/companies/scope";
 import type { AuthenticatedUser } from "@/lib/auth/current-user";
@@ -24,7 +25,7 @@ export type RouteSummary = {
 const EMPTY_SUMMARY: RouteSummary = { id: null, name: null, plannedDate: null, count: 0, leadTypeId: null, leadTypeName: null, country: null };
 export const DEFAULT_ROUTE_NAME = "My route";
 
-type Db = Prisma.TransactionClient | typeof prisma;
+type Db = AppTransactionClient | typeof prisma;
 
 function isoDate(date: Date | null): string | null {
   return date ? date.toISOString().slice(0, 10) : null;
@@ -44,7 +45,7 @@ async function activeRouteId(db: Db, userId: string): Promise<string | null> {
 
 /** The current route, creating "My route" (and making it current) when the
  * user has none yet — the first "Add to route" just works. */
-async function ensureActiveRoute(tx: Prisma.TransactionClient, userId: string) {
+async function ensureActiveRoute(tx: AppTransactionClient, userId: string) {
   const id = await activeRouteId(tx, userId);
   if (id) return tx.routePlan.findUniqueOrThrow({ where: { id } });
   const route = await tx.routePlan.create({ data: { userId, name: DEFAULT_ROUTE_NAME } });
@@ -54,7 +55,7 @@ async function ensureActiveRoute(tx: Prisma.TransactionClient, userId: string) {
 
 /** A route the user picked by id (must be theirs), or their current route
  * (created if they have none) when no id is given. */
-async function resolveTargetRoute(tx: Prisma.TransactionClient, userId: string, routeId?: string | null) {
+async function resolveTargetRoute(tx: AppTransactionClient, userId: string, routeId?: string | null) {
   if (!routeId) return ensureActiveRoute(tx, userId);
   return tx.routePlan.findFirst({ where: { id: routeId, userId } });
 }
