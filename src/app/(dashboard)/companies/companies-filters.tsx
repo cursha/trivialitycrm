@@ -2,10 +2,16 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useTransition } from "react";
+import clsx from "clsx";
 import { Input, Select } from "@/components/ui/field";
 import { Card } from "@/components/ui/card";
 
 type Option = { id: string; name: string };
+
+/** A filter that's narrowing the list gets a blue ring and bold text, so
+ * it's obvious at a glance which ones are on (Curt's call). A ring, not a
+ * border or background, so it doesn't fight the control's own classes. */
+const ACTIVE_FILTER_CLASS = "font-semibold ring-2 ring-secondary";
 
 export function CompaniesFilters({
   leadTypes,
@@ -37,19 +43,25 @@ export function CompaniesFilters({
     });
   }
 
-  const selectClass = "w-auto";
+  /** Classes for a filter control: highlighted when its value isn't the
+   * one that shows everything. */
+  function filterClass(key: string, showAllValue = "") {
+    const value = searchParams.get(key) ?? showAllValue;
+    return clsx("w-auto", value !== showAllValue && ACTIVE_FILTER_CLASS);
+  }
 
   return (
     <Card className="space-y-3">
       <Input
         type="search"
+        className={clsx(searchParams.get("q") && ACTIVE_FILTER_CLASS)}
         placeholder="Search by name, city, email or phone"
         defaultValue={searchParams.get("q") ?? ""}
         onChange={(event) => updateParam("q", event.target.value)}
       />
       <div className="flex flex-wrap gap-2">
         <Select
-          className={selectClass}
+          className={filterClass("leadTypeId")}
           defaultValue={searchParams.get("leadTypeId") ?? ""}
           onChange={(event) => updateParam("leadTypeId", event.target.value)}
         >
@@ -61,7 +73,7 @@ export function CompaniesFilters({
           ))}
         </Select>
         <Select
-          className={selectClass}
+          className={filterClass("pipelineStageId")}
           defaultValue={searchParams.get("pipelineStageId") ?? ""}
           onChange={(event) => updateParam("pipelineStageId", event.target.value)}
         >
@@ -73,7 +85,7 @@ export function CompaniesFilters({
           ))}
         </Select>
         <Select
-          className={selectClass}
+          className={filterClass("assignedToId")}
           defaultValue={searchParams.get("assignedToId") ?? ""}
           onChange={(event) => updateParam("assignedToId", event.target.value)}
         >
@@ -85,7 +97,7 @@ export function CompaniesFilters({
           ))}
         </Select>
         <Select
-          className={selectClass}
+          className={filterClass("competitorId")}
           defaultValue={searchParams.get("competitorId") ?? ""}
           onChange={(event) => updateParam("competitorId", event.target.value)}
         >
@@ -97,7 +109,7 @@ export function CompaniesFilters({
           ))}
         </Select>
         <Select
-          className={selectClass}
+          className={filterClass("triviaStatus")}
           defaultValue={searchParams.get("triviaStatus") ?? ""}
           onChange={(event) => updateParam("triviaStatus", event.target.value)}
         >
@@ -107,7 +119,7 @@ export function CompaniesFilters({
           <option value="UNCERTAIN">Uncertain</option>
         </Select>
         <Select
-          className={selectClass}
+          className={filterClass("followUp")}
           defaultValue={searchParams.get("followUp") ?? ""}
           onChange={(event) => updateParam("followUp", event.target.value)}
         >
@@ -118,7 +130,7 @@ export function CompaniesFilters({
           <option value="none">No follow-up set</option>
         </Select>
         <Select
-          className={selectClass}
+          className={filterClass("opportunityGrade")}
           defaultValue={searchParams.get("opportunityGrade") ?? ""}
           onChange={(event) => updateParam("opportunityGrade", event.target.value)}
         >
@@ -129,12 +141,12 @@ export function CompaniesFilters({
           <option value="C">C</option>
           <option value="D">D</option>
         </Select>
-        <Select className={selectClass} defaultValue={searchParams.get("sweetSpot") ?? ""} onChange={(event) => updateParam("sweetSpot", event.target.value)}>
+        <Select className={filterClass("sweetSpot")} defaultValue={searchParams.get("sweetSpot") ?? ""} onChange={(event) => updateParam("sweetSpot", event.target.value)}>
           <option value="">Any likelihood</option>
           <option value="1">Sweet spot only</option>
         </Select>
         <Select
-          className={selectClass}
+          className={filterClass("confidenceLevel")}
           defaultValue={searchParams.get("confidenceLevel") ?? ""}
           onChange={(event) => updateParam("confidenceLevel", event.target.value)}
         >
@@ -144,7 +156,7 @@ export function CompaniesFilters({
           <option value="LOW">Low</option>
         </Select>
         <Select
-          className={selectClass}
+          className={filterClass("primaryClassification")}
           defaultValue={searchParams.get("primaryClassification") ?? ""}
           onChange={(event) => updateParam("primaryClassification", event.target.value)}
         >
@@ -156,7 +168,7 @@ export function CompaniesFilters({
           <option value="EXISTING_CUSTOMER">Existing Customer</option>
         </Select>
         <Select
-          className={selectClass}
+          className="w-auto"
           defaultValue={searchParams.get("sortBy") ?? "name"}
           onChange={(event) => updateParam("sortBy", event.target.value)}
         >
@@ -167,7 +179,7 @@ export function CompaniesFilters({
           <option value="createdAt">Sort: Created</option>
         </Select>
         <Select
-          className={selectClass}
+          className="w-auto"
           defaultValue={searchParams.get("sortDir") ?? "asc"}
           onChange={(event) => updateParam("sortDir", event.target.value)}
         >
@@ -175,7 +187,7 @@ export function CompaniesFilters({
           <option value="desc">Descending</option>
         </Select>
         <Select
-          className={selectClass}
+          className={filterClass("status", "ACTIVE")}
           defaultValue={searchParams.get("status") ?? "ACTIVE"}
           onChange={(event) => updateParam("status", event.target.value)}
         >

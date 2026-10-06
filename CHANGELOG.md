@@ -13,6 +13,14 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v7.2 — 2026-10-06
+### Improved — Companies filters show which ones are on
+- On the Companies page, any filter that's narrowing the list (lead type,
+  stage, salesperson, competitor, trivia status, follow-up, grade,
+  likelihood, confidence, classification, Archived, or a search) now has a
+  blue outline and bold text (Curt's call). Filters left on "All"/"Any"
+  look as before, and so do the sort controls.
+
 ## v7.1 — 2026-10-06
 ### Fixed — "Add Selected to Route" now asks which route
 - Bulk-adding from Companies or a Pipeline list used to put every selected
