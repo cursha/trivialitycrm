@@ -206,6 +206,7 @@ export async function recordCallOutcome(
       outcome,
       canChangeStage,
       rejectionReasonId: input.rejectionReasonId ?? null,
+      activityId: activity.id,
     });
 
     await tx.callRecord.create({

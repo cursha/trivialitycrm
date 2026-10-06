@@ -37,3 +37,18 @@ export function toDateTimeInputValue(reference: Date = new Date()): string {
   const minutes = pad(reference.getMinutes());
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
+
+/**
+ * A follow-up's due date from a date input ("YYYY-MM-DD"). Stored at noon
+ * UTC, not `new Date(value)`'s midnight UTC: midnight UTC is the evening
+ * before in North America, so a follow-up picked for Oct 9 displayed as
+ * Oct 8. Noon UTC is the same calendar day from UTC-11 to UTC+11.
+ */
+export function dueDateFromInput(value: string): Date {
+  return new Date(`${value}T12:00:00Z`);
+}
+
+/** Formats a due date for display, matching how dueDateFromInput stores it. */
+export function formatDueDate(value: Date, options: Intl.DateTimeFormatOptions = {}): string {
+  return new Date(value).toLocaleDateString(undefined, { timeZone: "UTC", ...options });
+}

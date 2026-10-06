@@ -36,6 +36,9 @@ export async function applyOutcomeEffects(
     outcome: OutcomeConfig;
     canChangeStage: boolean;
     rejectionReasonId?: string | null;
+    /** The activity this outcome was logged as; its follow-up links to it
+     * so the activity timeline shows the follow-up on that entry. */
+    activityId?: string | null;
     now?: Date;
   },
 ): Promise<{ taskId: string | null; appliedPipelineStageId: string | null }> {
@@ -72,6 +75,7 @@ export async function applyOutcomeEffects(
         assignedToId: company.assignedToId ?? userId,
         title: outcome.defaultNextActionTitle ?? outcome.name,
         dueAt,
+        activityId: params.activityId ?? null,
       },
     });
     taskId = task.id;

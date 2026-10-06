@@ -293,7 +293,10 @@ export async function listCompanyActivities(user: AuthenticatedUser, companyId: 
 
   return prisma.activity.findMany({
     where: { companyId },
-    include: { user: { select: { name: true } } },
+    include: {
+      user: { select: { name: true } },
+      followUps: { select: { id: true, title: true, dueAt: true, status: true }, orderBy: { dueAt: "asc" } },
+    },
     orderBy: { occurredAt: "desc" },
   });
 }

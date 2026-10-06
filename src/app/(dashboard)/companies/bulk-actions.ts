@@ -8,6 +8,7 @@ import { companyScope, canAssignTo } from "@/lib/companies/scope";
 import { logPipelineChange, logAssignmentChange } from "@/lib/companies/activity-log";
 import { TaskSchema } from "@/lib/validation/task";
 import type { Company } from "@/generated/prisma/client";
+import { dueDateFromInput } from "@/lib/dates";
 
 export type BulkActionResult = {
   succeeded: string[];
@@ -169,7 +170,7 @@ export async function bulkCreateFollowUp(
           assignedToId: parsed.data.assignedToId,
           title: parsed.data.title,
           notes: parsed.data.notes ?? null,
-          dueAt: new Date(parsed.data.dueAt),
+          dueAt: dueDateFromInput(parsed.data.dueAt),
         },
       });
       succeeded.push(company.id);

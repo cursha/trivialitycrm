@@ -7,6 +7,7 @@ import { createTask, completeTask, cancelTask } from "./actions";
 import { useQuickActions } from "../quick-action-context";
 import { Card } from "@/components/ui/card";
 import { Input, Select, Textarea } from "@/components/ui/field";
+import { formatDueDate } from "@/lib/dates";
 
 export type TaskRow = {
   id: string;
@@ -185,7 +186,7 @@ export function TasksPanel({
                 <div>
                   <p className="font-semibold text-text">{task.title}</p>
                   <p className="text-xs text-text-muted">
-                    Due {new Date(task.dueAt).toLocaleDateString()} · {task.assignedTo.name}
+                    Due {formatDueDate(task.dueAt)} · {task.assignedTo.name}
                   </p>
                   {task.notes && <p className="mt-1 text-text-muted">{task.notes}</p>}
                 </div>

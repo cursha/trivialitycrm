@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { companyScope } from "@/lib/companies/scope";
 import { TaskSchema } from "@/lib/validation/task";
 import { formString } from "@/lib/form-data";
+import { dueDateFromInput } from "@/lib/dates";
 
 export type TaskActionResult = { error?: string } | undefined;
 
@@ -52,7 +53,7 @@ export async function createTask(
       assignedToId: parsed.data.assignedToId,
       title: parsed.data.title,
       notes: parsed.data.notes ?? null,
-      dueAt: new Date(parsed.data.dueAt),
+      dueAt: dueDateFromInput(parsed.data.dueAt),
     },
   });
 
@@ -88,7 +89,7 @@ export async function completeTask(companyId: string, taskId: string, formData: 
           assignedToId: nextParsed.data.assignedToId,
           title: nextParsed.data.title,
           notes: nextParsed.data.notes ?? null,
-          dueAt: new Date(nextParsed.data.dueAt),
+          dueAt: dueDateFromInput(nextParsed.data.dueAt),
         },
       });
     }

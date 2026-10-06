@@ -5,6 +5,9 @@ developer reference. For deployment/infrastructure topics, see `RAILWAY.md`,
 `ENVIRONMENT_VARIABLES.md`, `MIGRATIONS_AND_SEEDING.md`, `BACKUP_RESTORE.md`,
 and `INCIDENT_RESPONSE.md` instead.
 
+Why the CRM exists, and the sales process it's built around, is at the top
+of the Sales Quick Start: a good process works.
+
 ## First login
 
 Sign in with the administrator account created during setup (see
@@ -133,6 +136,11 @@ steps are in `AGENTS.md`.
   The first account the CRM creates is named "Administrator"; rename it to
   the person's real name. Everything assigned to that user shows the new
   name right away.
+- **Hand a user's work to someone else** (they're leaving, or changing
+  territory): click **Manage** next to them on Settings → Users. It shows
+  how many active companies and open follow-ups they own. Choose a person
+  under **Transfer to…** and click **Transfer**; after you confirm, all of
+  them move at once.
 - Settings → Roles: each role is a named set of permission grants. Duplicate
   an existing role as a starting point rather than building one from scratch.
 - The system prevents removing the last active Administrator — you cannot
@@ -160,6 +168,10 @@ steps are in `AGENTS.md`.
   straight to AI Settings — you don't need to visit Administration just to
   check spend at a glance. It shows "No budget configured" until you set a
   daily or monthly cap.
+- Leads → **Research Prompts**: edit, duplicate, archive/restore, or delete
+  a prompt (the garbage can; it asks you to confirm). Past searches keep
+  their own copy of the prompt they used, so deleting one never changes
+  search history.
 
 ## Email connections (per-user)
 
@@ -195,6 +207,17 @@ Data Quality → Rules/Scans: configure and trigger duplicate-detection scans.
 Reviewing and merging actual duplicate records is available to anyone with the
 right permission, not just administrators — see the in-app Data Quality
 workspace.
+
+How the CRM decides two companies might be the same bar (everywhere it
+checks: adding or editing a company, imports, research results, Competition
+Locator, Pub Lead Finder, and the scan):
+
+- A matching **phone**, **email**, or **street address + postal code** is
+  enough on its own.
+- A matching **name** (or website) only counts when the **city and
+  province/state match** and the street addresses don't conflict. Two
+  locations of the same chain, such as Boston Pizza in Oakville and in
+  Mississauga, are not flagged.
 
 ## Backups
 

@@ -12,6 +12,8 @@ import { applyOutcomeEffects } from "@/lib/companies/outcome-effects";
 import { createAppointment } from "@/lib/comms/appointments";
 import { isValidTimeZone, parseWallClock } from "@/lib/comms/calendar-time";
 import { formatRouteAddress } from "@/lib/route-plan/validation";
+import { ACTIVITY_TYPE_LABELS } from "@/lib/activities/labels";
+import { dueDateFromInput } from "@/lib/dates";
 
 export type ActivityActionResult = { error?: string } | undefined;
 
@@ -38,24 +40,48 @@ export async function createActivity(
     occurredAt: formString(formData, "occurredAt"),
     notes: formString(formData, "notes"),
     outcome: formString(formData, "outcome"),
+    followUpAt: formString(formData, "followUpAt"),
+    followUpTitle: formString(formData, "followUpTitle"),
   });
 
   if (!parsed.success) {
     return { error: parsed.error.issues[0]?.message ?? "Please correct the highlighted fields." };
   }
+  const input = parsed.data;
 
-  await prisma.activity.create({
-    data: {
-      companyId,
-      userId: user.id,
-      type: parsed.data.type,
-      occurredAt: parsed.data.occurredAt ? new Date(parsed.data.occurredAt) : undefined,
-      notes: parsed.data.notes ?? null,
-      outcome: parsed.data.outcome ?? null,
-    },
+  // The activity and its follow-up (if a date was given) commit together.
+  // The follow-up goes to the company's owner, like an outcome's automatic
+  // follow-up, falling back to whoever logged the activity.
+  await prisma.$transaction(async (tx) => {
+    const activity = await tx.activity.create({
+      data: {
+        companyId,
+        userId: user.id,
+        type: input.type,
+        occurredAt: input.occurredAt ? new Date(input.occurredAt) : undefined,
+        notes: input.notes ?? null,
+        outcome: input.outcome ?? null,
+      },
+    });
+
+    if (input.followUpAt) {
+      await tx.task.create({
+        data: {
+          companyId,
+          assignedToId: company.assignedToId ?? user.id,
+          title: input.followUpTitle ?? `Follow up: ${ACTIVITY_TYPE_LABELS[input.type] ?? input.type}`,
+          dueAt: dueDateFromInput(input.followUpAt),
+          activityId: activity.id,
+        },
+      });
+    }
   });
 
   revalidatePath(`/companies/${companyId}`);
+  if (input.followUpAt) {
+    revalidatePath("/follow-ups");
+    revalidatePath("/my-day");
+  }
 }
 
 export type LogVisitResult = { error: string } | { ok: true; demoBooked: boolean; inviteSent: boolean; warning?: string };
@@ -152,7 +178,7 @@ export async function logVisit(companyId: string, formData: FormData): Promise<L
   };
 
   await prisma.$transaction(async (tx) => {
-    await tx.activity.create({
+    const activity = await tx.activity.create({
       data: {
         companyId,
         userId: user.id,
@@ -170,6 +196,7 @@ export async function logVisit(companyId: string, formData: FormData): Promise<L
       outcome,
       canChangeStage: true,
       rejectionReasonId: input.rejectionReasonId ?? null,
+      activityId: activity.id,
     });
 
     if (Object.keys(intel).length > 0) {

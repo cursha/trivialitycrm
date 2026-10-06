@@ -4,6 +4,29 @@ No technical background required. If something in the CRM ever asks you to
 paste in a password, an API key, or a database link, stop and ask your
 administrator — that should never happen.
 
+## Why Triviality CRM exists
+
+**A good process works. There is no doubt.**
+
+Triviality is a self-running trivia game for bars and pubs, played on the
+bar's own TVs. We sell it one bar at a time: in person nearby (Local), and
+by phone, email and video further away (Long-distance).
+
+Selling that way works when the same good steps happen for every bar, every
+time: find the right bar, introduce it, demo it, trial it, win it, and
+follow up at each step without fail. Triviality CRM exists to make that
+process the easy thing to do:
+
+- **The right bars.** Research tools and the Entertainment Opportunity
+  Score (EOS) point you to the bars most likely to buy: the *sweet spot*.
+- **The next step, every time.** Every bar sits at a step in the sales
+  process (Target → Introduced → Demo → Trial → Won), and My Day shows what
+  is waiting for you today.
+- **No missed follow-ups.** Follow-ups are created for you as a bar moves
+  along, and anything overdue is flagged.
+
+Follow the process and the results follow.
+
 ## Signing in
 
 Use the email and password your administrator set up for you. If you're
@@ -205,6 +228,13 @@ On any company's page:
   contacts anyone or changes the pipeline stage on its own. It's a suggestion,
   not an automation.
 - **Activity timeline**: everything logged on this company, in order.
+  When you **Log activity**, you can set **Follow up on** to a date (and,
+  if you like, a title) right in the same form. The follow-up shows on that
+  entry in the timeline ("Follow-up Thu, Oct 9: Follow up: Phone call"),
+  turns red when it's overdue, and is crossed out once it's done. It also
+  appears on My Day and the Follow-ups page like any other follow-up.
+  Visit and call outcomes that create a follow-up show it on their entry
+  the same way.
 - **Follow-ups**: schedule, complete, or cancel. Completing one can prompt you
   to schedule the next one right away, so a lead never quietly falls through
   the cracks between visits.

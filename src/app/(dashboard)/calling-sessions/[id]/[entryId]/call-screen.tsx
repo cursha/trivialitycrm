@@ -11,6 +11,7 @@ import { Alert } from "@/components/ui/alert";
 import { CONFIDENCE_LABEL, CONFIDENCE_TONE, TRIVIA_STATUS_LABEL } from "@/lib/ui/status-tones";
 import { describeDefaultAction, type CallOutcomeLike } from "@/lib/calling/outcome-preview";
 import { recordCallOutcome, skipEntryTemporarily, skipEntryPermanently, pauseCallingSession, endCallingSession, goToNextEntryOrSummary } from "../../actions";
+import { formatDueDate } from "@/lib/dates";
 
 type Contact = { id: string; firstName: string; lastName: string; title: string | null; phone: string | null; email: string | null };
 type Activity = { id: string; type: string; occurredAt: Date; notes: string | null; outcome: string | null };
@@ -211,7 +212,7 @@ export function CallScreen({
             <ul className="mt-1 space-y-1 text-sm text-text">
               {company.tasks.map((t) => (
                 <li key={t.id}>
-                  {t.title} — due {new Date(t.dueAt).toLocaleDateString()}
+                  {t.title} — due {formatDueDate(t.dueAt)}
                 </li>
               ))}
               {company.tasks.length === 0 && <li className="text-text-muted">None.</li>}

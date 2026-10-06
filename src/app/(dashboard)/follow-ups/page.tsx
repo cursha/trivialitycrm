@@ -10,6 +10,7 @@ import {
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import clsx from "clsx";
+import { formatDueDate } from "@/lib/dates";
 
 export const metadata = { title: "Follow-Ups — Triviality CRM" };
 
@@ -98,7 +99,7 @@ async function TaskView({ user, view }: { user: Awaited<ReturnType<typeof requir
               <td className="px-5 py-4">
                 {view === "completed"
                   ? task.completedAt && new Date(task.completedAt).toLocaleDateString()
-                  : new Date(task.dueAt).toLocaleDateString()}
+                  : formatDueDate(task.dueAt)}
               </td>
             </tr>
           ))}

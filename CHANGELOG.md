@@ -13,6 +13,29 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v6.0 — 2026-10-06
+### Added — follow-up date when logging an activity
+- **Log activity** on a company page has an optional **Follow up on** date
+  and title (Curt's call: optional). It creates the follow-up together with
+  the activity, for the bar's owner, so there's no separate step afterwards.
+- The **activity timeline** shows each follow-up on the entry it came from,
+  with its date and title: red when overdue, crossed out when done or
+  cancelled. Follow-ups created by visit and call outcomes show there too.
+  Follow-ups made before this release aren't linked, so older entries don't
+  show one.
+### Fixed — follow-up dates showed a day early
+- A follow-up picked for Oct 9 was saved as midnight UTC, which is the
+  evening of Oct 8 in Toronto and Colorado Springs, so it showed as Oct 8.
+  New follow-up dates are saved at midday so they show on the day picked,
+  and the follow-up lists show dates the same way.
+### User manual
+- Sales Quick Start: a "Why Triviality CRM exists" section up front (a good
+  process works; Curt's words), and the follow-up date on Log activity.
+- Admin Guide: transferring a user's companies and follow-ups (Manage),
+  deleting research prompts, and how duplicate companies are matched.
+- Database: migration 20261006100244_activity_follow_up (adds an optional
+  link from a follow-up to its activity; applies on deploy).
+
 ## v5.1 — 2026-10-06
 ### Fixed — password hashes no longer reach the browser
 - Company pages loaded the full user record of whoever logged an activity

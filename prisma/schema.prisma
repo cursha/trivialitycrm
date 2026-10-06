@@ -1177,6 +1177,10 @@ model Activity {
   callOutcomeId String?
   callOutcome   CallOutcome? @relation(fields: [callOutcomeId], references: [id], onDelete: SetNull)
 
+  // Follow-ups scheduled when this activity was logged, shown on its entry
+  // in the company's activity timeline (see Task.activityId).
+  followUps Task[]
+
   @@index([callOutcomeId])
 }
 
@@ -1195,6 +1199,15 @@ model Task {
   updatedAt    DateTime   @updatedAt
 
   callRecord CallRecord?
+
+  // The logged activity (call, visit, meeting…) this follow-up was
+  // scheduled from, so the timeline can show it on that entry. Null for
+  // follow-ups created on their own. SetNull so removing an activity never
+  // removes a follow-up.
+  activityId String?
+  activity   Activity? @relation(fields: [activityId], references: [id], onDelete: SetNull)
+
+  @@index([activityId])
 }
 
 model PromptTemplate {
