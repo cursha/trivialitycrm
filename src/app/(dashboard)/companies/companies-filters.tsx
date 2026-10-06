@@ -8,10 +8,11 @@ import { Card } from "@/components/ui/card";
 
 type Option = { id: string; name: string };
 
-/** A filter that's narrowing the list gets a blue ring and bold text, so
- * it's obvious at a glance which ones are on (Curt's call). A ring, not a
- * border or background, so it doesn't fight the control's own classes. */
-const ACTIVE_FILTER_CLASS = "font-semibold ring-2 ring-secondary";
+/** A filter that's narrowing the list gets a red ring, light red shading
+ * and bold text, so it's obvious at a glance which ones are on (Curt's
+ * call). A ring rather than a border, so it doesn't fight the control's own
+ * border; the shading needs `!` to beat the control's own background. */
+const ACTIVE_FILTER_CLASS = "font-semibold ring-2 ring-primary bg-primary/10!";
 
 export function CompaniesFilters({
   leadTypes,

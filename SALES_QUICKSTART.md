@@ -71,8 +71,9 @@ The search icon in the header searches companies, contacts, and competitors
 at once — type at least 2 characters. Results are grouped by type; use the
 arrow keys and Enter to jump straight to one without touching the mouse.
 
-On the **Companies** list, any filter that's narrowing the list has a blue
-outline, so you can see at a glance which ones are on. Set it back to
+On the **Companies** list, any filter that's narrowing the list is shaded
+light red with a red outline, so you can see at a glance which ones are
+on. Set it back to
 "All…" or "Any…" to turn it off.
 
 ## Adding something quickly
