@@ -38,13 +38,13 @@ describe("buildCompanyWhere — Sales Lists filter extensions", () => {
   it("never-contacted-only excludes companies with any contact-type activity", () => {
     const result = clauses({ neverContactedOnly: true });
     expect(result).toContainEqual({
-      activities: { none: { type: { in: ["PHONE", "EMAIL", "MEETING", "MATERIAL_SENT", "DEMO", "TRIAL"] } } },
+      activities: { none: { type: { in: ["PHONE", "EMAIL", "MEETING", "VISIT", "MATERIAL_SENT", "DEMO", "TRIAL"] } } },
     });
   });
 
   it("last-contacted-before requires a contact history AND that the most recent one predates the cutoff", () => {
     const result = clauses({ lastContactedBefore: "2026-01-01" });
-    const contactTypes = ["PHONE", "EMAIL", "MEETING", "MATERIAL_SENT", "DEMO", "TRIAL"];
+    const contactTypes = ["PHONE", "EMAIL", "MEETING", "VISIT", "MATERIAL_SENT", "DEMO", "TRIAL"];
     expect(result).toContainEqual({ activities: { some: { type: { in: contactTypes } } } });
     expect(result).toContainEqual({
       activities: { none: { type: { in: contactTypes }, occurredAt: { gte: new Date("2026-01-01") } } },

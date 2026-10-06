@@ -44,9 +44,15 @@ describe("chains and the sweet-spot filter", () => {
     const user = await createTestUser({ roleId: role.id });
     const leadType = await createLeadTypeFixture();
     const stage = await createPipelineStageFixture();
-    const make = async (name: string, data: Partial<LikelihoodFields> & { city?: string } = {}) => {
+    type MakeData = {
+      city?: string;
+      eosScore?: number | null;
+      hasTvs?: boolean | null;
+      triviaStatus?: "CURRENT_TRIVIA" | "NO_CURRENT_TRIVIA" | "UNCERTAIN";
+    };
+    const make = async (name: string, data: MakeData = {}) => {
       const { city, ...rest } = data;
-      const company = await createCompanyFixture({ name, city, leadTypeId: leadType.id, pipelineStageId: stage.id, createdById: user.id });
+      const company = await createCompanyFixture({ name, city, leadTypeId: leadType.id, pipelineStageId: stage.id, assignedToId: null, createdById: user.id });
       return testPrisma.company.update({ where: { id: company.id }, data: { eosScore: 70, ...rest } });
     };
 
