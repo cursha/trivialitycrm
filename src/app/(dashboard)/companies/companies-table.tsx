@@ -40,6 +40,7 @@ export function CompaniesTable({
   canBulk,
   canRoutePlan,
   routeCompanyIds,
+  sweetSpotIds,
 }: {
   companies: CompanyRow[];
   stages: StageOption[];
@@ -52,7 +53,10 @@ export function CompaniesTable({
    * bulk-action page-selection checkbox never means, and must never be
    * confused with, "already in route"). */
   routeCompanyIds: string[];
+  /** Companies in the sweet spot (most likely to buy). */
+  sweetSpotIds: string[];
 }) {
+  const sweetSpot = new Set(sweetSpotIds);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const inRoute = new Set(routeCompanyIds);
   const allSelected = companies.length > 0 && companies.every((c) => selected.has(c.id));
@@ -142,6 +146,11 @@ export function CompaniesTable({
                       ) : (
                         <span className="text-text-muted">—</span>
                       )}
+                      {sweetSpot.has(company.id) && (
+                        <Badge tone="success" title="Most likely to buy: independent, no hosted trivia, EOS 60-89">
+                          Sweet spot
+                        </Badge>
+                      )}
                       {company.needsReview && <Badge tone="warning">Needs review</Badge>}
                     </div>
                   </td>
@@ -208,6 +217,7 @@ export function CompaniesTable({
                       <dt className="text-text-muted">EOS grade</dt>
                       <dd className="flex flex-wrap items-center gap-1 font-medium text-text">
                         {company.opportunityGrade ? GRADE_LABEL[company.opportunityGrade] : "—"}
+                        {sweetSpot.has(company.id) && <Badge tone="success">Sweet spot</Badge>}
                         {company.needsReview && <Badge tone="warning">Needs review</Badge>}
                       </dd>
                     </div>

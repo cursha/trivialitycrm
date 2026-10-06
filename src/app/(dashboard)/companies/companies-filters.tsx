@@ -129,6 +129,10 @@ export function CompaniesFilters({
           <option value="C">C</option>
           <option value="D">D</option>
         </Select>
+        <Select className={selectClass} defaultValue={searchParams.get("sweetSpot") ?? ""} onChange={(event) => updateParam("sweetSpot", event.target.value)}>
+          <option value="">Any likelihood</option>
+          <option value="1">Sweet spot only</option>
+        </Select>
         <Select
           className={selectClass}
           defaultValue={searchParams.get("confidenceLevel") ?? ""}

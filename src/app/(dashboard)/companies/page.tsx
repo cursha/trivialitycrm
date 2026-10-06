@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { CirclePlus } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { assessLikelihood, getChainNames, sweetSpotWhere } from "@/lib/companies/sweet-spot";
 import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
 import { listCompanies, PAGE_SIZE } from "./queries";
@@ -30,6 +31,10 @@ export default async function CompaniesPage({
 
   const canRoutePlan = hasPermission(user, "manage_route_plan");
 
+  // Sweet spot: the bars most likely to buy (see src/lib/companies/sweet-spot.ts).
+  const chainNames = await getChainNames();
+  const sweetSpotOnly = toSingle(params.sweetSpot) === "1";
+
   const [{ companies, total, pageCount }, leadTypes, pipelineStages, allPipelineStages, competitors, salespeople, territories, routeCompanyIds] =
     await Promise.all([
       listCompanies(user, {
@@ -46,6 +51,7 @@ export default async function CompaniesPage({
         confidenceLevel: toSingle(params.confidenceLevel),
         primaryClassification: toSingle(params.primaryClassification),
         followUp: toSingle(params.followUp),
+        ...(sweetSpotOnly ? { sweetSpotWhere: sweetSpotWhere(chainNames) } : {}),
         status: statusParam,
         sortBy: toSingle(params.sortBy),
         sortDir: toSingle(params.sortDir),
@@ -119,6 +125,7 @@ export default async function CompaniesPage({
         territories={territories.map((t) => ({ id: t.id, name: t.name ?? [t.city, t.region, t.country].filter(Boolean).join(", ") }))}
         canBulk={canBulk}
         canRoutePlan={canRoutePlan}
+        sweetSpotIds={companies.filter((company) => assessLikelihood(company, chainNames).sweetSpot).map((company) => company.id)}
         routeCompanyIds={Array.from(routeCompanyIds)}
       />
 

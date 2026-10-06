@@ -133,6 +133,24 @@ presence, and how ready the bar is to run trivia.
 - **History is kept:** a new score never replaces the old one, so you can
   see how a bar's score has changed.
 
+## The sweet spot
+
+A higher EOS doesn't always mean a likelier sale. The very best trivia
+venues usually buy hosted trivia, or head office decides for them. Our
+**sweet spot** is the independent bar with a good, not perfect, score. A
+bar gets the green **Sweet spot** badge when it's:
+
+- **Independent**: not a chain (a name at 3 or more locations in the CRM
+  counts as a chain)
+- **Not running hosted trivia** now
+- **Not confirmed to have no TVs**
+- **EOS 60 to 89**
+
+Every other bar is still worth working, just less likely. Its score card
+says why (a chain, already runs trivia, a top-scoring venue, under 60, or
+not scored yet). Use **Sweet spot only** on the Companies list to build a
+route or call list, and on My Day sweet-spot bars are listed first.
+
 ## Route plans
 
 Keep a route for each day or area, for example **Mississauga** today,
@@ -308,7 +326,7 @@ mobile, that's worth flagging — it's not intentional.
 
 ## Which version am I on?
 
-The version number is at the foot of the sidebar (for example **v4.1**).
+The version number is at the foot of the sidebar (for example **v5.0**).
 Each update to the CRM gets a new number; what changed in each one is in
 the changelog your administrator keeps.
 

@@ -75,6 +75,11 @@ function CompanyList({
                 {" "}
                 · {company.city}, {company.region} · {SALES_TRACK_LABELS[company.salesTrack]}
               </span>
+              {company.sweetSpot && (
+                <Badge tone="success" className="ml-2" title="Most likely to buy: independent, no hosted trivia, EOS 60-89">
+                  Sweet spot
+                </Badge>
+              )}
               {company.note && <p className="text-xs text-amber-700">{company.note}</p>}
             </div>
             {routeToggle && (

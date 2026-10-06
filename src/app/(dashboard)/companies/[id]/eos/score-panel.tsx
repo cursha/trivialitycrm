@@ -83,6 +83,7 @@ function CategoryBreakdown({ scores }: { scores: Record<keyof typeof EOS_CATEGOR
 }
 
 export function ScorePanel({
+  likelihood,
   companyId,
   companyName,
   summary,
@@ -90,6 +91,8 @@ export function ScorePanel({
   canEdit,
   canAnalyze,
 }: {
+  /** Sweet spot, or why this bar is less likely (never a no). */
+  likelihood: { sweetSpot: boolean; lessLikelyBecause: string[] };
   companyId: string;
   companyName: string;
   summary: CompanySummary;
@@ -213,6 +216,24 @@ export function ScorePanel({
           </div>
         </Alert>
       )}
+
+      <div className="mt-3 rounded-lg border border-border p-3 text-sm">
+        {likelihood.sweetSpot ? (
+          <p>
+            <Badge tone="success">Sweet spot</Badge>
+            <span className="ml-2 text-text">Most likely to buy: independent, no hosted trivia, EOS in the 60-89 range.</span>
+          </p>
+        ) : (
+          <div>
+            <p className="font-semibold text-text">Less likely, still worth working:</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5 text-text-muted">
+              {likelihood.lessLikelyBecause.map((reason) => (
+                <li key={reason}>{reason}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
 
       {summary.eosScore === null ? (
         <p className="mt-3 text-sm text-text-muted">No score recorded yet.</p>

@@ -6,6 +6,7 @@ import { companyScope, taskScope } from "@/lib/companies/scope";
 import { getAllRoutedCompanyIds, getRouteSummary, listRoutes, type RouteListItem } from "@/lib/route-plan/service";
 import { getRepScores, repTimeZone, type RepScore } from "@/lib/sales/scoreboard";
 import { zonedDayRange } from "@/lib/timezone";
+import { assessLikelihood, getChainNames } from "@/lib/companies/sweet-spot";
 import type { SalesStep, SalesTrack } from "@/generated/prisma/enums";
 
 /** How many companies each My Day step lists before "and N more". */
@@ -13,7 +14,7 @@ const LIST_LIMIT = 8;
 /** How many Target bars are checked for missing info (the step lists the first few). */
 const INFO_SCAN_LIMIT = 200;
 
-export type MyDayCompany = { id: string; name: string; city: string; region: string; salesTrack: SalesTrack; note?: string };
+export type MyDayCompany = { id: string; name: string; city: string; region: string; salesTrack: SalesTrack; note?: string; sweetSpot?: boolean };
 export type MyDayTask = { id: string; title: string; dueAt: Date; overdue: boolean; company: { id: string; name: string } };
 export type MyDayAppointment = { id: string; title: string; startAt: Date; timezone: string; company: { id: string; name: string } };
 
@@ -34,6 +35,14 @@ export type MyDayData = {
 };
 
 const companySelect = { id: true, name: true, city: true, region: true, salesTrack: true } as const;
+const likelihoodSelect = {
+  normalizedName: true,
+  eosScore: true,
+  hasTvs: true,
+  triviaStatus: true,
+  competitorId: true,
+  competitorTriviaProvider: true,
+} as const;
 
 /**
  * Everything the My Day page needs for one rep: the bars assigned to them
@@ -64,6 +73,7 @@ export async function getMyDay(user: AuthenticatedUser & { timezone?: string | n
         take: INFO_SCAN_LIMIT,
         select: {
           ...companySelect,
+          ...likelihoodSelect,
           triviaHistory: true,
           contacts: { where: { status: "ACTIVE" }, select: { phone: true, email: true } },
         },
@@ -73,7 +83,7 @@ export async function getMyDay(user: AuthenticatedUser & { timezone?: string | n
       canRoute ? listRoutes(user.id) : Promise.resolve([] as RouteListItem[]),
       prisma.activity.count({ where: { userId: user.id, type: "VISIT", occurredAt: { gte: today.start, lt: today.end } } }),
       prisma.company.count({ where: atStep("INTRODUCED") }),
-      prisma.company.findMany({ where: atStep("INTRODUCED"), orderBy: { updatedAt: "asc" }, take: LIST_LIMIT, select: companySelect }),
+      prisma.company.findMany({ where: atStep("INTRODUCED"), orderBy: { updatedAt: "asc" }, take: LIST_LIMIT, select: { ...companySelect, ...likelihoodSelect } }),
       prisma.task.count({ where: { AND: [tScope, { assignedToId: user.id, status: "OPEN", dueAt: { lt: today.end } }] } }),
       prisma.task.findMany({
         where: { AND: [tScope, { assignedToId: user.id, status: "OPEN", dueAt: { lt: today.end } }] },
@@ -95,27 +105,39 @@ export async function getMyDay(user: AuthenticatedUser & { timezone?: string | n
       prisma.company.findMany({ where: atStep("TRIAL_LIVE"), orderBy: { updatedAt: "asc" }, select: companySelect }),
       getRepScores([user.id], now),
     ]);
+  const chainNames = await getChainNames();
+  const withLikelihood = <T extends MyDayCompany & Parameters<typeof assessLikelihood>[0]>(company: T): MyDayCompany => ({
+    id: company.id,
+    name: company.name,
+    city: company.city,
+    region: company.region,
+    salesTrack: company.salesTrack,
+    note: company.note,
+    sweetSpot: assessLikelihood(company, chainNames).sweetSpot,
+  });
+  // Sweet-spot bars first (most likely to buy), keeping the order otherwise.
+  const sweetFirst = (companies: MyDayCompany[]) => [...companies].sort((a, b) => Number(b.sweetSpot ?? false) - Number(a.sweetSpot ?? false));
 
-  const needInfoAll = targets.flatMap(({ triviaHistory, contacts, ...company }) => {
+  const needInfoAll = targets.flatMap(({ triviaHistory, contacts, ...company }): MyDayCompany[] => {
     const missing: string[] = [];
     if (!contacts.some((contact) => contact.phone || contact.email)) missing.push("manager contact");
     if (!triviaHistory?.trim()) missing.push("trivia history");
-    return missing.length > 0 ? [{ ...company, note: `Missing ${missing.join(" and ")}` }] : [];
+    return missing.length > 0 ? [withLikelihood({ ...company, note: `Missing ${missing.join(" and ")}` })] : [];
   });
 
-  const readyAll = targets.filter((company) => company.salesTrack === "LOCAL" && !routeIds.has(company.id));
+  const readyAll = sweetFirst(targets.filter((company) => company.salesTrack === "LOCAL" && !routeIds.has(company.id)).map(withLikelihood));
 
   return {
     timezone,
-    needInfo: { companies: needInfoAll.slice(0, LIST_LIMIT), total: needInfoAll.length },
+    needInfo: { companies: sweetFirst(needInfoAll).slice(0, LIST_LIMIT), total: needInfoAll.length },
     readyToVisit: canRoute
-      ? { companies: readyAll.slice(0, LIST_LIMIT).map(({ id, name, city, region, salesTrack }) => ({ id, name, city, region, salesTrack })), total: readyAll.length }
+      ? { companies: readyAll.slice(0, LIST_LIMIT), total: readyAll.length }
       : null,
     routes,
     routeCount: routeSummary?.count ?? null,
     routeName: routeSummary?.name ?? null,
     visitsToday,
-    introduced: { companies: introduced, total: introducedTotal },
+    introduced: { companies: sweetFirst(introduced.map(withLikelihood)), total: introducedTotal },
     tasks: { items: tasks.map((task) => ({ ...task, overdue: task.dueAt < today.start })), total: tasksTotal },
     demosToday: demos,
     trials: { booked: trialsBooked, live: trialsLive },

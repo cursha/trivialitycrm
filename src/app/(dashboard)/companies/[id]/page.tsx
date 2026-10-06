@@ -16,6 +16,7 @@ import { ContactsPanel } from "./contacts/contacts-panel";
 import { ActivityPanel } from "./activities/activity-panel";
 import { TasksPanel } from "./tasks/tasks-panel";
 import { ScorePanel } from "./eos/score-panel";
+import { assessLikelihood, getChainNames } from "@/lib/companies/sweet-spot";
 import { EvidencePanel } from "./eos/evidence-panel";
 import { EmailPanel } from "./email/email-panel";
 import { SequenceEnrollmentPanel } from "./sequences/sequence-enrollment-panel";
@@ -158,6 +159,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const hasMailbox = connection?.status === "CONNECTED";
   const canEdit = hasPermission(user, "edit_leads");
   const canLogVisit = canEdit && company.status === "ACTIVE";
+  const likelihood = assessLikelihood(company, await getChainNames());
 
   // The sales process: the active stages tagged as process steps, in order.
   const processSteps: ProcessStepView[] = pipelineStages.flatMap((stage) =>
@@ -342,6 +344,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               companyId={company.id}
               companyName={company.name}
               summary={company}
+              likelihood={likelihood}
               history={scoreHistory}
               canEdit={canEdit}
               canAnalyze={canAnalyzeOpportunity}

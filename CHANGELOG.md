@@ -13,6 +13,18 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v5.0 — 2026-10-05
+### Added — the sweet spot
+- A green **Sweet spot** badge marks the bars most likely to buy: an
+  independent bar (not a chain at 3+ locations in the CRM), no hosted
+  trivia now, TVs not ruled out, and an EOS of 60 to 89. The very best
+  trivia venues usually buy hosted trivia or follow head office, so the
+  sweet spot is the good-but-not-perfect independent bar (Curt's call).
+- Nothing is ruled out: every other bar's score card shows "Less likely,
+  still worth working" with the reasons.
+- **Sweet spot only** filter on the Companies list; My Day lists
+  sweet-spot bars first in Steps 2 to 4, with the badge.
+
 ## v4.1 — 2026-10-05
 ### Added — EOS spelled out
 - EOS now reads as the **Entertainment Opportunity Score** (Curt's call):

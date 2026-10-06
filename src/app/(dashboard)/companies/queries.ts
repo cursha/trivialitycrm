@@ -50,6 +50,8 @@ export type CompanyListParams = {
    * this is the same idea, applied to the shared company-list builder). */
   scoreMin?: number;
   scoreMax?: number;
+  /** "Sweet spot only" — the clause from sweetSpotWhere() (src/lib/companies/sweet-spot.ts). */
+  sweetSpotWhere?: Prisma.CompanyWhereInput;
   /** ISO "YYYY-MM-DD" creation-date range. Same dormant-since-Module-Four
    * story as scoreMin/scoreMax above. */
   createdFrom?: string;
@@ -170,6 +172,7 @@ export function buildCompanyWhere(user: AuthenticatedUser, params: CompanyListPa
 
   if (params.scoreMin !== undefined) filters.push({ eosScore: { gte: params.scoreMin } });
   if (params.scoreMax !== undefined) filters.push({ eosScore: { lte: params.scoreMax } });
+  if (params.sweetSpotWhere) filters.push(params.sweetSpotWhere);
   if (params.createdFrom) filters.push({ createdAt: { gte: new Date(params.createdFrom) } });
   if (params.createdTo) filters.push({ createdAt: { lte: new Date(params.createdTo) } });
 
