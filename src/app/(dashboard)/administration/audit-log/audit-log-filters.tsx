@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input, Select, Label } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { exportAuditLog } from "./actions";
+import { saveBlob } from "@/lib/download/save-blob";
 
 export type CurrentFilters = {
   from?: string;
@@ -20,15 +21,7 @@ export type CurrentFilters = {
 };
 
 function downloadCsv(csv: string) {
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `audit-log-${new Date().toISOString().slice(0, 10)}.csv`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  saveBlob(new Blob([csv], { type: "text/csv;charset=utf-8;" }), `audit-log-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
 export function AuditLogFilters({

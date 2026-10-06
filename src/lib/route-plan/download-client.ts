@@ -7,6 +7,8 @@
 // as "the server successfully generated and returned the CSV response,"
 // not a browser download-completion event, since browsers don't reliably
 // report the latter.
+import { saveBlob } from "@/lib/download/save-blob";
+
 export type DownloadRoutePlanResult = { ok: true } | { ok: false; error: string };
 
 export async function downloadRoutePlanCsv(): Promise<DownloadRoutePlanResult> {
@@ -20,15 +22,7 @@ export async function downloadRoutePlanCsv(): Promise<DownloadRoutePlanResult> {
   const filenameMatch = /filename="([^"]+)"/.exec(disposition);
   const filename = filenameMatch?.[1] ?? "route.csv";
 
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  saveBlob(await response.blob(), filename);
 
   return { ok: true };
 }

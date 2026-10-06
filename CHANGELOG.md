@@ -13,6 +13,15 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v8.1 — 2026-10-06
+### Fixed — route export download on phones
+- Exporting a route on an Android phone left a greyed-out download that
+  wouldn't open (Curt hit it). The app let go of the file the instant the
+  download started, before the phone's browser had saved it; it now holds
+  on for a minute. Same fix for the Audit Log's CSV export.
+- Sales Quick Start: "Route plans" says where the file lands on Android and
+  iPhone.
+
 ## v8.0 — 2026-10-06
 ### Added — "Why this grade" on the sales analysis
 - The opportunity analysis now explains the grade it gave (Curt's call).

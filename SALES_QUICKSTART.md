@@ -203,7 +203,11 @@ alone; nobody else sees or changes them.
   switch to it, use **New route** to start another, and rename, change the
   day of, or delete the route you're looking at.
 - **Export** the route you're looking at to EZRoutePlanner to put the stops
-  in order. The file is named after the route and its day.
+  in order. The file is named after the route and its day. On a phone it
+  goes to your downloads: on Android, tap the "Download complete"
+  notification or open **Files → Downloads**; on iPhone, tap the download
+  arrow in Safari's address bar or open **Files → Downloads**. Share or
+  open it into EZRoutePlanner from there.
 - **Add several bars at once** from the Companies list or a Pipeline list:
   tick them, click **Add Selected to Route**, then pick the route (your
   current one is chosen for you) or **+ New route…**, and click **Add**.
