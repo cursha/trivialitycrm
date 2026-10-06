@@ -73,8 +73,10 @@ arrow keys and Enter to jump straight to one without touching the mouse.
 
 On the **Companies** list, any filter that's narrowing the list is shaded
 light red with a red outline, so you can see at a glance which ones are
-on. Set it back to
-"All…" or "Any…" to turn it off.
+on. Set it back to "All…" or "Any…" to turn it off. The sort controls
+light up the same way when you've changed them from Name, Ascending.
+Sorting by EOS score or follow-up date always lists bars without one
+last, so pick **Descending** to see the highest scores first.
 
 ## Adding something quickly
 

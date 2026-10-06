@@ -44,8 +44,8 @@ export function CompaniesFilters({
     });
   }
 
-  /** Classes for a filter control: highlighted when its value isn't the
-   * one that shows everything. */
+  /** Classes for a filter or sort control: highlighted when its value isn't
+   * the default (show everything; sort by name, ascending). */
   function filterClass(key: string, showAllValue = "") {
     const value = searchParams.get(key) ?? showAllValue;
     return clsx("w-auto", value !== showAllValue && ACTIVE_FILTER_CLASS);
@@ -169,7 +169,7 @@ export function CompaniesFilters({
           <option value="EXISTING_CUSTOMER">Existing Customer</option>
         </Select>
         <Select
-          className="w-auto"
+          className={filterClass("sortBy", "name")}
           defaultValue={searchParams.get("sortBy") ?? "name"}
           onChange={(event) => updateParam("sortBy", event.target.value)}
         >
@@ -180,7 +180,7 @@ export function CompaniesFilters({
           <option value="createdAt">Sort: Created</option>
         </Select>
         <Select
-          className="w-auto"
+          className={filterClass("sortDir", "asc")}
           defaultValue={searchParams.get("sortDir") ?? "asc"}
           onChange={(event) => updateParam("sortDir", event.target.value)}
         >

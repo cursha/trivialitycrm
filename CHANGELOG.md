@@ -13,6 +13,18 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v7.5 — 2026-10-06
+### Fixed — Companies sort
+- Sorting by **EOS score** or **Follow-up date** looked broken (Curt
+  spotted it): on Descending, the database listed every bar without a
+  score or follow-up first, so the first pages were all "—". Bars without
+  one now always come last, in either direction.
+- Bars that tie (same city, same score, imported at the same time) are now
+  ordered by name, so the order is stable and paging no longer repeats or
+  skips a bar.
+- The sort controls now get the red highlight too when changed from Name,
+  Ascending (Curt's call). Sales Quick Start updated.
+
 ## v7.4 — 2026-10-06
 ### Improved — active Companies filters are red and shaded
 - Filters that are on now have a red outline (was blue in v7.2) and light

@@ -97,6 +97,23 @@ export const SORTABLE_FIELDS_LIST = [
 ] as const;
 const SORTABLE_FIELDS = new Set<string>(SORTABLE_FIELDS_LIST);
 
+/** Sortable fields a company can have empty (unscored, no follow-up). */
+const NULLABLE_SORT_FIELDS = new Set<string>(["nextFollowUpAt", "eosScore"]);
+
+/**
+ * ORDER BY for the Companies list. Empty values always go last — Postgres
+ * puts NULLs first when descending, so "EOS score, Descending" used to open
+ * on pages of unscored bars and look unsorted. Ties fall back to name, then
+ * id, so equal values (same city, same import time) come back in a stable
+ * order and paging never repeats or skips a company.
+ */
+export function companyOrderBy(sortBy: string | undefined, sortDir: string | undefined): Prisma.CompanyOrderByWithRelationInput[] {
+  const field = sortBy && SORTABLE_FIELDS.has(sortBy) ? sortBy : "name";
+  const sort = sortDir === "desc" ? "desc" : "asc";
+  const primary = { [field]: NULLABLE_SORT_FIELDS.has(field) ? { sort, nulls: "last" } : sort } as Prisma.CompanyOrderByWithRelationInput;
+  return [primary, ...(field === "name" ? [] : [{ name: "asc" as const }]), { id: "asc" }];
+}
+
 function allowValue<T extends string>(value: string | undefined, allowed: readonly T[]): T | undefined {
   return value && (allowed as readonly string[]).includes(value) ? (value as T) : undefined;
 }
@@ -205,14 +222,12 @@ export async function listCompanies(user: AuthenticatedUser, params: CompanyList
     return { companies: [], total: 0, page: 1, pageCount: 1 };
   }
 
-  const sortBy = params.sortBy && SORTABLE_FIELDS.has(params.sortBy) ? params.sortBy : "name";
-  const sortDir = params.sortDir === "desc" ? "desc" : "asc";
   const page = Math.max(1, params.page ?? 1);
 
   const [companies, total] = await Promise.all([
     prisma.company.findMany({
       where,
-      orderBy: { [sortBy]: sortDir },
+      orderBy: companyOrderBy(params.sortBy, params.sortDir),
       include: { leadType: true, pipelineStage: true, assignedTo: true, competitor: true },
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
