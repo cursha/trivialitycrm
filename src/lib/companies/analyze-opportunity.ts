@@ -12,6 +12,7 @@ import { classifyProviderError } from "@/lib/integrations/provider-errors";
 import { gradeForScore, totalFromCategoryScores, validateCategoryScores } from "@/lib/eos/validation";
 import { writeAuditEvent } from "@/lib/audit/log";
 import { logger } from "@/lib/logger";
+import type { EosCategoryScores } from "@/lib/eos/constants";
 import type { OpportunityGrade, Weekday } from "@/generated/prisma/enums";
 
 export type AnalyzeOpportunityResult =
@@ -29,6 +30,10 @@ export type AnalyzeOpportunityResult =
       // category scores (food/beverage, weeknight revenue, etc.) still look
       // fine on their own.
       salesPriorityScore: number | null;
+      // The saved category scores (after the no-TVs override) and the AI's
+      // explanation — for the results panel's "Why this grade".
+      categoryScores: EosCategoryScores;
+      scoreExplanation: string;
       recommendedNextAction: string;
       needsReview: boolean;
       evidence: OpportunityAnalysisEvidence[];
@@ -235,6 +240,8 @@ export async function runOpportunityAnalysis(
     eosTotal,
     opportunityGrade,
     salesPriorityScore,
+    categoryScores,
+    scoreExplanation: result.scoreExplanation,
     recommendedNextAction: result.recommendedNextAction,
     needsReview,
     evidence: result.evidence,

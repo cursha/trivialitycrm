@@ -160,6 +160,13 @@ presence, and how ready the bar is to run trivia.
   the Companies list and Sales Lists, the Dashboard's EOS Grades card, and
   "Highest EOS" as a calling-session order. Hover over "EOS" in a table
   for the full name.
+- **Why it got its grade:** the grade comes straight from the score
+  (90+ A+, 80-89 A, 70-79 B, 60-69 C, under 60 D). The **Why** box on the
+  company's EOS card, and in the analysis results (click a bar's name; it
+  opens by itself when you analyze one bar), shows how far the bar is from
+  the next grade, the AI's reasons in plain words, the categories that
+  helped most and held it back (with the evidence for each), and whether
+  "no TVs" pulled the score down.
 - **History is kept:** a new score never replaces the old one, so you can
   see how a bar's score has changed.
 

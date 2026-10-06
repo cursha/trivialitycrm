@@ -13,6 +13,23 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v8.0 — 2026-10-06
+### Added — "Why this grade" on the sales analysis
+- The opportunity analysis now explains the grade it gave (Curt's call).
+  A **Why** box in the analysis results (it opens by itself when you
+  analyze one bar) and on the company's EOS card shows:
+  - the grade's range and how many points the next grade up needs
+    ("EOS 72 of 100 is a B (B is 70–79). 8 more points would make it
+    an A.");
+  - the AI's reasons in 2–4 plain sentences — the analysis now tells the
+    AI to explain why the bar landed at its score and grade;
+  - the categories that **helped most** and the ones that **held it back**,
+    each with its score and the newest evidence for it;
+  - whether a confirmed "no TVs" set Turnkey readiness to 0.
+- Older scores show the same box; their AI reasons are whatever the
+  analysis wrote at the time. Re-analyze a bar to get the new wording.
+- Sales Quick Start: "What's the EOS?" explains the Why box.
+
 ## v7.5 — 2026-10-06
 ### Fixed — Companies sort
 - Sorting by **EOS score** or **Follow-up date** looked broken (Curt

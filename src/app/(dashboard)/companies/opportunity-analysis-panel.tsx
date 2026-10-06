@@ -7,6 +7,7 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { GRADE_TONE, GRADE_LABEL, WEEKDAY_LABEL } from "@/lib/ui/status-tones";
+import { GradeReasons } from "./grade-reasons";
 
 type Success = Exclude<AnalyzeOpportunityResult, { error: string }>;
 
@@ -160,6 +161,8 @@ export function OpportunityAnalysisPanel({
           updateRow(row.id, { status: "error", error: outcome.error });
         } else {
           updateRow(row.id, { status: "done", result: outcome });
+          // One bar: open its details (incl. "Why this grade") straight away.
+          if (rows.length === 1) setExpanded(row.id);
         }
       }
       setFinished(true);
@@ -245,6 +248,13 @@ export function OpportunityAnalysisPanel({
                 {row.status === "error" && row.error && <p className="mt-1 text-xs text-danger">{row.error}</p>}
                 {row.status === "done" && row.result && expanded === row.id && (
                   <div className="mt-2 space-y-1 text-xs text-text-muted">
+                    <GradeReasons
+                      eosTotal={row.result.eosTotal}
+                      categoryScores={row.result.categoryScores}
+                      noTvs={row.result.hasTvs === false}
+                      explanation={row.result.scoreExplanation}
+                      evidence={row.result.evidence}
+                    />
                     <p>
                       <span className="font-semibold text-text">Recommended next action: </span>
                       {row.result.recommendedNextAction}

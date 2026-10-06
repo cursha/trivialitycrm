@@ -124,6 +124,10 @@ describe("analyzeCompanyOpportunity", () => {
     if (!("error" in outcome)) {
       expect(outcome.hasTvs).toBe(false);
       expect(outcome.salesPriorityScore).toBe(0);
+      // "Why this grade" gets the saved (overridden) scores, not the raw ones.
+      expect(outcome.categoryScores.turnkeyImplementationReadiness).toBe(0);
+      expect(Object.values(outcome.categoryScores).reduce((sum, value) => sum + value, 0)).toBe(outcome.eosTotal);
+      expect(typeof outcome.scoreExplanation).toBe("string");
     }
 
     const updated = await testPrisma.company.findUniqueOrThrow({ where: { id: company.id } });

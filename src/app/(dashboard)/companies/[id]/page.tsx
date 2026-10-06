@@ -352,6 +352,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               summary={company}
               likelihood={likelihood}
               history={scoreHistory}
+              evidence={evidence.map((item) => ({ category: item.category, evidenceSummary: item.evidenceSummary }))}
               canEdit={canEdit}
               canAnalyze={canAnalyzeOpportunity}
             />

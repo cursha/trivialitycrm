@@ -956,6 +956,8 @@ export class AnthropicOpportunityAnalysisProvider implements OpportunityAnalysis
                   ? `Known trivia providers we track (use this EXACT spelling as providerName if you find a match): ${knownCompetitors.map((c) => c.name).join(", ")}. If you find a different, unlisted trivia provider instead, report its name exactly as found. `
                   : "") +
                 "Report this as competitorFound: set providerName to the trivia provider's name and day to the weekday its trivia night runs (SCREAMING_SNAKE_CASE, e.g. THURSDAY) ONLY on a genuine positive finding, citing sourceUrl. Leave day null if a competitor is confirmed but the specific night isn't. Leave competitorFound entirely null if you find no positive evidence of an existing trivia competitor — a plain absence of any mention is NOT evidence of no competitor, so do not guess. " +
+                "The category scores add up to the EOS total, which sets the grade: 90+ is A+, 80-89 A, 70-79 B, 60-69 C, under 60 D. " +
+                "Write scoreExplanation for a salesperson, in 2-4 plain sentences: why this business landed at its total and grade — name the categories that carried the score and the ones that held it back, and the evidence (or missing evidence) behind each. No jargon, no category keys. " +
                 "Only set conflict.found to true if you discover a genuine contradiction of one of the trusted facts above (e.g. the business appears permanently closed, or the name at this address doesn't match) — never as a way to change the trusted facts themselves; otherwise leave conflict.found false.",
             },
           ],

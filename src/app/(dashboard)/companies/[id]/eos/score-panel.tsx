@@ -6,6 +6,7 @@ import { CirclePlus } from "lucide-react";
 import { EOS_CATEGORY_MAXIMA, EOS_CATEGORY_LABELS } from "@/lib/eos/constants";
 import { recordHistoricalScore, clearNeedsReview, setHasTvs } from "./actions";
 import { OpportunityAnalysisPanel } from "@/app/(dashboard)/companies/opportunity-analysis-panel";
+import { GradeReasons } from "@/app/(dashboard)/companies/grade-reasons";
 import { useQuickActions } from "../quick-action-context";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -88,6 +89,7 @@ export function ScorePanel({
   companyName,
   summary,
   history,
+  evidence,
   canEdit,
   canAnalyze,
 }: {
@@ -97,6 +99,9 @@ export function ScorePanel({
   companyName: string;
   summary: CompanySummary;
   history: ScoreHistoryRow[];
+  /** The company's evidence, newest first — shown beside each category in
+   * "Why this grade". */
+  evidence: { category: string; evidenceSummary: string }[];
   canEdit: boolean;
   canAnalyze: boolean;
 }) {
@@ -262,7 +267,20 @@ export function ScorePanel({
             {summary.isQualified && <Badge tone="success">Qualified</Badge>}
             {summary.doNotContact && <Badge tone="danger">Do not contact</Badge>}
           </div>
-          {summary.scoreExplanation && <Field label="Explanation" value={summary.scoreExplanation} />}
+          {history.length > 0 ? (
+            // history[0] is the record this summary came from (see below).
+            <div className="sm:col-span-2">
+              <GradeReasons
+                eosTotal={summary.eosScore}
+                categoryScores={history[0]}
+                noTvs={summary.hasTvs === false}
+                explanation={summary.scoreExplanation}
+                evidence={evidence}
+              />
+            </div>
+          ) : (
+            summary.scoreExplanation && <Field label="Explanation" value={summary.scoreExplanation} />
+          )}
           {summary.recommendedSalesApproach && <Field label="Recommended approach" value={summary.recommendedSalesApproach} />}
           {summary.recommendedNextAction && <Field label="Recommended next action" value={summary.recommendedNextAction} />}
 
