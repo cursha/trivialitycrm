@@ -7,6 +7,7 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { LookupNameSchema } from "@/lib/validation/lookup";
 import { formString } from "@/lib/form-data";
 import { sanitizeRoutePlanSlug } from "@/lib/route-plan/validation";
+import { writeAuditEvent } from "@/lib/audit/log";
 
 export type ActionResult = { error?: string } | undefined;
 
@@ -113,14 +114,72 @@ export async function moveLeadType(id: string, direction: "up" | "down"): Promis
   revalidatePath(PATH);
 }
 
-export async function deleteLeadType(id: string): Promise<ActionResult> {
-  await requireSettingsManager();
+export type DeleteLeadTypeResult = { error?: string; needsReplacement?: boolean } | undefined;
 
-  const usageCount = await prisma.company.count({ where: { leadTypeId: id } });
-  if (usageCount > 0) {
-    return { error: "This lead type is used by existing companies — deactivate it instead of deleting." };
+function plural(count: number, one: string, many: string) {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+/**
+ * Deletes a lead type. Companies, lead searches, routes and email templates
+ * all point at their lead type, so one still in use can only go once
+ * everything is moved to `replacementId` — done in the same transaction as
+ * the delete, so nothing is ever left pointing at a type that's gone.
+ */
+export async function deleteLeadType(id: string, replacementId?: string): Promise<DeleteLeadTypeResult> {
+  const user = await requireSettingsManager();
+
+  const leadType = await prisma.leadType.findUnique({ where: { id } });
+  if (!leadType) return { error: "That lead type no longer exists." };
+
+  const where = { leadTypeId: id };
+  const [companies, searches, routes, templates] = await Promise.all([
+    prisma.company.count({ where }),
+    prisma.leadSearch.count({ where }),
+    prisma.routePlan.count({ where }),
+    prisma.emailTemplate.count({ where }),
+  ]);
+  const inUse = companies + searches + routes + templates > 0;
+
+  if (inUse && !replacementId) {
+    const uses = [
+      companies && plural(companies, "company", "companies"),
+      searches && plural(searches, "lead search", "lead searches"),
+      routes && plural(routes, "route", "routes"),
+      templates && plural(templates, "email template", "email templates"),
+    ].filter(Boolean);
+    return {
+      error: `"${leadType.name}" is used by ${uses.join(", ")}. Choose a lead type to move them to, then delete.`,
+      needsReplacement: true,
+    };
   }
 
-  await prisma.leadType.delete({ where: { id } });
+  if (inUse) {
+    if (replacementId === id) return { error: "Choose a different lead type to move them to." };
+    const replacement = await prisma.leadType.findUnique({ where: { id: replacementId } });
+    if (!replacement) return { error: "The lead type to move them to no longer exists." };
+
+    const data = { leadTypeId: replacement.id };
+    await prisma.$transaction([
+      prisma.company.updateMany({ where, data }),
+      prisma.leadSearch.updateMany({ where, data }),
+      prisma.routePlan.updateMany({ where, data }),
+      prisma.emailTemplate.updateMany({ where, data }),
+      prisma.leadType.delete({ where: { id } }),
+    ]);
+    await writeAuditEvent({
+      actorId: user.id,
+      module: "settings",
+      action: "lead_type.deleted",
+      entityType: "LeadType",
+      entityId: id,
+      beforeData: { name: leadType.name },
+      metadata: { movedTo: { id: replacement.id, name: replacement.name }, companies, searches, routes, templates },
+    });
+  } else {
+    await prisma.leadType.delete({ where: { id } });
+    await writeAuditEvent({ actorId: user.id, module: "settings", action: "lead_type.deleted", entityType: "LeadType", entityId: id, beforeData: { name: leadType.name } });
+  }
+
   revalidatePath(PATH);
 }

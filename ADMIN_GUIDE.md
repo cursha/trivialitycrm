@@ -26,6 +26,11 @@ not to gate.
    Stages): confirm these match how your team actually sells before anyone
    starts adding real companies — changing them later is fine, but existing
    companies keep whatever they were assigned at the time.
+   To **remove a lead type**, press its bin icon. If nothing uses it, it's
+   deleted. If companies, lead searches, routes or email templates still use
+   it, the page says how many and asks which lead type to **move them to**;
+   **Move and delete** moves them all, then deletes it. To hide a lead type
+   without moving anything, click its **Active** badge to make it Inactive.
    The stages are also the **sales process** (Target → Introduced → Demo
    Booked → Demo Held → Trial Booked → Trial Live → Won / Lost). On the
    Pipeline Stages page, **Checklist & follow-ups** opens each step's

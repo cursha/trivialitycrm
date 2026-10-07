@@ -205,7 +205,7 @@ export async function createLeadSearchFixture(opts: {
   region?: string;
   cities?: string[];
   minimumScore?: number;
-  mode?: "TRIVIA_GAP" | "TRIVIA_CONFIRMED" | "COMPETITOR" | "GENERAL" | "PUB_RADIUS";
+  mode?: "TRIVIA_GAP" | "TRIVIA_CONFIRMED" | "COMPETITOR" | "GENERAL" | "PUB_RADIUS" | "AI_PROMPT";
   runCorrelationId?: string | null;
   // PUB_RADIUS only — see the schema comment on LeadSearch. Left undefined
   // for every other mode's fixture calls.

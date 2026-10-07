@@ -18,6 +18,10 @@ export type LookupItem = {
 };
 
 type ActionResult = { error?: string } | undefined;
+/** `needsReplacement` (Lead Types only): the item is still in use, so the
+ * table asks which other item to move everything to, then calls `remove`
+ * again with that item's id. */
+type RemoveResult = { error?: string; needsReplacement?: boolean } | undefined;
 
 export function LookupTable({
   items,
@@ -35,7 +39,7 @@ export function LookupTable({
   rename: (id: string, formData: FormData) => Promise<ActionResult>;
   setActive: (id: string, active: boolean) => Promise<void>;
   move: (id: string, direction: "up" | "down") => Promise<void>;
-  remove: (id: string) => Promise<ActionResult>;
+  remove: (id: string, replacementId?: string) => Promise<RemoveResult>;
   setDefault?: (id: string) => Promise<void>;
   defaultLabel?: string;
   /** Only pipeline stages pass this — everything else (lead types,
@@ -55,6 +59,7 @@ export function LookupTable({
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
+  const [replacing, setReplacing] = useState<{ id: string; replacementId: string } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function clearError(id: string) {
@@ -81,6 +86,9 @@ export function LookupTable({
     if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
     startTransition(async () => {
       const result = await remove(id);
+      if (result?.needsReplacement) {
+        setReplacing({ id, replacementId: items.find((other) => other.id !== id)?.id ?? "" });
+      }
       if (result?.error) {
         setRowErrors((prev) => ({ ...prev, [id]: result.error! }));
       } else {
@@ -89,8 +97,23 @@ export function LookupTable({
     });
   }
 
+  function handleMoveAndDelete(id: string, name: string, replacementId: string) {
+    const target = items.find((other) => other.id === replacementId);
+    if (!target) return;
+    if (!window.confirm(`Move everything from "${name}" to "${target.name}", then delete "${name}"? This cannot be undone.`)) return;
+    startTransition(async () => {
+      const result = await remove(id, replacementId);
+      if (result?.error) {
+        setRowErrors((prev) => ({ ...prev, [id]: result.error! }));
+      } else {
+        clearError(id);
+        setReplacing(null);
+      }
+    });
+  }
+
   return (
-    <Card className="overflow-hidden p-0">
+    <Card className="overflow-x-auto p-0">
       <table className="w-full text-left text-sm">
         <thead className="bg-black/5 text-xs uppercase text-text-muted">
           <tr>
@@ -164,6 +187,47 @@ export function LookupTable({
                   </div>
                 )}
                 {rowErrors[item.id] && <p className="mt-1 text-xs font-semibold text-danger">{rowErrors[item.id]}</p>}
+                {replacing?.id === item.id && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                    <label htmlFor={`replace-${item.id}`} className="font-semibold text-text">
+                      Move to
+                    </label>
+                    <select
+                      id={`replace-${item.id}`}
+                      value={replacing.replacementId}
+                      disabled={isPending}
+                      onChange={(event) => setReplacing({ id: item.id, replacementId: event.target.value })}
+                      className="rounded border border-border-strong bg-transparent px-2 py-1 font-semibold text-text"
+                    >
+                      {items
+                        .filter((other) => other.id !== item.id)
+                        .map((other) => (
+                          <option key={other.id} value={other.id}>
+                            {other.name}
+                            {other.active ? "" : " (inactive)"}
+                          </option>
+                        ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={isPending || !replacing.replacementId}
+                      onClick={() => handleMoveAndDelete(item.id, item.name, replacing.replacementId)}
+                      className="rounded bg-danger px-2 py-1 font-semibold text-white disabled:opacity-50"
+                    >
+                      Move and delete
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReplacing(null);
+                        clearError(item.id);
+                      }}
+                      className="rounded px-2 py-1 font-semibold text-text-muted hover:bg-black/5"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
               </td>
               <td className="px-5 py-4">
                 <button

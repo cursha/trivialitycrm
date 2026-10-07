@@ -13,6 +13,20 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v9.1 — 2026-10-07
+### Fixed — deleting a lead type
+- Deleting a lead type only checked for companies, so a lead type with no
+  companies but used by a past lead search or route (e.g. "Retirement")
+  couldn't be deleted, with no explanation. It now counts companies, lead
+  searches, routes and email templates and says which are using it.
+- New: **Move and delete** — choose another lead type, and everything
+  using the old one moves to it, then the old one is deleted, all in one
+  step (audited). Curt's call: remove retirement/nursing homes from the
+  system entirely, not just hide them.
+- The settings tables now scroll sideways on a narrow screen instead of
+  cutting off the Actions column (Lead Types' Route Planning column made it
+  too wide for a phone).
+
 ## v9.0 — 2026-10-07
 ### Added — "AI search — find venues using your prompt"
 - A new lead-search mode, and now the default (Curt's call). Until now no
