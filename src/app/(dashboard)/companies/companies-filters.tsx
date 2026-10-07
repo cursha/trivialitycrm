@@ -61,18 +61,21 @@ export function CompaniesFilters({
         onChange={(event) => updateParam("q", event.target.value)}
       />
       <div className="flex flex-wrap gap-2">
-        <Select
-          className={filterClass("leadTypeId")}
-          defaultValue={searchParams.get("leadTypeId") ?? ""}
-          onChange={(event) => updateParam("leadTypeId", event.target.value)}
-        >
-          <option value="">All Lead Types</option>
-          {leadTypes.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.name}
-            </option>
-          ))}
-        </Select>
+        {/* A lead-type filter only matters once there is more than one lead type. */}
+        {leadTypes.length > 1 && (
+          <Select
+            className={filterClass("leadTypeId")}
+            defaultValue={searchParams.get("leadTypeId") ?? ""}
+            onChange={(event) => updateParam("leadTypeId", event.target.value)}
+          >
+            <option value="">All Lead Types</option>
+            {leadTypes.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.name}
+              </option>
+            ))}
+          </Select>
+        )}
         <Select
           className={filterClass("pipelineStageId")}
           defaultValue={searchParams.get("pipelineStageId") ?? ""}

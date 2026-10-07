@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { hasMultipleLeadTypes } from "@/lib/lead-types/multiple";
 import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
 import { parseReportFilters } from "@/lib/reports/filters";
@@ -142,16 +143,18 @@ export default async function PipelineReportPage({
       </Card>
 
       <div className="grid gap-4 xl:grid-cols-3">
-        <Card>
-          <SectionHeading>Win rate by lead type (in range)</SectionHeading>
-          <div className="mt-3 space-y-2">
-            {report.winRateByLeadType.length === 0 ? (
-              <NoDataNote>No decided leads in this range.</NoDataNote>
-            ) : (
-              report.winRateByLeadType.map((r) => <RateStat key={r.label} label={r.label} result={r.result} />)
-            )}
-          </div>
-        </Card>
+        {(await hasMultipleLeadTypes()) && (
+          <Card>
+            <SectionHeading>Win rate by lead type (in range)</SectionHeading>
+            <div className="mt-3 space-y-2">
+              {report.winRateByLeadType.length === 0 ? (
+                <NoDataNote>No decided leads in this range.</NoDataNote>
+              ) : (
+                report.winRateByLeadType.map((r) => <RateStat key={r.label} label={r.label} result={r.result} />)
+              )}
+            </div>
+          </Card>
+        )}
         <Card>
           <SectionHeading>Win rate by source (in range)</SectionHeading>
           <div className="mt-3 space-y-2">

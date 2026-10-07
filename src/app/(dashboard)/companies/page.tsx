@@ -120,6 +120,7 @@ export default async function CompaniesPage({
       <CompaniesFilters leadTypes={leadTypes} pipelineStages={pipelineStages} salespeople={salespeople} competitors={competitors} />
 
       <CompaniesTable
+        showLeadType={leadTypes.length > 1}
         companies={companies}
         stages={allPipelineStages.map((s) => ({ id: s.id, name: s.name, active: s.active }))}
         salespeople={salespeople}

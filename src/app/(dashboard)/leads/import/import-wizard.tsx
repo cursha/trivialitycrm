@@ -183,17 +183,20 @@ export function ImportWizard({
 
       {step === "preview" && (
         <div className="space-y-4">
-          <Card className="grid grid-cols-3 gap-4">
-            <div>
-              <Label className="mb-1 block text-xs uppercase">Lead Type</Label>
-              <Select value={leadTypeId} onChange={(e) => setLeadTypeId(e.target.value)} className="py-1.5">
-                {leadTypes.map((lt) => (
-                  <option key={lt.id} value={lt.id}>
-                    {lt.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
+          <Card className={`grid gap-4 ${leadTypes.length === 1 ? "grid-cols-2" : "grid-cols-3"}`}>
+            {/* With a single lead type there's nothing to choose — leadTypeId already holds it. */}
+            {leadTypes.length !== 1 && (
+              <div>
+                <Label className="mb-1 block text-xs uppercase">Lead Type</Label>
+                <Select value={leadTypeId} onChange={(e) => setLeadTypeId(e.target.value)} className="py-1.5">
+                  {leadTypes.map((lt) => (
+                    <option key={lt.id} value={lt.id}>
+                      {lt.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
             <div>
               <Label className="mb-1 block text-xs uppercase">Pipeline stage</Label>
               <Select value={pipelineStageId} onChange={(e) => setPipelineStageId(e.target.value)} className="py-1.5">

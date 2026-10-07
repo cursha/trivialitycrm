@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { hasMultipleLeadTypes } from "@/lib/lead-types/multiple";
 import { BarChart3, Building2, CalendarClock, ListTree, Trophy, Users } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
@@ -195,12 +196,14 @@ export default async function DashboardPage() {
           items={stats.pipelineBreakdown.map((s) => ({ label: s.stageName, count: s.count }))}
           emptyLabel="No active companies yet."
         />
-        <BreakdownList
-          title="Lead Types"
-          icon={ListTree}
-          items={stats.leadTypeBreakdown.map((t) => ({ label: t.leadTypeName, count: t.count }))}
-          emptyLabel="No active companies yet."
-        />
+        {(await hasMultipleLeadTypes()) && (
+          <BreakdownList
+            title="Lead Types"
+            icon={ListTree}
+            items={stats.leadTypeBreakdown.map((t) => ({ label: t.leadTypeName, count: t.count }))}
+            emptyLabel="No active companies yet."
+          />
+        )}
         <BreakdownList
           title="Salespeople"
           icon={Users}

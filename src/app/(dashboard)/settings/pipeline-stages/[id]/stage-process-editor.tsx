@@ -61,7 +61,7 @@ export function StageProcessEditor({
           <div>
             <Label htmlFor="stage-description">What this step means</Label>
             <Textarea id="stage-description" name="description" rows={3} maxLength={1000} defaultValue={description} className="mt-1" />
-            <HelpText className="mt-1">Shown as a bubble when a rep hovers over or taps this step on a company&apos;s Sales process card.</HelpText>
+            <HelpText className="mt-1">Shown as a bubble when a salesperson hovers over or taps this step on a company&apos;s Sales process card.</HelpText>
           </div>
           <div>
             <Label htmlFor="playbook-local">{SALES_TRACK_LABELS.LOCAL} bars</Label>
@@ -72,7 +72,7 @@ export function StageProcessEditor({
             <Textarea id="playbook-remote" name="playbookRemote" rows={5} defaultValue={playbookRemote} className="mt-1" />
           </div>
           <HelpText>
-            Checklists: one item per line. Write {"{{trialWeeks}}"} for the bar&apos;s rep&apos;s trial length (e.g. &quot;up to {"{{trialWeeks}}"} weeks free&quot;).
+            Checklists: one item per line. Write {"{{trialWeeks}}"} for the bar&apos;s salesperson&apos;s trial length (e.g. &quot;up to {"{{trialWeeks}}"} weeks free&quot;).
           </HelpText>
           {playbookError && <FieldError>{playbookError}</FieldError>}
           <div className="flex items-center gap-3">

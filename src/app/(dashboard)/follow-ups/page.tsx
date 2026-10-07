@@ -82,7 +82,7 @@ async function TaskView({ user, view }: { user: Awaited<ReturnType<typeof requir
           <tr>
             <th className="px-5 py-3">Company</th>
             <th className="px-5 py-3">Follow-up</th>
-            <th className="px-5 py-3">Assigned to</th>
+            <th className="px-5 py-3">Salesperson</th>
             <th className="px-5 py-3">{view === "completed" ? "Completed" : "Due"}</th>
           </tr>
         </thead>
@@ -122,7 +122,7 @@ async function NoFollowUpView({ user }: { user: Awaited<ReturnType<typeof requir
         <thead className="bg-black/5 text-xs uppercase text-text-muted">
           <tr>
             <th className="px-5 py-3">Company</th>
-            <th className="px-5 py-3">Assigned to</th>
+            <th className="px-5 py-3">Salesperson</th>
           </tr>
         </thead>
         <tbody>

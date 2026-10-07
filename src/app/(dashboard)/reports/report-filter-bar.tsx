@@ -122,7 +122,8 @@ export function ReportFilterBar({
           </div>
         )}
 
-        {leadTypes && (
+        {/* A lead-type filter only matters once there is more than one lead type. */}
+        {leadTypes && leadTypes.length > 1 && (
           <div>
             <Label className="text-xs">Lead type</Label>
             <Select

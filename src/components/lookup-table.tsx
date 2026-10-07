@@ -20,8 +20,12 @@ export type LookupItem = {
 type ActionResult = { error?: string } | undefined;
 /** `needsReplacement` (Lead Types only): the item is still in use, so the
  * table asks which other item to move everything to, then calls `remove`
- * again with that item's id. */
-type RemoveResult = { error?: string; needsReplacement?: boolean } | undefined;
+ * again with that item's id. `searches` > 0 also offers deleting that search
+ * history instead of moving it; `othersInUse` says whether anything else
+ * still has to move (if not, deleting the searches needs no "Move to"). */
+type RemoveResult = { error?: string; needsReplacement?: boolean; searches?: number; othersInUse?: boolean } | undefined;
+type RemoveOptions = { replacementId?: string; deleteSearches?: boolean };
+type Replacing = { id: string; replacementId: string; searches: number; othersInUse: boolean; deleteSearches: boolean };
 
 export function LookupTable({
   items,
@@ -39,7 +43,7 @@ export function LookupTable({
   rename: (id: string, formData: FormData) => Promise<ActionResult>;
   setActive: (id: string, active: boolean) => Promise<void>;
   move: (id: string, direction: "up" | "down") => Promise<void>;
-  remove: (id: string, replacementId?: string) => Promise<RemoveResult>;
+  remove: (id: string, options?: RemoveOptions) => Promise<RemoveResult>;
   setDefault?: (id: string) => Promise<void>;
   defaultLabel?: string;
   /** Only pipeline stages pass this — everything else (lead types,
@@ -59,7 +63,7 @@ export function LookupTable({
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
-  const [replacing, setReplacing] = useState<{ id: string; replacementId: string } | null>(null);
+  const [replacing, setReplacing] = useState<Replacing | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function clearError(id: string) {
@@ -87,7 +91,13 @@ export function LookupTable({
     startTransition(async () => {
       const result = await remove(id);
       if (result?.needsReplacement) {
-        setReplacing({ id, replacementId: items.find((other) => other.id !== id)?.id ?? "" });
+        setReplacing({
+          id,
+          replacementId: items.find((other) => other.id !== id)?.id ?? "",
+          searches: result.searches ?? 0,
+          othersInUse: result.othersInUse ?? true,
+          deleteSearches: false,
+        });
       }
       if (result?.error) {
         setRowErrors((prev) => ({ ...prev, [id]: result.error! }));
@@ -97,12 +107,17 @@ export function LookupTable({
     });
   }
 
-  function handleMoveAndDelete(id: string, name: string, replacementId: string) {
-    const target = items.find((other) => other.id === replacementId);
-    if (!target) return;
-    if (!window.confirm(`Move everything from "${name}" to "${target.name}", then delete "${name}"? This cannot be undone.`)) return;
+  function handleMoveAndDelete(name: string, choice: Replacing) {
+    const needsTarget = choice.othersInUse || !choice.deleteSearches;
+    const target = items.find((other) => other.id === choice.replacementId);
+    if (needsTarget && !target) return;
+    const searchesPart = choice.deleteSearches ? `Delete its ${choice.searches} lead search${choice.searches === 1 ? "" : "es"} and their results, ` : "";
+    const movePart = target && needsTarget ? `${choice.deleteSearches ? "move everything else" : "Move everything"} to "${target.name}", ` : "";
+    const question = `${searchesPart}${movePart}then delete "${name}"? This cannot be undone.`;
+    if (!window.confirm(question.charAt(0).toUpperCase() + question.slice(1))) return;
+    const { id } = choice;
     startTransition(async () => {
-      const result = await remove(id, replacementId);
+      const result = await remove(id, { replacementId: needsTarget ? choice.replacementId : undefined, deleteSearches: choice.deleteSearches });
       if (result?.error) {
         setRowErrors((prev) => ({ ...prev, [id]: result.error! }));
       } else {
@@ -188,44 +203,61 @@ export function LookupTable({
                 )}
                 {rowErrors[item.id] && <p className="mt-1 text-xs font-semibold text-danger">{rowErrors[item.id]}</p>}
                 {replacing?.id === item.id && (
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                    <label htmlFor={`replace-${item.id}`} className="font-semibold text-text">
-                      Move to
-                    </label>
-                    <select
-                      id={`replace-${item.id}`}
-                      value={replacing.replacementId}
-                      disabled={isPending}
-                      onChange={(event) => setReplacing({ id: item.id, replacementId: event.target.value })}
-                      className="rounded border border-border-strong bg-transparent px-2 py-1 font-semibold text-text"
-                    >
-                      {items
-                        .filter((other) => other.id !== item.id)
-                        .map((other) => (
-                          <option key={other.id} value={other.id}>
-                            {other.name}
-                            {other.active ? "" : " (inactive)"}
-                          </option>
-                        ))}
-                    </select>
-                    <button
-                      type="button"
-                      disabled={isPending || !replacing.replacementId}
-                      onClick={() => handleMoveAndDelete(item.id, item.name, replacing.replacementId)}
-                      className="rounded bg-danger px-2 py-1 font-semibold text-white disabled:opacity-50"
-                    >
-                      Move and delete
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setReplacing(null);
-                        clearError(item.id);
-                      }}
-                      className="rounded px-2 py-1 font-semibold text-text-muted hover:bg-black/5"
-                    >
-                      Cancel
-                    </button>
+                  <div className="mt-2 space-y-2 text-xs">
+                    {replacing.searches > 0 && (
+                      <label className="flex items-center gap-2 font-semibold text-text">
+                        <input
+                          type="checkbox"
+                          checked={replacing.deleteSearches}
+                          disabled={isPending}
+                          onChange={(event) => setReplacing({ ...replacing, deleteSearches: event.target.checked })}
+                        />
+                        Delete its {replacing.searches} lead search{replacing.searches === 1 ? "" : "es"} and their results instead of moving them
+                      </label>
+                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(replacing.othersInUse || !replacing.deleteSearches) && (
+                        <>
+                          <label htmlFor={`replace-${item.id}`} className="font-semibold text-text">
+                            {replacing.deleteSearches ? "Move the rest to" : "Move to"}
+                          </label>
+                          <select
+                            id={`replace-${item.id}`}
+                            value={replacing.replacementId}
+                            disabled={isPending}
+                            onChange={(event) => setReplacing({ ...replacing, replacementId: event.target.value })}
+                            className="rounded border border-border-strong bg-transparent px-2 py-1 font-semibold text-text"
+                          >
+                            {items
+                              .filter((other) => other.id !== item.id)
+                              .map((other) => (
+                                <option key={other.id} value={other.id}>
+                                  {other.name}
+                                  {other.active ? "" : " (inactive)"}
+                                </option>
+                              ))}
+                          </select>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        disabled={isPending || ((replacing.othersInUse || !replacing.deleteSearches) && !replacing.replacementId)}
+                        onClick={() => handleMoveAndDelete(item.name, replacing)}
+                        className="rounded bg-danger px-2 py-1 font-semibold text-white disabled:opacity-50"
+                      >
+                        {replacing.othersInUse || !replacing.deleteSearches ? "Move and delete" : "Delete"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReplacing(null);
+                          clearError(item.id);
+                        }}
+                        className="rounded px-2 py-1 font-semibold text-text-muted hover:bg-black/5"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 )}
               </td>

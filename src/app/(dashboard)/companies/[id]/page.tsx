@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { hasMultipleLeadTypes } from "@/lib/lead-types/multiple";
 import { notFound, redirect } from "next/navigation";
 import { Pencil } from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
@@ -314,9 +315,9 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                   ) : null
                 }
               />
-              <Field label="Lead Type" value={company.leadType.name} />
+              {(await hasMultipleLeadTypes()) && <Field label="Lead Type" value={company.leadType.name} />}
               <Field label="Pipeline Stage" value={company.pipelineStage.name} />
-              <Field label="Assigned salesperson" value={company.assignedTo?.name} />
+              <Field label="Salesperson" value={company.assignedTo?.name} />
               <Field label="Competitor" value={company.competitor?.name} />
               <Field label="Trivia status" value={TRIVIA_STATUS_LABEL[company.triviaStatus]} />
               <Field label="Existing trivia provider" value={company.competitorTriviaProvider} />

@@ -109,17 +109,22 @@ export function SearchForm({ prompts, leadTypes, competitors, canOverrideBudget 
         ))}
       </div>
 
-      <div>
-        <Label className="mb-1 block text-xs uppercase">Lead Type</Label>
-        <Select name="leadTypeId" required>
-          <option value="">Choose a Lead Type...</option>
-          {leadTypes.map((leadType) => (
-            <option key={leadType.id} value={leadType.id}>
-              {leadType.name}
-            </option>
-          ))}
-        </Select>
-      </div>
+      {/* With a single lead type there's nothing to choose — it's used without asking. */}
+      {leadTypes.length === 1 ? (
+        <input type="hidden" name="leadTypeId" value={leadTypes[0].id} />
+      ) : (
+        <div>
+          <Label className="mb-1 block text-xs uppercase">Lead Type</Label>
+          <Select name="leadTypeId" required>
+            <option value="">Choose a Lead Type...</option>
+            {leadTypes.map((leadType) => (
+              <option key={leadType.id} value={leadType.id}>
+                {leadType.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+      )}
 
       <div>
         <Label className="mb-1 block text-xs uppercase">Minimum quality score</Label>

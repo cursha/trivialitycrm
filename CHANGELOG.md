@@ -13,6 +13,31 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v10.0 — 2026-10-07
+### Changed — no more lead type questions with only one lead type
+- With a single active lead type (today just "pubs"), the app no longer asks
+  for one or shows it: new company, Quick Add, lead searches, quick search,
+  competition locator and import all use it automatically, and the lead
+  type filters (Companies, Pipeline, Sales Lists, Reports), the Lead Type
+  columns, the company page field, the dashboard breakdown and the Lead
+  Types report are hidden. Curt's call: "no use having a filter that will
+  never be used". Everything comes back once a second lead type is active.
+
+### Added — delete a lead type's search history
+- When deleting a lead type, **Delete its lead searches** deletes its old
+  lead searches and their results instead of moving them to another lead
+  type (companies are never deleted; a search still running blocks it).
+  Prompted by the "retirement homes" clean-up, whose searches had been
+  moved to "pubs" and then needed deleting separately.
+
+### Changed — one name for salespeople
+- "Owner", "Rep" and "Assigned to" now read **Salesperson** everywhere
+  they meant the salesperson: sales lists, the Manager page, the
+  scoreboard, follow-ups, territories, the company page, the pipeline step
+  editor, the companies CSV export's column and the manuals (Curt's call).
+  "Owner" still means the bar's owner where it says so (e.g. "ask for the
+  owner or manager").
+
 ## v9.1 — 2026-10-07
 ### Fixed — deleting a lead type
 - Deleting a lead type only checked for companies, so a lead type with no

@@ -123,7 +123,7 @@ gets **a new game**, which they can run as often as they like that week.
 They have **one game at a time**: each new week's game replaces the last. Your manager
 sets your trial length (1 to 4 weeks), and the checklists and follow-ups
 on your bars use it: "up to 3 weeks free" if yours is 3. A bar follows the
-trial length of the rep it's assigned to.
+trial length of the salesperson it's assigned to.
 
 ### Follow-ups are created for you
 
@@ -268,7 +268,7 @@ On any company's page:
 ## Sales Lists
 
 A Sales List is a saved set of companies built from the same filters used
-elsewhere (location, lead type, pipeline stage, EOS score, contact history,
+elsewhere (location, pipeline stage, EOS score, contact history,
 and more). When you create one, you pick what it's for — a general list, a
 **Calling List**, or an **Email Campaign** list — which changes what counts
 as "eligible": archived, merged, or do-not-contact companies are always
@@ -370,7 +370,7 @@ a bar found this way isn't marked as running trivia.
 
 1. Under Leads, review or create a research prompt — this is what tells the
    AI what kind of business you're looking for.
-2. Start a search: choose a prompt, a location, a lead type and a mode,
+2. Start a search: choose a prompt, a location and a mode,
    and run it. Results stay inside the province or state you choose, and
    inside your cities if you list any. The modes:
    - **AI search — find venues using your prompt** (the usual choice): the
@@ -378,7 +378,7 @@ a bar found this way isn't marked as running trivia.
      already run trivia (that's a buying signal), then researches and
      scores each against the prompt. Slower and costs more than a
      directory listing.
-   - **Directory listing**: every business of that lead type from the
+   - **Directory listing**: every business of that type (pubs) from the
      directory, fast and cheap. Your prompt isn't used until you click
      **Research this business** on a result.
    - **Offers events but not trivia** / **Currently offers trivia**: AI

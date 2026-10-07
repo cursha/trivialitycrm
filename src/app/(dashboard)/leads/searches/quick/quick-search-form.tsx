@@ -22,18 +22,23 @@ export function QuickSearchForm({ leadTypes }: QuickSearchFormOptions) {
   return (
     <form action={formAction}>
       <Card className="space-y-4">
-        <div>
-          <Label className="mb-1 block text-xs uppercase">Venue types</Label>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {leadTypes.map((leadType) => (
-              <label key={leadType.id} className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm text-text">
-                <input type="checkbox" name="leadTypeIds" value={leadType.id} />
-                {leadType.name}
-              </label>
-            ))}
+        {/* With a single lead type there's nothing to choose — it's used without asking. */}
+        {leadTypes.length === 1 ? (
+          <input type="hidden" name="leadTypeIds" value={leadTypes[0].id} />
+        ) : (
+          <div>
+            <Label className="mb-1 block text-xs uppercase">Venue types</Label>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {leadTypes.map((leadType) => (
+                <label key={leadType.id} className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm text-text">
+                  <input type="checkbox" name="leadTypeIds" value={leadType.id} />
+                  {leadType.name}
+                </label>
+              ))}
+            </div>
+            {leadTypes.length === 0 && <p className="text-sm text-text-muted">No active Lead Types configured yet.</p>}
           </div>
-          {leadTypes.length === 0 && <p className="text-sm text-text-muted">No active Lead Types configured yet.</p>}
-        </div>
+        )}
 
         <div>
           <Label className="mb-1 block text-xs uppercase">Only venues that offer (optional)</Label>

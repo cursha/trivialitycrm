@@ -18,7 +18,10 @@ export function ListDetailTable({
   companies,
   lastContactByCompanyId,
   canManage,
+  showLeadType,
 }: {
+  /** False when there's only one lead type — see hasMultipleLeadTypes(). */
+  showLeadType: boolean;
   listId: string;
   purpose: SalesListPurpose;
   type: "FIXED" | "DYNAMIC";
@@ -65,11 +68,11 @@ export function ListDetailTable({
           <thead className="bg-black/5 text-xs uppercase text-text-muted">
             <tr>
               <th className="px-4 py-3">Company</th>
-              <th className="px-4 py-3">Owner</th>
+              <th className="px-4 py-3">Salesperson</th>
               <th className="px-4 py-3">Primary Contact</th>
               <th className="px-4 py-3">Phone</th>
               <th className="px-4 py-3">Email</th>
-              <th className="px-4 py-3">Lead Type</th>
+              {showLeadType && <th className="px-4 py-3">Lead Type</th>}
               <th className="px-4 py-3">Stage</th>
               <th className="px-4 py-3" title="Entertainment Opportunity Score">EOS</th>
               <th className="px-4 py-3">Confidence</th>
@@ -101,7 +104,7 @@ export function ListDetailTable({
                   </td>
                   <td className="px-4 py-3">{company.phone ?? <span className="text-text-muted">—</span>}</td>
                   <td className="px-4 py-3">{company.email ?? <span className="text-text-muted">—</span>}</td>
-                  <td className="px-4 py-3">{company.leadType.name}</td>
+                  {showLeadType && <td className="px-4 py-3">{company.leadType.name}</td>}
                   <td className="px-4 py-3">
                     <Badge tone="secondary">{company.pipelineStage.name}</Badge>
                   </td>
@@ -133,7 +136,7 @@ export function ListDetailTable({
             })}
             {companies.length === 0 && (
               <tr>
-                <td colSpan={15} className="px-4 py-10 text-center text-text-muted">
+                <td colSpan={showLeadType ? 15 : 14} className="px-4 py-10 text-center text-text-muted">
                   No companies to show.
                 </td>
               </tr>
@@ -162,7 +165,7 @@ export function ListDetailTable({
               {!eligible && <p className="mt-1 text-xs text-text-muted">{reasons.join("; ")}</p>}
               <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
                 <div>
-                  <dt className="text-text-muted">Owner</dt>
+                  <dt className="text-text-muted">Salesperson</dt>
                   <dd className="font-medium text-text">{company.assignedTo?.name ?? "Unassigned"}</dd>
                 </div>
                 <div>

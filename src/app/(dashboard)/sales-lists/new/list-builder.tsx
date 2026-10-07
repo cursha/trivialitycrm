@@ -159,7 +159,7 @@ export function ListBuilder({
                   <input type="checkbox" checked={allOnPageSelected} onChange={toggleAllOnPage} aria-label="Select all on page" />
                 </th>
                 <th className="px-5 py-3">Company</th>
-                <th className="px-5 py-3">Owner</th>
+                <th className="px-5 py-3">Salesperson</th>
                 <th className="px-5 py-3">Primary Contact</th>
                 <th className="px-5 py-3" title="Entertainment Opportunity Score">EOS</th>
                 <th className="px-5 py-3">Eligibility</th>
@@ -272,7 +272,7 @@ export function ListBuilder({
                     {!eligible && <p className="mt-1 text-xs text-text-muted">{reasons.join("; ")}</p>}
                     <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
                       <div>
-                        <dt className="text-text-muted">Owner</dt>
+                        <dt className="text-text-muted">Salesperson</dt>
                         <dd className="font-medium text-text">{company.assignedTo?.name ?? "Unassigned"}</dd>
                       </div>
                       <div>

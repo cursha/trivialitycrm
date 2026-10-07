@@ -51,7 +51,7 @@ export function TeamScoreboard({ scores }: { scores: RepScore[] }) {
       <table className="mt-3 w-full min-w-[40rem] text-left text-sm">
         <thead className="text-xs uppercase text-text-muted">
           <tr>
-            <th className="py-2 pr-3">Rep</th>
+            <th className="py-2 pr-3">Salesperson</th>
             {SCOREBOARD_METRICS.map((metric) => (
               <th key={metric} className="py-2 pr-3">
                 {SCOREBOARD_LABELS[metric]}

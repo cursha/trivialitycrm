@@ -108,19 +108,24 @@ export function CompanyForm({
           />
         </div>
 
-        <div>
-          <Label>Lead Type</Label>
-          <Select name="leadTypeId" defaultValue={defaultValues?.leadTypeId ?? ""} required className="mt-1">
-            <option value="" disabled>
-              Choose a lead type
-            </option>
-            {leadTypes.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name}
+        {/* With a single lead type there's nothing to choose — it's used without asking. */}
+        {leadTypes.length === 1 ? (
+          <input type="hidden" name="leadTypeId" value={defaultValues?.leadTypeId ?? leadTypes[0].id} />
+        ) : (
+          <div>
+            <Label>Lead Type</Label>
+            <Select name="leadTypeId" defaultValue={defaultValues?.leadTypeId ?? ""} required className="mt-1">
+              <option value="" disabled>
+                Choose a lead type
               </option>
-            ))}
-          </Select>
-        </div>
+              {leadTypes.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
         <div>
           <Label>Pipeline Stage</Label>
           <Select

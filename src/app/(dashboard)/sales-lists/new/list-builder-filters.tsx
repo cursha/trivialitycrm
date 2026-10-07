@@ -53,14 +53,17 @@ export function ListBuilderFilters({
           <Input className="w-36" placeholder="Country" defaultValue={searchParams.get("country") ?? ""} onChange={(e) => updateParam("country", e.target.value)} />
           <Input className="w-32" placeholder="State/Province" defaultValue={searchParams.get("region") ?? ""} onChange={(e) => updateParam("region", e.target.value)} />
           <Input className="w-36" placeholder="City" defaultValue={searchParams.get("city") ?? ""} onChange={(e) => updateParam("city", e.target.value)} />
-          <Select className={selectClass} defaultValue={searchParams.get("leadTypeId") ?? ""} onChange={(e) => updateParam("leadTypeId", e.target.value)}>
-            <option value="">All Lead Types</option>
-            {leadTypes.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
-            ))}
-          </Select>
+          {/* A lead-type filter only matters once there is more than one lead type. */}
+          {leadTypes.length > 1 && (
+            <Select className={selectClass} defaultValue={searchParams.get("leadTypeId") ?? ""} onChange={(e) => updateParam("leadTypeId", e.target.value)}>
+              <option value="">All Lead Types</option>
+              {leadTypes.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </Select>
+          )}
           <Select className={selectClass} defaultValue={searchParams.get("pipelineStageId") ?? ""} onChange={(e) => updateParam("pipelineStageId", e.target.value)}>
             <option value="">All Pipeline Stages</option>
             {pipelineStages.map((o) => (
@@ -70,7 +73,7 @@ export function ListBuilderFilters({
             ))}
           </Select>
           <Select className={selectClass} defaultValue={searchParams.get("assignedToId") ?? ""} onChange={(e) => updateParam("assignedToId", e.target.value)}>
-            <option value="">All Owners</option>
+            <option value="">All Salespeople</option>
             {salespeople.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.name}

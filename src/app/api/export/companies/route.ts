@@ -20,7 +20,7 @@ const COLUMNS: ExportColumn[] = [
   { key: "websiteUrl", label: "Website" },
   { key: "leadType", label: "Lead Type" },
   { key: "pipelineStage", label: "Pipeline Stage" },
-  { key: "assignedTo", label: "Assigned To" },
+  { key: "assignedTo", label: "Salesperson" },
   { key: "competitor", label: "Competitor" },
   { key: "triviaStatus", label: "Trivia Status" },
   { key: "status", label: "Status" },

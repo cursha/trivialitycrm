@@ -114,7 +114,18 @@ export async function moveLeadType(id: string, direction: "up" | "down"): Promis
   revalidatePath(PATH);
 }
 
-export type DeleteLeadTypeResult = { error?: string; needsReplacement?: boolean } | undefined;
+/** `needsReplacement`: still in use, so the settings table asks which lead
+ * type to move everything to; `searches` lets it also offer deleting that
+ * search history instead, and `othersInUse` says whether anything besides
+ * searches still needs moving. */
+export type DeleteLeadTypeResult = { error?: string; needsReplacement?: boolean; searches?: number; othersInUse?: boolean } | undefined;
+
+export type DeleteLeadTypeOptions = {
+  replacementId?: string;
+  /** Delete the type's lead searches (and their results) instead of moving
+   * them. Companies already transferred from those results are kept. */
+  deleteSearches?: boolean;
+};
 
 function plural(count: number, one: string, many: string) {
   return `${count} ${count === 1 ? one : many}`;
@@ -123,11 +134,13 @@ function plural(count: number, one: string, many: string) {
 /**
  * Deletes a lead type. Companies, lead searches, routes and email templates
  * all point at their lead type, so one still in use can only go once
- * everything is moved to `replacementId` — done in the same transaction as
- * the delete, so nothing is ever left pointing at a type that's gone.
+ * everything is moved to `replacementId` (or, for searches, deleted) — done
+ * in the same transaction as the delete, so nothing is ever left pointing at
+ * a type that's gone.
  */
-export async function deleteLeadType(id: string, replacementId?: string): Promise<DeleteLeadTypeResult> {
+export async function deleteLeadType(id: string, options: DeleteLeadTypeOptions = {}): Promise<DeleteLeadTypeResult> {
   const user = await requireSettingsManager();
+  const { replacementId, deleteSearches = false } = options;
 
   const leadType = await prisma.leadType.findUnique({ where: { id } });
   if (!leadType) return { error: "That lead type no longer exists." };
@@ -139,9 +152,10 @@ export async function deleteLeadType(id: string, replacementId?: string): Promis
     prisma.routePlan.count({ where }),
     prisma.emailTemplate.count({ where }),
   ]);
-  const inUse = companies + searches + routes + templates > 0;
+  const othersInUse = companies + routes + templates > 0;
+  const needsMove = othersInUse || (searches > 0 && !deleteSearches);
 
-  if (inUse && !replacementId) {
+  if (needsMove && !replacementId) {
     const uses = [
       companies && plural(companies, "company", "companies"),
       searches && plural(searches, "lead search", "lead searches"),
@@ -151,35 +165,41 @@ export async function deleteLeadType(id: string, replacementId?: string): Promis
     return {
       error: `"${leadType.name}" is used by ${uses.join(", ")}. Choose a lead type to move them to, then delete.`,
       needsReplacement: true,
+      searches,
+      othersInUse,
     };
   }
 
-  if (inUse) {
-    if (replacementId === id) return { error: "Choose a different lead type to move them to." };
-    const replacement = await prisma.leadType.findUnique({ where: { id: replacementId } });
-    if (!replacement) return { error: "The lead type to move them to no longer exists." };
-
-    const data = { leadTypeId: replacement.id };
-    await prisma.$transaction([
-      prisma.company.updateMany({ where, data }),
-      prisma.leadSearch.updateMany({ where, data }),
-      prisma.routePlan.updateMany({ where, data }),
-      prisma.emailTemplate.updateMany({ where, data }),
-      prisma.leadType.delete({ where: { id } }),
-    ]);
-    await writeAuditEvent({
-      actorId: user.id,
-      module: "settings",
-      action: "lead_type.deleted",
-      entityType: "LeadType",
-      entityId: id,
-      beforeData: { name: leadType.name },
-      metadata: { movedTo: { id: replacement.id, name: replacement.name }, companies, searches, routes, templates },
-    });
-  } else {
-    await prisma.leadType.delete({ where: { id } });
-    await writeAuditEvent({ actorId: user.id, module: "settings", action: "lead_type.deleted", entityType: "LeadType", entityId: id, beforeData: { name: leadType.name } });
+  if (deleteSearches && searches > 0) {
+    const running = await prisma.leadSearch.count({ where: { ...where, status: { in: ["PENDING", "RUNNING"] } } });
+    if (running > 0) return { error: "One of its lead searches is still running. Wait for it to finish, then delete." };
   }
+
+  let replacement: { id: string; name: string } | null = null;
+  if (needsMove) {
+    if (replacementId === id) return { error: "Choose a different lead type to move them to." };
+    replacement = await prisma.leadType.findUnique({ where: { id: replacementId }, select: { id: true, name: true } });
+    if (!replacement) return { error: "The lead type to move them to no longer exists." };
+  }
+
+  const operations = [];
+  if (replacement) {
+    const data = { leadTypeId: replacement.id };
+    operations.push(prisma.company.updateMany({ where, data }), prisma.routePlan.updateMany({ where, data }), prisma.emailTemplate.updateMany({ where, data }));
+    if (!deleteSearches) operations.push(prisma.leadSearch.updateMany({ where, data }));
+  }
+  // Results and the searches' other child rows cascade with the search.
+  if (deleteSearches) operations.push(prisma.leadSearch.deleteMany({ where }));
+  await prisma.$transaction([...operations, prisma.leadType.delete({ where: { id } })]);
+  await writeAuditEvent({
+    actorId: user.id,
+    module: "settings",
+    action: "lead_type.deleted",
+    entityType: "LeadType",
+    entityId: id,
+    beforeData: { name: leadType.name },
+    metadata: { movedTo: replacement, companies, searches, routes, templates, searchesDeleted: deleteSearches ? searches : 0 },
+  });
 
   revalidatePath(PATH);
 }

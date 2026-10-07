@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/auth/current-user";
+import { hasMultipleLeadTypes } from "@/lib/lead-types/multiple";
 import { hasPermission } from "@/lib/auth/permissions";
 import { reportScope } from "@/lib/reports/scope";
 import { PageHeader } from "@/components/ui/page-header";
@@ -6,6 +7,7 @@ import { ReportTabs, type ReportTab } from "./report-tabs";
 
 export default async function ReportsLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
+  const multipleLeadTypes = await hasMultipleLeadTypes();
   const scope = reportScope(user);
 
   if (!scope) {
@@ -31,7 +33,7 @@ export default async function ReportsLayout({ children }: { children: React.Reac
   }
   tabs.push(
     { href: "/reports/territories", label: "Territories" },
-    { href: "/reports/lead-types", label: "Lead Types" },
+    ...(multipleLeadTypes ? [{ href: "/reports/lead-types", label: "Lead Types" }] : []),
     { href: "/reports/trends", label: "Trends" },
   );
   if (hasPermission(user, "view_campaign_reports")) {

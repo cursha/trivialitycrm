@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Pagination } from "@/components/ui/pagination";
 import { PAGE_SIZE } from "@/app/(dashboard)/companies/queries";
 import { ListDetailTable } from "./list-detail-table";
+import { hasMultipleLeadTypes } from "@/lib/lead-types/multiple";
 import { ListActionsBar } from "./list-actions-bar";
 import { StartCallingSessionButton } from "./start-calling-session-button";
 import { CAMPAIGN_STATUS_TONE, humanizeEnum } from "@/lib/ui/status-tones";
@@ -36,7 +37,7 @@ const FILTER_LABELS: Record<string, string> = {
   cities: "Cities",
   leadTypeId: "Lead type",
   pipelineStageId: "Pipeline stage",
-  assignedToId: "Owner",
+  assignedToId: "Salesperson",
   competitorId: "Competitor",
   triviaStatus: "Trivia status",
   confidenceLevel: "Confidence",
@@ -213,6 +214,7 @@ export default async function SalesListDetailPage({
         companies={companies}
         lastContactByCompanyId={Object.fromEntries(Object.entries(lastContactByCompanyId).map(([k, v]) => [k, v]))}
         canManage={canManage}
+        showLeadType={await hasMultipleLeadTypes()}
       />
 
       <Pagination page={page} pageCount={pageCount} pageSize={PAGE_SIZE} hrefFor={(p) => `/sales-lists/${list.id}?page=${p}`} />

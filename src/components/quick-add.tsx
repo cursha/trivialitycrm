@@ -228,21 +228,26 @@ function QuickAddCompanyForm({ options }: { options: QuickAddOptions | null }) {
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <div>
+        <div className={options.leadTypes.length === 1 ? "col-span-2" : undefined}>
           <Label>Country</Label>
           <Input name="country" required className="mt-1" />
         </div>
-        <div>
-          <Label>Lead type</Label>
-          <Select name="leadTypeId" required className="mt-1">
-            <option value="">Choose…</option>
-            {options.leadTypes.map((lt) => (
-              <option key={lt.id} value={lt.id}>
-                {lt.name}
-              </option>
-            ))}
-          </Select>
-        </div>
+        {/* With a single lead type there's nothing to choose — it's used without asking. */}
+        {options.leadTypes.length === 1 ? (
+          <input type="hidden" name="leadTypeId" value={options.leadTypes[0].id} />
+        ) : (
+          <div>
+            <Label>Lead type</Label>
+            <Select name="leadTypeId" required className="mt-1">
+              <option value="">Choose…</option>
+              {options.leadTypes.map((lt) => (
+                <option key={lt.id} value={lt.id}>
+                  {lt.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
       </div>
       <input type="hidden" name="pipelineStageId" value={options.defaultPipelineStageId ?? ""} />
       <input type="hidden" name="triviaStatus" value="UNCERTAIN" />

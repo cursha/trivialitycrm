@@ -43,8 +43,11 @@ export function CompaniesTable({
   canRoutePlan,
   routeCompanyIds,
   sweetSpotIds,
+  showLeadType,
 }: {
   companies: CompanyRow[];
+  /** False when there's only one lead type — see hasMultipleLeadTypes(). */
+  showLeadType: boolean;
   stages: StageOption[];
   salespeople: Option[];
   territories: Option[];
@@ -103,7 +106,7 @@ export function CompaniesTable({
                   </th>
                 )}
                 <th className="px-5 py-3">Company</th>
-                <th className="px-5 py-3">Lead Type</th>
+                {showLeadType && <th className="px-5 py-3">Lead Type</th>}
                 <th className="px-5 py-3">Stage</th>
                 <th className="px-5 py-3">Salesperson</th>
                 <th className="px-5 py-3">Trivia Status</th>
@@ -135,7 +138,7 @@ export function CompaniesTable({
                       {formatAddressLine(company)}
                     </div>
                   </td>
-                  <td className="px-5 py-4">{company.leadType.name}</td>
+                  {showLeadType && <td className="px-5 py-4">{company.leadType.name}</td>}
                   <td className="px-5 py-4">
                     <Badge tone="secondary">{company.pipelineStage.name}</Badge>
                   </td>
@@ -169,7 +172,7 @@ export function CompaniesTable({
               ))}
               {companies.length === 0 && (
                 <tr>
-                  <td colSpan={canBulk ? 8 : 7} className="px-5 py-10 text-center text-text-muted">
+                  <td colSpan={6 + (canBulk ? 1 : 0) + (showLeadType ? 1 : 0)} className="px-5 py-10 text-center text-text-muted">
                     No companies match these filters.
                   </td>
                 </tr>
@@ -205,10 +208,12 @@ export function CompaniesTable({
                   </div>
                   <p className="text-xs text-text-muted">{formatAddressLine(company)}</p>
                   <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-                    <div>
-                      <dt className="text-text-muted">Lead type</dt>
-                      <dd className="font-medium text-text">{company.leadType.name}</dd>
-                    </div>
+                    {showLeadType && (
+                      <div>
+                        <dt className="text-text-muted">Lead type</dt>
+                        <dd className="font-medium text-text">{company.leadType.name}</dd>
+                      </div>
+                    )}
                     <div>
                       <dt className="text-text-muted">Salesperson</dt>
                       <dd className="font-medium text-text">{company.assignedTo?.name ?? "Unassigned"}</dd>

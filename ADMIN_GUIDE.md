@@ -29,18 +29,24 @@ not to gate.
    To **remove a lead type**, press its bin icon. If nothing uses it, it's
    deleted. If companies, lead searches, routes or email templates still use
    it, the page says how many and asks which lead type to **move them to**;
-   **Move and delete** moves them all, then deletes it. To hide a lead type
-   without moving anything, click its **Active** badge to make it Inactive.
+   **Move and delete** moves them all, then deletes it. Tick **Delete its
+   lead searches** to delete its old searches and their results instead of
+   moving them (companies are never deleted). To hide a lead type without
+   moving anything, click its **Active** badge to make it Inactive.
+   With only **one** active lead type (e.g. just "pubs"), nobody is asked
+   for a lead type: forms use it automatically, and the lead type filters,
+   columns and the Lead Types report are hidden. They come back as soon as a
+   second lead type is active.
    The stages are also the **sales process** (Target → Introduced → Demo
    Booked → Demo Held → Trial Booked → Trial Live → Won / Lost). On the
    Pipeline Stages page, **Checklist & follow-ups** opens each step's
-   description (the bubble reps see when they hover over or tap the step),
-   its checklist (what reps see on the company page, separately for Local and
-   Long-distance bars) and its automatic follow-ups (created when a company
+   description (the bubble salespeople see when they hover over or tap the
+   step), its checklist (what salespeople see on the company page,
+   separately for Local and Long-distance bars) and its automatic follow-ups (created when a company
    enters the step, for all bars or one kind only, due a set number of days
    later, or a set number of days **before the trial ends** with "Count back
    from the trial end"). In any of this text, `{{trialWeeks}}` is replaced
-   with the bar's rep's trial length (e.g. "up to {{trialWeeks}} weeks
+   with the bar's salesperson's trial length (e.g. "up to {{trialWeeks}} weeks
    free"). Edits apply from then on; follow-ups already created are left
    alone. Renaming a step is safe: the process, dashboard counts and
    scoreboard find steps by their role, not their name.
@@ -102,22 +108,23 @@ not to gate.
 
 ## Sales scoreboard, daily goals and trial length
 
-The Manager page shows every rep's scoreboard (anyone whose role can edit
+The Manager page shows every salesperson's scoreboard (anyone whose role can edit
 leads): today's visits, long-distance intros, demos booked, demos held and
 trials booked against their daily goal, plus this week's totals.
 
-Under **Daily goals & trial length**, click **Edit** next to a rep to set:
+Under **Daily goals & trial length**, click **Edit** next to a salesperson
+to set:
 
-- **Daily goals.** Reps with none saved get the defaults: 10 visits, 2
+- **Daily goals.** Salespeople with none saved get the defaults: 10 visits, 2
   demos booked, 2 demos held, 1 trial booked. A goal of 0 hides that number
-  from the rep's own scoreboard unless they do some.
+  from the salesperson's own scoreboard unless they do some.
 - **Trial length** (1 to 4 weeks; default 4). A bar's trial follows the
-  trial length of the rep it's assigned to: the conversion follow-up is due
+  trial length of the salesperson it's assigned to: the conversion follow-up is due
   a week before the trial ends, Trial Live check-ins that would land after
   the trial are skipped, and the checklists say "up to N weeks". It applies
-  the next time one of the rep's bars enters a step; follow-ups already
+  the next time one of the salesperson's bars enters a step; follow-ups already
   created don't move.
-- **Timezone**, so a Colorado Springs rep's "today" is Mountain time.
+- **Timezone**, so a Colorado Springs salesperson's "today" is Mountain time.
 
 ## User manual
 

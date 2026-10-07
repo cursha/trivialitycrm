@@ -71,7 +71,7 @@ export default async function ManagerWorkspacePage() {
 
       <Card>
         <SectionHeading>Sales scoreboard</SectionHeading>
-        <p className="mt-1 text-sm text-text-muted">Today against each rep&apos;s daily goal (in their own timezone), and this week&apos;s total so far.</p>
+        <p className="mt-1 text-sm text-text-muted">Today against each salesperson&apos;s daily goal (in their own timezone), and this week&apos;s total so far.</p>
         {scores.length === 0 ? <EmptyState>No salespeople yet.</EmptyState> : <TeamScoreboard scores={scores} />}
       </Card>
 
@@ -170,7 +170,7 @@ export default async function ManagerWorkspacePage() {
               <thead className="text-xs uppercase text-text-muted">
                 <tr>
                   <th className="py-2">Territory</th>
-                  <th className="py-2">Owner</th>
+                  <th className="py-2">Salesperson</th>
                   <th className="py-2">Companies</th>
                 </tr>
               </thead>
@@ -196,7 +196,7 @@ export default async function ManagerWorkspacePage() {
           </Link>
         </div>
         <p className="mt-1 text-sm text-text-muted">
-          Select companies in the Team Leads view and use the bulk-action toolbar to reassign or set a territory owner.
+          Select companies in the Team Leads view and use the bulk-action toolbar to reassign them to a salesperson or set their territory.
         </p>
       </Card>
     </div>

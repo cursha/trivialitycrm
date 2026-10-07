@@ -100,7 +100,7 @@ export function TerritoryManager({
           <thead className="bg-black/5 text-xs uppercase text-text-muted">
             <tr>
               <th className="px-5 py-3">Scope</th>
-              <th className="px-5 py-3">Assigned to</th>
+              <th className="px-5 py-3">Salesperson</th>
               <th className="px-5 py-3">Status</th>
               <th className="px-5 py-3 text-right">Actions</th>
             </tr>
@@ -114,7 +114,7 @@ export function TerritoryManager({
                     <form action={(formData) => handleUpdate(territory.id, formData)} className="space-y-3">
                       <TerritoryFields defaultValues={territory} salespeople={salespeople} />
                       <div>
-                        <Label>Assigned to (optional)</Label>
+                        <Label>Salesperson (optional)</Label>
                         <Select name="assignedToId" defaultValue={territory.assignedToId ?? ""} className="mt-1">
                           <option value="">Unassigned</option>
                           {salespeople.map((sp) => (
@@ -189,7 +189,7 @@ export function TerritoryManager({
           <form action={handleCreate} className="space-y-3">
             <TerritoryFields salespeople={salespeople} />
             <div>
-              <Label>Assigned to (optional)</Label>
+              <Label>Salesperson (optional)</Label>
               <Select name="assignedToId" defaultValue="" className="mt-1">
                 <option value="">Unassigned</option>
                 {salespeople.map((sp) => (
