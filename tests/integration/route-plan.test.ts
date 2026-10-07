@@ -28,9 +28,9 @@ async function baseFixtures() {
   const user = await fetchAuthenticatedUser((await createTestUser({ roleId: role.id })).id);
   const stage = await createPipelineStageFixture();
   const pubType = await createLeadTypeFixture("Pub Trivia", { routePlanEnabled: true, routePlanSlug: "pub" });
-  const seniorHomeType = await createLeadTypeFixture("Senior Home", { routePlanEnabled: true });
+  const golfClubType = await createLeadTypeFixture("Golf Club", { routePlanEnabled: true });
   const ineligibleType = await createLeadTypeFixture("Not Route-Eligible", { routePlanEnabled: false });
-  return { user, stage, pubType, seniorHomeType, ineligibleType };
+  return { user, stage, pubType, golfClubType, ineligibleType };
 }
 
 async function makeCompany(f: Awaited<ReturnType<typeof baseFixtures>>, overrides: { leadTypeId?: string; country?: string; name?: string } = {}) {
@@ -68,11 +68,11 @@ describe("addCompanyToRoute", () => {
   it("rejects a different lead type as a conflict, pending resolution", async () => {
     const f = await baseFixtures();
     const pub = await makeCompany(f, { leadTypeId: f.pubType.id });
-    const seniorHome = await makeCompany(f, { leadTypeId: f.seniorHomeType.id });
+    const golfClub = await makeCompany(f, { leadTypeId: f.golfClubType.id });
 
     await addCompanyToRoute(f.user, pub.id);
-    const result = await addCompanyToRoute(f.user, seniorHome.id);
-    expect(result).toEqual({ ok: false, conflict: { type: "lead_type_conflict", currentLeadTypeName: "Pub Trivia", newLeadTypeName: "Senior Home" } });
+    const result = await addCompanyToRoute(f.user, golfClub.id);
+    expect(result).toEqual({ ok: false, conflict: { type: "lead_type_conflict", currentLeadTypeName: "Pub Trivia", newLeadTypeName: "Golf Club" } });
     // The conflicting company must NOT have been added.
     expect((await getRouteSummary(f.user.id)).count).toBe(1);
   });
@@ -186,8 +186,8 @@ describe("clearRoute", () => {
     expect(await getRouteSummary(f.user.id)).toMatchObject({ name: "My route", count: 0, leadTypeId: null, leadTypeName: null, country: null });
 
     // A different lead type/country can now start a fresh route.
-    const seniorHome = await makeCompany(f, { leadTypeId: f.seniorHomeType.id, country: "USA" });
-    const result = await addCompanyToRoute(f.user, seniorHome.id);
+    const golfClub = await makeCompany(f, { leadTypeId: f.golfClubType.id, country: "USA" });
+    const result = await addCompanyToRoute(f.user, golfClub.id);
     expect(result).toMatchObject({ ok: true, count: 1 });
   });
 });
@@ -206,10 +206,10 @@ describe("bulkAddCompaniesToRoute", () => {
   it("does not partially change the route when the batch has a lead-type conflict", async () => {
     const f = await baseFixtures();
     const pub = await makeCompany(f, { leadTypeId: f.pubType.id });
-    const seniorHome = await makeCompany(f, { leadTypeId: f.seniorHomeType.id });
+    const golfClub = await makeCompany(f, { leadTypeId: f.golfClubType.id });
 
-    const result = await bulkAddCompaniesToRoute(f.user, [pub.id, seniorHome.id]);
-    expect(result).toEqual({ ok: false, conflict: { type: "lead_type_conflict", currentLeadTypeName: "Pub Trivia", newLeadTypeName: "Senior Home" } });
+    const result = await bulkAddCompaniesToRoute(f.user, [pub.id, golfClub.id]);
+    expect(result).toEqual({ ok: false, conflict: { type: "lead_type_conflict", currentLeadTypeName: "Pub Trivia", newLeadTypeName: "Golf Club" } });
     // Nothing committed — not even the pub, which was valid on its own.
     expect((await getRouteSummary(f.user.id)).count).toBe(0);
   });
@@ -277,9 +277,9 @@ describe("bulkAddCompaniesToRoute", () => {
   it("leaves no new route behind when a batch for a new route is rejected", async () => {
     const f = await baseFixtures();
     const pub = await makeCompany(f, { leadTypeId: f.pubType.id });
-    const seniorHome = await makeCompany(f, { leadTypeId: f.seniorHomeType.id });
+    const golfClub = await makeCompany(f, { leadTypeId: f.golfClubType.id });
 
-    const result = await bulkAddCompaniesToRoute(f.user, [pub.id, seniorHome.id], { newRoute: { name: "Oakville", plannedDate: null } });
+    const result = await bulkAddCompaniesToRoute(f.user, [pub.id, golfClub.id], { newRoute: { name: "Oakville", plannedDate: null } });
     expect(result).toMatchObject({ ok: false, conflict: { type: "lead_type_conflict" } });
     expect(await listRoutes(f.user.id)).toEqual([]);
     expect(await bulkAddCompaniesToRoute(f.user, [pub.id], { newRoute: { name: "  ", plannedDate: null } })).toEqual({ ok: false, error: "Give the route a name, e.g. Mississauga." });
@@ -324,7 +324,7 @@ describe("getRouteDetail", () => {
     const company = await makeCompany(f, { leadTypeId: f.pubType.id });
     await addCompanyToRoute(f.user, company.id);
 
-    await testPrisma.company.update({ where: { id: company.id }, data: { leadTypeId: f.seniorHomeType.id } });
+    await testPrisma.company.update({ where: { id: company.id }, data: { leadTypeId: f.golfClubType.id } });
 
     const detail = await getRouteDetail(f.user);
     expect(detail.companies[0].stillValid).toBe(false);

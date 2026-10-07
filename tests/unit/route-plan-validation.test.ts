@@ -112,7 +112,7 @@ describe("sortRouteCompanies", () => {
 
 describe("sanitizeRoutePlanSlug", () => {
   it("lowercases and hyphenates", () => {
-    expect(sanitizeRoutePlanSlug("Senior Home")).toBe("senior-home");
+    expect(sanitizeRoutePlanSlug("Golf Club")).toBe("golf-club");
     expect(sanitizeRoutePlanSlug("Pub")).toBe("pub");
   });
 
@@ -125,7 +125,7 @@ describe("sanitizeRoutePlanSlug", () => {
 describe("buildRoutePlanFilename", () => {
   it("builds <slug>-route-YYYY-MM-DD.csv with zero-padded month/day and no time", () => {
     expect(buildRoutePlanFilename("pub", { year: 2026, month: 7, day: 28 })).toBe("pub-route-2026-07-28.csv");
-    expect(buildRoutePlanFilename("senior-home", { year: 2026, month: 1, day: 5 })).toBe("senior-home-route-2026-01-05.csv");
+    expect(buildRoutePlanFilename("golf-club", { year: 2026, month: 1, day: 5 })).toBe("golf-club-route-2026-01-05.csv");
   });
 });
 
@@ -147,7 +147,7 @@ describe("resolveRouteAddOutcome", () => {
   });
 
   it("flags a lead-type conflict", () => {
-    expect(resolveRouteAddOutcome({ leadTypeId: "lt-senior-home", country: "Canada" }, eligible)).toEqual({ type: "lead_type_conflict" });
+    expect(resolveRouteAddOutcome({ leadTypeId: "lt-golf-club", country: "Canada" }, eligible)).toEqual({ type: "lead_type_conflict" });
   });
 
   it("flags a country conflict only when the lead type already matches", () => {
@@ -155,6 +155,6 @@ describe("resolveRouteAddOutcome", () => {
   });
 
   it("checks lead type before country when both differ", () => {
-    expect(resolveRouteAddOutcome({ leadTypeId: "lt-senior-home", country: "USA" }, eligible)).toEqual({ type: "lead_type_conflict" });
+    expect(resolveRouteAddOutcome({ leadTypeId: "lt-golf-club", country: "USA" }, eligible)).toEqual({ type: "lead_type_conflict" });
   });
 });

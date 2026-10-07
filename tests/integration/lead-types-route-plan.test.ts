@@ -61,7 +61,7 @@ describe("setLeadTypeRoutePlanSettings", () => {
   it("rejects a slug already used by another lead type", async () => {
     await adminFixture();
     await createLeadTypeFixture("Pub Trivia", { routePlanEnabled: true, routePlanSlug: "pub" });
-    const other = await createLeadTypeFixture("Senior Home");
+    const other = await createLeadTypeFixture("Golf Club");
 
     const result = await setLeadTypeRoutePlanSettings(other.id, formData({ routePlanEnabled: "on", routePlanSlug: "pub" }));
     expect(result?.error).toBeTruthy();
