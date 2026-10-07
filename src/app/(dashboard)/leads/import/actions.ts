@@ -1,13 +1,26 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/prisma";
+import { prisma, type AppPrismaClient, type AppTransactionClient } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
 import { parseSpreadsheet, SpreadsheetParseError } from "@/lib/import/parse";
 import { putUpload, getUpload, recordMapping, markImported } from "@/lib/import/batch-store";
 import { mapAndValidateRow, type ImportMapping, type MappedRow } from "@/lib/validation/import";
 import { findPotentialDuplicates, computeNormalizedFields } from "@/lib/duplicates/match";
+import { computeAddressNormalizedFields, computeContactNormalizedFields } from "@/lib/data-quality/normalize";
+import { findCompetitorByName } from "@/lib/competitors/find-or-create";
+import {
+  appendImportNotes,
+  fieldLabel,
+  fillExistingCompany,
+  importedContact,
+  isLinkableProvider,
+  newCompanyNotes,
+  newCompanyResearch,
+  type ImportedContact,
+} from "@/lib/import/company-fields";
+import { zonedCalendarDate } from "@/lib/timezone";
 import { logInitialPipelineStage } from "@/lib/companies/activity-log";
 import { checkRateLimit } from "@/lib/rate-limit/postgres-bucket";
 
@@ -36,8 +49,66 @@ export async function uploadSpreadsheet(formData: FormData): Promise<UploadResul
   }
 }
 
-export type PreviewedRow = { index: number; values: MappedRow; errors: string[]; warnings: string[]; duplicateOf: string | null };
+export type PreviewedMatch = {
+  name: string;
+  city: string;
+  /** Labels of the empty fields this row will fill in. */
+  fills: string[];
+  addsNotes: boolean;
+  addsContact: boolean;
+};
+export type PreviewedRow = { index: number; values: MappedRow; errors: string[]; warnings: string[]; match: PreviewedMatch | null };
 export type PreviewResult = { error: string } | { rows: PreviewedRow[] };
+
+const EXISTING_SELECT = {
+  id: true,
+  name: true,
+  city: true,
+  country: true,
+  notes: true,
+  address1: true,
+  postalCode: true,
+  phone: true,
+  email: true,
+  websiteUrl: true,
+  currentEntertainment: true,
+  triviaHistory: true,
+  verifiedEvidenceSummary: true,
+  inferredEvidenceSummary: true,
+  missingInformation: true,
+  recommendedSalesApproach: true,
+  recommendedNextAction: true,
+  triviaStatus: true,
+  competitorTriviaProvider: true,
+  competitorId: true,
+  competitorTriviaDay: true,
+  slowNight: true,
+  needsReview: true,
+  needsReviewReason: true,
+} as const;
+
+/** The tracked Competitor a row's provider name links to, if any. */
+async function matchedCompetitorId(client: AppPrismaClient | AppTransactionClient, values: MappedRow): Promise<string | null> {
+  if (!isLinkableProvider(values.competitorTriviaProvider)) return null;
+  return (await findCompetitorByName(client, values.competitorTriviaProvider))?.id ?? null;
+}
+
+/** Whether a contact with this name, email or phone is already on the company. */
+async function hasMatchingContact(client: AppPrismaClient | AppTransactionClient, companyId: string, contact: ImportedContact): Promise<boolean> {
+  const normalized = computeContactNormalizedFields(contact);
+  const existing = await client.contact.findMany({ where: { companyId, status: "ACTIVE" } });
+  return existing.some(
+    (other) =>
+      (other.normalizedFirstName === normalized.normalizedFirstName && other.normalizedLastName === normalized.normalizedLastName) ||
+      (!!normalized.normalizedEmail && other.normalizedEmail === normalized.normalizedEmail) ||
+      (!!normalized.normalizedPhone && other.normalizedPhone === normalized.normalizedPhone),
+  );
+}
+
+function importDate(): string {
+  const { year, month, day } = zonedCalendarDate(new Date());
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
 
 export async function previewImport(sessionId: string, mapping: ImportMapping): Promise<PreviewResult> {
   const user = await requireUser();
@@ -47,25 +118,44 @@ export async function previewImport(sessionId: string, mapping: ImportMapping): 
   if (!upload) return { error: "This upload has expired — please upload the file again." };
 
   await recordMapping(sessionId, mapping);
+  const today = importDate();
 
   const rows: PreviewedRow[] = [];
   for (const [index, rawRow] of upload.rows.entries()) {
     const { values, errors, warnings } = mapAndValidateRow(rawRow, mapping);
 
-    let duplicateOf: string | null = null;
+    let match: PreviewedMatch | null = null;
     if (errors.length === 0) {
       const matches = await findPotentialDuplicates(prisma, values);
-      if (matches.length > 0) duplicateOf = matches[0].name;
+      const existing = matches[0] ? await prisma.company.findUnique({ where: { id: matches[0].id }, select: EXISTING_SELECT }) : null;
+      if (existing) {
+        const { filled } = fillExistingCompany(existing, values, await matchedCompetitorId(prisma, values));
+        const contact = importedContact(values);
+        match = {
+          name: existing.name,
+          city: existing.city,
+          fills: filled.map(fieldLabel),
+          addsNotes: appendImportNotes(existing.notes, values, today, upload.filename) !== null,
+          addsContact: !!contact && !(await hasMatchingContact(prisma, existing.id, contact)),
+        };
+      }
     }
 
-    rows.push({ index, values, errors, warnings, duplicateOf });
+    rows.push({ index, values, errors, warnings, match });
   }
 
   return { rows };
 }
 
-export type CommitResult = { error: string } | { importedCount: number; skippedCount: number };
+export type CommitResult = { error: string } | { importedCount: number; updatedCount: number; skippedCount: number };
 
+/**
+ * Creates a company for each selected row, or — when the row matches a
+ * company already in the CRM (or one an earlier row of this import just
+ * created) — fills in only that company's empty fields, appends its notes
+ * under a dated header and adds its contact if it isn't there yet. A match
+ * with nothing new to add counts as skipped, as does an invalid row.
+ */
 export async function commitImport(
   sessionId: string,
   mapping: ImportMapping,
@@ -86,92 +176,114 @@ export async function commitImport(
   const upload = await getUpload(sessionId, user.id);
   if (!upload) return { error: "This upload has expired — please upload the file again." };
 
+  const today = importDate();
   let importedCount = 0;
+  let updatedCount = 0;
   let skippedCount = 0;
 
-  await prisma.$transaction(async (tx) => {
-    for (const index of selectedIndexes) {
-      const rawRow = upload.rows[index];
-      if (!rawRow) continue;
+  await prisma.$transaction(
+    async (tx) => {
+      for (const index of selectedIndexes) {
+        const rawRow = upload.rows[index];
+        if (!rawRow) continue;
 
-      const { values, errors } = mapAndValidateRow(rawRow, mapping);
-      if (errors.length > 0) {
-        skippedCount += 1;
-        continue;
-      }
-
-      const matches = await findPotentialDuplicates(tx, values);
-      const normalized = computeNormalizedFields(values);
-
-      if (matches.length > 0) {
-        // Same physical location already exists (either pre-existing, or
-        // created by an earlier row in this same import) — attach this
-        // row's contact instead of creating a duplicate company. This is
-        // how the v1 "one contact per row" structure supports multiple
-        // contacts per company (repeated rows, see MODULE_2_REPORT.md).
-        if (values.contactFirstName && values.contactLastName) {
-          await tx.contact.create({
-            data: {
-              companyId: matches[0].id,
-              firstName: values.contactFirstName,
-              lastName: values.contactLastName,
-              phone: values.contactPhone || null,
-              email: values.contactEmail || null,
-              title: values.contactTitle || null,
-            },
-          });
+        const { values, errors } = mapAndValidateRow(rawRow, mapping);
+        if (errors.length > 0) {
+          skippedCount += 1;
+          continue;
         }
-        skippedCount += 1;
-        continue;
-      }
 
-      const company = await tx.company.create({
-        data: {
-          name: values.name,
-          address1: values.address1 || null,
-          city: values.city,
-          region: values.region,
-          postalCode: values.postalCode || null,
-          country: values.country,
-          phone: values.phone || null,
-          email: values.email || null,
-          websiteUrl: values.websiteUrl || null,
-          leadTypeId,
-          pipelineStageId,
-          assignedToId,
-          createdById: user.id,
-          source: "IMPORT",
-          importBatchId: sessionId,
-          ...normalized,
-        },
-      });
+        const matches = await findPotentialDuplicates(tx, values);
+        const competitorId = await matchedCompetitorId(tx, values);
+        const contact = importedContact(values);
 
-      await logInitialPipelineStage(tx, { companyId: company.id, userId: user.id, toStageId: company.pipelineStageId });
+        if (matches.length > 0) {
+          // Same physical location already exists (either pre-existing, or
+          // created by an earlier row in this same import). Repeated rows
+          // are also how one spreadsheet gives a company several contacts.
+          const existing = await tx.company.findUniqueOrThrow({ where: { id: matches[0].id }, select: EXISTING_SELECT });
+          const { data } = fillExistingCompany(existing, values, competitorId);
+          const notes = appendImportNotes(existing.notes, values, today, upload.filename);
+          const addContact = !!contact && !(await hasMatchingContact(tx, existing.id, contact));
 
-      if (values.contactFirstName && values.contactLastName) {
-        await tx.contact.create({
+          if (Object.keys(data).length === 0 && notes === null && !addContact) {
+            skippedCount += 1;
+            continue;
+          }
+
+          if (Object.keys(data).length > 0 || notes !== null) {
+            const normalized = computeNormalizedFields({
+              name: existing.name,
+              phone: data.phone ?? existing.phone,
+              email: data.email ?? existing.email,
+              websiteUrl: data.websiteUrl ?? existing.websiteUrl,
+            });
+            await tx.company.update({
+              where: { id: existing.id },
+              data: {
+                ...data,
+                ...(data.phone ? { normalizedPhone: normalized.normalizedPhone } : {}),
+                ...(data.email ? { normalizedEmail: normalized.normalizedEmail } : {}),
+                ...(data.websiteUrl ? { websiteDomain: normalized.websiteDomain } : {}),
+                ...(data.postalCode
+                  ? { normalizedPostalCode: computeAddressNormalizedFields({ postalCode: data.postalCode, country: existing.country }).normalizedPostalCode }
+                  : {}),
+                ...(notes !== null ? { notes } : {}),
+                updatedById: user.id,
+              },
+            });
+          }
+          if (contact && addContact) await createContact(tx, existing.id, contact);
+          updatedCount += 1;
+          continue;
+        }
+
+        const company = await tx.company.create({
           data: {
-            companyId: company.id,
-            firstName: values.contactFirstName,
-            lastName: values.contactLastName,
-            phone: values.contactPhone || null,
-            email: values.contactEmail || null,
-            title: values.contactTitle || null,
+            name: values.name,
+            address1: values.address1 || null,
+            city: values.city,
+            region: values.region,
+            postalCode: values.postalCode || null,
+            country: values.country,
+            phone: values.phone || null,
+            email: values.email || null,
+            websiteUrl: values.websiteUrl || null,
+            notes: newCompanyNotes(values),
+            ...newCompanyResearch(values, competitorId),
+            leadTypeId,
+            pipelineStageId,
+            assignedToId,
+            createdById: user.id,
+            source: "IMPORT",
+            importBatchId: sessionId,
+            ...computeNormalizedFields(values),
+            ...computeAddressNormalizedFields(values),
           },
         });
+
+        await logInitialPipelineStage(tx, { companyId: company.id, userId: user.id, toStageId: company.pipelineStageId });
+        if (contact) await createContact(tx, company.id, contact);
+
+        importedCount += 1;
       }
 
-      importedCount += 1;
-    }
-
-    // Wiped in the same transaction as the rows it produced — a crash
-    // between the two can't leave the staged payload lingering while its
-    // data is already live in Company/Contact.
-    await markImported(tx, sessionId);
-  });
+      // Wiped in the same transaction as the rows it produced — a crash
+      // between the two can't leave the staged payload lingering while its
+      // data is already live in Company/Contact.
+      await markImported(tx, sessionId);
+    },
+    // Same 60s timeout as the research save actions: several queries per
+    // row exceed Prisma's 5s default for a realistic file.
+    { timeout: 60_000 },
+  );
 
   revalidatePath("/companies");
-  return { importedCount, skippedCount };
+  return { importedCount, updatedCount, skippedCount };
+}
+
+async function createContact(tx: AppTransactionClient, companyId: string, contact: ImportedContact) {
+  await tx.contact.create({ data: { companyId, ...contact, ...computeContactNormalizedFields(contact) } });
 }
 
 export type TemplateActionResult = { error?: string } | undefined;

@@ -213,6 +213,34 @@ changes, settings changes, and similar — not routine CRUD on companies/
 contacts (that has its own activity history on each record instead). Useful
 for "who changed X and when."
 
+## Spreadsheet imports
+
+Leads → **Import** (`import_leads`) is described for salespeople in the
+Sales Quick Start. For administrators:
+
+- **Mapping templates** (`manage_settings`): save a column matching as a
+  template to reuse it. Templates saved before v11.0 don't include the lead
+  research fields; columns named exactly like a field still match
+  themselves when you load one.
+- **Research files**: a CSV whose headings are the field names (`name`,
+  `address1`, `city`, `region`, `postalCode`, `country`, `phone`, `email`,
+  `websiteUrl`, `contactFirstName`, `contactLastName`, `contactTitle`,
+  `contactPhone`, `contactEmail`, `contactNote`, `notes`,
+  `researchPriority`, `currentEntertainment`, `triviaStatus`,
+  `competitorTriviaProvider`, `competitorTriviaDay`, `slowNight`,
+  `triviaHistory`, `verifiedEvidenceSummary`, `inferredEvidenceSummary`,
+  `missingInformation`, `recommendedSalesApproach`,
+  `recommendedNextAction`, `needsReview`) maps itself.
+- **Pubs already in the CRM** only have their empty fields filled in, and
+  notes are added under a dated "Imported" line. Lead type, stage,
+  salesperson and source never change.
+- **Not imported**: EOS scores, grades, priority scores and their evidence
+  records. Only the CRM's own scoring writes those, so an import can't move
+  a pub's score. Evidence from research goes in the evidence summaries.
+- A trivia provider is linked to a competitor only when the name matches
+  one on the Competitors page exactly (any case); an import never creates a
+  competitor.
+
 ## Data quality administration
 
 Data Quality → Rules/Scans: configure and trigger duplicate-detection scans.

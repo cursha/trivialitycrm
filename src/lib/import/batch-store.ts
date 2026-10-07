@@ -37,13 +37,13 @@ export async function putUpload(uploadedById: string, filename: string, parsed: 
 /** Returns undefined for a missing batch, a different uploader, an expired batch, or one
  * whose payload has already been cleared (committed or previously expired) — the caller
  * can't distinguish these cases and shouldn't need to; they're all "start over." */
-export async function getUpload(batchId: string, uploadedById: string): Promise<ParsedSpreadsheet | undefined> {
+export async function getUpload(batchId: string, uploadedById: string): Promise<(ParsedSpreadsheet & { filename: string }) | undefined> {
   const batch = await prisma.importBatch.findUnique({ where: { id: batchId } });
   if (!batch) return undefined;
   if (batch.uploadedById !== uploadedById) return undefined;
   if (batch.payload === null) return undefined;
   if (batch.expiresAt.getTime() < Date.now()) return undefined;
-  return { headers: batch.headers as unknown as string[], rows: batch.payload as unknown as Record<string, string>[] };
+  return { filename: batch.filename, headers: batch.headers as unknown as string[], rows: batch.payload as unknown as Record<string, string>[] };
 }
 
 /** Opportunistic, for admin visibility only — the mapping actually used is still passed

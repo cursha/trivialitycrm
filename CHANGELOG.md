@@ -13,6 +13,36 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v11.0 — 2026-10-07
+### New — imports bring in lead research
+- Imports now bring in research details (entertainment, trivia provider,
+  slow night, evidence, what to confirm), fill gaps on pubs already in the
+  CRM, and no longer lose contact notes or contacts without a last name.
+- New import fields: notes, research priority (High/Medium/Low, at the top
+  of the notes), entertainment now, runs trivia now, trivia provider and
+  night, slow night, trivia history, verified and inferred evidence, what
+  still needs confirming, recommended sales approach and next action, and
+  needs review. Days accept Tue, Tues or Tuesday; trivia status accepts
+  yes/no/unknown. A trivia provider matching a tracked competitor is
+  linked to it; "In-house", "Independent" and "None" stay as text.
+- A column headed exactly like a field's name maps itself, so research
+  files made for the CRM need no matching.
+- A row matching a pub already in the CRM used to be skipped. Now it fills
+  in only that pub's empty fields (nothing already there changes, nor its
+  lead type, stage, salesperson or source) and adds its notes under a
+  dated "Imported" line. The preview names the pub it matched and what it
+  will fill; the result counts imported, updated and skipped. Importing
+  the same file twice changes nothing the second time, including contacts.
+- Scores are never imported (EOS, grade, priority score, confidence,
+  evidence records): only the CRM's own scoring sets those.
+### Fixed — contact data an import dropped
+- The contact note column was matched but never saved. It now goes into
+  the company notes as "Contact note (First Last): …".
+- A contact with only a first name (or only a last name) was silently
+  dropped. Their details now go into the company notes, and the preview
+  warns about it.
+- No database change.
+
 ## v10.1 — 2026-10-07
 ### Fixed — the Follow-up column was always empty
 - The Companies list's Follow-up column (and the follow-up date on the

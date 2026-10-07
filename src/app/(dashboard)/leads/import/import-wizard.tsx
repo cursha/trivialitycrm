@@ -1,8 +1,8 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { IMPORT_TARGET_FIELDS, type ImportTargetField } from "@/lib/validation/import";
-import { uploadSpreadsheet, previewImport, commitImport, saveImportTemplate, type PreviewedRow } from "./actions";
+import { IMPORT_TARGET_FIELDS, IMPORT_FIELD_LABELS, autoMapHeaders, type ImportTargetField } from "@/lib/validation/import";
+import { uploadSpreadsheet, previewImport, commitImport, saveImportTemplate, type PreviewedRow, type PreviewedMatch } from "./actions";
 import { Card } from "@/components/ui/card";
 import { Label, Input, Select } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
@@ -11,23 +11,8 @@ import { Alert } from "@/components/ui/alert";
 type Option = { id: string; name: string };
 type Template = { id: string; name: string; mapping: Record<string, string> };
 
-const FIELD_LABELS: Record<ImportTargetField, string> = {
-  name: "Company name *",
-  address1: "Address",
-  city: "City *",
-  region: "State/Province *",
-  postalCode: "Postal code",
-  country: "Country *",
-  phone: "Phone",
-  email: "Email",
-  websiteUrl: "Website",
-  contactFirstName: "Contact first name",
-  contactLastName: "Contact last name",
-  contactPhone: "Contact phone",
-  contactEmail: "Contact email",
-  contactTitle: "Contact title",
-  contactNote: "Contact note",
-};
+// The research fields get their own heading on the mapping screen.
+const FIRST_RESEARCH_FIELD = IMPORT_TARGET_FIELDS.indexOf("notes");
 
 export function ImportWizard({
   leadTypes,
@@ -55,7 +40,7 @@ export function ImportWizard({
   const [leadTypeId, setLeadTypeId] = useState(leadTypes[0]?.id ?? "");
   const [pipelineStageId, setPipelineStageId] = useState(defaultPipelineStageId);
   const [assignedToId, setAssignedToId] = useState(salespeople[0]?.id ?? "");
-  const [result, setResult] = useState<{ importedCount: number; skippedCount: number } | null>(null);
+  const [result, setResult] = useState<{ importedCount: number; updatedCount: number; skippedCount: number } | null>(null);
 
   function handleUpload() {
     const file = fileInputRef.current?.files?.[0];
@@ -75,13 +60,16 @@ export function ImportWizard({
       }
       setSessionId(uploadResult.sessionId);
       setHeaders(uploadResult.headers);
+      setMapping(autoMapHeaders(uploadResult.headers));
       setStep("map");
     });
   }
 
   function applyTemplate(templateId: string) {
     const template = templates.find((t) => t.id === templateId);
-    if (template) setMapping(template.mapping);
+    // A template saved before a field existed doesn't map it, so columns
+    // named exactly like a field still map themselves underneath.
+    if (template) setMapping({ ...autoMapHeaders(headers), ...template.mapping });
   }
 
   function handlePreview() {
@@ -94,7 +82,9 @@ export function ImportWizard({
         return;
       }
       setRows(previewResult.rows);
-      setSelected(new Set(previewResult.rows.filter((r) => r.errors.length === 0 && !r.duplicateOf).map((r) => r.index)));
+      // Rows matching a company already in the CRM are selected too: they
+      // only ever fill in what's empty there.
+      setSelected(new Set(previewResult.rows.filter((r) => r.errors.length === 0).map((r) => r.index)));
       setStep("preview");
     });
   }
@@ -116,7 +106,8 @@ export function ImportWizard({
   if (step === "done" && result) {
     return (
       <Alert tone="success" className="block p-6 text-base">
-        Imported {result.importedCount} row(s). Skipped {result.skippedCount} (invalid or duplicate).
+        Imported {result.importedCount} new {result.importedCount === 1 ? "company" : "companies"}. Updated {result.updatedCount} already in the CRM
+        (empty fields filled in). Skipped {result.skippedCount} (already in the CRM with nothing new to add, or invalid).
       </Alert>
     );
   }
@@ -152,25 +143,12 @@ export function ImportWizard({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            {IMPORT_TARGET_FIELDS.map((field) => (
-              <div key={field}>
-                <Label className="mb-1 block text-xs">{FIELD_LABELS[field]}</Label>
-                <Select
-                  value={mapping[field] ?? ""}
-                  onChange={(e) => setMapping((prev) => ({ ...prev, [field]: e.target.value }))}
-                  className="py-1.5"
-                >
-                  <option value="">(not mapped)</option>
-                  {headers.map((header) => (
-                    <option key={header} value={header}>
-                      {header}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            ))}
+          <MappingGrid fields={IMPORT_TARGET_FIELDS.slice(0, FIRST_RESEARCH_FIELD)} headers={headers} mapping={mapping} setMapping={setMapping} />
+          <div>
+            <h3 className="text-sm font-semibold text-text">Lead research</h3>
+            <p className="text-xs text-text-muted">Optional. Fills the research details on the company page.</p>
           </div>
+          <MappingGrid fields={IMPORT_TARGET_FIELDS.slice(FIRST_RESEARCH_FIELD)} headers={headers} mapping={mapping} setMapping={setMapping} />
 
           <div className="flex items-center gap-2">
             <Button type="button" disabled={isPending} onClick={handlePreview} variant="primary">
@@ -262,7 +240,7 @@ export function ImportWizard({
                           {w}
                         </p>
                       ))}
-                      {row.duplicateOf && <p className="text-xs font-semibold text-amber-700">Possible duplicate of &quot;{row.duplicateOf}&quot;</p>}
+                      {row.match && <MatchSummary match={row.match} />}
                     </td>
                   </tr>
                 ))}
@@ -276,6 +254,50 @@ export function ImportWizard({
         </div>
       )}
     </div>
+  );
+}
+
+function MappingGrid({
+  fields,
+  headers,
+  mapping,
+  setMapping,
+}: {
+  fields: readonly ImportTargetField[];
+  headers: string[];
+  mapping: Record<string, string>;
+  setMapping: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      {fields.map((field) => (
+        <div key={field}>
+          <Label className="mb-1 block text-xs">{IMPORT_FIELD_LABELS[field]}</Label>
+          <Select value={mapping[field] ?? ""} onChange={(e) => setMapping((prev) => ({ ...prev, [field]: e.target.value }))} className="py-1.5">
+            <option value="">(not mapped)</option>
+            {headers.map((header) => (
+              <option key={header} value={header}>
+                {header}
+              </option>
+            ))}
+          </Select>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function MatchSummary({ match }: { match: PreviewedMatch }) {
+  const adds = [
+    match.fills.length > 0 && `fill in ${match.fills.join(", ")}`,
+    match.addsNotes && "add to notes",
+    match.addsContact && "add the contact",
+  ].filter(Boolean);
+  return (
+    <p className="text-xs font-semibold text-amber-700">
+      Already in the CRM as &quot;{match.name}&quot; ({match.city}).{" "}
+      {adds.length > 0 ? `Will ${adds.join("; ")}.` : "Nothing new to add, so it will be skipped."}
+    </p>
   );
 }
 

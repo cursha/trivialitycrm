@@ -402,6 +402,38 @@ a bar found this way isn't marked as running trivia.
    companies. Anything that looks like a duplicate of something already in the
    CRM is flagged before you commit, not after.
 
+## Importing a spreadsheet (if you have access)
+
+Leads → **Import** brings in a CSV or Excel file of pubs.
+
+1. **Upload** the file.
+2. **Match the columns** to CRM fields. A column whose heading is exactly a
+   field's name (e.g. `name`, `city`, `slowNight`) matches itself, so a
+   research file made for the CRM needs no matching. Under **Lead
+   research** you can also bring in what entertainment the pub runs now,
+   whether it runs trivia, who hosts it and on what night, its slow night,
+   its trivia history, the evidence, what still needs confirming, a
+   recommended approach and next action, a research priority
+   (High/Medium/Low) and "needs review" (yes/no). Days can be written Tue,
+   Tues or Tuesday.
+3. **Preview.** Rows with a problem (a missing city, a day that isn't a
+   day) are shown in red and can't be imported. A contact with only a first
+   or only a last name is saved in the company's notes instead, and the
+   preview says so.
+4. **Import.** A pub that's already in the CRM isn't added twice: the
+   preview names the company it matched and what it will fill in. Only
+   fields that are empty on that company are filled; nothing already there
+   is changed, and its lead type, stage and salesperson stay as they are.
+   New notes are added at the end under a line like
+   "— Imported 2026-10-07 (pubs.csv) —". Importing the same file again adds
+   nothing.
+
+The result says how many pubs were imported, how many already in the CRM
+were updated, and how many were skipped. A trivia provider that matches a
+competitor on the Competitors page is linked to it; "In-house",
+"Independent" and "None" are kept as text. Scores (the EOS and its grade)
+are never imported; the CRM works those out itself.
+
 ## On your phone
 
 The company list, search results, My Day, login, and every company detail

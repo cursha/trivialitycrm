@@ -15,7 +15,7 @@ import type { AppTransactionClient, AppPrismaClient } from "@/lib/prisma";
  */
 export async function findOrCreateCompetitor(client: AppPrismaClient | AppTransactionClient, name: string): Promise<{ id: string; name: string }> {
   const trimmed = name.trim();
-  const existing = await client.competitor.findFirst({ where: { name: { equals: trimmed, mode: "insensitive" } } });
+  const existing = await findCompetitorByName(client, trimmed);
   if (existing) return existing;
 
   try {
@@ -27,4 +27,13 @@ export async function findOrCreateCompetitor(client: AppPrismaClient | AppTransa
     }
     throw error;
   }
+}
+
+/** The same exact, case-insensitive name match, without creating anything —
+ * for the spreadsheet import, which only links a provider name to a
+ * Competitor already being tracked. */
+export async function findCompetitorByName(client: AppPrismaClient | AppTransactionClient, name: string): Promise<{ id: string; name: string } | null> {
+  const trimmed = name.trim();
+  if (!trimmed) return null;
+  return client.competitor.findFirst({ where: { name: { equals: trimmed, mode: "insensitive" } }, select: { id: true, name: true } });
 }
