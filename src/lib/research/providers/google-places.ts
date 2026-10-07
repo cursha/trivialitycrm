@@ -10,7 +10,7 @@
 // allowance that very likely covers this app's actual usage entirely.
 import { getEnv } from "../../env";
 import type { CandidateDiscoveryProvider, DiscoverParams, DiscoveryProgressUpdate, ResearchCandidate } from "./types";
-import type { SearchEntertainment } from "../../../generated/prisma/enums";
+import type { SearchEntertainment, SearchVenueKind } from "../../../generated/prisma/enums";
 import { isInSearchedRegion, placeIsInCity } from "../area";
 
 // Exported: geocoder.ts reuses this same Text Search endpoint to resolve a
@@ -110,20 +110,29 @@ export type GooglePlace = NonNullable<PlacesTextSearchResult["places"]>[number];
 const ENTERTAINMENT_PHRASES: Record<SearchEntertainment, string> = {
   TRIVIA: "with trivia night",
   KARAOKE: "with karaoke",
+  BINGO: "with bingo night",
+  // Catches venues that list an events calendar (open mic, game nights and
+  // so on). Live music is deliberately not its own option: Curt's call, it
+  // draws a different audience from trivia.
+  EVENTS: "with weekly events",
 };
 
+const VENUE_KIND_TERMS: Record<SearchVenueKind, string> = { PUB: "Pub", BAR: "Bar", TAVERN: "Tavern" };
+
 /**
- * The Text Search queries for one city: "Bar in Oakville, ON, Canada", or
- * one query per entertainment ticked on Quick Search ("Bar with trivia
- * night in …", "Bar with karaoke in …") — "and/or" by running each and
- * letting run-search's dedupeWithinRun merge the overlap. Google matches
- * these from listings and reviews, so it's a best guess, not confirmation.
+ * The Text Search queries for one city: "Pub in Oakville, ON, Canada" —
+ * one per venue kind ticked on Quick Search (Pub, Bar, Tavern; the Lead
+ * Type's name when none), times one per entertainment ticked ("Pub with
+ * trivia night in …", "Bar with karaoke in …"). "And/or" by running each
+ * and letting run-search's dedupeWithinRun merge the overlap. Google
+ * matches these from listings and reviews, so it's a best guess, not
+ * confirmation.
  */
-export function placesTextQueries(params: Pick<DiscoverParams, "leadTypeName" | "region" | "country" | "entertainment">, city: string): string[] {
+export function placesTextQueries(params: Pick<DiscoverParams, "leadTypeName" | "region" | "country" | "entertainment" | "venueKinds">, city: string): string[] {
   const place = `in ${city}, ${params.region}, ${params.country}`;
+  const terms = params.venueKinds?.length ? params.venueKinds.map((kind) => VENUE_KIND_TERMS[kind]) : [params.leadTypeName];
   const entertainment = params.entertainment ?? [];
-  if (entertainment.length === 0) return [`${params.leadTypeName} ${place}`];
-  return entertainment.map((kind) => `${params.leadTypeName} ${ENTERTAINMENT_PHRASES[kind]} ${place}`);
+  return terms.flatMap((term) => (entertainment.length === 0 ? [`${term} ${place}`] : entertainment.map((kind) => `${term} ${ENTERTAINMENT_PHRASES[kind]} ${place}`)));
 }
 
 // The place's own province/state code and country, not the searched-for

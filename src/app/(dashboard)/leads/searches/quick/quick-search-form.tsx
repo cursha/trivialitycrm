@@ -6,6 +6,12 @@ import { Card } from "@/components/ui/card";
 import { Label, Input, Select, FieldError } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 
+const VENUE_KINDS = [
+  { value: "PUB", label: "Pubs" },
+  { value: "BAR", label: "Bars" },
+  { value: "TAVERN", label: "Taverns" },
+];
+
 export type QuickSearchFormOptions = {
   leadTypes: { id: string; name: string }[];
 };
@@ -41,6 +47,19 @@ export function QuickSearchForm({ leadTypes }: QuickSearchFormOptions) {
         )}
 
         <div>
+          <Label className="mb-1 block text-xs uppercase">Search for</Label>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {VENUE_KINDS.map(({ value, label }) => (
+              <label key={value} className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm text-text">
+                <input type="checkbox" name="venueKinds" value={value} defaultChecked={value === "PUB"} />
+                {label}
+              </label>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-text-muted">Each one is its own directory search; the results are combined, without duplicates.</p>
+        </div>
+
+        <div>
           <Label className="mb-1 block text-xs uppercase">Only venues that offer (optional)</Label>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <label className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm text-text">
@@ -51,9 +70,17 @@ export function QuickSearchForm({ leadTypes }: QuickSearchFormOptions) {
               <input type="checkbox" name="entertainment" value="KARAOKE" />
               Karaoke
             </label>
+            <label className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm text-text">
+              <input type="checkbox" name="entertainment" value="BINGO" />
+              Bingo
+            </label>
+            <label className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm text-text">
+              <input type="checkbox" name="entertainment" value="EVENTS" />
+              Any events
+            </label>
           </div>
           <p className="mt-1 text-xs text-text-muted">
-            Tick both to find venues with trivia and/or karaoke. Leave both blank to list every venue. This is the directory&apos;s best guess from
+            Tick any to find venues with any of them. Any events catches open mic, game nights and other weekly event nights. Leave all blank to list every venue. This is the directory&apos;s best guess from
             listings and reviews, not a confirmed fact.
           </p>
         </div>

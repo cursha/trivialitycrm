@@ -9,7 +9,7 @@ import { formString } from "@/lib/form-data";
 import { enqueueSearchJob } from "@/lib/jobs/enqueue";
 import { checkAiBudget, getAiSettings } from "@/lib/ai/budget";
 import { checkRateLimit } from "@/lib/rate-limit/postgres-bucket";
-import { describeEntertainment } from "@/lib/research/entertainment";
+import { describeEntertainment, describeVenueKinds } from "@/lib/research/entertainment";
 
 export type QuickSearchFormState = { error?: string } | undefined;
 
@@ -48,6 +48,7 @@ export async function startQuickSearch(_prevState: QuickSearchFormState, formDat
       .map((value) => String(value).trim())
       .filter(Boolean),
     entertainment: formData.getAll("entertainment").map((value) => String(value)),
+    venueKinds: formData.getAll("venueKinds").map((value) => String(value)),
   });
 
   if (!parsed.success) {
@@ -63,8 +64,9 @@ export async function startQuickSearch(_prevState: QuickSearchFormState, formDat
     return { error: "One or more selected Lead Types no longer exist." };
   }
 
-  const { entertainment } = parsed.data;
+  const { entertainment, venueKinds } = parsed.data;
   const offering = entertainment.length === 0 ? "" : ` offering ${describeEntertainment(entertainment)}`;
+  const searchingFor = venueKinds.length === 0 ? "" : ` (searching for ${describeVenueKinds(venueKinds)})`;
 
   const searchIds: string[] = [];
   for (const leadType of leadTypes) {
@@ -79,7 +81,8 @@ export async function startQuickSearch(_prevState: QuickSearchFormState, formDat
         minimumScore: 0,
         mode: "GENERAL",
         entertainment,
-        promptSnapshot: `Quick search — list every "${leadType.name}"${offering} match in ${parsed.data.region}, ${parsed.data.country}. No AI qualification prompt used.`,
+        venueKinds,
+        promptSnapshot: `Quick search — list every "${leadType.name}"${searchingFor}${offering} match in ${parsed.data.region}, ${parsed.data.country}. No AI qualification prompt used.`,
       },
     });
     const providerJobId = await enqueueSearchJob(search.id);

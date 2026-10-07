@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission, hasPermission } from "@/lib/auth/permissions";
 import { SearchStatus } from "./search-status";
 import { PageHeader } from "@/components/ui/page-header";
-import { describeEntertainment } from "@/lib/research/entertainment";
+import { describeEntertainment, describeVenueKinds } from "@/lib/research/entertainment";
 
 export const metadata = { title: "Search Status — Triviality CRM" };
 
@@ -25,6 +25,7 @@ export default async function SearchStatusPage({ params }: { params: Promise<{ i
       country: true,
       mode: true,
       entertainment: true,
+      venueKinds: true,
       originCompany: { select: { name: true } },
     },
   });
@@ -37,7 +38,7 @@ export default async function SearchStatusPage({ params }: { params: Promise<{ i
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader
         title={title}
-        description={`Mode: ${search.mode}${search.entertainment.length > 0 ? ` · Only venues offering ${describeEntertainment(search.entertainment)}` : ""}`}
+        description={`Mode: ${search.mode}${search.venueKinds.length > 0 ? ` · Searched for ${describeVenueKinds(search.venueKinds)}` : ""}${search.entertainment.length > 0 ? ` · Only venues offering ${describeEntertainment(search.entertainment)}` : ""}`}
       />
       <SearchStatus
         searchId={search.id}

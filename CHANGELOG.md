@@ -13,6 +13,25 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v12.0 — 2026-10-07
+### New — Quick Search looks for pubs, bars and taverns
+- Quick Search used to ask the directory only for your lead type's name
+  ("pubs"), missing venues listed as bars or taverns. A new **Search for**
+  row has **Pubs**, **Bars** and **Taverns** (Pubs ticked to start); each
+  ticked one is searched and the results are combined without duplicates.
+  Everything found is still saved under your lead type.
+### New — Quick Search finds bingo and event nights
+- Quick Search's "Only venues that offer" now also has **Bingo** and
+  **Any events** (open mic, game nights and other weekly event nights),
+  alongside Trivia and Karaoke. A venue that already hosts events is a good
+  trivia prospect.
+- Live music is deliberately not an option (Curt's call: "live music is a
+  different audience").
+- Database change: migration
+  `20261007220000_quick_search_venue_kinds_and_events` adds the two
+  choices, the Pub/Bar/Tavern list and a column on searches recording
+  which were ticked. Nothing existing is changed.
+
 ## v11.0 — 2026-10-07
 ### New — imports bring in lead research
 - Imports now bring in research details (entertainment, trivia provider,

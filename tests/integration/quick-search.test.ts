@@ -93,11 +93,38 @@ describe("startQuickSearch with trivia / karaoke", () => {
     const fd = quickSearchFormData([pubs.id]);
     fd.append("entertainment", "TRIVIA");
     fd.append("entertainment", "KARAOKE");
+    fd.append("entertainment", "BINGO");
+    fd.append("entertainment", "EVENTS");
     expect(await run(fd)).toBeUndefined();
 
     const search = await testPrisma.leadSearch.findFirstOrThrow();
-    expect(search.entertainment).toEqual(["TRIVIA", "KARAOKE"]);
-    expect(search.promptSnapshot).toContain('"Pubs" offering trivia and/or karaoke');
+    expect(search.entertainment).toEqual(["TRIVIA", "KARAOKE", "BINGO", "EVENTS"]);
+    expect(search.promptSnapshot).toContain('"Pubs" offering trivia and/or karaoke and/or bingo and/or events');
+  });
+
+  it("saves the venue kinds to search for, and describes them", async () => {
+    const { user } = await baseFixtures();
+    const pubs = await createLeadTypeFixture("Pubs");
+    await loginAs(user.id);
+
+    const fd = quickSearchFormData([pubs.id]);
+    for (const kind of ["PUB", "BAR", "TAVERN"]) fd.append("venueKinds", kind);
+    await run(fd);
+
+    const search = await testPrisma.leadSearch.findFirstOrThrow();
+    expect(search.venueKinds).toEqual(["PUB", "BAR", "TAVERN"]);
+    expect(search.promptSnapshot).toContain('"Pubs" (searching for pubs, bars, taverns)');
+  });
+
+  it("refuses an unknown venue kind", async () => {
+    const { user } = await baseFixtures();
+    const pubs = await createLeadTypeFixture("Pubs");
+    await loginAs(user.id);
+
+    const fd = quickSearchFormData([pubs.id]);
+    fd.append("venueKinds", "NIGHTCLUB");
+    expect((await run(fd))?.error).toBe("Choose pub, bar or tavern.");
+    expect(await testPrisma.leadSearch.count()).toBe(0);
   });
 
   it("lists every venue when nothing is ticked", async () => {
@@ -106,17 +133,19 @@ describe("startQuickSearch with trivia / karaoke", () => {
     await loginAs(user.id);
 
     await run(quickSearchFormData([pubs.id]));
-    expect((await testPrisma.leadSearch.findFirstOrThrow()).entertainment).toEqual([]);
+    const search = await testPrisma.leadSearch.findFirstOrThrow();
+    expect(search.entertainment).toEqual([]);
+    expect(search.venueKinds).toEqual([]);
   });
 
-  it("refuses anything other than trivia or karaoke", async () => {
+  it("refuses anything other than trivia, karaoke, bingo or events", async () => {
     const { user } = await baseFixtures();
     const pubs = await createLeadTypeFixture("Pubs");
     await loginAs(user.id);
 
     const fd = quickSearchFormData([pubs.id]);
-    fd.append("entertainment", "BINGO");
-    expect((await run(fd))?.error).toBe("Choose trivia or karaoke.");
+    fd.append("entertainment", "LIVE_MUSIC");
+    expect((await run(fd))?.error).toBe("Choose trivia, karaoke, bingo or events.");
     expect(await testPrisma.leadSearch.count()).toBe(0);
   });
 });

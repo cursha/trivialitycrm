@@ -367,11 +367,16 @@ inbox:
 ## Quick Search (if you have access)
 
 Leads → **Quick Search** lists businesses from the directory, with no AI
-scoring. Tick the venue types you want (Bar, Pub…) and the area.
+scoring. Choose the area, and under **Search for** tick **Pubs**, **Bars**
+and/or **Taverns** (Pubs is ticked to start). Each is its own directory
+search, and the results are combined without duplicates, so ticking all
+three finds venues listed under any of those names.
 
 To find venues that already put on entertainment, tick **Trivia**,
-**Karaoke**, or both under "Only venues that offer". Both means trivia
-and/or karaoke. Leave them blank to list every venue. It's the directory's
+**Karaoke**, **Bingo** or **Any events** under "Only venues that offer".
+Any events catches open mic, game nights and other weekly event nights.
+Ticking several finds venues with any of them. Leave them all blank to
+list every venue. It's the directory's
 best guess from listings and reviews, so check before you rely on it, and
 a bar found this way isn't marked as running trivia.
 

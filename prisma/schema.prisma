@@ -1228,9 +1228,18 @@ model PromptTemplate {
   updatedAt           DateTime     @updatedAt
 }
 
+enum SearchVenueKind {
+  PUB
+  BAR
+  TAVERN
+}
+
 enum SearchEntertainment {
   TRIVIA
   KARAOKE
+  BINGO
+  // Any recurring event night (open mic, game nights, quiz...)
+  EVENTS
 }
 
 model LeadSearch {
@@ -1306,6 +1315,11 @@ model LeadSearch {
   // deduped. Shapes the search only; it never marks a found company as
   // running trivia, since a directory match isn't confirmation.
   entertainment SearchEntertainment[] @default([])
+
+  // Quick Search: what to call the venues when asking the directory, one
+  // query per kind ("Bar in Oakville", "Tavern in Oakville"), merged and
+  // deduped like entertainment. Empty = the Lead Type's own name, as before.
+  venueKinds SearchVenueKind[] @default([])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

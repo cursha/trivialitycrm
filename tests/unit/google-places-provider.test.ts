@@ -337,6 +337,20 @@ describe("Quick Search trivia / karaoke", () => {
       "Pub with trivia night in Milton, ON, Canada",
       "Pub with karaoke in Milton, ON, Canada",
     ]);
+    expect(placesTextQueries({ ...baseParams, entertainment: ["BINGO", "EVENTS"] }, "Milton")).toEqual([
+      "Pub with bingo night in Milton, ON, Canada",
+      "Pub with weekly events in Milton, ON, Canada",
+    ]);
+  });
+
+  it("searches for each ticked venue kind instead of the Lead Type name", () => {
+    expect(placesTextQueries({ ...baseParams, venueKinds: ["BAR", "TAVERN"] }, "Milton")).toEqual(["Bar in Milton, ON, Canada", "Tavern in Milton, ON, Canada"]);
+    expect(placesTextQueries({ ...baseParams, venueKinds: ["PUB", "BAR"], entertainment: ["TRIVIA", "KARAOKE"] }, "Milton")).toEqual([
+      "Pub with trivia night in Milton, ON, Canada",
+      "Pub with karaoke in Milton, ON, Canada",
+      "Bar with trivia night in Milton, ON, Canada",
+      "Bar with karaoke in Milton, ON, Canada",
+    ]);
   });
 
   it("runs both queries for each city and returns what each found (run-search dedupes the overlap)", async () => {
