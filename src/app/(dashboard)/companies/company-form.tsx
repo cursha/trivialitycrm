@@ -41,7 +41,6 @@ export function CompanyForm({
     salesTrack?: string;
     lossReasonId?: string;
     notes?: string;
-    nextFollowUpAt?: string;
   };
   leadTypes: Option[];
   pipelineStages: PipelineStageOption[];
@@ -203,15 +202,6 @@ export function CompanyForm({
             <option value="LOCAL">Local (we visit in person)</option>
             <option value="REMOTE">Long-distance (phone, email, video)</option>
           </Select>
-        </div>
-        <div>
-          <Label>Next follow-up date</Label>
-          <Input
-            name="nextFollowUpAt"
-            type="date"
-            defaultValue={defaultValues?.nextFollowUpAt}
-            className="mt-1"
-          />
         </div>
 
         <div className="sm:col-span-2">

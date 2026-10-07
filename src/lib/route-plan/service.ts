@@ -102,15 +102,18 @@ export async function getRouteSummary(userId: string): Promise<RouteSummary> {
   };
 }
 
-/** Set of company IDs currently in the user's current route — used to
- * render "already in route" state on the company profile and list,
- * distinct from (and never confused with) a bulk-action page-selection
- * checkbox. */
-export async function getRouteCompanyIds(userId: string): Promise<Set<string>> {
-  const id = await activeRouteId(prisma, userId);
-  if (!id) return new Set();
-  const entries = await prisma.routePlanCompany.findMany({ where: { routePlanId: id }, select: { companyId: true } });
-  return new Set(entries.map((c) => c.companyId));
+/** For each company in any of the user's routes (not just the current one),
+ * the names of those routes — the Companies list's "In route" tag. Routes
+ * are private, so only the signed-in user's own routes count. */
+export async function getCompanyRouteNames(userId: string): Promise<Record<string, string[]>> {
+  const entries = await prisma.routePlanCompany.findMany({
+    where: { routePlan: { userId } },
+    select: { companyId: true, routePlan: { select: { name: true } } },
+    orderBy: { routePlan: { name: "asc" } },
+  });
+  const byCompany: Record<string, string[]> = {};
+  for (const entry of entries) (byCompany[entry.companyId] ??= []).push(entry.routePlan.name);
+  return byCompany;
 }
 
 export type RouteListItem = { id: string; name: string; plannedDate: string | null; count: number; isActive: boolean };

@@ -565,6 +565,9 @@ model Company {
   aiScore              Int?
   aiExplanation        String?       @db.Text
   triviaStatus         TriviaStatus  @default(UNCERTAIN)
+  // Due date of the earliest OPEN follow-up (Task). Maintained by a Postgres
+  // trigger on "Task" (migration 20261007160000_company_next_follow_up_from_tasks)
+  // — never write it from app code.
   nextFollowUpAt       DateTime?
   leadTypeId           String
   pipelineStageId      String

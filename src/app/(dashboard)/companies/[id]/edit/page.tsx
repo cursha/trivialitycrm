@@ -50,7 +50,6 @@ export default async function EditCompanyPage({ params }: { params: Promise<{ id
             triviaStatus: company.triviaStatus,
             salesTrack: company.salesTrack,
             notes: company.notes ?? undefined,
-            nextFollowUpAt: company.nextFollowUpAt ? company.nextFollowUpAt.toISOString().slice(0, 10) : undefined,
           }}
           leadTypes={leadTypes}
           pipelineStages={pipelineStages}

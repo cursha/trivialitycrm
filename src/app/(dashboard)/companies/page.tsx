@@ -7,7 +7,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { listCompanies, PAGE_SIZE } from "./queries";
 import { CompaniesFilters } from "./companies-filters";
 import { CompaniesTable } from "./companies-table";
-import { getRouteCompanyIds, listRoutes, type RouteListItem } from "@/lib/route-plan/service";
+import { getCompanyRouteNames, listRoutes, type RouteListItem } from "@/lib/route-plan/service";
 import { PageHeader } from "@/components/ui/page-header";
 import { Pagination } from "@/components/ui/pagination";
 
@@ -35,7 +35,7 @@ export default async function CompaniesPage({
   const chainNames = await getChainNames();
   const sweetSpotOnly = toSingle(params.sweetSpot) === "1";
 
-  const [{ companies, total, pageCount }, leadTypes, pipelineStages, allPipelineStages, competitors, salespeople, territories, routeCompanyIds, routes] =
+  const [{ companies, total, pageCount }, leadTypes, pipelineStages, allPipelineStages, competitors, salespeople, territories, routeNamesByCompany, routes] =
     await Promise.all([
       listCompanies(user, {
         q: toSingle(params.q),
@@ -63,7 +63,7 @@ export default async function CompaniesPage({
       prisma.competitor.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
       prisma.user.findMany({ where: { disabled: false }, orderBy: { name: "asc" } }),
       prisma.territory.findMany({ where: { active: true }, orderBy: { name: "asc" } }),
-      canRoutePlan ? getRouteCompanyIds(user.id) : Promise.resolve(new Set<string>()),
+      canRoutePlan ? getCompanyRouteNames(user.id) : Promise.resolve({}),
       canRoutePlan ? listRoutes(user.id) : Promise.resolve([] as RouteListItem[]),
     ]);
 
@@ -129,7 +129,7 @@ export default async function CompaniesPage({
         canBulk={canBulk}
         canRoutePlan={canRoutePlan}
         sweetSpotIds={companies.filter((company) => assessLikelihood(company, chainNames).sweetSpot).map((company) => company.id)}
-        routeCompanyIds={Array.from(routeCompanyIds)}
+        routeNamesByCompany={routeNamesByCompany}
       />
 
       <Pagination page={page} pageCount={pageCount} pageSize={PAGE_SIZE} hrefFor={pageHref} />

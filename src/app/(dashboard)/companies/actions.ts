@@ -36,7 +36,6 @@ function parseCompanyForm(formData: FormData) {
     salesTrack: formString(formData, "salesTrack"),
     lossReasonId: formString(formData, "lossReasonId"),
     notes: formString(formData, "notes"),
-    nextFollowUpAt: formString(formData, "nextFollowUpAt"),
   });
 }
 
@@ -88,7 +87,6 @@ export async function createCompany(_prevState: CompanyFormState, formData: Form
         triviaStatus: parsed.data.triviaStatus,
         salesTrack: parsed.data.salesTrack ?? "LOCAL",
         notes: parsed.data.notes ?? null,
-        nextFollowUpAt: parsed.data.nextFollowUpAt ? new Date(parsed.data.nextFollowUpAt) : null,
         createdById: user.id,
         source: "MANUAL",
         ...normalized,
@@ -172,7 +170,6 @@ export async function updateCompany(
         triviaStatus: parsed.data.triviaStatus,
         ...(parsed.data.salesTrack ? { salesTrack: parsed.data.salesTrack } : {}),
         notes: parsed.data.notes ?? null,
-        nextFollowUpAt: parsed.data.nextFollowUpAt ? new Date(parsed.data.nextFollowUpAt) : null,
         updatedById: user.id,
         ...normalized,
       },

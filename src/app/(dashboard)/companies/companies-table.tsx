@@ -41,7 +41,7 @@ export function CompaniesTable({
   routes,
   canBulk,
   canRoutePlan,
-  routeCompanyIds,
+  routeNamesByCompany,
   sweetSpotIds,
   showLeadType,
 }: {
@@ -54,17 +54,16 @@ export function CompaniesTable({
   routes: RouteListItem[];
   canBulk: boolean;
   canRoutePlan: boolean;
-  /** Companies already in the signed-in user's active Route Plan — a
-   * persisted-state badge, deliberately separate from `selected` below (a
-   * bulk-action page-selection checkbox never means, and must never be
-   * confused with, "already in route"). */
-  routeCompanyIds: string[];
+  /** Company id → names of the signed-in user's routes it's in (any route,
+   * not just the current one) — a persisted-state badge, deliberately
+   * separate from `selected` below (a bulk-action page-selection checkbox
+   * never means, and must never be confused with, "already in route"). */
+  routeNamesByCompany: Record<string, string[]>;
   /** Companies in the sweet spot (most likely to buy). */
   sweetSpotIds: string[];
 }) {
   const sweetSpot = new Set(sweetSpotIds);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const inRoute = new Set(routeCompanyIds);
   const allSelected = companies.length > 0 && companies.every((c) => selected.has(c.id));
 
   function toggleAll() {
@@ -132,7 +131,7 @@ export function CompaniesTable({
                       <Link href={`/companies/${company.id}`} className="font-bold text-secondary hover:underline">
                         {company.name}
                       </Link>
-                      {inRoute.has(company.id) && <Badge tone="focus">In Route</Badge>}
+                      <RouteBadge names={routeNamesByCompany[company.id]} />
                     </div>
                     <div className="max-w-xs truncate text-xs text-text-muted" title={formatAddressLine(company)}>
                       {formatAddressLine(company)}
@@ -200,7 +199,7 @@ export function CompaniesTable({
                       <Link href={`/companies/${company.id}`} className="font-bold text-secondary hover:underline">
                         {company.name}
                       </Link>
-                      {inRoute.has(company.id) && <Badge tone="focus">In Route</Badge>}
+                      <RouteBadge names={routeNamesByCompany[company.id]} />
                     </div>
                     <Badge tone="secondary" className="shrink-0">
                       {company.pipelineStage.name}
@@ -247,5 +246,16 @@ export function CompaniesTable({
         </ul>
       </Card>
     </div>
+  );
+}
+
+/** "In route: Oakville", or "In 2 routes" with the names on hover. */
+function RouteBadge({ names }: { names: string[] | undefined }) {
+  if (!names?.length) return null;
+  const label = names.length === 1 ? `In route: ${names[0]}` : `In ${names.length} routes`;
+  return (
+    <Badge tone="focus" className="max-w-40 truncate" title={names.join(", ")}>
+      {label}
+    </Badge>
   );
 }

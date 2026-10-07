@@ -3,7 +3,7 @@ import { resetDatabase, testPrisma } from "../helpers/db";
 import { createRoleWithPermissions, createTestUser, createLeadTypeFixture, createPipelineStageFixture, createCompanyFixture, fetchAuthenticatedUser } from "../helpers/fixtures";
 import {
   getRouteSummary,
-  getRouteCompanyIds,
+  getCompanyRouteNames,
   addCompanyToRoute,
   removeCompanyFromRoute,
   clearRoute,
@@ -143,14 +143,27 @@ describe("private per-user route", () => {
     await addCompanyToRoute(f.user, company.id);
 
     expect((await getRouteSummary(userB.id)).count).toBe(0);
-    expect((await getRouteCompanyIds(userB.id)).has(company.id)).toBe(false);
-    expect((await getRouteCompanyIds(f.user.id)).has(company.id)).toBe(true);
+    expect((await getCompanyRouteNames(userB.id))[company.id] !== undefined).toBe(false);
+    expect((await getCompanyRouteNames(f.user.id))[company.id] !== undefined).toBe(true);
 
     // userB can independently build their own route with the same company —
     // routes are per-user, not exclusive/shared.
     const resultB = await addCompanyToRoute(userB, company.id);
     expect(resultB).toMatchObject({ ok: true, count: 1 });
     expect((await getRouteSummary(f.user.id)).count).toBe(1); // userA's route untouched
+  });
+});
+
+describe("getCompanyRouteNames", () => {
+  it("names every route a company is in, not just the current one", async () => {
+    const f = await baseFixtures();
+    const a = await makeCompany(f);
+    const b = await makeCompany(f);
+    await bulkAddCompaniesToRoute(f.user, [a.id], { newRoute: { name: "Oakville", plannedDate: null } });
+    await bulkAddCompaniesToRoute(f.user, [a.id, b.id], { newRoute: { name: "Burlington", plannedDate: null } });
+    await createRoute(f.user, "Mississauga", null);
+
+    expect(await getCompanyRouteNames(f.user.id)).toEqual({ [a.id]: ["Burlington", "Oakville"], [b.id]: ["Burlington"] });
   });
 });
 
@@ -164,8 +177,8 @@ describe("removeCompanyFromRoute", () => {
 
     const result = await removeCompanyFromRoute(f.user, a.id);
     expect(result).toEqual({ count: 1 });
-    expect((await getRouteCompanyIds(f.user.id)).has(a.id)).toBe(false);
-    expect((await getRouteCompanyIds(f.user.id)).has(b.id)).toBe(true);
+    expect((await getCompanyRouteNames(f.user.id))[a.id] !== undefined).toBe(false);
+    expect((await getCompanyRouteNames(f.user.id))[b.id] !== undefined).toBe(true);
   });
 
   it("removing a company not in the route is a silent no-op", async () => {

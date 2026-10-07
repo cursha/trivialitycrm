@@ -60,11 +60,6 @@ export const CompanySchema = z
       .optional()
       .transform((value) => (value ? value : undefined)),
     notes: optionalText(5000),
-    nextFollowUpAt: z
-      .string()
-      .optional()
-      .or(z.literal(""))
-      .transform((value) => (value ? value : undefined)),
   })
   .transform(withCheckedPostalCode);
 

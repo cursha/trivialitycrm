@@ -13,6 +13,31 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v10.1 — 2026-10-07
+### Fixed — the Follow-up column was always empty
+- The Companies list's Follow-up column (and the follow-up date on the
+  company page, pipeline cards, sales lists, follow-up filters and sort)
+  read a date that could only be typed into the company's edit form — so
+  follow-ups added on the company page, after a call or visit, or by the
+  sales process never showed there.
+- It now shows each company's next open follow-up, kept up to date by the
+  database whenever a follow-up is added, completed, cancelled,
+  rescheduled, moved or deleted. A one-time update fills it in from the
+  follow-ups that already exist.
+- The unused "Next follow-up date" field on the company form is removed
+  (Curt's call: "it makes no sense to show it if it's not used"); add a
+  follow-up on the company's page instead.
+- Database change: migration
+  `20261007160000_company_next_follow_up_from_tasks` (a trigger on follow-ups
+  plus the one-time fill-in).
+
+### Fixed — "In Route" tag missing for most routes
+- The Companies list tagged only bars on your *current* route, so bars
+  added to any other route (e.g. with Add Selected to Route → another
+  route or + New route) showed nothing. It now tags a bar on any of your
+  routes, with the route's name ("In route: Oakville", or "In 2 routes"
+  with the names on hover).
+
 ## v10.0 — 2026-10-07
 ### Changed — no more lead type questions with only one lead type
 - With a single active lead type (today just "pubs"), the app no longer asks

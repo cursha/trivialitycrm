@@ -78,6 +78,12 @@ light up the same way when you've changed them from Name, Ascending.
 Sorting by EOS score or follow-up date always lists bars without one
 last, so pick **Descending** to see the highest scores first.
 
+The **Follow-up** column shows each bar's next open follow-up — the
+earliest one not yet done or cancelled, however it was added (by you, after
+a call or visit, or automatically by the sales process). Completing it moves
+the date on to the next one; with none left it shows "—". To set a
+follow-up, add one on the company's page.
+
 ## Adding something quickly
 
 The **Quick Add** button (header) is a fast path for a short form — a new
@@ -212,6 +218,9 @@ alone; nobody else sees or changes them.
   tick them, click **Add Selected to Route**, then pick the route (your
   current one is chosen for you) or **+ New route…**, and click **Add**.
   Adding to another route doesn't change which one is current.
+- On the Companies list, a bar on one of your routes shows a tag with the
+  route's name (e.g. **In route: Oakville**), whichever route it's on; on
+  more than one it says **In 2 routes**, and hovering shows which.
 
 ## Logging a bar visit
 
