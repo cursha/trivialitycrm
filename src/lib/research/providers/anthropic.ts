@@ -576,9 +576,13 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
             {
               role: "user",
               content:
+                // The area first and as a hard rule: a trailing "Location:"
+                // line after long criteria let results drift into nearby
+                // towns and other provinces (Curt hit it). run-search also
+                // drops anything outside the country/province afterwards.
+                `SEARCH AREA (a hard rule): only include ${params.leadTypeName} venues physically located in ${locationScope}, ${params.country}. Leave out anything outside it, even if it's nearby or otherwise a perfect fit, and set city, region and country to the venue's real ones.\n\n` +
                 `${modeInstructions(params.mode, params.competitorName)}\n\n` +
                 `Business criteria: ${params.promptText}\n\n` +
-                `Location: ${locationScope}, ${params.country}. Lead type: ${params.leadTypeName}.\n\n` +
                 "Only report facts you can support with a web_search or web_fetch result. Do not invent addresses, phone numbers, or emails — leave a field null rather than guessing. Every evidence entry must cite a sourceUrl you actually fetched or found in search results. address1 must be the street address ONLY (e.g. \"123 Main St\") — never append city, region, postal code, or country, since those are already separate fields. " +
                 DAY_FIELD_INSTRUCTION,
             },

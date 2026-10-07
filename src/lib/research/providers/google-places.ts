@@ -11,6 +11,7 @@
 import { getEnv } from "../../env";
 import type { CandidateDiscoveryProvider, DiscoverParams, DiscoveryProgressUpdate, ResearchCandidate } from "./types";
 import type { SearchEntertainment } from "../../../generated/prisma/enums";
+import { isInSearchedRegion, placeIsInCity } from "../area";
 
 // Exported: geocoder.ts reuses this same Text Search endpoint to resolve a
 // known address to coordinates (see that file for why a separate Geocoding
@@ -125,14 +126,24 @@ export function placesTextQueries(params: Pick<DiscoverParams, "leadTypeName" | 
   return entertainment.map((kind) => `${params.leadTypeName} ${ENTERTAINMENT_PHRASES[kind]} ${place}`);
 }
 
+// The place's own province/state code and country, not the searched-for
+// ones — stamping the search's region on every result hid out-of-area
+// places as in-area ones. Falls back to the search's only when Google
+// returns no such component.
+function componentOfType(addressComponents: PlaceAddressComponent[] | undefined, type: string): PlaceAddressComponent | undefined {
+  return addressComponents?.find((c) => c.types?.includes(type));
+}
+
 export function candidateFromPlace(place: GooglePlace, params: DiscoverParams, queryCity: string): ResearchCandidate {
+  const region = componentOfType(place.addressComponents, "administrative_area_level_1");
+  const country = componentOfType(place.addressComponents, "country");
   return {
     name: place.displayName?.text ?? "Unknown business",
     address1: extractStreetAddress(place.addressComponents, place.formattedAddress ?? null),
     city: extractCity(place.addressComponents, queryCity),
-    region: params.region,
+    region: region?.shortText ?? region?.longText ?? params.region,
     postalCode: extractPostalCode(place.addressComponents),
-    country: params.country,
+    country: country?.longText ?? country?.shortText ?? params.country,
     phone: place.nationalPhoneNumber ?? null,
     email: null,
     websiteUrl: place.websiteUri ?? null,
@@ -194,7 +205,13 @@ export class GooglePlacesDiscoveryProvider implements CandidateDiscoveryProvider
           const data = (await response.json()) as PlacesTextSearchResult;
           for (const place of data.places ?? []) {
             if (place.businessStatus === "CLOSED_PERMANENTLY" || place.businessStatus === "CLOSED_TEMPORARILY") continue;
-            results.push(candidateFromPlace(place, params, city));
+            // Google treats the query's city as a hint, not a boundary —
+            // drop places outside the searched province/state, or outside
+            // the requested city when one was given.
+            const candidate = candidateFromPlace(place, params, city);
+            if (!isInSearchedRegion(candidate, params)) continue;
+            if (params.cities.length > 0 && !placeIsInCity(place.addressComponents, city)) continue;
+            results.push(candidate);
           }
 
           if (!data.nextPageToken) break;

@@ -13,6 +13,26 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v8.4 — 2026-10-06
+### Fixed — lead searches stay inside the area you choose
+- A lead search returned venues outside the city and province entered
+  (Curt hit it). Three causes, all fixed:
+  - Google's directory treats "Pub in Mississauga, ON" as a hint, not a
+    boundary, and nothing filtered its results. Now places outside the
+    searched province/state, or outside the listed cities, are dropped. A
+    neighbourhood still counts (Scarborough is found within Toronto).
+  - Directory results were labelled with the province you searched, not
+    their own, which hid out-of-area places. They now carry their real
+    province and country.
+  - The AI searches got the area as a last line after the criteria. It's
+    now a hard rule up front, and anything outside the country/province is
+    dropped afterwards. (Competition Locator already shows those as
+    auto-rejected, and the radius search can rightly cross a border, so
+    both are unchanged.)
+- Sales Quick Start: "AI lead research" says results stay in your area, and
+  that **General** mode lists directory businesses without using your
+  prompt until you click **Research this business**.
+
 ## v8.3 — 2026-10-06
 ### Fixed — route export on Android, found the cause
 - Curt tested on his phone: opening the export address directly downloaded

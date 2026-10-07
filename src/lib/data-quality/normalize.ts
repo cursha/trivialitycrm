@@ -113,6 +113,13 @@ function isUnitedStates(country: string): boolean {
   return c === "united states" || c === "usa" || c === "us" || c === "u.s." || c === "u.s.a." || c === "united states of america";
 }
 
+/** "canada" / "united states" for any common spelling, else lower-cased. */
+export function normalizeCountry(country: string): string {
+  if (isCanada(country)) return "canada";
+  if (isUnitedStates(country)) return "united states";
+  return country.trim().toLowerCase();
+}
+
 /**
  * Maps a free-text state/province to its canonical 2-letter code for the
  * given country. Falls back to a trimmed, lowercased passthrough when

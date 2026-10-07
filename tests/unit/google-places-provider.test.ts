@@ -69,6 +69,79 @@ describe("GooglePlacesDiscoveryProvider", () => {
     });
   });
 
+  it("keeps only places in the searched province and city, labelled with their real province and country", async () => {
+    const place = (name: string, city: string, region: string, country = "Canada", extra: { longText: string; types: string[] }[] = []) => ({
+      displayName: { text: name },
+      businessStatus: "OPERATIONAL",
+      addressComponents: [
+        { longText: city, shortText: city, types: ["locality"] },
+        ...extra,
+        { longText: region, shortText: region, types: ["administrative_area_level_1"] },
+        { longText: country, shortText: country === "Canada" ? "CA" : "US", types: ["country"] },
+      ],
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          places: [
+            place("In Milton", "Milton", "ON"),
+            place("Next Town Over", "Halton Hills", "ON"),
+            place("Other Province", "Milton", "QC"),
+            place("Other Country", "Milton", "NY", "United States"),
+          ],
+        }),
+      }),
+    );
+
+    const candidates = await new GooglePlacesDiscoveryProvider(0).discover(baseParams);
+    expect(candidates.map((c) => c.name)).toEqual(["In Milton"]);
+    expect(candidates[0]).toMatchObject({ region: "ON", country: "Canada" });
+  });
+
+  it("matches a requested city to a place's neighbourhood name too (Scarborough within Toronto)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          places: [
+            {
+              displayName: { text: "Scarborough Pub" },
+              addressComponents: [
+                { longText: "Scarborough", types: ["sublocality_level_1", "sublocality"] },
+                { longText: "Toronto", types: ["locality"] },
+                { longText: "Ontario", shortText: "ON", types: ["administrative_area_level_1"] },
+              ],
+            },
+          ],
+        }),
+      }),
+    );
+
+    const candidates = await new GooglePlacesDiscoveryProvider(0).discover({ ...baseParams, cities: ["Scarborough"] });
+    expect(candidates.map((c) => c.name)).toEqual(["Scarborough Pub"]);
+  });
+
+  it("only checks the province, not the city, on a whole-province search", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          places: [
+            { displayName: { text: "Anywhere In Ontario" }, addressComponents: [{ longText: "Kenora", types: ["locality"] }, { shortText: "ON", types: ["administrative_area_level_1"] }] },
+            { displayName: { text: "Manitoba Pub" }, addressComponents: [{ longText: "Winnipeg", types: ["locality"] }, { shortText: "MB", types: ["administrative_area_level_1"] }] },
+          ],
+        }),
+      }),
+    );
+
+    const candidates = await new GooglePlacesDiscoveryProvider(0).discover({ ...baseParams, cities: [] });
+    expect(candidates.map((c) => c.name)).toEqual(["Anywhere In Ontario"]);
+  });
+
   it("leaves postalCode null when the response has no postal_code address component", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,

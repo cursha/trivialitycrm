@@ -5,6 +5,7 @@
 import { prisma } from "../prisma";
 import { getProviders } from "./providers/factory";
 import { filterByModeExclusivity, dedupeWithinRun } from "./exclusivity";
+import { isInSearchedRegion } from "./area";
 import { computeNormalizedFields, findPriorRejectedMatches } from "../duplicates/match";
 import { normalizeCompanyName } from "../duplicates/normalize";
 import { normalizeRegion } from "../data-quality/normalize";
@@ -212,7 +213,14 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       // PUB_RADIUS only: drop the origin pub itself from its own results —
       // see isOriginCompany()'s comment above. Every other mode has no
       // originCompany, so this is a no-op for them.
-      const filtered = search.mode === "PUB_RADIUS" && search.originCompany ? deduped.filter((candidate) => !isOriginCompany(candidate, search.originCompany!)) : deduped;
+      const withoutOrigin = search.mode === "PUB_RADIUS" && search.originCompany ? deduped.filter((candidate) => !isOriginCompany(candidate, search.originCompany!)) : deduped;
+
+      // Outside the searched country/province: dropped for every mode but
+      // PUB_RADIUS (a radius can rightly cross a border) and COMPETITOR
+      // (which keeps them visible as auto-rejected, below). Google Places
+      // results are also checked by city in the provider itself.
+      const filtered =
+        search.mode === "PUB_RADIUS" || search.mode === "COMPETITOR" ? withoutOrigin : withoutOrigin.filter((candidate) => isInSearchedRegion(candidate, search));
 
       // Module 8A: an administrator-configured cap (AiSettings.
       // maxResultsPerSearch, null = unlimited) — applied here, after
