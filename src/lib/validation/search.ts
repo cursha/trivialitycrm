@@ -8,7 +8,7 @@ const CitiesSchema = z
   .default([]);
 
 export const CountryValues = ["Canada", "United States"] as const;
-export const LeadSearchModeValues = ["TRIVIA_GAP", "TRIVIA_CONFIRMED", "COMPETITOR", "GENERAL"] as const;
+export const LeadSearchModeValues = ["TRIVIA_GAP", "TRIVIA_CONFIRMED", "COMPETITOR", "GENERAL", "AI_PROMPT"] as const;
 
 export const SearchSetupSchema = z
   .object({

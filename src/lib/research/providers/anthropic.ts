@@ -467,6 +467,12 @@ function modeInstructions(mode: DiscoverParams["mode"], competitorName?: string)
         "Exclude: venues that are permanently closed or out of business; a trivia event that was a one-time or cancelled occurrence rather than a regular recurring night; any listing you cannot reasonably confirm reflects the current/recent state (treat a listing with no date or evidence of freshness as stale, not current); private/members-only events that aren't a standing public venue offering; and any evidence quality below your own \"VERIFIED\" bar — mark those UNVERIFIED/INFERRED rather than reporting the location with unfounded confidence. " +
         "Every evidence entry that supports the competitor match must cite a sourceUrl actually fetched or found in search results, and be marked \"VERIFIED\" only when that source itself is current."
       );
+    case "AI_PROMPT":
+      return (
+        "Find locations matching the business criteria below. A location that already runs trivia is a buying signal, never a reason to leave it out: " +
+        "mark triviaStatus \"CURRENT_TRIVIA\" only with positive, current evidence (and name the trivia provider in competitorName when one is identifiable), \"NO_CURRENT_TRIVIA\" only with evidence of a current events schedule that has no trivia, and \"UNCERTAIN\" otherwise. " +
+        "Exclude permanently closed venues and private/members-only venues."
+      );
     default:
       return "Find locations matching the business criteria below. Only mark triviaStatus \"CURRENT_TRIVIA\" with positive evidence; use \"UNCERTAIN\" rather than guessing.";
   }
@@ -530,10 +536,10 @@ export class AnthropicPromptAssistant implements PromptAssistant {
 
 export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryProvider {
   async discover(params: DiscoverParams, onProgress?: (update: DiscoveryProgressUpdate) => Promise<void>): Promise<ResearchCandidate[]> {
-    // COMPETITOR mode gets its own two-step implementation — see
+    // COMPETITOR and AI_PROMPT get the two-step implementation — see
     // discoverCompetitorTwoStep()'s own comment for why. Every other mode
     // keeps this original one-shot shape, unchanged.
-    if (params.mode === "COMPETITOR") {
+    if (params.mode === "COMPETITOR" || params.mode === "AI_PROMPT") {
       return this.discoverCompetitorTwoStep(params, onProgress);
     }
 
@@ -654,13 +660,30 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
    * tool-free pass that structures the ALREADY-FOUND text into
    * COMPETITOR_DISCOVERY_SCHEMA — the schema constraint now only applies
    * to a short, fixed piece of input, not to open-ended exploration.
+   *
+   * AI_PROMPT (v9.0) uses the same two steps with its own step-1 question:
+   * venues matching the search's prompt, trivia kept. Its search budget is
+   * the admin's per-call setting when that's higher than COMPETITOR's fixed
+   * one, since a criteria search has to cover a whole area, not one brand.
    */
   private async discoverCompetitorTwoStep(
     params: DiscoverParams,
     onProgress?: (update: DiscoveryProgressUpdate) => Promise<void>,
   ): Promise<ResearchCandidate[]> {
-    const { model } = await resolveResearchSettings();
+    const { model, maxSearchToolUses } = await resolveResearchSettings();
     const locationScope = params.cities.length > 0 ? params.cities.join(", ") : `all of ${params.region} (no city filter given)`;
+    const isPromptSearch = params.mode === "AI_PROMPT";
+    const searchBudget = isPromptSearch ? Math.max(maxSearchToolUses, COMPETITOR_PASS1_MAX_SEARCH_USES) : COMPETITOR_PASS1_MAX_SEARCH_USES;
+    const researchQuestion = isPromptSearch
+      ? `SEARCH AREA (a hard rule): only ${params.leadTypeName} venues physically located in ${locationScope}, ${params.country} — leave out anything outside it, even if it's nearby.\n\n` +
+        `Find venues there that match these business criteria:\n${params.promptText}\n\n` +
+        "Search systematically across the whole area (by town or neighbourhood, and by event type) rather than stopping at the first few results. " +
+        "A venue that already runs trivia is a match, not an exclusion — note its trivia provider and night when shown. "
+      : `Find ${params.leadTypeName} venues in ${locationScope}, ${params.country} that currently run trivia hosted by the service "${params.competitorName}". ` +
+        `Business criteria: ${params.promptText}\n\n`;
+    const otherProviderNote = isPromptSearch
+      ? "For each venue, note any recurring entertainment shown (event type and night) and any named trivia provider."
+      : "If a location clearly runs trivia through a DIFFERENT named provider, still list it and note that provider's name — don't omit or guess.";
 
     const researchText = await callProvider({ providerName: "anthropic-discovery-research", timeoutMs: 300_000 }, async (signal) => {
       const stream = client().messages.stream(
@@ -684,16 +707,15 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
           // "direct" calling disables that automatic filtering pass,
           // matching a plain conversational web_search call's fast,
           // unfiltered behavior.
-          tools: [{ type: "web_search_20260209", name: "web_search", max_uses: COMPETITOR_PASS1_MAX_SEARCH_USES, allowed_callers: ["direct"] }],
+          tools: [{ type: "web_search_20260209", name: "web_search", max_uses: searchBudget, allowed_callers: ["direct"] }],
           messages: [
             {
               role: "user",
               content:
-                `Find ${params.leadTypeName} venues in ${locationScope}, ${params.country} that currently run trivia hosted by the service "${params.competitorName}". ` +
-                `Business criteria: ${params.promptText}\n\n` +
+                researchQuestion +
                 "Search the web and list every plausible venue you find — name, city/town, and day of the week if mentioned, plus address, phone number, email, and website whenever they're visible directly in the search results or listing snippet (don't fetch full pages digging for these — only what's already shown). " +
                 "One line per PHYSICAL LOCATION, never one line per chain/brand: if a chain has multiple branches running this competitor's trivia, list each branch on its own line with its own city (e.g. \"St. Louis Bar & Grill — Burlington\" and \"St. Louis Bar & Grill — Newmarket\" as two separate lines) — never summarize them together as one entry like \"St. Louis Bar & Grill (multiple locations)\", which throws away real, distinct leads. " +
-                "If a location clearly runs trivia through a DIFFERENT named provider, still list it and note that provider's name — don't omit or guess.",
+                otherProviderNote,
             },
           ],
         },
@@ -750,7 +772,10 @@ export class AnthropicCandidateDiscoveryProvider implements CandidateDiscoveryPr
               content:
                 "Convert these research notes into a structured candidate list. Only include venues actually named in the notes — never invent one. Leave a field null when the notes don't say. address1 must be the street address ONLY (no city, region, postal code, or country). " +
                 "Each candidate must be one specific physical location with a real city — if a note groups several branches together (e.g. \"multiple locations\" or similar, with no single city given), skip that note entirely rather than creating one candidate with a vague or non-city value in the city field. " +
-                `Region: ${params.region}, Country: ${params.country}. Only set competitorName to "${params.competitorName}" when the notes tie that venue to this specific service — if the notes name a different provider for a venue, use that provider's name instead. ` +
+                `Region: ${params.region}, Country: ${params.country}. Leave out any venue the notes place outside this region or country. ` +
+                (isPromptSearch
+                  ? "Set triviaStatus \"CURRENT_TRIVIA\" only when the notes show a current trivia night (and competitorName to the trivia provider the notes name, if any), otherwise \"UNCERTAIN\". "
+                  : `Only set competitorName to "${params.competitorName}" when the notes tie that venue to this specific service — if the notes name a different provider for a venue, use that provider's name instead. `) +
                 `${DAY_FIELD_INSTRUCTION}\n\n` +
                 `Research notes:\n${researchText}`,
             },
@@ -789,11 +814,16 @@ export class AnthropicEvidenceVerificationProvider implements EvidenceVerificati
     // discover()'s budget instead of guessing at a smaller number. Now uses
     // the same admin-configurable maxSearchToolUsesPerCall as discover() —
     // previously hardcoded to a smaller fixed 3, independently of it.
+    // AI_PROMPT (v9.0): the search's own criteria go into verification too,
+    // so the evidence records what the prompt asks for (ownership, seating,
+    // entertainment, ...) — more evidence entries, hence the larger cap.
+    const isPromptSearch = params.mode === "AI_PROMPT";
+    const criteria = isPromptSearch ? `Business criteria — record evidence for what these ask for:\n${params.promptText}\n\n` : "";
     return callProvider({ providerName: "anthropic-verification", timeoutMs: 300_000 }, async (signal) => {
       const response = await client().messages.create(
         {
           model,
-          max_tokens: 2000,
+          max_tokens: isPromptSearch ? 6000 : 2000,
           tools: [
             { type: "web_search_20260209", name: "web_search", max_uses: maxSearchToolUses },
             { type: "web_fetch_20260209", name: "web_fetch", max_uses: maxSearchToolUses },
@@ -808,7 +838,7 @@ export class AnthropicEvidenceVerificationProvider implements EvidenceVerificati
             {
               role: "user",
               content:
-                `${modeInstructions(params.mode, params.competitorName)}\n\n${DAY_FIELD_INSTRUCTION}\n\nVerify and refresh the evidence for this specific candidate, re-checking its website/public listings:\n\n${JSON.stringify(candidate)}`,
+                `${modeInstructions(params.mode, params.competitorName)}\n\n${criteria}${DAY_FIELD_INSTRUCTION}\n\nVerify and refresh the evidence for this specific candidate, re-checking its website/public listings:\n\n${JSON.stringify(candidate)}`,
             },
           ],
         },

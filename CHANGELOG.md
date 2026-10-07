@@ -13,6 +13,29 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v9.0 — 2026-10-07
+### Added — "AI search — find venues using your prompt"
+- A new lead-search mode, and now the default (Curt's call). Until now no
+  mode used your prompt to find venues *and* kept venues that already run
+  trivia: "General" was a directory listing that ignored the prompt, and
+  the two trivia modes each kept only one side.
+- How it works: the AI searches the web across the whole area (not just
+  the first few results) for venues fitting the prompt, keeping existing
+  trivia as a buying signal; it then researches each venue against the
+  prompt (recording evidence for what the prompt asks, e.g. ownership,
+  seating, entertainment) and scores it. Venues below the search's minimum
+  score go to "Below score" as with the trivia modes.
+- Uses the larger of the admin's searches-per-call setting and 15 for the
+  area sweep. Costs more than a directory listing; the AI budget limits
+  apply as for the other AI modes.
+- "General" is now labelled **Directory listing** so it's clear it doesn't
+  use the prompt.
+- Sales Quick Start: "AI lead research" lists the modes and when to use
+  each.
+- Database: migration 20261007020313_ai_prompt_search_mode (adds the new
+  mode to the search-mode list; nothing existing changes; applies on
+  deploy).
+
 ## v8.4 — 2026-10-06
 ### Fixed — lead searches stay inside the area you choose
 - A lead search returned venues outside the city and province entered

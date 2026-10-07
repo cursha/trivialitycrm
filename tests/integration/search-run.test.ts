@@ -174,6 +174,41 @@ describe("runSearchJob", () => {
     expect(updated.errorMessage).not.toContain("overloaded_error");
   });
 
+  it("AI_PROMPT keeps venues that already run trivia, verifies and scores each, and drops ones outside the searched province", async () => {
+    const { user, leadType } = await baseFixtures();
+    const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, cities: ["Milton"], region: "ON", mode: "AI_PROMPT", minimumScore: 0 });
+    const venue = (name: string, region: string, triviaStatus: "CURRENT_TRIVIA" | "UNCERTAIN") => ({
+      name,
+      address1: `${name.length} Main St`,
+      city: "Milton",
+      region,
+      postalCode: null,
+      country: "Canada",
+      phone: null,
+      email: null,
+      websiteUrl: null,
+      contactData: null,
+      triviaStatus,
+      competitorName: null,
+      day: null,
+      evidence: [],
+      sources: [],
+    });
+    vi.spyOn(MockCandidateDiscoveryProvider.prototype, "discover").mockResolvedValueOnce([
+      venue("Has Trivia Already", "ON", "CURRENT_TRIVIA"),
+      venue("Live Music Pub", "ON", "UNCERTAIN"),
+      venue("Wrong Province", "QC", "UNCERTAIN"),
+    ]);
+
+    await runSearchJob(search.id);
+
+    expect((await testPrisma.leadSearch.findUniqueOrThrow({ where: { id: search.id } })).status).toBe("SUCCEEDED");
+    const results = await testPrisma.searchResult.findMany({ where: { searchId: search.id }, orderBy: { name: "asc" } });
+    expect(results.map((r) => r.name)).toEqual(["Has Trivia Already", "Live Music Pub"]);
+    const candidates = await testPrisma.searchCandidate.findMany({ where: { searchId: search.id } });
+    expect(candidates.every((c) => c.status === "COMPLETED" && c.verifiedData !== null)).toBe(true);
+  });
+
   it("checkpoints a large discovery in one bulk insert, not a per-candidate transaction", async () => {
     // Regression test: the discovery checkpoint was a $transaction of one
     // upsert per candidate, whose duration grows with the candidate count —

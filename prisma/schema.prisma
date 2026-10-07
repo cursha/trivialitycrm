@@ -47,6 +47,9 @@ enum LeadSearchMode {
   COMPETITOR
   GENERAL
   PUB_RADIUS
+  // AI finds venues against the search's prompt; existing trivia is kept
+  // (a buying signal), not excluded. Curt's call, v9.0.
+  AI_PROMPT
 }
 
 enum DistanceUnit {

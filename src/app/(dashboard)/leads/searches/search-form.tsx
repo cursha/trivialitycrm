@@ -14,7 +14,8 @@ export type SearchFormOptions = {
 };
 
 const MODES = [
-  { value: "GENERAL", label: "General — match the prompt's criteria" },
+  { value: "AI_PROMPT", label: "AI search — find venues using your prompt" },
+  { value: "GENERAL", label: "Directory listing — every business of this type" },
   { value: "TRIVIA_GAP", label: "Offers events but not trivia" },
   { value: "TRIVIA_CONFIRMED", label: "Currently offers trivia" },
   { value: "COMPETITOR", label: "Competitor research" },
@@ -22,7 +23,7 @@ const MODES = [
 
 export function SearchForm({ prompts, leadTypes, competitors, canOverrideBudget }: SearchFormOptions) {
   const [state, formAction, pending] = useActionState<SearchFormState, FormData>(startSearch, undefined);
-  const [mode, setMode] = useState("GENERAL");
+  const [mode, setMode] = useState("AI_PROMPT");
   const [citiesInput, setCitiesInput] = useState("");
 
   const cities = citiesInput
@@ -54,6 +55,12 @@ export function SearchForm({ prompts, leadTypes, competitors, canOverrideBudget 
             </option>
           ))}
         </Select>
+        {mode === "AI_PROMPT" && (
+          <p className="mt-1 text-xs text-text-muted">
+            The AI searches the web for venues that fit your prompt, keeps venues that already run trivia (a buying signal), then
+            researches and scores each one against the prompt. Slower and costs more than a directory listing.
+          </p>
+        )}
         {mode === "GENERAL" && (
           <p className="mt-1 text-xs text-text-muted">
             When fast directory search is configured, General mode looks up businesses by Lead Type and city — the prompt text isn&apos;t

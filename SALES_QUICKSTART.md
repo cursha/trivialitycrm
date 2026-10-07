@@ -370,12 +370,20 @@ a bar found this way isn't marked as running trivia.
 
 1. Under Leads, review or create a research prompt — this is what tells the
    AI what kind of business you're looking for.
-2. Start a search: choose a location and lead type, and run it. Results
-   stay inside the province or state you choose, and inside your cities if
-   you list any. Note that **General** mode lists businesses from the
-   directory and doesn't use your prompt to find them; the prompt is only
-   applied when you click **Research this business** on a result. The
-   trivia modes use the AI and your prompt to find venues.
+2. Start a search: choose a prompt, a location, a lead type and a mode,
+   and run it. Results stay inside the province or state you choose, and
+   inside your cities if you list any. The modes:
+   - **AI search — find venues using your prompt** (the usual choice): the
+     AI searches the web for venues that fit your prompt, keeps ones that
+     already run trivia (that's a buying signal), then researches and
+     scores each against the prompt. Slower and costs more than a
+     directory listing.
+   - **Directory listing**: every business of that lead type from the
+     directory, fast and cheap. Your prompt isn't used until you click
+     **Research this business** on a result.
+   - **Offers events but not trivia** / **Currently offers trivia**: AI
+     searches limited to one or the other.
+   - **Competitor research**: venues running a named trivia company.
 3. Review results: each one shows a quality score, why it scored that way,
    the evidence behind it (with source links where available), a confidence
    level, and a recommended next action. If a result's evidence panel is
