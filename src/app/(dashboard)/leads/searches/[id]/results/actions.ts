@@ -11,8 +11,16 @@ import type { DiscoverParams, ResearchCandidate } from "@/lib/research/providers
 import { readContactDataEntries } from "@/lib/research/contact-data";
 import { writeAuditEvent } from "@/lib/audit/log";
 import { classifyProviderError } from "@/lib/integrations/provider-errors";
+import { findEmailOnWebsite } from "@/lib/research/website-email";
 
 export type ResultActionResult = { error?: string } | undefined;
+
+export type FindEmailsResult = { error: string } | { checked: number; found: number; skipped: number };
+
+// One results page's worth; each venue takes a few seconds. (Not exported:
+// a "use server" file may only export async functions.)
+const FIND_EMAILS_MAX = 25;
+const FIND_EMAILS_CONCURRENCY = 5;
 
 export async function rejectResult(id: string, rejectionReasonId: string): Promise<ResultActionResult> {
   const user = await requireUser();
@@ -166,4 +174,59 @@ export async function researchResult(id: string): Promise<ResultActionResult> {
   });
 
   revalidatePath(`/leads/searches/${result.searchId}/results`);
+}
+
+/**
+ * "Find emails" for the results the user ticked: reads each venue's own
+ * website for a public email (see website-email.ts). No AI and no paid API,
+ * so no budget check — only a rate limit, since it makes outside requests.
+ * Fills the result's email only when it's empty, and records why when none
+ * was found. A result that already has an email is skipped.
+ */
+export async function findResultEmails(ids: string[]): Promise<FindEmailsResult> {
+  const user = await requireUser();
+  requirePermission(user, "review_research_results");
+
+  const uniqueIds = [...new Set(ids.filter((id) => typeof id === "string" && id.length > 0))];
+  if (uniqueIds.length === 0) return { error: "Tick at least one venue first." };
+  if (uniqueIds.length > FIND_EMAILS_MAX) return { error: `Choose ${FIND_EMAILS_MAX} venues or fewer at a time.` };
+
+  const rateLimit = await checkRateLimit(`find-emails:${user.id}`, { windowMs: 60_000, limit: 4 });
+  if (!rateLimit.allowed) return { error: "Too many email lookups — wait a minute and try again." };
+
+  const results = await prisma.searchResult.findMany({ where: { id: { in: uniqueIds } } });
+  const toCheck = results.filter((result) => !result.email);
+
+  const foundIds = new Set<string>();
+  for (let start = 0; start < toCheck.length; start += FIND_EMAILS_CONCURRENCY) {
+    await Promise.all(
+      toCheck.slice(start, start + FIND_EMAILS_CONCURRENCY).map(async (result) => {
+        const lookup = await findEmailOnWebsite(result.websiteUrl);
+        if (lookup.email) foundIds.add(result.id);
+        // updateMany with email: null so an email added meanwhile is never overwritten.
+        await prisma.searchResult.updateMany({
+          where: { id: result.id, email: null },
+          data: { email: lookup.email ?? undefined, emailLookupAt: new Date(), emailLookupNote: lookup.note },
+        });
+      }),
+    );
+  }
+
+  const searchIds = [...new Set(results.map((result) => result.searchId))];
+  for (const searchId of searchIds) {
+    await writeAuditEvent({
+      actorId: user.id,
+      module: "research",
+      action: "results.emails_looked_up",
+      entityType: "LeadSearch",
+      entityId: searchId,
+      metadata: {
+        checked: toCheck.filter((result) => result.searchId === searchId).length,
+        found: toCheck.filter((result) => result.searchId === searchId && foundIds.has(result.id)).length,
+      },
+    });
+    revalidatePath(`/leads/searches/${searchId}/results`);
+  }
+
+  return { checked: toCheck.length, found: foundIds.size, skipped: results.length - toCheck.length };
 }

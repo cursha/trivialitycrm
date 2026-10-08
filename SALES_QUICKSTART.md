@@ -444,6 +444,8 @@ city.
 2. Skim the list and skip anything that's clearly not a fit.
 3. Click **Research this business** only on the ones that look promising.
    That's the AI step, at about $1 per pub.
+4. Tick the keepers and click **Find emails** to pick up their email
+   addresses from their own websites, at no AI cost.
 
 An AI search does all of this for you, but it researches every pub it
 finds: about $1.80 to find them plus about $1.20 for each one, so $5–10
@@ -555,6 +557,17 @@ researched" until you research them.
   are remembered: a later search that finds one marks it rejected again.
   **Restore**
   brings one back.
+- **Find emails**: tick the venues that look like a fit and click **Find
+  emails**. Tick **Yes, check these websites** to confirm, then click
+  **Find emails** again. The CRM reads each venue's own website (its home
+  page, then its contact page) for a public email address. There's no AI
+  cost, and it takes a few seconds per venue, up to 25 at a time. A found
+  email shows under the venue's name and goes with it when you transfer
+  it. Venues that already have an email are skipped, so it never
+  overwrites one. Where none is found, the reason shows instead: no
+  website on file, the website is a Facebook or Instagram page (check
+  those by hand), the website couldn't be reached, or no email is shown
+  on it.
 - **Export CSV / Excel** downloads the list.
 - Tick the ones worth pursuing and click **Transfer selected**. On the
   next page you can edit each one, add a first contact, choose who it's

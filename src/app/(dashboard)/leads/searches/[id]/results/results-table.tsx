@@ -3,10 +3,11 @@
 import { Fragment, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronRight, Sparkles } from "lucide-react";
-import { rejectResult, restoreResult, researchResult } from "./actions";
+import { ChevronDown, ChevronRight, Mail, Sparkles } from "lucide-react";
+import { rejectResult, restoreResult, researchResult, findResultEmails } from "./actions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
 import { TRIVIA_STATUS_TONE, DISPOSITION_TONE, DISPOSITION_LABEL, humanizeEnum, type BadgeTone } from "@/lib/ui/status-tones";
 import { isMockResearchResult, computeResultConfidence, recommendResultNextAction } from "@/lib/research/result-explanation";
@@ -21,6 +22,7 @@ export type ResultRow = {
   country: string;
   phone: string | null;
   email: string | null;
+  emailLookupNote: string | null;
   websiteUrl: string | null;
   score: number;
   explanation: string;
@@ -107,6 +109,19 @@ function ResultEvidencePanel({ result, minimumScore }: { result: ResultRow; mini
       )}
     </div>
   );
+}
+
+/** The venue's email, or why "Find emails" couldn't fill one in. */
+function ResultEmail({ result }: { result: ResultRow }) {
+  if (result.email) {
+    return (
+      <a href={`mailto:${result.email}`} className="mt-0.5 block break-all text-xs text-secondary hover:underline">
+        {result.email}
+      </a>
+    );
+  }
+  if (result.emailLookupNote) return <p className="mt-0.5 text-xs text-text-muted">{result.emailLookupNote}</p>;
+  return null;
 }
 
 /** The research/restore/reject action controls for one result — shared
@@ -212,6 +227,10 @@ export function ResultsTable({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [researchErrors, setResearchErrors] = useState<Record<string, string>>({});
+  const [confirmingEmails, setConfirmingEmails] = useState(false);
+  const [emailsConfirmed, setEmailsConfirmed] = useState(false);
+  const [findingEmails, setFindingEmails] = useState(false);
+  const [emailMessage, setEmailMessage] = useState<{ tone: "info" | "error"; text: string } | null>(null);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   function setResearchError(id: string, message: string | null) {
@@ -236,6 +255,28 @@ export function ResultsTable({
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
+    });
+  }
+
+  // Ticked venues that don't have an email yet — the ones "Find emails" reads.
+  const emailTargets = results.filter((r) => selected.has(r.id) && !r.email);
+
+  function findEmails() {
+    const ids = emailTargets.map((r) => r.id);
+    setConfirmingEmails(false);
+    setEmailMessage(null);
+    setFindingEmails(true);
+    startTransition(async () => {
+      const outcome = await findResultEmails(ids).finally(() => setFindingEmails(false));
+      if ("error" in outcome) {
+        setEmailMessage({ tone: "error", text: outcome.error });
+        return;
+      }
+      setEmailMessage({
+        tone: "info",
+        text: `Found ${outcome.found} email${outcome.found === 1 ? "" : "s"} from ${outcome.checked} website${outcome.checked === 1 ? "" : "s"}. Where none was found, the reason is shown under the venue's name.`,
+      });
+      router.refresh();
     });
   }
 
@@ -271,7 +312,21 @@ export function ResultsTable({
           </button>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={isPending || emailTargets.length === 0}
+            onClick={() => {
+              setEmailMessage(null);
+              setEmailsConfirmed(false);
+              setConfirmingEmails(true);
+            }}
+            title="Reads each ticked venue's own website for an email address. No AI cost."
+            className="inline-flex items-center gap-1 rounded-lg border border-border-strong px-3 py-2 text-xs font-semibold text-text hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Mail size={14} />
+            {findingEmails ? "Finding emails..." : `Find emails (${emailTargets.length})`}
+          </button>
           {canExport && (
             <>
               <a
@@ -301,6 +356,30 @@ export function ResultsTable({
           )}
         </div>
       </div>
+
+      {confirmingEmails && (
+        <Card className="space-y-3">
+          <p className="text-sm text-text">
+            Check the websites of {emailTargets.length} venue{emailTargets.length === 1 ? "" : "s"} for an email address? There&apos;s no AI cost. It takes a few seconds per
+            venue, and only fills in venues that don&apos;t already have an email.
+          </p>
+          <label className="flex items-center gap-2 text-sm font-semibold text-text">
+            <input type="checkbox" checked={emailsConfirmed} onChange={(event) => setEmailsConfirmed(event.target.checked)} />
+            Yes, check these websites
+          </label>
+          <div className="flex gap-2">
+            <Button type="button" variant="primary" disabled={!emailsConfirmed || emailTargets.length === 0} onClick={findEmails}>
+              Find emails
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => setConfirmingEmails(false)}>
+              Cancel
+            </Button>
+          </div>
+        </Card>
+      )}
+      {emailMessage && (
+        <p className={`text-sm ${emailMessage.tone === "error" ? "font-semibold text-danger" : "text-text-muted"}`}>{emailMessage.text}</p>
+      )}
 
       <Card className="overflow-hidden p-0">
         <div className="hidden overflow-x-auto md:block">
@@ -343,6 +422,7 @@ export function ResultsTable({
                       {result.name}
                     </button>
                     {result.competitorName && <p className="mt-0.5 text-xs text-amber-700">Uses {result.competitorName}</p>}
+                    <ResultEmail result={result} />
                   </td>
                   <td className="px-4 py-3 text-text-muted">{result.address1 ?? "—"}</td>
                   <td className="px-4 py-3 text-text-muted">{result.city}</td>
@@ -435,6 +515,7 @@ export function ResultsTable({
                     {result.name}
                   </button>
                   {result.competitorName && <p className="mt-0.5 text-xs text-amber-700">Uses {result.competitorName}</p>}
+                  <ResultEmail result={result} />
                   <p className="text-xs text-text-muted">
                     {result.address1 && <>{result.address1}, </>}
                     {result.city}, {result.region}

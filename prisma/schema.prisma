@@ -1382,6 +1382,10 @@ model SearchResult {
   phone             String?
   email             String?
   websiteUrl        String?
+  // "Find emails" on the results page: when the venue's own website was last
+  // read for an email, and why none was filled in (null when one was found).
+  emailLookupAt     DateTime?
+  emailLookupNote   String?
   contactData       Json?
   score             Int
   explanation       String                  @db.Text

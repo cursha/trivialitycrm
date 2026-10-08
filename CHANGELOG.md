@@ -13,6 +13,27 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v13.0 — 2026-10-08
+### New — Find emails on the search results page
+- Tick venues on a search's results page and click **Find emails**; a
+  confirmation tick box ("Yes, check these websites") has to be ticked
+  before it runs. The CRM reads each venue's own website, the home page
+  and then its contact page, for a public email address, and fills it in.
+  No AI and no paid service, so it costs nothing beyond a few seconds per
+  venue; up to 25 at a time.
+- Only the venues you tick, rather than every Quick Search result: Quick
+  Search can't tell which venues fit, and checking every website would
+  add minutes to each search (Curt's call).
+- It never overwrites an email. Where none is found it says why: no
+  website, a Facebook or Instagram page, the site couldn't be reached, or
+  no email on it. Emails now show under each venue's name on the results
+  page, and go with the venue when it's transferred.
+- Websites come from Google's listings, which businesses control, so the
+  lookup only reads ordinary public web addresses and refuses anything on
+  a private or internal network.
+- Database change: two new columns on search results (when the website
+  was checked, and the reason when no email was found).
+
 ## v12.1 — 2026-10-07
 ### Fixed — Quick Search returned parks, halls and fairgrounds
 - A Milton search for pubs, bars and taverns with trivia or events
