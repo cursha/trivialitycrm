@@ -13,6 +13,29 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v14.0 — 2026-10-08
+### New — Search the web for emails, and a Facebook/Instagram link
+- For ticked venues the free website check missed, **Search the web for
+  emails** runs a short AI web search per venue, picking up emails shown
+  in search results for its Facebook page and listing sites. Measured live
+  at 8–9¢ per venue (two searches, claude-sonnet-5); the confirmation shows
+  the estimated total and needs a "Yes, spend about $…" tick. Up to 10 at a
+  time, and each venue is only ever searched once, so it's never paid for
+  twice. It stops early if a daily or monthly AI budget limit is reached.
+- Facebook and Instagram aren't read directly: they need a login, block
+  automated visits, and forbid it in their terms. Instead, where a
+  venue's website is a Facebook or Instagram page, the results page links
+  to it so a person can check its About section (free).
+- Low-cost options only, no paid email-finder subscription (Curt's call).
+### New — is the email search worth it?
+- Reports → AI Research → **Finding emails**: emails found by the website
+  check and by the web search, the hit rate of each, how many web-search
+  finds were transferred into the CRM, and the web search's spend and cost
+  per email found. Also in that report's export. Curt asked for this so he
+  can stop the paid search if it isn't producing results.
+- Database change: search results record when a web search ran and where
+  each email came from (website or web search).
+
 ## v13.1 — 2026-10-08
 ### Fixed — missing space in the Find emails confirmation
 - With one venue ticked it read "Check the websites of 1 venuefor an email

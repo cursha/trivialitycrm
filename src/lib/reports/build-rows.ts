@@ -176,6 +176,17 @@ export async function buildReportRows(key: ReportKey, user: AuthenticatedUser, f
                 { section: "Provider calls", value: String(report.costEstimate.callCount) },
               ]
             : [{ section: "Estimated AI cost", value: "Not permitted to view" }]),
+          { section: "Emails: websites checked", value: String(report.emailFinding.websiteChecked) },
+          { section: "Emails: found on websites", value: String(report.emailFinding.websiteFound) },
+          { section: "Emails: venues web-searched", value: String(report.emailFinding.webSearched) },
+          { section: "Emails: found by web search", value: String(report.emailFinding.webFound) },
+          { section: "Emails: web-search finds transferred", value: String(report.emailFinding.webFoundTransferred) },
+          ...(report.emailFinding.webSearchCostUsd !== null
+            ? [
+                { section: "Emails: web search cost (USD, estimate)", value: report.emailFinding.webSearchCostUsd.toFixed(2) },
+                { section: "Emails: cost per web-search email (USD)", value: report.emailFinding.costPerWebEmailUsd?.toFixed(2) ?? "—" },
+              ]
+            : []),
         ],
       };
     }

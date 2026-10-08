@@ -4,7 +4,8 @@ import { Fragment, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronRight, Mail, Sparkles } from "lucide-react";
-import { rejectResult, restoreResult, researchResult, findResultEmails } from "./actions";
+import { rejectResult, restoreResult, researchResult, findResultEmails, searchWebForResultEmails, type FindEmailsResult } from "./actions";
+import { socialSiteName } from "@/lib/research/social-sites";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ export type ResultRow = {
   phone: string | null;
   email: string | null;
   emailLookupNote: string | null;
+  emailWebSearched: boolean;
   websiteUrl: string | null;
   score: number;
   explanation: string;
@@ -111,18 +113,31 @@ function ResultEvidencePanel({ result, minimumScore }: { result: ResultRow; mini
   );
 }
 
-/** The venue's email, or why "Find emails" couldn't fill one in. */
+/** The venue's email (and where a web search found it), or why none was
+ * found, with a link to its Facebook or Instagram page to check by hand. */
 function ResultEmail({ result }: { result: ResultRow }) {
-  if (result.email) {
-    return (
-      <a href={`mailto:${result.email}`} className="mt-0.5 block break-all text-xs text-secondary hover:underline">
-        {result.email}
-      </a>
-    );
-  }
-  if (result.emailLookupNote) return <p className="mt-0.5 text-xs text-text-muted">{result.emailLookupNote}</p>;
-  return null;
+  const social = result.email ? null : socialSiteName(result.websiteUrl);
+  return (
+    <>
+      {result.email && (
+        <a href={`mailto:${result.email}`} className="mt-0.5 block break-all text-xs text-secondary hover:underline">
+          {result.email}
+        </a>
+      )}
+      {result.emailLookupNote && <p className="mt-0.5 text-xs text-text-muted">{result.emailLookupNote}</p>}
+      {social && result.websiteUrl && (
+        <a href={result.websiteUrl} target="_blank" rel="noreferrer noopener" className="mt-0.5 block text-xs text-secondary hover:underline">
+          Open {social} page
+        </a>
+      )}
+    </>
+  );
 }
+
+// Per venue, for the confirmation: an email web search measured 8–9¢ live
+// (claude-sonnet-5, two searches, 2026-10-08).
+const WEB_SEARCH_COST_LOW = 0.08;
+const WEB_SEARCH_COST_HIGH = 0.1;
 
 /** The research/restore/reject action controls for one result — shared
  * between the desktop table's actions cell and the mobile card layout. */
@@ -227,9 +242,10 @@ export function ResultsTable({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [researchErrors, setResearchErrors] = useState<Record<string, string>>({});
-  const [confirmingEmails, setConfirmingEmails] = useState(false);
+  // Which email confirmation is open: the free website check or the paid web search.
+  const [confirming, setConfirming] = useState<"website" | "web" | null>(null);
   const [emailsConfirmed, setEmailsConfirmed] = useState(false);
-  const [findingEmails, setFindingEmails] = useState(false);
+  const [findingEmails, setFindingEmails] = useState<"website" | "web" | null>(null);
   const [emailMessage, setEmailMessage] = useState<{ tone: "info" | "error"; text: string } | null>(null);
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
@@ -258,23 +274,36 @@ export function ResultsTable({
     });
   }
 
-  // Ticked venues that don't have an email yet — the ones "Find emails" reads.
+  // Ticked venues that don't have an email yet — the ones "Find emails"
+  // reads, and of those, the ones never web-searched (never paid for twice).
   const emailTargets = results.filter((r) => selected.has(r.id) && !r.email);
+  const webSearchTargets = emailTargets.filter((r) => !r.emailWebSearched);
+  const confirmTargets = confirming === "web" ? webSearchTargets : emailTargets;
+  const costRange = `$${(webSearchTargets.length * WEB_SEARCH_COST_LOW).toFixed(2)}–$${(webSearchTargets.length * WEB_SEARCH_COST_HIGH).toFixed(2)}`;
 
-  function findEmails() {
-    const ids = emailTargets.map((r) => r.id);
-    setConfirmingEmails(false);
+  function openConfirm(kind: "website" | "web") {
     setEmailMessage(null);
-    setFindingEmails(true);
+    setEmailsConfirmed(false);
+    setConfirming(kind);
+  }
+
+  function runEmails(kind: "website" | "web") {
+    const ids = (kind === "web" ? webSearchTargets : emailTargets).map((r) => r.id);
+    setConfirming(null);
+    setEmailMessage(null);
+    setFindingEmails(kind);
     startTransition(async () => {
-      const outcome = await findResultEmails(ids).finally(() => setFindingEmails(false));
+      const action: (ids: string[]) => Promise<FindEmailsResult> = kind === "web" ? searchWebForResultEmails : findResultEmails;
+      const outcome = await action(ids).finally(() => setFindingEmails(null));
       if ("error" in outcome) {
         setEmailMessage({ tone: "error", text: outcome.error });
         return;
       }
+      const searched = kind === "web" ? `${outcome.checked} web search${outcome.checked === 1 ? "" : "es"}` : `${outcome.checked} website${outcome.checked === 1 ? "" : "s"}`;
+      const stopped = outcome.stoppedReason ? ` Stopped early: ${outcome.stoppedReason}` : "";
       setEmailMessage({
-        tone: "info",
-        text: `Found ${outcome.found} email${outcome.found === 1 ? "" : "s"} from ${outcome.checked} website${outcome.checked === 1 ? "" : "s"}. Where none was found, the reason is shown under the venue's name.`,
+        tone: outcome.stoppedReason ? "error" : "info",
+        text: `Found ${outcome.found} email${outcome.found === 1 ? "" : "s"} from ${searched}. Where none was found, the reason is shown under the venue's name.${stopped}`,
       });
       router.refresh();
     });
@@ -316,17 +345,25 @@ export function ResultsTable({
           <button
             type="button"
             disabled={isPending || emailTargets.length === 0}
-            onClick={() => {
-              setEmailMessage(null);
-              setEmailsConfirmed(false);
-              setConfirmingEmails(true);
-            }}
+            onClick={() => openConfirm("website")}
             title="Reads each ticked venue's own website for an email address. No AI cost."
             className="inline-flex items-center gap-1 rounded-lg border border-border-strong px-3 py-2 text-xs font-semibold text-text hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Mail size={14} />
-            {findingEmails ? "Finding emails..." : `Find emails (${emailTargets.length})`}
+            {findingEmails === "website" ? "Finding emails..." : `Find emails (${emailTargets.length})`}
           </button>
+          {canResearch && (
+            <button
+              type="button"
+              disabled={isPending || webSearchTargets.length === 0}
+              onClick={() => openConfirm("web")}
+              title="An AI web search for each ticked venue still missing an email, including what search engines show of its Facebook page. About 8–10¢ each."
+              className="inline-flex items-center gap-1 rounded-lg border border-border-strong px-3 py-2 text-xs font-semibold text-text hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Sparkles size={14} />
+              {findingEmails === "web" ? "Searching the web..." : `Search the web for emails (${webSearchTargets.length})`}
+            </button>
+          )}
           {canExport && (
             <>
               <a
@@ -357,20 +394,22 @@ export function ResultsTable({
         </div>
       </div>
 
-      {confirmingEmails && (
+      {confirming && (
         <Card className="space-y-3">
           <p className="text-sm text-text">
-            {`Check the websites of ${emailTargets.length} ${emailTargets.length === 1 ? "venue" : "venues"} for an email address? There's no AI cost. It takes a few seconds per venue, and only fills in venues that don't already have an email.`}
+            {confirming === "web"
+              ? `Search the web for the emails of ${webSearchTargets.length} ${webSearchTargets.length === 1 ? "venue" : "venues"}? This uses AI, about 8–10¢ per venue, so roughly ${costRange} in all, from your AI budget. Each venue is only ever searched once. Up to 10 at a time.`
+              : `Check the websites of ${emailTargets.length} ${emailTargets.length === 1 ? "venue" : "venues"} for an email address? There's no AI cost. It takes a few seconds per venue, and only fills in venues that don't already have an email.`}
           </p>
           <label className="flex items-center gap-2 text-sm font-semibold text-text">
             <input type="checkbox" checked={emailsConfirmed} onChange={(event) => setEmailsConfirmed(event.target.checked)} />
-            Yes, check these websites
+            {confirming === "web" ? `Yes, spend about ${costRange} on this` : "Yes, check these websites"}
           </label>
           <div className="flex gap-2">
-            <Button type="button" variant="primary" disabled={!emailsConfirmed || emailTargets.length === 0} onClick={findEmails}>
-              Find emails
+            <Button type="button" variant="primary" disabled={!emailsConfirmed || confirmTargets.length === 0} onClick={() => runEmails(confirming)}>
+              {confirming === "web" ? "Search the web" : "Find emails"}
             </Button>
-            <Button type="button" variant="ghost" onClick={() => setConfirmingEmails(false)}>
+            <Button type="button" variant="ghost" onClick={() => setConfirming(null)}>
               Cancel
             </Button>
           </div>

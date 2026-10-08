@@ -68,5 +68,54 @@ export async function getAiResearchReport(user: AuthenticatedUser, filters: Repo
     };
   }
 
-  return { searchesRun, funnel, dispositionBreakdown, searchStatusBreakdown, costEstimate };
+  const emailFinding = await getEmailFindingStats(user, scope, filters, dateRange);
+
+  return { searchesRun, funnel, dispositionBreakdown, searchStatusBreakdown, costEstimate, emailFinding };
+}
+
+/**
+ * Is "Find emails" paying off? Counted by when each lookup ran (not when
+ * its search was created), so a month's figures are that month's lookups.
+ * Kept so Curt can stop the paid web search if it isn't finding enough
+ * emails for what it costs (his call, 2026-10-08): emails found, how many
+ * of those venues went on to be transferred into the CRM, and — with the
+ * cost permission — the spend and the cost per email found.
+ */
+async function getEmailFindingStats(
+  user: AuthenticatedUser,
+  scope: NonNullable<ReturnType<typeof reportScope>>,
+  filters: ReportFilters,
+  dateRange: { start: Date; end: Date },
+) {
+  const searchScope = {
+    AND: [{ createdBy: reportUserWhere(scope) }, filters.leadTypeId ? { leadTypeId: filters.leadTypeId } : {}, filters.competitorId ? { competitorId: filters.competitorId } : {}],
+  };
+  const inRange = { gte: dateRange.start, lt: dateRange.end };
+
+  const [websiteChecked, websiteFound, webSearched, webFound, webFoundTransferred] = await Promise.all([
+    prisma.searchResult.count({ where: { search: searchScope, emailLookupAt: inRange } }),
+    prisma.searchResult.count({ where: { search: searchScope, emailLookupAt: inRange, emailSource: "WEBSITE" } }),
+    prisma.searchResult.count({ where: { search: searchScope, emailWebSearchAt: inRange } }),
+    prisma.searchResult.count({ where: { search: searchScope, emailWebSearchAt: inRange, emailSource: "WEB_SEARCH" } }),
+    prisma.searchResult.count({ where: { search: searchScope, emailWebSearchAt: inRange, emailSource: "WEB_SEARCH", disposition: "TRANSFERRED" } }),
+  ]);
+
+  let webSearchCostUsd: number | null = null;
+  if (hasPermission(user, "view_ai_costs")) {
+    const usage = await prisma.aiUsageRecord.aggregate({
+      where: { operation: "findEmail", createdAt: inRange, search: searchScope },
+      _sum: { estimatedCostUsd: true },
+    });
+    webSearchCostUsd = Number(usage._sum.estimatedCostUsd ?? 0);
+  }
+
+  return {
+    websiteChecked,
+    websiteFound,
+    webSearched,
+    webFound,
+    webFoundTransferred,
+    webSearchCostUsd,
+    costPerWebEmailUsd: webSearchCostUsd !== null && webFound > 0 ? webSearchCostUsd / webFound : null,
+  };
 }

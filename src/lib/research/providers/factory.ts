@@ -1,12 +1,13 @@
 import type { LeadSearchMode } from "../../../generated/prisma/enums";
-import type { OpportunityAnalysisProvider, ResearchProviders } from "./types";
-import { MockPromptAssistant, MockCandidateDiscoveryProvider, MockEvidenceVerificationProvider, MockScoringProvider, MockPlacesProvider, MockPubRadiusPlacesProvider, MockOpportunityAnalysisProvider } from "./mock";
+import type { EmailSearchProvider, OpportunityAnalysisProvider, ResearchProviders } from "./types";
+import { MockEmailSearchProvider, MockPromptAssistant, MockCandidateDiscoveryProvider, MockEvidenceVerificationProvider, MockScoringProvider, MockPlacesProvider, MockPubRadiusPlacesProvider, MockOpportunityAnalysisProvider } from "./mock";
 import {
   AnthropicPromptAssistant,
   AnthropicCandidateDiscoveryProvider,
   AnthropicEvidenceVerificationProvider,
   AnthropicScoringProvider,
   AnthropicOpportunityAnalysisProvider,
+  AnthropicEmailSearchProvider,
 } from "./anthropic";
 import { GooglePlacesDiscoveryProvider } from "./google-places";
 import { GooglePlacesNearbyDiscoveryProvider } from "./google-places-nearby";
@@ -84,6 +85,19 @@ export function getOpportunityAnalysisProvider(): OpportunityAnalysisProvider {
       return new MockOpportunityAnalysisProvider();
     case "anthropic":
       return new AnthropicOpportunityAnalysisProvider();
+    default:
+      throw new Error(`Unknown AI_PROVIDER "${aiProvider}" — expected "mock" or "anthropic".`);
+  }
+}
+
+/** Selects the "Search the web for emails" provider from AI_PROVIDER, the same way. */
+export function getEmailSearchProvider(): EmailSearchProvider {
+  const aiProvider = (process.env.AI_PROVIDER || "mock").toLowerCase();
+  switch (aiProvider) {
+    case "mock":
+      return new MockEmailSearchProvider();
+    case "anthropic":
+      return new AnthropicEmailSearchProvider();
     default:
       throw new Error(`Unknown AI_PROVIDER "${aiProvider}" — expected "mock" or "anthropic".`);
   }

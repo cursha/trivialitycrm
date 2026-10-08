@@ -13,15 +13,13 @@ import https from "node:https";
 import dns from "node:dns";
 import net from "node:net";
 import type { LookupFunction } from "node:net";
+import { socialSiteName } from "./social-sites";
 
 const PAGE_TIMEOUT_MS = 8000;
 const MAX_PAGE_BYTES = 1_000_000;
 const MAX_REDIRECTS = 3;
 const USER_AGENT = "Mozilla/5.0 (compatible; TrivialityCRM/1.0; +https://trivialitycrm.com)";
 
-// Sites that need a login or block automated visits; their email has to be
-// looked up by hand.
-const SOCIAL_HOSTS = ["facebook.com", "fb.com", "instagram.com", "twitter.com", "x.com", "tiktok.com", "linktr.ee"];
 
 // Addresses that show up on pages but aren't the venue's: site-builder
 // tracking, placeholders and image names like "logo@2x.png".
@@ -200,7 +198,8 @@ export function decodeCloudflareEmail(hex: string): string | null {
   return out;
 }
 
-function usableEmail(raw: string): string | null {
+/** A lower-cased, plausible venue email, or null for junk, placeholders and no-reply addresses. */
+export function usableEmail(raw: string): string | null {
   const email = raw.trim().replace(/^mailto:/i, "").replace(/[.,;:]+$/, "").toLowerCase();
   const match = email.match(/^([a-z0-9._%+-]+)@([a-z0-9.-]+\.[a-z]{2,24})$/);
   if (!match) return null;
@@ -278,7 +277,7 @@ export const EMAIL_LOOKUP_NOTES = {
 export async function findEmailOnWebsite(websiteUrl: string | null, fetcher: PageFetcher = fetchPage): Promise<EmailLookup> {
   const url = websiteUrl ? parseWebsiteUrl(websiteUrl) : null;
   if (!url) return { email: null, note: EMAIL_LOOKUP_NOTES.noWebsite };
-  if (hostMatches(url.hostname, SOCIAL_HOSTS)) return { email: null, note: EMAIL_LOOKUP_NOTES.social };
+  if (socialSiteName(url.toString())) return { email: null, note: EMAIL_LOOKUP_NOTES.social };
 
   const home = await fetcher(url).catch(() => null);
   if (!home) return { email: null, note: EMAIL_LOOKUP_NOTES.unreachable };

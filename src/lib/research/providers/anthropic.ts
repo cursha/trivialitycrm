@@ -10,10 +10,14 @@ import { estimateCostUsd } from "./pricing";
 import { prisma } from "../../prisma";
 import { getAiSettings } from "../../ai/budget";
 import { EOS_CATEGORY_MAXIMA, EOS_CATEGORY_LABELS } from "../../eos/constants";
+import { usableEmail } from "../website-email";
 import type {
   CandidateDiscoveryProvider,
   DiscoverParams,
   DiscoveryProgressUpdate,
+  EmailSearchInput,
+  EmailSearchProvider,
+  EmailSearchResult,
   EvidenceVerificationProvider,
   OpportunityAnalysisInput,
   OpportunityAnalysisProvider,
@@ -368,7 +372,7 @@ type ProviderUsage = {
  * the derived cost estimate (see ./pricing.ts). Best-effort: a failure to
  * write the usage row must never fail the research call itself. */
 async function recordUsage(params: {
-  operation: "discover" | "verify" | "score" | "promptAssist" | "analyzeOpportunity";
+  operation: "discover" | "verify" | "score" | "promptAssist" | "analyzeOpportunity" | "findEmail";
   model: string;
   usage: ProviderUsage;
   searchId?: string;
@@ -850,6 +854,63 @@ export class AnthropicEvidenceVerificationProvider implements EvidenceVerificati
       if (!jsonBlock || !("text" in jsonBlock)) return candidate;
       const merged = { ...candidate, ...(JSON.parse(jsonBlock.text) as Partial<ResearchCandidate>) };
       return { ...merged, day: normalizeWeekday(merged.day) };
+    });
+  }
+}
+
+// Two searches is enough to see a venue's Facebook "About" or a listing
+// site's contact line in the results; more mostly adds cost.
+const EMAIL_SEARCH_MAX_USES = 2;
+
+const EMAIL_SEARCH_SCHEMA = {
+  type: "object",
+  properties: { email: { type: ["string", "null"] }, sourceUrl: { type: ["string", "null"] } },
+  required: ["email", "sourceUrl"],
+  additionalProperties: false,
+} as const;
+
+/**
+ * "Search the web for emails": one short web_search pass for a single
+ * venue's public email, aimed at what search engines show of its Facebook
+ * or Instagram page and listing sites. Search results only, no web_fetch —
+ * those pages need a login anyway, and fetching is where the cost is. Kept
+ * to EMAIL_SEARCH_MAX_USES searches, direct calling (no automatic
+ * code-execution filtering pass, see discoverCompetitorTwoStep()), and a
+ * small output, so it costs cents rather than Research this business's $1.
+ */
+export class AnthropicEmailSearchProvider implements EmailSearchProvider {
+  async findEmail(input: EmailSearchInput, context: { searchId?: string; userId?: string }): Promise<EmailSearchResult> {
+    const model = await resolveModel();
+    return callProvider({ providerName: "anthropic-email-search", timeoutMs: 90_000 }, async (signal) => {
+      const response = await client().messages.create(
+        {
+          model,
+          max_tokens: 400,
+          tools: [{ type: "web_search_20260209", name: "web_search", max_uses: EMAIL_SEARCH_MAX_USES, allowed_callers: ["direct"] }],
+          output_config: { format: { type: "json_schema", schema: EMAIL_SEARCH_SCHEMA } },
+          messages: [
+            {
+              role: "user",
+              content:
+                `Find the public contact email address for this bar or pub: ${input.name}, ${input.city}, ${input.region}, ${input.country}` +
+                `${input.phone ? `, phone ${input.phone}` : ""}${input.websiteUrl ? `, website ${input.websiteUrl}` : ""}.
+
+` +
+                `Search for it (for example "${input.name} ${input.city} email"). Its Facebook or Instagram page, as shown in the search results, and local listing sites often show it. ` +
+                "Only report an email you actually saw in a search result, for this exact venue in this city, not a similarly named one elsewhere or the head office of a chain. " +
+                "Never guess or construct one from the website's domain. If you didn't see one, return email null. sourceUrl is the page the email was shown for.",
+            },
+          ],
+        },
+        { signal },
+      );
+      await recordUsage({ operation: "findEmail", model, usage: response.usage, searchId: context.searchId, userId: context.userId });
+      assertNotTruncated(response.stop_reason, "anthropic-email-search");
+      const jsonBlock = response.content.findLast((block) => block.type === "text");
+      if (!jsonBlock || !("text" in jsonBlock)) return { email: null, sourceUrl: null };
+      const parsed = JSON.parse(jsonBlock.text) as EmailSearchResult;
+      const email = parsed.email ? usableEmail(parsed.email) : null;
+      return { email, sourceUrl: email ? parsed.sourceUrl : null };
     });
   }
 }

@@ -10,6 +10,42 @@ import { Card, SectionHeading } from "@/components/ui/card";
 
 export const metadata = { title: "AI Research Reports — Triviality CRM" };
 
+function percent(part: number, whole: number): string {
+  return whole === 0 ? "—" : `${Math.round((part / whole) * 100)}%`;
+}
+
+/** Whether "Find emails" and its paid web search are worth it. */
+function EmailFindingCard({ stats }: { stats: NonNullable<Awaited<ReturnType<typeof getAiResearchReport>>>["emailFinding"] }) {
+  return (
+    <Card>
+      <SectionHeading>Finding emails (in range)</SectionHeading>
+      <div className="mt-3 grid gap-4 sm:grid-cols-2">
+        <div>
+          <p className="text-sm font-semibold text-text">Website check (free)</p>
+          <p className="mt-1 text-sm text-text-muted">
+            {stats.websiteFound} email{stats.websiteFound === 1 ? "" : "s"} found from {stats.websiteChecked} website{stats.websiteChecked === 1 ? "" : "s"} checked (
+            {percent(stats.websiteFound, stats.websiteChecked)}).
+          </p>
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-text">Web search (AI)</p>
+          <p className="mt-1 text-sm text-text-muted">
+            {stats.webFound} email{stats.webFound === 1 ? "" : "s"} found from {stats.webSearched} venue{stats.webSearched === 1 ? "" : "s"} searched (
+            {percent(stats.webFound, stats.webSearched)}). {stats.webFoundTransferred} of those venue{stats.webFoundTransferred === 1 ? " was" : "s were"} transferred
+            into the CRM.
+          </p>
+          {stats.webSearchCostUsd !== null && (
+            <p className="mt-1 text-sm text-text-muted">
+              Spent about ${stats.webSearchCostUsd.toFixed(2)}
+              {stats.costPerWebEmailUsd !== null ? `, about $${stats.costPerWebEmailUsd.toFixed(2)} per email found.` : stats.webSearched > 0 ? ", with no emails found yet." : "."}
+            </p>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export default async function AiResearchReportPage({
   searchParams,
 }: {
@@ -47,6 +83,8 @@ export default async function AiResearchReportPage({
         rows={report.dispositionBreakdown}
         emptyLabel="No results in this range."
       />
+
+      <EmailFindingCard stats={report.emailFinding} />
 
       <Card>
         <SectionHeading>Estimated AI cost (in range)</SectionHeading>

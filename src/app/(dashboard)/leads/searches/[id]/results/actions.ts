@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
 import { checkAiBudget } from "@/lib/ai/budget";
 import { checkRateLimit } from "@/lib/rate-limit/postgres-bucket";
-import { getProviders } from "@/lib/research/providers/factory";
+import { getProviders, getEmailSearchProvider } from "@/lib/research/providers/factory";
 import type { DiscoverParams, ResearchCandidate } from "@/lib/research/providers/types";
 import { readContactDataEntries } from "@/lib/research/contact-data";
 import { writeAuditEvent } from "@/lib/audit/log";
@@ -15,12 +15,16 @@ import { findEmailOnWebsite } from "@/lib/research/website-email";
 
 export type ResultActionResult = { error?: string } | undefined;
 
-export type FindEmailsResult = { error: string } | { checked: number; found: number; skipped: number };
+export type FindEmailsResult = { error: string } | { checked: number; found: number; skipped: number; stoppedReason?: string };
 
 // One results page's worth; each venue takes a few seconds. (Not exported:
 // a "use server" file may only export async functions.)
 const FIND_EMAILS_MAX = 25;
 const FIND_EMAILS_CONCURRENCY = 5;
+// The paid web search: fewer at once, since each is an AI call of 10-30s.
+const WEB_SEARCH_EMAILS_MAX = 10;
+const WEB_SEARCH_EMAILS_CONCURRENCY = 5;
+const NO_EMAIL_ONLINE_NOTE = "No email found on the website or in a web search";
 
 export async function rejectResult(id: string, rejectionReasonId: string): Promise<ResultActionResult> {
   const user = await requireUser();
@@ -206,7 +210,9 @@ export async function findResultEmails(ids: string[]): Promise<FindEmailsResult>
         // updateMany with email: null so an email added meanwhile is never overwritten.
         await prisma.searchResult.updateMany({
           where: { id: result.id, email: null },
-          data: { email: lookup.email ?? undefined, emailLookupAt: new Date(), emailLookupNote: lookup.note },
+          data: lookup.email
+            ? { email: lookup.email, emailSource: "WEBSITE", emailLookupAt: new Date(), emailLookupNote: null }
+            : { emailLookupAt: new Date(), emailLookupNote: lookup.note },
         });
       }),
     );
@@ -229,4 +235,92 @@ export async function findResultEmails(ids: string[]): Promise<FindEmailsResult>
   }
 
   return { checked: toCheck.length, found: foundIds.size, skipped: results.length - toCheck.length };
+}
+
+/**
+ * "Search the web for emails" for the ticked results that still have no
+ * email: a short AI web search per venue (see AnthropicEmailSearchProvider),
+ * about 8–10¢ each, charged to the AI budget like any research. Each venue
+ * is searched at most once (emailWebSearchAt), so it's never paid for
+ * twice. The budget is rechecked before every venue, so a run stops as soon
+ * as a daily or monthly limit is reached.
+ */
+export async function searchWebForResultEmails(ids: string[]): Promise<FindEmailsResult> {
+  const user = await requireUser();
+  requirePermission(user, "run_research");
+
+  const uniqueIds = [...new Set(ids.filter((id) => typeof id === "string" && id.length > 0))];
+  if (uniqueIds.length === 0) return { error: "Tick at least one venue first." };
+  if (uniqueIds.length > WEB_SEARCH_EMAILS_MAX) return { error: `Choose ${WEB_SEARCH_EMAILS_MAX} venues or fewer at a time for a web search.` };
+
+  const budgetCheck = await checkAiBudget();
+  if (!budgetCheck.allowed) return { error: budgetCheck.reason ?? "The AI budget limit has been reached." };
+
+  const rateLimit = await checkRateLimit(`web-search-emails:${user.id}`, { windowMs: 60_000, limit: 3 });
+  if (!rateLimit.allowed) return { error: "Too many email searches — wait a minute and try again." };
+
+  const results = await prisma.searchResult.findMany({ where: { id: { in: uniqueIds } } });
+  const toSearch = results.filter((result) => !result.email && !result.emailWebSearchAt);
+  const provider = getEmailSearchProvider();
+
+  const foundIds = new Set<string>();
+  const searchedIds = new Set<string>();
+  let stoppedReason: string | null = null;
+  for (let start = 0; start < toSearch.length && !stoppedReason; start += WEB_SEARCH_EMAILS_CONCURRENCY) {
+    const midRun = await checkAiBudget();
+    if (!midRun.allowed) {
+      stoppedReason = midRun.reason ?? "The AI budget limit has been reached.";
+      break;
+    }
+    await Promise.all(
+      toSearch.slice(start, start + WEB_SEARCH_EMAILS_CONCURRENCY).map(async (result) => {
+        let found: { email: string | null; sourceUrl: string | null };
+        try {
+          found = await provider.findEmail(
+            { name: result.name, city: result.city, region: result.region, country: result.country, phone: result.phone, websiteUrl: result.websiteUrl },
+            { searchId: result.searchId, userId: user.id },
+          );
+        } catch {
+          // Left unmarked so it can be tried again; any cost is already recorded.
+          return;
+        }
+        searchedIds.add(result.id);
+        if (found.email) foundIds.add(result.id);
+        const sourceHost = found.sourceUrl ? safeHost(found.sourceUrl) : null;
+        await prisma.searchResult.updateMany({
+          where: { id: result.id, email: null },
+          data: found.email
+            ? { email: found.email, emailSource: "WEB_SEARCH", emailWebSearchAt: new Date(), emailLookupNote: `Found by web search${sourceHost ? ` (${sourceHost})` : ""}` }
+            : { emailWebSearchAt: new Date(), emailLookupNote: result.emailLookupAt ? NO_EMAIL_ONLINE_NOTE : "No email found in a web search" },
+        });
+      }),
+    );
+  }
+
+  for (const searchId of new Set(results.map((result) => result.searchId))) {
+    const inSearch = toSearch.filter((result) => result.searchId === searchId);
+    await writeAuditEvent({
+      actorId: user.id,
+      module: "research",
+      action: "results.emails_web_searched",
+      entityType: "LeadSearch",
+      entityId: searchId,
+      metadata: {
+        searched: inSearch.filter((result) => searchedIds.has(result.id)).length,
+        found: inSearch.filter((result) => foundIds.has(result.id)).length,
+      },
+    });
+    revalidatePath(`/leads/searches/${searchId}/results`);
+  }
+
+  if (stoppedReason && searchedIds.size === 0) return { error: stoppedReason };
+  return { checked: searchedIds.size, found: foundIds.size, skipped: results.length - toSearch.length, ...(stoppedReason ? { stoppedReason } : {}) };
+}
+
+function safeHost(url: string): string | null {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
 }

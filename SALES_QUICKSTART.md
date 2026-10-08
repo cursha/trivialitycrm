@@ -445,7 +445,8 @@ city.
 3. Click **Research this business** only on the ones that look promising.
    That's the AI step, at about $1 per pub.
 4. Tick the keepers and click **Find emails** to pick up their email
-   addresses from their own websites, at no AI cost.
+   addresses from their own websites, at no AI cost. For the ones it
+   misses, **Search the web for emails** (about 8–10¢ each).
 
 An AI search does all of this for you, but it researches every pub it
 finds: about $1.80 to find them plus about $1.20 for each one, so $5–10
@@ -565,9 +566,19 @@ researched" until you research them.
   email shows under the venue's name and goes with it when you transfer
   it. Venues that already have an email are skipped, so it never
   overwrites one. Where none is found, the reason shows instead: no
-  website on file, the website is a Facebook or Instagram page (check
-  those by hand), the website couldn't be reached, or no email is shown
-  on it.
+  website on file, the website is a Facebook or Instagram page, the
+  website couldn't be reached, or no email is shown on it. When the
+  website is a Facebook or Instagram page, an **Open Facebook page** (or
+  Instagram) link appears so you can check its About section yourself.
+- **Search the web for emails** (if you can run research): for ticked
+  venues that still have no email, the AI searches the web for one,
+  including what Google shows of the venue's Facebook page and listing
+  sites. This one costs money: about 8–10¢ per venue, from the AI budget.
+  The confirmation shows the total; tick **Yes, spend about $…** and click
+  **Search the web**. Up to 10 venues at a time, and each venue is only
+  ever searched once, so you never pay twice for the same one. An email it
+  finds shows "Found by web search" and the site it came from. Run the
+  free **Find emails** first, so you only pay for the venues it missed.
 - **Export CSV / Excel** downloads the list.
 - Tick the ones worth pursuing and click **Transfer selected**. On the
   next page you can edit each one, add a first contact, choose who it's
@@ -614,6 +625,11 @@ and outcome.
 - **Lead Sources**: where new bars came from (added by hand, AI research
   or import).
 - **AI Research**: searches by status and what happened to their results.
+  **Finding emails** shows how many emails the free website check and the
+  paid web search each found, how many of the web-search finds were
+  transferred into the CRM, and (with cost access) what the web search
+  cost and the cost per email it found. Use it to decide whether the web
+  search is worth keeping.
 - **Competitors**: bars linked to each competitor.
 - **Territories**: how each territory is covered.
 - **Lead Types**: active bars by lead type (shown when there's more than

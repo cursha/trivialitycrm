@@ -180,6 +180,15 @@ steps are in `AGENTS.md`.
   under about $2 stops every AI search before it researches anything. The
   limit is checked before each venue is researched, so a search can end a
   little over it. Quick Search uses no AI and isn't affected.
+- **Search the web for emails** (results page, needs `run_research`)
+  costs about 8–10¢ per venue (measured: two web searches on
+  claude-sonnet-5) and counts against the same daily and monthly caps;
+  the budget is rechecked between batches. A search's per-search limit
+  doesn't stop it, but its cost is added to that search's spend. Reports → AI Research → **Finding emails**
+  shows its hit rate and cost per email found; if it isn't paying off,
+  tell salespeople to stop using it, or remove `run_research` from their
+  role (which also stops Research this business). The free website check
+  needs only `review_research_results`.
 - **Minimum score:** a strict prompt scores honestly, so a good lead can
   land in the 70s. If good-looking venues are marked below the minimum
   score, lower it (70 suits a prompt that says 70–84 is a good fit).

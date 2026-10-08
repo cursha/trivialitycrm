@@ -55,6 +55,7 @@ export default async function SearchResultsPage({
     phone: result.phone,
     email: result.email,
     emailLookupNote: result.emailLookupNote,
+    emailWebSearched: result.emailWebSearchAt !== null,
     websiteUrl: result.websiteUrl,
     score: result.score,
     explanation: result.explanation,

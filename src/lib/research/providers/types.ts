@@ -231,3 +231,22 @@ export type OpportunityAnalysisProgressEvent = { message: string };
 export interface OpportunityAnalysisProvider {
   analyze(input: OpportunityAnalysisInput, onProgress?: (event: OpportunityAnalysisProgressEvent) => void): Promise<OpportunityAnalysisResult>;
 }
+
+export type EmailSearchInput = {
+  name: string;
+  city: string;
+  region: string;
+  country: string;
+  phone: string | null;
+  websiteUrl: string | null;
+};
+
+/** What a web search turned up: the email and the page it was seen on, or nothing. */
+export type EmailSearchResult = { email: string | null; sourceUrl: string | null };
+
+/** "Search the web for emails" on the results page: a short, cheap AI web
+ * search for one venue's public email, for the venues whose own website
+ * didn't show one (see website-email.ts for the free check). */
+export interface EmailSearchProvider {
+  findEmail(input: EmailSearchInput, context: { searchId?: string; userId?: string }): Promise<EmailSearchResult>;
+}

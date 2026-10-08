@@ -103,3 +103,15 @@ describe("private network protection", () => {
     expect(requests).toBe(0);
   });
 });
+
+describe("socialSiteName", () => {
+  it("names the social site a venue's website is on, and nothing for a real website", async () => {
+    const { socialSiteName } = await import("../../src/lib/research/social-sites");
+    expect(socialSiteName("https://www.facebook.com/keenans")).toBe("Facebook");
+    expect(socialSiteName("m.facebook.com/keenans")).toBe("Facebook");
+    expect(socialSiteName("https://instagram.com/keenans")).toBe("Instagram");
+    expect(socialSiteName("https://www.keenanspub.ca")).toBeNull();
+    expect(socialSiteName("https://notfacebook.com")).toBeNull();
+    expect(socialSiteName(null)).toBeNull();
+  });
+});

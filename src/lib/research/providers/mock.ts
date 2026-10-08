@@ -6,6 +6,9 @@ import type {
   CandidateDiscoveryProvider,
   DiscoverParams,
   DiscoveryProgressUpdate,
+  EmailSearchInput,
+  EmailSearchProvider,
+  EmailSearchResult,
   EvidenceVerificationProvider,
   OpportunityAnalysisInput,
   OpportunityAnalysisProgressEvent,
@@ -234,5 +237,18 @@ export class MockOpportunityAnalysisProvider implements OpportunityAnalysisProvi
         ? { providerName: "Mock Trivia Co.", day: "THURSDAY", sourceUrl: input.websiteUrl }
         : null,
     };
+  }
+}
+
+/**
+ * Deterministic stand-in for AnthropicEmailSearchProvider — no network. A
+ * venue whose name contains "No Email" finds nothing; any other gets a
+ * made-up address on a .example.test domain.
+ */
+export class MockEmailSearchProvider implements EmailSearchProvider {
+  async findEmail(input: EmailSearchInput): Promise<EmailSearchResult> {
+    if (/no email/i.test(input.name)) return { email: null, sourceUrl: null };
+    const slug = input.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+    return { email: `info@${slug}.example.test`, sourceUrl: `https://www.facebook.com/${slug}` };
   }
 }

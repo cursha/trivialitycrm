@@ -1361,6 +1361,12 @@ model SearchCandidate {
   @@index([searchId, status])
 }
 
+/// Where a search result's email was found by "Find emails".
+enum EmailSource {
+  WEBSITE
+  WEB_SEARCH
+}
+
 model SearchResult {
   id                String                  @id @default(cuid())
   searchId          String
@@ -1386,6 +1392,11 @@ model SearchResult {
   // read for an email, and why none was filled in (null when one was found).
   emailLookupAt     DateTime?
   emailLookupNote   String?
+  // "Search the web for emails" (paid, AI): when it ran for this venue, so
+  // it's never paid for twice, and where the email came from — kept so the
+  // AI research report can show whether the web search is worth its cost.
+  emailWebSearchAt  DateTime?
+  emailSource       EmailSource?
   contactData       Json?
   score             Int
   explanation       String                  @db.Text
