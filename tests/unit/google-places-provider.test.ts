@@ -330,27 +330,51 @@ describe("GooglePlacesDiscoveryProvider", () => {
 });
 
 describe("Quick Search trivia / karaoke", () => {
+  const texts = (queries: { textQuery: string }[]) => queries.map((query) => query.textQuery);
+
   it("builds one query per ticked entertainment, or the plain query when none", () => {
-    expect(placesTextQueries(baseParams, "Milton")).toEqual(["Pub in Milton, ON, Canada"]);
-    expect(placesTextQueries({ ...baseParams, entertainment: ["TRIVIA"] }, "Milton")).toEqual(["Pub with trivia night in Milton, ON, Canada"]);
-    expect(placesTextQueries({ ...baseParams, entertainment: ["TRIVIA", "KARAOKE"] }, "Milton")).toEqual([
+    expect(placesTextQueries(baseParams, "Milton")).toEqual([{ textQuery: "Pub in Milton, ON, Canada" }]);
+    expect(texts(placesTextQueries({ ...baseParams, entertainment: ["TRIVIA"] }, "Milton"))).toEqual(["Pub with trivia night in Milton, ON, Canada"]);
+    expect(texts(placesTextQueries({ ...baseParams, entertainment: ["TRIVIA", "KARAOKE"] }, "Milton"))).toEqual([
       "Pub with trivia night in Milton, ON, Canada",
       "Pub with karaoke in Milton, ON, Canada",
     ]);
-    expect(placesTextQueries({ ...baseParams, entertainment: ["BINGO", "EVENTS"] }, "Milton")).toEqual([
+    expect(texts(placesTextQueries({ ...baseParams, entertainment: ["BINGO", "EVENTS"] }, "Milton"))).toEqual([
       "Pub with bingo night in Milton, ON, Canada",
       "Pub with weekly events in Milton, ON, Canada",
     ]);
   });
 
-  it("searches for each ticked venue kind instead of the Lead Type name", () => {
-    expect(placesTextQueries({ ...baseParams, venueKinds: ["BAR", "TAVERN"] }, "Milton")).toEqual(["Bar in Milton, ON, Canada", "Tavern in Milton, ON, Canada"]);
-    expect(placesTextQueries({ ...baseParams, venueKinds: ["PUB", "BAR"], entertainment: ["TRIVIA", "KARAOKE"] }, "Milton")).toEqual([
+  it("searches for each ticked venue kind, held to its Google place type", () => {
+    expect(placesTextQueries({ ...baseParams, venueKinds: ["PUB", "BAR", "TAVERN"] }, "Milton")).toEqual([
+      { textQuery: "Pub in Milton, ON, Canada", includedType: "pub" },
+      { textQuery: "Bar in Milton, ON, Canada", includedType: "bar" },
+      { textQuery: "Tavern in Milton, ON, Canada", includedType: "bar" },
+    ]);
+    expect(texts(placesTextQueries({ ...baseParams, venueKinds: ["PUB", "BAR"], entertainment: ["TRIVIA", "KARAOKE"] }, "Milton"))).toEqual([
       "Pub with trivia night in Milton, ON, Canada",
       "Pub with karaoke in Milton, ON, Canada",
       "Bar with trivia night in Milton, ON, Canada",
       "Bar with karaoke in Milton, ON, Canada",
     ]);
+  });
+
+  it("asks Google for only places of the venue kind's type", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ places: [] }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new GooglePlacesDiscoveryProvider(0).discover({ ...baseParams, venueKinds: ["BAR"], entertainment: ["EVENTS"] });
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ textQuery: "Bar with weekly events in Milton, ON, Canada", includedType: "bar", strictTypeFiltering: true });
+  });
+
+  it("sends no place type when searching by the Lead Type name", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ places: [] }) });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await new GooglePlacesDiscoveryProvider(0).discover(baseParams);
+
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ textQuery: "Pub in Milton, ON, Canada" });
   });
 
   it("runs both queries for each city and returns what each found (run-search dedupes the overlap)", async () => {

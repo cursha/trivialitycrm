@@ -15,17 +15,13 @@ import { getGeocoder } from "@/lib/research/providers/geocoder";
 import { PubRadiusSetupSchema } from "@/lib/validation/pub-radius";
 import { formString } from "@/lib/form-data";
 
-// The Lead Type this app's data actually uses for pubs — confirmed against
-// the live Lead Types list ("Mayhem Lead" is the pub category; there is no
-// separate "Pub" Lead Type). Resolved by name, same "resolve by name/key"
-// convention as COMPETITOR_REJECTION_REASON_NAMES in run-search.ts.
-const PUB_LEAD_TYPE_NAME = "Mayhem Lead";
-
 export type PubRadiusOriginOption = { id: string; name: string; city: string; region: string };
 
 /** Origin-pub picker's search-as-you-type — near-identical fork of
  * quickAddCompanySearch (src/app/(dashboard)/quick-add/actions.ts), scoped
- * to ACTIVE companies on the pub Lead Type only. */
+ * to ACTIVE companies. Any lead type: it used to require one named "Mayhem
+ * Lead", which production doesn't have ("pubs"), so no origin pub could
+ * ever be found. The search's results take the origin's own lead type. */
 export async function searchOriginPubCompanies(query: string): Promise<PubRadiusOriginOption[]> {
   const user = await requireUser();
   if (query.trim().length < MIN_QUERY_LENGTH) return [];
@@ -38,7 +34,7 @@ export async function searchOriginPubCompanies(query: string): Promise<PubRadius
 
   const contains = { contains: query.trim(), mode: "insensitive" as const };
   const companies = await prisma.company.findMany({
-    where: { AND: [scope, { status: "ACTIVE" }, { leadType: { name: PUB_LEAD_TYPE_NAME } }, { name: contains }] },
+    where: { AND: [scope, { status: "ACTIVE" }, { name: contains }] },
     select: { id: true, name: true, city: true, region: true },
     orderBy: { name: "asc" },
     take: 8,

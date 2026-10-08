@@ -273,6 +273,58 @@ On any company's page:
   now, and the button to move it to the next step (see "The sales
   process" above). You can also change the stage from the edit form or
   the pipeline board.
+- **Follow-up Sequences** card: enroll the bar in a sequence your
+  administrator has built (see "Follow-up sequences" below).
+
+### Archiving a company
+
+**Archive** a bar that's closed, a duplicate, or not worth working. Its
+contacts, activities and history are kept, it drops out of your lists, and
+it can be restored at any time. Find archived bars on the Pipeline's
+**Archived** view and click **Restore**. Only an administrator can
+permanently delete an archived bar, which removes everything about it and
+can't be undone.
+
+## The pipeline
+
+**Pipeline** (in the menu) is your sales workspace.
+
+- **Board**: one column per step of the sales process. Drag a bar's card to
+  another column to move it to that step (the same as the button on its
+  Sales process card, so its follow-ups are created). An **Overdue** badge
+  means a follow-up is late.
+- **Views** along the top: My Leads, Team Leads, Unassigned Leads, Today's,
+  Overdue and Upcoming Follow-ups, Recently Added, No Recent Activity, Won,
+  Lost and Archived.
+- **Filters**: by salesperson, competitor and territory (and lead type when
+  there's more than one). **Saved Views** keeps a set of filters under a
+  name, private or shared with the team.
+- **Bulk actions**: tick several bars, then change their step, assign them
+  to someone, set their territory, create a follow-up or note for all of
+  them, analyze them for opportunities (the EOS, an AI cost per bar), add
+  them to a route, export them, or archive or restore them.
+
+## The Follow-ups page
+
+**Follow-ups** (in the menu) lists follow-ups by tab: **Overdue**, **Due
+today**, **Upcoming**, **Completed**, and **No follow-up**, which lists the
+bars that have nothing scheduled at all. Those are the ones most likely to
+be forgotten, so it's worth checking now and then.
+
+## Follow-up sequences
+
+A sequence is a set of steps your administrator builds, such as an email
+on day 0, a call reminder on day 3 and a trial follow-up on day 10. On a
+company's page, under **Follow-up Sequences**, click **Enroll**, choose the
+sequence and (when it sends email) the contact, and check every step it
+will take before you click **Confirm enrollment**.
+
+- Emails go out from **your** connected mailbox on their day; reminders
+  appear as follow-ups.
+- It stops by itself if the contact opts out, or if the bar reaches the
+  step the sequence is set to stop at (for example once a demo is booked).
+- **Pause**, **Resume** or cancel it from the same card. Nothing is ever
+  enrolled automatically.
 
 ## Sales Lists
 
@@ -369,16 +421,94 @@ inbox:
 Leads → **Quick Search** lists businesses from the directory, with no AI
 scoring. Choose the area, and under **Search for** tick **Pubs**, **Bars**
 and/or **Taverns** (Pubs is ticked to start). Each is its own directory
-search, and the results are combined without duplicates, so ticking all
-three finds venues listed under any of those names.
+search, and the results are combined without duplicates. Only places the
+directory lists as a pub or bar come back, so a search for events won't
+turn up parks or community halls, though a golf club or entertainment
+centre with a bar inside can. Chains are included.
 
 To find venues that already put on entertainment, tick **Trivia**,
 **Karaoke**, **Bingo** or **Any events** under "Only venues that offer".
 Any events catches open mic, game nights and other weekly event nights.
 Ticking several finds venues with any of them. Leave them all blank to
-list every venue. It's the directory's
-best guess from listings and reviews, so check before you rely on it, and
-a bar found this way isn't marked as running trivia.
+list every venue. It's the directory's best guess from listings and
+reviews, so check before you rely on it, and a bar found this way isn't
+marked as running trivia.
+
+Quick Search has no AI cost. It uses Google's business directory, which
+costs pennies per search, and each box you tick adds another search per
+city.
+
+### The cheapest way to find good leads
+
+1. Run a **Quick Search** for your area.
+2. Skim the list and skip anything that's clearly not a fit.
+3. Click **Research this business** only on the ones that look promising.
+   That's the AI step, at about $1 per pub.
+
+An AI search does all of this for you, but it researches every pub it
+finds: about $1.80 to find them plus about $1.20 for each one, so $5–10
+for a single area.
+
+### What makes a good lead
+
+Worth pursuing:
+
+- **Already pays for trivia.** A host or company named on their events page
+  means there's a trivia budget to win, or a second night to fill.
+- **Trivia, karaoke or bingo on a weeknight (Mon–Wed).** They're trying to
+  fill slow nights, which is exactly what Triviality Mayhem does.
+- **Karaoke but no trivia.** They already run event nights and have a crowd
+  that joins in.
+- **Recent posts.** Events on Facebook or Instagram in the last month or two,
+  the same night every week.
+- **TVs or a projector** in the photos, and table seating.
+- **Independent, with a named owner or manager.** They can say yes without
+  head office.
+- **Reviews that mention the event** ("great trivia night"), which shows
+  people actually come.
+
+Rank lower:
+
+- **Chains** (Kelseys, Montana's, Boston Pizza…): head office decides.
+- **A trivia company's branded night** on a long contract: still worth a
+  call, but a longer sell. Note the provider and night.
+- **Nightclubs and lounges** without table seating, and very large venues.
+- **No posts in six months or more.**
+- **Live music only.** It draws a different audience from trivia.
+
+The quickest check: their Facebook or Instagram first (more current than a
+website), then the newest Google reviews (search them for "trivia" or
+"karaoke"), then the Google photos for TVs and seating.
+
+## Pub Lead Finder (if you have access)
+
+Leads → **Pub Lead Finder** finds bars near a pub you already have, for
+example to fill a route around a bar you're visiting anyway. Type the
+pub's name (it has to be in the CRM and not archived), choose a radius (1
+to 50 miles, or 1 to 80 km) and click **Start search**. It uses the
+business directory, not the AI, so it costs pennies, though it counts
+toward your daily search limit. The pub you started from is left out of
+its own results.
+
+Results are reviewed on their own page (see "Saving results from Pub Lead
+Finder and Competition Locator" below).
+
+## Competition Locator (if you have access)
+
+Leads → **Competition Locator** finds venues running a named trivia
+company's nights, such as Ruby or Tremendous Trivia. Those bars already
+pay for trivia, so they're strong leads. Choose the competitor (from the
+Competitors page), and the states or provinces to search.
+
+- It uses the AI and **costs money for each region** searched. Leaving
+  every state and province unticked searches all of Canada and the United
+  States one region at a time, which can take hours. Tick only the areas
+  you sell in.
+- The run page shows its progress: possible locations, verified,
+  rejected, needing review and possible duplicates. **Cancel search** stops
+  it. If it stops at the spending limit, **Continue anyway** resumes every
+  region from where it left off, for this run only.
+- **Search history** lists past runs by competitor.
 
 ## AI lead research (if you have access)
 
@@ -387,25 +517,100 @@ a bar found this way isn't marked as running trivia.
 2. Start a search: choose a prompt, a location and a mode,
    and run it. Results stay inside the province or state you choose, and
    inside your cities if you list any. The modes:
-   - **AI search — find venues using your prompt** (the usual choice): the
-     AI searches the web for venues that fit your prompt, keeps ones that
-     already run trivia (that's a buying signal), then researches and
-     scores each against the prompt. Slower and costs more than a
-     directory listing.
-   - **Directory listing**: every business of that type (pubs) from the
-     directory, fast and cheap. Your prompt isn't used until you click
-     **Research this business** on a result.
+   - **AI search — find venues using your prompt**: the AI searches the
+     web for venues that fit your prompt, keeps ones that already run
+     trivia (that's a buying signal), then researches and scores each
+     against the prompt. It's the most thorough and the most expensive:
+     about $1.80 to find the venues plus about $1.20 for each one.
+   - **Directory listing**: every business of your lead type from the
+     directory, with no AI cost. Quick Search does the same with more
+     choices (pubs, bars and taverns, trivia, karaoke, bingo, events), so
+     use Quick Search instead.
    - **Offers events but not trivia** / **Currently offers trivia**: AI
      searches limited to one or the other.
    - **Competitor research**: venues running a named trivia company.
-3. Review results: each one shows a quality score, why it scored that way,
-   the evidence behind it (with source links where available), a confidence
-   level, and a recommended next action. If a result's evidence panel is
-   marked "Mock data," it came from the safe demo provider, not a real
-   researched lead — never treat it as one.
-4. Select the ones worth pursuing and transfer them into your pipeline as
-   companies. Anything that looks like a duplicate of something already in the
-   CRM is flagged before you commit, not after.
+3. **If a search stops** with "This search has reached its maximum
+   per-search AI budget", it keeps the venues it had already researched.
+   Click **Continue anyway** on the search's page to finish it over the
+   limit, this once. Your administrator sets the limit.
+4. Review the results and move the ones worth pursuing into the CRM (see
+   below).
+
+## Reviewing search results
+
+A search's **results** page lists what it found, highest score first.
+Directory results (Quick Search, Directory listing) all show "Not yet
+researched" until you research them.
+
+- **Meets minimum score** shows only results at or above the search's
+  minimum score; **All results** shows everything, including those below
+  it.
+- Click a result to see its score explanation, recommended next action,
+  confidence, evidence and sources. A result marked **Mock data** came from
+  the demo provider, not real research: never treat it as a lead.
+- **Research this business** runs the AI on just that one result (about
+  $1): it checks its trivia status, gathers evidence and gives it a fresh
+  score.
+- **Reject…** a result that isn't a fit, with a reason. Rejected venues
+  are remembered: a later search that finds one marks it rejected again.
+  **Restore**
+  brings one back.
+- **Export CSV / Excel** downloads the list.
+- Tick the ones worth pursuing and click **Transfer selected**. On the
+  next page you can edit each one, add a first contact, choose who it's
+  assigned to and its starting step. A result that matches a bar already
+  in the CRM is flagged, and you choose:
+  - **Merge** (usually the right choice): update the existing bar. The
+    result's details win wherever it has them; the bar keeps its own
+    wherever the result is blank.
+  - **Replace**: overwrite the existing bar's address, phone, email and
+    website with the result's, even blanking ones the result doesn't
+    have.
+  - **Ignore**: leave the existing bar alone and skip this result.
+
+  Only an administrator can settle a possible duplicate.
+
+### Saving results from Pub Lead Finder and Competition Locator
+
+Their results open on a review page in sections: **New companies**,
+**Existing companies with new information**, **Possible duplicates**,
+**Competitor conflicts** (Competition Locator only: the bar is already
+linked to a different competitor) and **Rejected / unverified**.
+
+- Tick results one by one, or **Select all in section**.
+- For a possible duplicate, choose which value to keep for each field
+  that differs, or **Create as a new company anyway**, or **Ignore — do
+  nothing**.
+- For a competitor conflict, choose **Keep existing competitor**, **Assign
+  this competitor anyway** or **Skip this result**.
+- Choose who new companies are assigned to and their starting step, then
+  save. **Open source** shows where a finding came from.
+
+## Reports (if you have access)
+
+**Reports** (in the menu) has a tab for each report. Most tabs share the
+same filters: date range, territory, step, salesperson, competitor, source
+and outcome.
+
+- **Dashboard**: the headline numbers at a glance.
+- **Pipeline**: how many bars are at each step now, and how many entered
+  each step in the date range.
+- **Salespeople**: each salesperson's activity, pipeline progress, wins,
+  losses and current workload, side by side rather than blended into one
+  score.
+- **Lead Sources**: where new bars came from (added by hand, AI research
+  or import).
+- **AI Research**: searches by status and what happened to their results.
+- **Competitors**: bars linked to each competitor.
+- **Territories**: how each territory is covered.
+- **Lead Types**: active bars by lead type (shown when there's more than
+  one).
+- **Trends**: new leads, wins, losses and activities week by week (weeks
+  start Monday).
+- **Campaigns**: email campaign results.
+- **Scheduled Reports**: have a report produced daily, weekly or monthly
+  for the people you choose. They get a notification (the bell) when it's
+  ready, and **Download CSV** under Recent runs gets it again.
 
 ## Importing a spreadsheet (if you have access)
 

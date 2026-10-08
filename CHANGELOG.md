@@ -13,6 +13,38 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v12.1 — 2026-10-07
+### Fixed — Quick Search returned parks, halls and fairgrounds
+- A Milton search for pubs, bars and taverns with trivia or events
+  returned 56 places, about 25 of them not bars at all (Country Heritage
+  Park, the fairgrounds, community centres, a cycling centre, a banquet
+  hall). The directory was matching the words ("bar with weekly events")
+  rather than the kind of business.
+- Each Pubs, Bars or Taverns search is now held to Google's own business
+  type: pubs to places Google lists as a pub, bars and taverns to places it
+  lists as a bar (it has no tavern type). The same Milton search, checked
+  against the live directory, now returns only pubs and bars, plus a few
+  places with a bar inside such as a golf club or an entertainment centre.
+- Chains are still included (Curt's call).
+### Fixed — Pub Lead Finder could never find a starting pub
+- Its pub picker only matched companies on a lead type named "Mayhem
+  Lead", which this CRM doesn't have (its lead type is "pubs"), so it
+  always said "No matching pubs". It now finds any active company.
+### Improved — a much fuller user manual
+- Sales Quick Start, new sections: Pub Lead Finder, Competition Locator,
+  reviewing and saving search results (Research this business, reject and
+  restore, transfer, Merge / Replace / Ignore), the pipeline board, views
+  and bulk actions, the Follow-ups page, follow-up sequences, archiving a
+  company, and every Reports tab including scheduled reports. Also what
+  each kind of search costs, the cheapest way to find leads, what makes a
+  good lead, and what to do when a search stops at its spending limit.
+- Administrator Guide, new sections: territories, competitors, email
+  templates (with the placeholders), template categories, follow-up
+  sequences, scheduled emails, communication compliance and review, data
+  quality issues and enrichment, plus setting the per-search AI limit,
+  choosing a minimum score and writing a research prompt.
+- No database change.
+
 ## v12.0 — 2026-10-07
 ### New — Quick Search looks for pubs, bars and taverns
 - Quick Search used to ask the directory only for your lead type's name

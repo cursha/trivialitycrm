@@ -171,8 +171,24 @@ steps are in `AGENTS.md`.
   or just to pause spend.
 - The AI Settings page's daily/monthly/per-search budget caps and per-user
   daily search limit stop new AI activity once exceeded, mid-run included —
-  a search that hits its per-search cap mid-way still keeps whatever it had
-  already found, it just stops finding more.
+  a search that hits its per-search cap mid-way still keeps the venues it
+  had already researched, it just stops researching more. Open the search
+  and click **Continue anyway** to finish that one search over the limit.
+- **Set the per-search limit high enough for an AI search to finish.**
+  Finding the venues alone costs about $1.30–1.90, and researching each one
+  about $1.20, so an area with 7 venues costs around $7. A per-search limit
+  under about $2 stops every AI search before it researches anything. The
+  limit is checked before each venue is researched, so a search can end a
+  little over it. Quick Search uses no AI and isn't affected.
+- **Minimum score:** a strict prompt scores honestly, so a good lead can
+  land in the 70s. If good-looking venues are marked below the minimum
+  score, lower it (70 suits a prompt that says 70–84 is a good fit).
+- **Writing a research prompt:** the same prompt is used to find venues,
+  to research each one and to score it, so describe what qualifies a venue
+  and how to score it, not the format of a report. Asking for a full
+  report while finding venues makes that step slow and expensive and
+  returns few. Name chains to leave out, and treat hard-to-find facts (seat
+  count, ownership) as signals rather than must-haves.
 - The Integrations page shows recent AI/email usage and any recent provider
   errors — check here first if something AI/email-related seems off.
 - Anyone with `view_administration` also sees a running today's-spend/
@@ -258,6 +274,86 @@ Locator, Pub Lead Finder, and the scan):
   province/state match** and the street addresses don't conflict. Two
   locations of the same chain, such as Boston Pizza in Oakville and in
   Mississauga, are not flagged.
+
+- **Issues** (Data Quality → Issues) lists the problems the latest scan
+  found. For each one you can **Correct value** (the change is recorded in
+  the audit log), **Defer** it, **Ignore** it, **Reopen** it, or assign it to
+  someone to review. Bulk assign, defer and ignore handle several at once;
+  merges and corrections are always reviewed one by one.
+- **Enrichment** (Data Quality → Enrichment) is not in use yet. It only has
+  a demo provider, so its suggestions aren't real data. Nothing it suggests
+  is ever applied unless someone clicks **Accept**.
+
+## Territories
+
+Settings → **Territories** groups bars by area and gives each area a
+salesperson.
+
+- A territory covers a **country**, a **state/province** or a **city**
+  (leave the smaller ones blank to cover the whole of the larger one). Give
+  it a name such as "Greater Toronto Area" if you like.
+- When territories overlap, the most specific wins: a Milton territory
+  beats an Ontario one for a bar in Milton. Two territories can't cover
+  exactly the same area.
+- A bar's territory is worked out from its address every time, so editing
+  a territory's area takes effect straight away.
+- **Set territory** (a bulk action on the Pipeline) assigns the ticked bars
+  to that territory's salesperson. The Territories report shows how each
+  territory is covered.
+
+## Competitors
+
+**Competitors** (in the main menu) is the list of trivia companies you
+compete with, such as Ruby or Tremendous Trivia. Competition Locator
+searches for one of them, the AI links a bar to one when it finds that
+company runs its trivia, and an import links a trivia provider whose name
+matches one exactly.
+
+- **Locations** is your own estimate of the competitor's total number of
+  venues. It isn't worked out from the bars linked to it in the CRM.
+- Make a competitor inactive rather than deleting it, so bars already
+  linked to it keep the link.
+
+## Email templates, sequences and scheduled emails
+
+- **Email templates** (Settings → Email Templates): reusable emails with
+  placeholders filled in when sent: `{{contact.firstName}}`,
+  `{{contact.lastName}}`, `{{contact.email}}`, `{{company.name}}`,
+  `{{sender.name}}`, `{{sender.mailingAddress}}`, `{{today}}` and
+  `{{unsubscribeLink}}`. Every template must include
+  `{{unsubscribeLink}}` (the law requires a working unsubscribe link). An
+  email with a placeholder that can't be filled is held back rather than
+  sent with `{{…}}` in it. A template is **personal** (only its author) or **shared**
+  (the whole team), and can be limited to a lead type, a step of the sales
+  process or a language. **Standard links** attach a document by link (for
+  example a Google Drive PDF) every time the template is used; senders can
+  add or remove links on each email.
+- **Template categories** (Settings → Email Template Categories) group
+  templates in the chooser. A category in use can be deactivated, not
+  deleted.
+- **Follow-up sequences** (Settings → Sequences): build a sequence of steps
+  (an email from a shared template, a wait of some days, or a task, call,
+  demo or trial reminder), in order. Set **Stop if this stage is reached**
+  so a bar leaves the sequence once, say, a demo is booked. Salespeople
+  enroll bars from the company page and see every step first; email steps
+  send from the mailbox of whoever enrolled the bar. A sequence also stops
+  for a contact who opts out.
+- **Scheduled emails** (Settings → Scheduled Emails): every email waiting
+  to go out. You can edit or cancel one that's still Scheduled; once the
+  system has started sending it, it's left alone. Administrators see the
+  whole team's; everyone else sees their own.
+
+## Email compliance
+
+- **Communication compliance** (Settings → Communication Compliance):
+  search for a contact to see and record their email consent (express,
+  implied, or withdrawn/opt-out), with where it came from and a note. It's
+  a record for your compliance needs and doesn't block sending, except
+  that a contact marked **Do Not Contact** is never emailed.
+- **Communications review** (Settings → Communications Review): replies
+  whose sender didn't match exactly one contact wait here. Link each to the
+  right contact, or **Dismiss** it if it isn't a real reply. Nothing here
+  is attached to a company until you link it.
 
 ## Backups
 

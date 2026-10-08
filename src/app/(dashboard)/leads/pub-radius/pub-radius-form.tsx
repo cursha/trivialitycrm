@@ -51,7 +51,7 @@ function OriginPicker({ selected, onSelect, onClear }: { selected: PubRadiusOrig
         {query.trim().length < 2 && <p className="text-sm text-text-muted">Type at least 2 characters.</p>}
         {query.trim().length >= 2 && searching && <p className="text-sm text-text-muted">Searching…</p>}
         {query.trim().length >= 2 && !searching && results.length === 0 && (
-          <p className="text-sm text-text-muted">No matching pubs — make sure the company exists and is on the &ldquo;Mayhem Lead&rdquo; Lead Type.</p>
+          <p className="text-sm text-text-muted">No matching pubs — it has to be a company already in the CRM (and not archived).</p>
         )}
         {results.map((company) => (
           <button

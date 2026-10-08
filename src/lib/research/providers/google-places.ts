@@ -119,6 +119,14 @@ const ENTERTAINMENT_PHRASES: Record<SearchEntertainment, string> = {
 
 const VENUE_KIND_TERMS: Record<SearchVenueKind, string> = { PUB: "Pub", BAR: "Bar", TAVERN: "Tavern" };
 
+// The Google place type each venue kind is held to (Places API Table A —
+// it has "pub" and "bar" but no tavern type, so a tavern search is held to
+// "bar"). Without it Google matches the words alone: "Bar with weekly
+// events in Milton" returned fairgrounds, parks and community centres.
+const VENUE_KIND_PLACE_TYPES: Record<SearchVenueKind, string> = { PUB: "pub", BAR: "bar", TAVERN: "bar" };
+
+export type PlacesQuery = { textQuery: string; includedType?: string };
+
 /**
  * The Text Search queries for one city: "Pub in Oakville, ON, Canada" —
  * one per venue kind ticked on Quick Search (Pub, Bar, Tavern; the Lead
@@ -128,11 +136,18 @@ const VENUE_KIND_TERMS: Record<SearchVenueKind, string> = { PUB: "Pub", BAR: "Ba
  * matches these from listings and reviews, so it's a best guess, not
  * confirmation.
  */
-export function placesTextQueries(params: Pick<DiscoverParams, "leadTypeName" | "region" | "country" | "entertainment" | "venueKinds">, city: string): string[] {
+export function placesTextQueries(params: Pick<DiscoverParams, "leadTypeName" | "region" | "country" | "entertainment" | "venueKinds">, city: string): PlacesQuery[] {
   const place = `in ${city}, ${params.region}, ${params.country}`;
-  const terms = params.venueKinds?.length ? params.venueKinds.map((kind) => VENUE_KIND_TERMS[kind]) : [params.leadTypeName];
+  // A search by the Lead Type's own name has no place type to hold it to.
+  const terms: { term: string; includedType?: string }[] = params.venueKinds?.length
+    ? params.venueKinds.map((kind) => ({ term: VENUE_KIND_TERMS[kind], includedType: VENUE_KIND_PLACE_TYPES[kind] }))
+    : [{ term: params.leadTypeName }];
   const entertainment = params.entertainment ?? [];
-  return terms.flatMap((term) => (entertainment.length === 0 ? [`${term} ${place}`] : entertainment.map((kind) => `${term} ${ENTERTAINMENT_PHRASES[kind]} ${place}`)));
+  return terms.flatMap(({ term, includedType }) =>
+    (entertainment.length === 0 ? [`${term} ${place}`] : entertainment.map((kind) => `${term} ${ENTERTAINMENT_PHRASES[kind]} ${place}`)).map((textQuery) =>
+      includedType ? { textQuery, includedType } : { textQuery },
+    ),
+  );
 }
 
 // The place's own province/state code and country, not the searched-for
@@ -193,7 +208,11 @@ export class GooglePlacesDiscoveryProvider implements CandidateDiscoveryProvider
         for (let page = 0; page < MAX_PAGES_PER_CITY; page++) {
           // Per Google's docs, every field besides maxResultCount/pageSize/
           // pageToken must stay identical across pages of the same search.
-          const body: { textQuery: string; pageToken?: string } = { textQuery: query };
+          // strictTypeFiltering: only places of includedType come back, not
+          // just places ranked as more likely to be one.
+          const body: { textQuery: string; includedType?: string; strictTypeFiltering?: boolean; pageToken?: string } = query.includedType
+            ? { textQuery: query.textQuery, includedType: query.includedType, strictTypeFiltering: true }
+            : { textQuery: query.textQuery };
           if (pageToken) body.pageToken = pageToken;
 
           const response = await fetch(TEXT_SEARCH_URL, {
