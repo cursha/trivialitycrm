@@ -426,6 +426,28 @@ directory lists as a pub or bar come back, so a search for events won't
 turn up parks or community halls, though a golf club or entertainment
 centre with a bar inside can. Chains are included.
 
+### Searching a list of cities
+
+Choose the country and province or state once, then paste your cities
+into the **Cities** box: one per line, or separated by commas, up to 50.
+"Milton, ON" on its own line is read as Milton, and repeats are dropped.
+The box shows the cities it read, so check them before you start. Leave
+it blank to search the whole province or state.
+
+With more than one city, **Run each city as its own search** is ticked:
+each city gets its own search and results page, and the next page lists
+them all so you can open each one. Untick it to get one combined list for
+all the cities instead.
+
+**Saving a list to reuse it.** Under the cities, type a name (for example
+"West GTA towns") and click **Save list**. It saves the country, province
+and cities together. Next time, pick it from **Saved lists** at the top of
+the area section and everything fills in; you can still change the cities
+before you search. Saved lists are shared with everyone who can run Quick
+Search. Saving under a name that's already taken replaces that list (the
+button says **Replace list** so you know), and **Delete list** removes the
+one you've picked.
+
 To find venues that already put on entertainment, tick **Trivia**,
 **Karaoke**, **Bingo** or **Any events** under "Only venues that offer".
 Any events catches open mic, game nights and other weekly event nights.

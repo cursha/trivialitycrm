@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { resetDatabase, testPrisma } from "../helpers/db";
 import { createRoleWithPermissions, createTestUser, createLeadTypeFixture, loginAs } from "../helpers/fixtures";
 import { resetFakeCookies, RedirectSignal } from "../setup/mock-next";
-import { startQuickSearch } from "../../src/app/(dashboard)/leads/searches/quick/actions";
+import { startQuickSearch, saveCityList, deleteCityList } from "../../src/app/(dashboard)/leads/searches/quick/actions";
 
 beforeEach(async () => {
   await resetDatabase();
@@ -150,3 +150,73 @@ describe("startQuickSearch with trivia / karaoke", () => {
   });
 });
 
+
+describe("startQuickSearch with a pasted list of cities", () => {
+  async function start(cities: string[], perCity: boolean) {
+    const { user } = await baseFixtures();
+    const pubs = await createLeadTypeFixture("Pubs");
+    await loginAs(user.id);
+    const fd = quickSearchFormData([pubs.id]);
+    for (const city of cities) fd.append("cities", city);
+    if (perCity) fd.set("perCity", "on");
+    let redirectUrl: string | undefined;
+    try {
+      await startQuickSearch(undefined, fd);
+    } catch (error) {
+      redirectUrl = (error as RedirectSignal).url;
+    }
+    return { redirectUrl, searches: await testPrisma.leadSearch.findMany({ orderBy: { createdAt: "asc" } }) };
+  }
+
+  it("runs each city as its own search when asked", async () => {
+    const { redirectUrl, searches } = await start(["Milton", "Oakville", "Burlington"], true);
+
+    expect(searches.map((s) => s.cities)).toEqual([["Milton"], ["Oakville"], ["Burlington"]]);
+    expect(searches[0].promptSnapshot).toContain("in Milton, ON, Canada");
+    expect(redirectUrl).toBe(`/leads/searches/quick/batch?ids=${searches.map((s) => s.id).join(",")}`);
+  });
+
+  it("keeps the cities together in one search otherwise", async () => {
+    const { searches } = await start(["Milton", "Oakville"], false);
+
+    expect(searches.map((s) => s.cities)).toEqual([["Milton", "Oakville"]]);
+  });
+});
+
+describe("saved city lists", () => {
+  const towns = { name: "West GTA towns", country: "Canada", region: "on", cities: ["Milton", "acton", "Georgetown"] };
+
+  it("saves a list, replacing one with the same name, and deletes it", async () => {
+    const { user } = await baseFixtures();
+    await loginAs(user.id);
+
+    const first = await saveCityList(towns);
+    expect(first).toMatchObject({ replaced: false });
+    const saved = await testPrisma.cityList.findUniqueOrThrow({ where: { name: "West GTA towns" } });
+    expect(saved).toMatchObject({ country: "Canada", region: "ON", cities: ["Milton", "Acton", "Georgetown"], createdById: user.id });
+
+    const second = await saveCityList({ ...towns, cities: ["Milton"] });
+    expect(second).toEqual({ id: saved.id, replaced: true });
+    expect((await testPrisma.cityList.findUniqueOrThrow({ where: { id: saved.id } })).cities).toEqual(["Milton"]);
+
+    expect(await deleteCityList(saved.id)).toEqual({});
+    expect(await testPrisma.cityList.count()).toBe(0);
+    expect(await deleteCityList(saved.id)).toEqual({ error: "That list no longer exists." });
+  });
+
+  it("needs a name and at least one city", async () => {
+    const { user } = await baseFixtures();
+    await loginAs(user.id);
+
+    expect(await saveCityList({ ...towns, name: "  " })).toEqual({ error: "Give the list a name." });
+    expect(await saveCityList({ ...towns, cities: [] })).toEqual({ error: "Add at least one city to save." });
+  });
+
+  it("requires run_research", async () => {
+    const role = await createRoleWithPermissions("Viewer", []);
+    const viewer = await createTestUser({ roleId: role.id });
+    await loginAs(viewer.id);
+
+    await expect(saveCityList(towns)).rejects.toThrow();
+  });
+});

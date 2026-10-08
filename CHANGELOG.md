@@ -13,6 +13,27 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v15.0 — 2026-10-08
+### New — Quick Search a pasted list of cities, one search each
+- The Cities box on Quick Search is now a larger box you can paste a list
+  into: one city per line or separated by commas, up to 50. "Milton, ON"
+  on a line is read as Milton, repeats are dropped, and the box shows the
+  cities it read.
+- **Run each city as its own search** (ticked by default when there's
+  more than one city) gives each city its own search and results page,
+  listed together on the next page. Untick it for one combined list, as
+  before. Choose the country and province once for the whole list (Curt's
+  call).
+### New — saved city lists
+- Name a city list on Quick Search and **Save list**; it keeps the
+  country, province and cities. Pick it from **Saved lists** next time to
+  fill them all in. Shared by everyone who can run Quick Search. Saving
+  under an existing name replaces that list; **Delete list** removes one.
+- Database change: a new table for saved city lists.
+### Fixed
+- The State / Province box suggested "Colorado", which it doesn't accept;
+  it now suggests a two-letter code ("ON or CO").
+
 ## v14.0 — 2026-10-08
 ### New — Search the web for emails, and a Facebook/Instagram link
 - For ticked venues the free website check missed, **Search the web for

@@ -57,3 +57,11 @@ export const QuickSearchSetupSchema = z.object({
 });
 
 export type QuickSearchSetupValues = z.infer<typeof QuickSearchSetupSchema>;
+
+/** A saved Quick Search city list. */
+export const CityListSchema = z.object({
+  name: z.string().trim().min(1, { error: "Give the list a name." }).max(60, { error: "Keep the name to 60 characters or fewer." }),
+  country: z.enum(CountryValues, { error: "Choose Canada or United States." }),
+  region: RegionCodeSchema,
+  cities: CitiesSchema.refine((cities) => cities.length > 0, { error: "Add at least one city to save." }),
+});

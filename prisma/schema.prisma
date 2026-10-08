@@ -261,6 +261,7 @@ model User {
   tasks                          Task[]                  @relation("TaskAssignee")
   prompts                        PromptTemplate[]
   searches                       LeadSearch[]
+  cityLists                      CityList[]
   importTemplates                ImportTemplate[]
   createdEvidence                EvidenceRecord[]        @relation("EvidenceCreator")
   scoredHistoricalRecords        HistoricalScoreRecord[] @relation("ScoreAuthor")
@@ -1359,6 +1360,22 @@ model SearchCandidate {
 
   @@unique([searchId, normalizedIdentity])
   @@index([searchId, status])
+}
+
+/// A saved Quick Search city list ("West GTA towns"): the country,
+/// province/state and cities, picked from a menu instead of pasted again.
+/// Shared by everyone who can run Quick Search; saving under an existing
+/// name replaces that list.
+model CityList {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  country     String
+  region      String
+  cities      String[]
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 /// Where a search result's email was found by "Find emails".

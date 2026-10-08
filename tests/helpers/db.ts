@@ -93,6 +93,7 @@ const TABLES_TO_RESET = [
   "SalesListShare",
   "SalesListDynamicMember",
   "SalesList",
+  "CityList",
   "Territory",
   "WorkspaceSettings",
   "Company",

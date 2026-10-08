@@ -10,7 +10,10 @@ export default async function QuickSearchPage() {
   const user = await requireUser();
   requirePermission(user, "run_research");
 
-  const leadTypes = await prisma.leadType.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } });
+  const [leadTypes, cityLists] = await Promise.all([
+    prisma.leadType.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
+    prisma.cityList.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, country: true, region: true, cities: true } }),
+  ]);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -18,7 +21,7 @@ export default async function QuickSearchPage() {
         title="Quick Search"
         description="Check off the venue types you want and an area — this just lists matching businesses from the directory. No prompt, no AI scoring."
       />
-      <QuickSearchForm leadTypes={leadTypes} />
+      <QuickSearchForm leadTypes={leadTypes} cityLists={cityLists} />
     </div>
   );
 }
