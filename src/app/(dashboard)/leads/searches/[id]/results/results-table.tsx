@@ -360,8 +360,7 @@ export function ResultsTable({
       {confirmingEmails && (
         <Card className="space-y-3">
           <p className="text-sm text-text">
-            Check the websites of {emailTargets.length} venue{emailTargets.length === 1 ? "" : "s"} for an email address? There&apos;s no AI cost. It takes a few seconds per
-            venue, and only fills in venues that don&apos;t already have an email.
+            {`Check the websites of ${emailTargets.length} ${emailTargets.length === 1 ? "venue" : "venues"} for an email address? There's no AI cost. It takes a few seconds per venue, and only fills in venues that don't already have an email.`}
           </p>
           <label className="flex items-center gap-2 text-sm font-semibold text-text">
             <input type="checkbox" checked={emailsConfirmed} onChange={(event) => setEmailsConfirmed(event.target.checked)} />

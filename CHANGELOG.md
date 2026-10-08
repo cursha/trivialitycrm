@@ -13,6 +13,11 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v13.1 — 2026-10-08
+### Fixed — missing space in the Find emails confirmation
+- With one venue ticked it read "Check the websites of 1 venuefor an email
+  address?". It now reads "1 venue for".
+
 ## v13.0 — 2026-10-08
 ### New — Find emails on the search results page
 - Tick venues on a search's results page and click **Find emails**; a
