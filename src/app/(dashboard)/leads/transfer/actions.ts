@@ -101,6 +101,11 @@ export async function transferSearchResults(rawPayload: TransferPayload): Promis
   let transferredCount = 0;
   let ignoredCount = 0;
 
+  // Each row is several writes, so a big batch outlasts Prisma's default
+  // 5-second transaction limit (a large transfer hit it in production).
+  // Allow time in proportion to the batch, still all-or-nothing.
+  const timeout = Math.max(10_000, payload.rows.length * 500);
+
   await prisma.$transaction(async (tx) => {
     for (const row of payload.rows) {
       const source = resultsById.get(row.resultId)!;
@@ -201,7 +206,7 @@ export async function transferSearchResults(rawPayload: TransferPayload): Promis
 
       transferredCount++;
     }
-  });
+  }, { timeout, maxWait: 10_000 });
 
   revalidatePath("/companies");
   return { transferredCount, ignoredCount };

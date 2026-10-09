@@ -13,6 +13,13 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v15.1 — 2026-10-08
+### Fixed
+- Transferring a large batch of leads failed with an error and transferred
+  nothing: the database gave the whole batch only 5 seconds, and each venue
+  takes several writes. A batch now gets time in proportion to its size,
+  and it is still all-or-nothing.
+
 ## v15.0 — 2026-10-08
 ### New — Quick Search a pasted list of cities, one search each
 - The Cities box on Quick Search is now a larger box you can paste a list
