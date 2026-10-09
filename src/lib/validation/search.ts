@@ -58,6 +58,26 @@ export const QuickSearchSetupSchema = z.object({
 
 export type QuickSearchSetupValues = z.infer<typeof QuickSearchSetupSchema>;
 
+// A population box: blank for no limit, otherwise a whole number of people
+// ("10,000" and "10000" both read as 10000).
+const PopulationBoundSchema = z
+  .string()
+  .trim()
+  .transform((value) => value.replace(/[,\s]/g, ""))
+  .refine((value) => value === "" || /^\d+$/.test(value), { error: "Enter the population as a number, e.g. 10000." })
+  .transform((value) => (value === "" ? null : Number(value)));
+
+/** Quick Search's "Find towns by population". */
+export const TownPopulationSchema = z
+  .object({
+    country: z.enum(CountryValues, { error: "Choose Canada or United States." }),
+    region: RegionCodeSchema,
+    min: PopulationBoundSchema,
+    max: PopulationBoundSchema,
+  })
+  .refine((data) => data.min !== null || data.max !== null, { error: "Enter a smallest or largest population (or both)." })
+  .refine((data) => data.min === null || data.max === null || data.min <= data.max, { error: "The smallest population is bigger than the largest." });
+
 /** A saved Quick Search city list. */
 export const CityListSchema = z.object({
   name: z.string().trim().min(1, { error: "Give the list a name." }).max(60, { error: "Keep the name to 60 characters or fewer." }),

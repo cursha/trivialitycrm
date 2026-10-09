@@ -239,4 +239,44 @@ describe("runSearchJob", () => {
     expect(createManySpy.mock.calls[0][0]).toMatchObject({ skipDuplicates: true });
     expect(transactionSpy.mock.calls.some((call) => Array.isArray(call[0]))).toBe(false);
   }, 120_000);
+
+  it("leaves chains out of a search that excludes them, and records which", async () => {
+    const { user, leadType } = await baseFixtures();
+    const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, cities: ["Milton"] });
+    await testPrisma.leadSearch.update({ where: { id: search.id }, data: { excludeChains: true } });
+
+    const original = MockPlacesProvider.prototype.discover;
+    vi.spyOn(MockPlacesProvider.prototype, "discover").mockImplementationOnce(async function (this: MockPlacesProvider, params, onProgress) {
+      const [template] = await original.call(this, params, onProgress);
+      return [
+        { ...template, name: "The Independent", address1: "1 Main St" },
+        { ...template, name: "Boston Pizza", address1: "2 Main St" },
+        { ...template, name: "Some Grill", address1: "3 Main St", websiteUrl: "https://somegrill.com/locations/milton" },
+      ];
+    });
+
+    await runSearchJob(search.id);
+
+    const updated = await testPrisma.leadSearch.findUniqueOrThrow({ where: { id: search.id } });
+    expect(updated.status).toBe("SUCCEEDED");
+    expect(updated.chainsLeftOut).toEqual(["Boston Pizza", "Some Grill"]);
+    const results = await testPrisma.searchResult.findMany({ where: { searchId: search.id } });
+    expect(results.map((r) => r.name)).toEqual(["The Independent"]);
+  });
+
+  it("keeps chains in a search that doesn't exclude them", async () => {
+    const { user, leadType } = await baseFixtures();
+    const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, cities: ["Milton"] });
+
+    const original = MockPlacesProvider.prototype.discover;
+    vi.spyOn(MockPlacesProvider.prototype, "discover").mockImplementationOnce(async function (this: MockPlacesProvider, params, onProgress) {
+      const [template] = await original.call(this, params, onProgress);
+      return [{ ...template, name: "Boston Pizza", address1: "2 Main St" }];
+    });
+
+    await runSearchJob(search.id);
+
+    expect((await testPrisma.leadSearch.findUniqueOrThrow({ where: { id: search.id } })).chainsLeftOut).toEqual([]);
+    expect(await testPrisma.searchResult.count({ where: { searchId: search.id } })).toBe(1);
+  });
 });

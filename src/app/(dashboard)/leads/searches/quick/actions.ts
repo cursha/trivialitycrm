@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
-import { QuickSearchSetupSchema, CityListSchema } from "@/lib/validation/search";
+import { QuickSearchSetupSchema, CityListSchema, TownPopulationSchema } from "@/lib/validation/search";
+import { findTownsByPopulation, type TownsByPopulation } from "@/lib/research/towns-by-population";
 import { writeAuditEvent } from "@/lib/audit/log";
 import { formString } from "@/lib/form-data";
 import { enqueueSearchJob } from "@/lib/jobs/enqueue";
@@ -75,6 +76,8 @@ export async function startQuickSearch(_prevState: QuickSearchFormState, formDat
   // whose results mix every city.
   const perCity = formData.get("perCity") === "on" && parsed.data.cities.length > 1;
   const cityGroups = perCity ? parsed.data.cities.map((city) => [city]) : [parsed.data.cities];
+  // Chains and franchises are left out unless the box is ticked.
+  const excludeChains = formData.get("includeChains") !== "on";
 
   const searchIds: string[] = [];
   for (const leadType of leadTypes) {
@@ -92,7 +95,8 @@ export async function startQuickSearch(_prevState: QuickSearchFormState, formDat
           mode: "GENERAL",
           entertainment,
           venueKinds,
-          promptSnapshot: `Quick search — list every "${leadType.name}"${searchingFor}${offering} match in ${where}, ${parsed.data.country}. No AI qualification prompt used.`,
+          excludeChains,
+          promptSnapshot: `Quick search — list every "${leadType.name}"${searchingFor}${offering} match in ${where}, ${parsed.data.country}. ${excludeChains ? " Chains and franchises left out." : ""} No AI qualification prompt used.`,
         },
       });
       const providerJobId = await enqueueSearchJob(search.id);
@@ -105,6 +109,21 @@ export async function startQuickSearch(_prevState: QuickSearchFormState, formDat
     redirect(`/leads/searches/${searchIds[0]}`);
   }
   redirect(`/leads/searches/quick/batch?ids=${searchIds.join(",")}`);
+}
+
+/**
+ * "Find towns by population": the towns in the chosen province or state
+ * within a population range, largest first, to fill the Cities box. Up to
+ * the most Quick Search takes at once (CitiesSchema's 50).
+ */
+export async function findTowns(input: { country: string; region: string; min: string; max: string }): Promise<{ error: string } | TownsByPopulation> {
+  const user = await requireUser();
+  requirePermission(user, "run_research");
+
+  const parsed = TownPopulationSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Please check the population range." };
+  const { country, region, min, max } = parsed.data;
+  return findTownsByPopulation(country, region, min, max, 50);
 }
 
 export type CityListActionResult = { error: string } | { id: string; replaced: boolean };

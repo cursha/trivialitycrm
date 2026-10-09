@@ -26,6 +26,8 @@ export default async function SearchStatusPage({ params }: { params: Promise<{ i
       mode: true,
       entertainment: true,
       venueKinds: true,
+      excludeChains: true,
+      chainsLeftOut: true,
       originCompany: { select: { name: true } },
     },
   });
@@ -34,12 +36,22 @@ export default async function SearchStatusPage({ params }: { params: Promise<{ i
   const isPubRadius = search.mode === "PUB_RADIUS";
   const title = isPubRadius ? `Search: near ${search.originCompany?.name ?? "Unknown pub"}` : `Search: ${search.region}, ${search.country}`;
 
+  // Each chain once, with how many of its locations were left out.
+  const chainCounts = new Map<string, number>();
+  for (const name of search.chainsLeftOut) chainCounts.set(name, (chainCounts.get(name) ?? 0) + 1);
+  const chainList = [...chainCounts].map(([name, count]) => (count > 1 ? `${name} (${count})` : name)).join(", ");
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader
         title={title}
-        description={`Mode: ${search.mode}${search.venueKinds.length > 0 ? ` · Searched for ${describeVenueKinds(search.venueKinds)}` : ""}${search.entertainment.length > 0 ? ` · Only venues offering ${describeEntertainment(search.entertainment)}` : ""}`}
+        description={`Mode: ${search.mode}${search.venueKinds.length > 0 ? ` · Searched for ${describeVenueKinds(search.venueKinds)}` : ""}${search.entertainment.length > 0 ? ` · Only venues offering ${describeEntertainment(search.entertainment)}` : ""}${search.excludeChains ? " · Chains and franchises left out" : ""}`}
       />
+      {search.chainsLeftOut.length > 0 && (
+        <p className="text-sm text-text-muted">
+          {`Left out ${search.chainsLeftOut.length} chain ${search.chainsLeftOut.length === 1 ? "location" : "locations"}: ${chainList}. Tick "Include chains and franchises" on Quick Search to keep them.`}
+        </p>
+      )}
       <SearchStatus
         searchId={search.id}
         initial={{

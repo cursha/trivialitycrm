@@ -13,6 +13,33 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v16.0 — 2026-10-09
+### New — find towns by population on Quick Search
+- Enter a population range under **Find towns by population** and click
+  **Find towns**: every town in the chosen province or state in that range
+  fills the Cities box, largest first, ready to search one city at a time.
+  Works for every province and state in Canada and the US (Curt's call).
+- Populations come built in, so finding towns costs nothing: Canada from
+  Statistics Canada's 2021 census, the US from the Census Bureau's 2025
+  estimates. Reserves, unorganized areas and places under 500 people are
+  left out. `scripts/build-population-data.ts` rebuilds the list when new
+  figures come out.
+- Up to 50 towns go in at once (Quick Search's limit); when more match,
+  the largest 50 go in and the page says how many matched.
+
+### New — leave chains and franchises out of Quick Search
+- Quick Search has a new **Include chains and franchises** box, unticked
+  to start, so chains are left out unless you ask for them (Curt's call).
+  Before, chains were always included.
+- Google's directory doesn't say which places are chains, so a place
+  counts as one when it's a known bar or restaurant chain, when its
+  website is a chain's page for that location ("/locations/milton"), or
+  when its name turns up at three or more locations, in the CRM or in the
+  same search.
+- The search page lists the chain locations it left out.
+- Database change: two new fields on a search, for whether it leaves
+  chains out and which ones it did.
+
 ## v15.1 — 2026-10-08
 ### Fixed
 - Transferring a large batch of leads failed with an error and transferred

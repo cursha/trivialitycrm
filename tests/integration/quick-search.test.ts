@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { resetDatabase, testPrisma } from "../helpers/db";
 import { createRoleWithPermissions, createTestUser, createLeadTypeFixture, loginAs } from "../helpers/fixtures";
 import { resetFakeCookies, RedirectSignal } from "../setup/mock-next";
-import { startQuickSearch, saveCityList, deleteCityList } from "../../src/app/(dashboard)/leads/searches/quick/actions";
+import { startQuickSearch, saveCityList, deleteCityList, findTowns } from "../../src/app/(dashboard)/leads/searches/quick/actions";
 
 beforeEach(async () => {
   await resetDatabase();
@@ -127,6 +127,22 @@ describe("startQuickSearch with trivia / karaoke", () => {
     expect(await testPrisma.leadSearch.count()).toBe(0);
   });
 
+  it("leaves chains out unless Include chains and franchises is ticked", async () => {
+    const { user } = await baseFixtures();
+    const pubs = await createLeadTypeFixture("Pubs");
+    await loginAs(user.id);
+
+    await run(quickSearchFormData([pubs.id]));
+    const unticked = await testPrisma.leadSearch.findFirstOrThrow();
+    expect(unticked.excludeChains).toBe(true);
+    expect(unticked.promptSnapshot).toContain("Chains and franchises left out.");
+
+    await run(quickSearchFormData([pubs.id], { includeChains: "on" }));
+    const ticked = await testPrisma.leadSearch.findFirstOrThrow({ where: { id: { not: unticked.id } } });
+    expect(ticked.excludeChains).toBe(false);
+    expect(ticked.promptSnapshot).not.toContain("Chains");
+  });
+
   it("lists every venue when nothing is ticked", async () => {
     const { user } = await baseFixtures();
     const pubs = await createLeadTypeFixture("Pubs");
@@ -218,5 +234,31 @@ describe("saved city lists", () => {
     await loginAs(viewer.id);
 
     await expect(saveCityList(towns)).rejects.toThrow();
+  });
+});
+
+describe("findTowns", () => {
+  it("returns the towns in a population range for someone who can run Quick Search", async () => {
+    const { user } = await baseFixtures();
+    await loginAs(user.id);
+
+    const outcome = await findTowns({ country: "Canada", region: "ON", min: "100,000", max: "150000" });
+    if ("error" in outcome) throw new Error(outcome.error);
+    expect(outcome.towns.map((town) => town.name)).toContain("Milton");
+  });
+
+  it("explains a bad range", async () => {
+    const { user } = await baseFixtures();
+    await loginAs(user.id);
+
+    expect(await findTowns({ country: "Canada", region: "ON", min: "", max: "" })).toEqual({ error: "Enter a smallest or largest population (or both)." });
+  });
+
+  it("refuses someone who can't run Quick Search", async () => {
+    const role = await createRoleWithPermissions("Viewer", []);
+    const user = await createTestUser({ roleId: role.id });
+    await loginAs(user.id);
+
+    await expect(findTowns({ country: "Canada", region: "ON", min: "1000", max: "" })).rejects.toThrow();
   });
 });

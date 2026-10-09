@@ -43,6 +43,7 @@ export default async function QuickSearchBatchPage({ searchParams }: { searchPar
               {manyLeadTypes && citiesLabel(search.cities) && <span className="font-normal text-text-muted"> · {search.leadType.name}</span>}
               {search.venueKinds.length > 0 && <span className="font-normal text-text-muted"> ({describeVenueKinds(search.venueKinds)})</span>}
               {search.entertainment.length > 0 && <span className="font-normal text-text-muted"> offering {describeEntertainment(search.entertainment)}</span>}
+              {search.excludeChains && <span className="font-normal text-text-muted"> · no chains</span>}
             </span>
             <span className="text-sm text-text-muted">
               {search.region}, {search.country} — {search.status}

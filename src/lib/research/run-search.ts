@@ -6,6 +6,7 @@ import { prisma } from "../prisma";
 import { getProviders } from "./providers/factory";
 import { filterByModeExclusivity, dedupeWithinRun } from "./exclusivity";
 import { isInSearchedRegion } from "./area";
+import { separateChains, getCrmChainNames } from "./chains";
 import { computeNormalizedFields, findPriorRejectedMatches } from "../duplicates/match";
 import { normalizeCompanyName } from "../duplicates/normalize";
 import { normalizeRegion } from "../data-quality/normalize";
@@ -220,8 +221,17 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       // PUB_RADIUS (a radius can rightly cross a border) and COMPETITOR
       // (which keeps them visible as auto-rejected, below). Google Places
       // results are also checked by city in the provider itself.
-      const filtered =
+      const inArea =
         search.mode === "PUB_RADIUS" || search.mode === "COMPETITOR" ? withoutOrigin : withoutOrigin.filter((candidate) => isInSearchedRegion(candidate, search));
+
+      // Quick Search with "Include chains and franchises" unticked: drop
+      // them before the cap, so the cap counts only places that are kept.
+      let filtered = inArea;
+      if (search.excludeChains) {
+        const { kept, chains } = separateChains(inArea, await getCrmChainNames());
+        filtered = kept;
+        await prisma.leadSearch.update({ where: { id: searchId }, data: { chainsLeftOut: chains.map((chain) => chain.name) } });
+      }
 
       // Module 8A: an administrator-configured cap (AiSettings.
       // maxResultsPerSearch, null = unlimited) — applied here, after

@@ -1322,6 +1322,16 @@ model LeadSearch {
   // deduped like entertainment. Empty = the Lead Type's own name, as before.
   venueKinds SearchVenueKind[] @default([])
 
+  // Quick Search: leave chains and franchises out of the results (the
+  // default; "Include chains and franchises" unticked). See
+  // src/lib/research/chains.ts for how a chain is recognized. False for
+  // every other kind of search, which keeps them as before.
+  excludeChains Boolean @default(false)
+
+  // The names of the chain locations left out, one per location, so the
+  // search page can say what was dropped.
+  chainsLeftOut String[] @default([])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -424,7 +424,15 @@ and/or **Taverns** (Pubs is ticked to start). Each is its own directory
 search, and the results are combined without duplicates. Only places the
 directory lists as a pub or bar come back, so a search for events won't
 turn up parks or community halls, though a golf club or entertainment
-centre with a bar inside can. Chains are included.
+centre with a bar inside can.
+
+Chains and franchises are left out unless you tick **Include chains and
+franchises**. A place counts as a chain when it's a known bar or
+restaurant chain (Boston Pizza, Kelseys, Applebee's and so on), when its
+website is a chain's page for that location, or when its name turns up at
+three or more locations, in the CRM or in the same search. The search
+page lists every chain location it left out, so you can see what was
+dropped and run it again with the box ticked if you want them.
 
 ### Searching a list of cities
 
@@ -438,6 +446,19 @@ With more than one city, **Run each city as its own search** is ticked:
 each city gets its own search and results page, and the next page lists
 them all so you can open each one. Untick it to get one combined list for
 all the cities instead.
+
+**Finding towns by population.** Instead of typing the cities, choose
+the country and province or state, then enter a population range under
+**Find towns by population** (for example 10,000 to 75,000) and click
+**Find towns**. Every town in that range goes into the Cities box,
+largest first, replacing what was there. Leave one side blank for no
+limit: just a smallest population finds every town that size or bigger.
+If more than 50 towns match, the largest 50 go in and the page says how
+many matched; narrow the range to see the rest. Canadian populations are
+from the 2021 census and US ones from the Census Bureau's latest
+estimates. Only incorporated cities and towns are listed, so a large
+community that isn't its own town (Sherwood Park, AB, or Highlands
+Ranch, CO) won't come up; type those in yourself.
 
 **Saving a list to reuse it.** Under the cities, type a name (for example
 "West GTA towns") and click **Save list**. It saves the country, province

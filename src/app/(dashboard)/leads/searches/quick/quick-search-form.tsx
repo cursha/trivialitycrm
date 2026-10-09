@@ -2,7 +2,7 @@
 
 import { useActionState, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { startQuickSearch, saveCityList, deleteCityList, type QuickSearchFormState } from "./actions";
+import { startQuickSearch, saveCityList, deleteCityList, findTowns, type QuickSearchFormState } from "./actions";
 import { Card } from "@/components/ui/card";
 import { Label, Input, Select, Textarea, FieldError } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,36 @@ export function QuickSearchForm({ leadTypes, cityLists }: QuickSearchFormOptions
   const [listPending, startListTransition] = useTransition();
   const selectedList = cityLists.find((list) => list.id === listId) ?? null;
   const nameTaken = cityLists.some((list) => list.name.toLowerCase() === listName.trim().toLowerCase());
+
+  // Find towns by population: fills the cities box with every town in the
+  // province or state within the range, largest first.
+  const [populationMin, setPopulationMin] = useState("");
+  const [populationMax, setPopulationMax] = useState("");
+  const [townMessage, setTownMessage] = useState<{ tone: "info" | "error"; text: string } | null>(null);
+  const [townsPending, startTownsTransition] = useTransition();
+
+  function findTownsByPopulation() {
+    setTownMessage(null);
+    startTownsTransition(async () => {
+      const outcome = await findTowns({ country, region, min: populationMin, max: populationMax });
+      if ("error" in outcome) {
+        setTownMessage({ tone: "error", text: outcome.error });
+        return;
+      }
+      if (outcome.towns.length === 0) {
+        setTownMessage({ tone: "error", text: `No towns in ${region.toUpperCase()} have a population in that range.` });
+        return;
+      }
+      setCitiesInput(outcome.towns.map((town) => town.name).join("\n"));
+      setListId("");
+      const shown = outcome.towns.length;
+      const more = outcome.totalMatches - shown;
+      setTownMessage({
+        tone: "info",
+        text: `${outcome.totalMatches} ${outcome.totalMatches === 1 ? "town matches" : "towns match"}${more > 0 ? `; the largest ${shown} are in the cities box (Quick Search takes ${MAX_CITIES} at a time)` : ", now in the cities box"}. Population from ${outcome.source}.`,
+      });
+    });
+  }
 
   function pickList(id: string) {
     setListId(id);
@@ -116,6 +146,14 @@ export function QuickSearchForm({ leadTypes, cityLists }: QuickSearchFormOptions
             ))}
           </div>
           <p className="mt-1 text-xs text-text-muted">Each one is its own directory search; the results are combined, without duplicates.</p>
+          <label className="mt-2 flex items-center gap-2 text-sm text-text">
+            <input type="checkbox" name="includeChains" />
+            Include chains and franchises
+          </label>
+          <p className="mt-1 text-xs text-text-muted">
+            Left unticked, places like Boston Pizza or Applebee&apos;s are left out: known chains, places whose website is a chain&apos;s location page, and names found at three or more
+            locations. The search page lists what was left out.
+          </p>
         </div>
 
         <div>
@@ -189,6 +227,36 @@ export function QuickSearchForm({ leadTypes, cityLists }: QuickSearchFormOptions
             <Label className="mb-1 block text-xs uppercase">State / Province</Label>
             <Input name="region" required value={region} onChange={(event) => setRegion(event.target.value)} placeholder="e.g. ON or CO" />
           </div>
+        </div>
+
+        <div>
+          <Label className="mb-1 block text-xs uppercase">Find towns by population (optional)</Label>
+          <div className="flex flex-wrap items-center gap-2">
+            <Input
+              value={populationMin}
+              onChange={(event) => setPopulationMin(event.target.value)}
+              inputMode="numeric"
+              placeholder="Smallest, e.g. 10000"
+              aria-label="Smallest population"
+              className="max-w-[11rem]"
+            />
+            <span className="text-sm text-text-muted">to</span>
+            <Input
+              value={populationMax}
+              onChange={(event) => setPopulationMax(event.target.value)}
+              inputMode="numeric"
+              placeholder="Largest, e.g. 75000"
+              aria-label="Largest population"
+              className="max-w-[11rem]"
+            />
+            <Button type="button" variant="ghost" disabled={townsPending || !region.trim() || (!populationMin.trim() && !populationMax.trim())} onClick={findTownsByPopulation}>
+              {townsPending ? "Finding..." : "Find towns"}
+            </Button>
+          </div>
+          <p className="mt-1 text-xs text-text-muted">
+            Fills the cities box with every town in the state/province in that range, largest first. Leave one blank for no limit. Replaces what&apos;s in the box.
+          </p>
+          {townMessage && <p className={`mt-1 text-xs ${townMessage.tone === "error" ? "font-semibold text-danger" : "text-text-muted"}`}>{townMessage.text}</p>}
         </div>
 
         <div>
