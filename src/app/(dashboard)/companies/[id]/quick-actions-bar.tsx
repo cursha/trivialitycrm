@@ -2,8 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Phone, Mail, Users, FileText, Presentation, FlaskConical, StickyNote, CalendarClock, Sparkles, Globe, Send, MapPin, Search } from "lucide-react";
+import { Phone, Mail, Users, FileText, Presentation, FlaskConical, StickyNote, CalendarClock, Sparkles, Globe, Send, MapPin, Search, AtSign } from "lucide-react";
 import { changeCompanyStage } from "../actions";
+import { findCompanyEmail, searchWebForCompanyEmail, type FindCompanyEmailResult } from "./find-email-actions";
 import { useQuickActions } from "./quick-action-context";
 import { SendCompanyEmailModal } from "./send-company-email-modal";
 import { Card } from "@/components/ui/card";
@@ -32,6 +33,7 @@ export function QuickActionsBar({
   findWebsiteHref,
   canSendEmail,
   companyEmail,
+  hasEmail,
 }: {
   companyId: string;
   currentStageId: string;
@@ -50,6 +52,8 @@ export function QuickActionsBar({
    * has no email on file, or it doesn't pass validateEmailAddress(). The
    * "Send email" button is only ever rendered when this is set. */
   companyEmail: string | null;
+  /** Any email on file, valid or not — "Find email" is only offered without one. */
+  hasEmail: boolean;
 }) {
   const router = useRouter();
   const { requestActivity, requestFollowUp, requestAnalyze } = useQuickActions();
@@ -57,6 +61,29 @@ export function QuickActionsBar({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | undefined>();
   const [showSendEmail, setShowSendEmail] = useState(false);
+
+  // "Find email": the bar's website first (free), then, if that shows
+  // none, an AI web search (about 10¢) after the user confirms.
+  const [emailPending, startEmailTransition] = useTransition();
+  const [emailMessage, setEmailMessage] = useState<{ tone: "info" | "error"; text: string } | null>(null);
+  const [offerWebSearch, setOfferWebSearch] = useState(false);
+
+  function runEmailLookup(lookup: (companyId: string) => Promise<FindCompanyEmailResult>) {
+    setEmailMessage(null);
+    setOfferWebSearch(false);
+    startEmailTransition(async () => {
+      const outcome = await lookup(companyId);
+      if ("error" in outcome) {
+        setEmailMessage({ tone: "error", text: outcome.error });
+      } else if (outcome.email !== null) {
+        setEmailMessage({ tone: "info", text: `Found ${outcome.email} and saved it to this company.` });
+        router.refresh();
+      } else {
+        setEmailMessage({ tone: "error", text: `${outcome.note}.` });
+        setOfferWebSearch(outcome.canSearchWeb);
+      }
+    });
+  }
 
   function handleStageChange(newStageId: string) {
     const previous = stageId;
@@ -119,6 +146,18 @@ export function QuickActionsBar({
             Send email
           </button>
         )}
+        {canEdit && !hasEmail && (
+          <button
+            type="button"
+            disabled={emailPending}
+            onClick={() => runEmailLookup(findCompanyEmail)}
+            title="Look for a public email on the bar's website"
+            className="flex items-center gap-1.5 rounded-lg border border-border-strong px-3 py-2 text-xs font-semibold text-text hover:bg-black/5 disabled:opacity-60"
+          >
+            <AtSign size={14} />
+            {emailPending ? "Finding email..." : "Find email"}
+          </button>
+        )}
         {canEdit &&
           ACTIVITY_LINKS.map((link) => (
             <button
@@ -152,6 +191,23 @@ export function QuickActionsBar({
           </button>
         )}
       </div>
+      {emailMessage && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          <span className={emailMessage.tone === "error" ? "font-semibold text-danger" : "text-text-muted"}>{emailMessage.text}</span>
+          {offerWebSearch && !emailPending && (
+            <>
+              <span className="text-text-muted">Search the web for it? An AI web search costs about 10¢.</span>
+              <button
+                type="button"
+                onClick={() => runEmailLookup(searchWebForCompanyEmail)}
+                className="rounded-lg border border-border-strong px-2 py-1 font-semibold text-text hover:bg-black/5"
+              >
+                Search the web
+              </button>
+            </>
+          )}
+        </div>
+      )}
       {!canEdit && <p className="mt-3 text-sm text-text-muted">You don&apos;t have permission to log activity for this company.</p>}
       {canEdit && (
         <div className="mt-3 max-w-xs">

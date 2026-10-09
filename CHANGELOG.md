@@ -13,6 +13,18 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v17.0 — 2026-10-09
+### New — Find email in a company's Quick Sales Actions
+- A company with no email now has a **Find email** button in Quick Sales
+  Actions. It reads the bar's own website (home page, then contact page)
+  for a public email and saves it to the company, free, the same check as
+  "Find emails" on search results.
+- When the website shows none, someone who can run research is offered
+  **Search the web**: one AI web search for the bar's email, about 10¢,
+  charged to the AI budget like any research.
+- Neither replaces an email already on file, and each found email is
+  recorded in the audit log.
+
 ## v16.0 — 2026-10-09
 ### New — find towns by population on Quick Search
 - Enter a population range under **Find towns by population** and click

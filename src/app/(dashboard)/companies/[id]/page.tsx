@@ -273,6 +273,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         findWebsiteHref={findWebsiteHref(company)}
         canSendEmail={canSendCompanyEmail}
         companyEmail={validCompanyEmail}
+        hasEmail={!!company.email}
       />
 
       {canRoutePlan && <AddToRouteToggle companyId={company.id} routes={routeOptions} canManage={canRoutePlan} />}

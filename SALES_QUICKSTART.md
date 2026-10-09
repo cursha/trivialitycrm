@@ -253,6 +253,12 @@ On any company's page:
   scroll down and find the right form first. **Visit website** opens the
   bar's website in a new tab; when there's no website on file it says
   **Find website** and searches the web for the bar by name and city.
+  When the company has no email, **Find email** reads the bar's website
+  (its home page, then its contact page) for a public email and saves it
+  to the company. That's free. If the website doesn't show one, and you
+  can run research, it offers **Search the web**: an AI web search for the
+  bar's email, about 10¢, charged to the AI budget. Neither ever replaces
+  an email already on file.
 - **Next best action**: a short, plain-language list of what this company
   specifically needs next (e.g. "no contact on file," "a follow-up is
   overdue," "no activity in a while") — never an opaque score, and it never
