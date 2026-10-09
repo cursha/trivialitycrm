@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { resetDatabase, testPrisma } from "../helpers/db";
 import { createRoleWithPermissions, createTestUser, createLeadTypeFixture, createPipelineStageFixture, createCompanyFixture, loginAs } from "../helpers/fixtures";
 import { resetFakeCookies } from "../setup/mock-next";
@@ -7,7 +7,7 @@ import { encryptToken } from "../../src/lib/comms/token-crypto";
 import { sendEmail, sendEmailToCompany } from "../../src/lib/comms/send-email";
 import { verifyUnsubscribeToken } from "../../src/lib/comms/unsubscribe-token";
 import { sendComposedEmail, sendCompanyEmail } from "../../src/app/(dashboard)/companies/[id]/email/actions";
-import { SIMULATED_SEND_FAILURE_ADDRESS } from "../../src/lib/comms/providers/mock";
+import { SIMULATED_SEND_FAILURE_ADDRESS, MockEmailProvider } from "../../src/lib/comms/providers/mock";
 
 const TEST_KEY = "SRvbw8Ualx2XC/Ekfrk0RWORk0fg8/dcL1kL5krkqbk=";
 const UNSUBSCRIBE_BODY = "Thanks for your interest. Unsubscribe: {{unsubscribeLink}}";
@@ -373,5 +373,45 @@ describe("sendCompanyEmail (server action)", () => {
     const message = await testPrisma.emailMessage.findFirstOrThrow({ where: { companyId: company.id } });
     expect(message.toAddresses).toEqual(["info@example.test"]);
     expect(message.contactId).toBeNull();
+  });
+});
+
+describe("branded layout", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("sends in the branded layout with the footer from Settings", async () => {
+    const { user, company } = await baseFixtures();
+    await connectMailbox(user.id);
+    const contact = await permittedContactFixture(company.id);
+    await testPrisma.workspaceSettings.upsert({
+      where: { id: 1 },
+      update: { emailFooterPhone: "905-555-0123", emailFooterWebsite: "trivialitymayhem.com" },
+      create: { id: 1, emailFooterPhone: "905-555-0123", emailFooterWebsite: "trivialitymayhem.com" },
+    });
+    const sendSpy = vi.spyOn(MockEmailProvider.prototype, "sendEmail");
+
+    const result = await sendEmail({ userId: user.id, companyId: company.id, contactId: contact.id, subject: "Hi", body: `<p>Hello there</p>${UNSUBSCRIBE_BODY}` });
+
+    expect(result.ok).toBe(true);
+    const html = sendSpy.mock.calls[0][1].bodyHtml;
+    expect(html).toContain("triviality-mayhem-logo-email.png");
+    expect(html).toContain("<p>Hello there</p>");
+    expect(html).toContain(user.name);
+    expect(html).toContain("905-555-0123");
+    expect(html).toContain("trivialitymayhem.com");
+  });
+
+  it("sends plain when an administrator turns the layout off", async () => {
+    const { user, company } = await baseFixtures();
+    await connectMailbox(user.id);
+    const contact = await permittedContactFixture(company.id);
+    await testPrisma.workspaceSettings.upsert({ where: { id: 1 }, update: { emailBrandingEnabled: false }, create: { id: 1, emailBrandingEnabled: false } });
+    const sendSpy = vi.spyOn(MockEmailProvider.prototype, "sendEmail");
+
+    await sendEmail({ userId: user.id, companyId: company.id, contactId: contact.id, subject: "Hi", body: `<p>Hello there</p>${UNSUBSCRIBE_BODY}` });
+
+    expect(sendSpy.mock.calls[0][1].bodyHtml).not.toContain("triviality-mayhem-logo-email.png");
   });
 });

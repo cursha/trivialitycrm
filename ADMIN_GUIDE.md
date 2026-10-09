@@ -352,6 +352,18 @@ matches one exactly.
   system has started sending it, it's left alone. Administrators see the
   whole team's; everyone else sees their own.
 
+## Branded email layout
+
+Every email reps send from the CRM (composer, scheduled sends, sequences,
+campaigns) goes out in the Triviality Mayhem layout: the logo at the top,
+the rep's message on a white card, and a footer with the rep's name,
+"Triviality Mayhem", and the business phone and website. Set the phone
+and website under **Settings → Sales Workspace thresholds** (**Email
+footer phone** and **Email footer website**); left blank, the footer shows
+just the rep's name and Triviality Mayhem. Untick **Send email in the
+Triviality Mayhem branded layout** there to go back to plain emails.
+Password resets and other system emails aren't affected.
+
 ## Email compliance
 
 - **Communication compliance** (Settings → Communication Compliance):

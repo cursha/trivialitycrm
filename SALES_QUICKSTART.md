@@ -421,6 +421,11 @@ inbox:
 - Every outbound email automatically gets an unsubscribe link appended if
   your message doesn't already include one — you don't need to add it
   yourself.
+- Your emails go out in the Triviality Mayhem layout: the logo at the top
+  and a footer with your name and the business phone and website. Just
+  write your message as usual; the layout is added when it sends. If you
+  put the logo in your message yourself, the layout doesn't add a second
+  one.
 
 ## Quick Search (if you have access)
 

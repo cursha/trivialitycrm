@@ -12,6 +12,7 @@ import { validateOutgoingEmail } from "@/lib/comms/validate";
 import { resolveTemplatePlaceholders, hasUnsubscribePlaceholder } from "@/lib/comms/templates";
 import { createUnsubscribeToken } from "@/lib/comms/unsubscribe-token";
 import { sanitizeEmailHtml } from "@/lib/comms/sanitize-html";
+import { wrapInBrandedLayout } from "@/lib/comms/branded-layout";
 import { logEmailSent } from "@/lib/comms/activity-log";
 import { getQuietHoursWindow, isWithinQuietHours, quietHoursEndInstant } from "@/lib/comms/quiet-hours";
 
@@ -200,7 +201,7 @@ export async function attemptDelivery(
       cc: params.cc,
       bcc: params.bcc,
       subject: prepared.resolvedSubject,
-      bodyHtml: sanitizeEmailHtml(prepared.resolvedBody),
+      bodyHtml: await finalEmailHtml(params.userId, prepared.resolvedBody),
     });
 
     await prisma.$transaction(async (tx) => {
@@ -239,6 +240,19 @@ export async function attemptDelivery(
     });
     return { ok: false, error: message };
   }
+}
+
+/** The HTML that actually goes out: the sanitized message, in the branded
+ * frame unless an administrator turned it off. Every send path (composer,
+ * scheduled, sequence, campaign, company-direct) comes through here. */
+async function finalEmailHtml(userId: string, resolvedBody: string): Promise<string> {
+  const body = sanitizeEmailHtml(resolvedBody);
+  const [sender, settings] = await Promise.all([
+    prisma.user.findUnique({ where: { id: userId }, select: { name: true } }),
+    prisma.workspaceSettings.findUnique({ where: { id: 1 }, select: { emailBrandingEnabled: true, emailFooterPhone: true, emailFooterWebsite: true } }),
+  ]);
+  if (settings && !settings.emailBrandingEnabled) return body;
+  return wrapInBrandedLayout(body, { senderName: sender?.name ?? "", phone: settings?.emailFooterPhone ?? null, website: settings?.emailFooterWebsite ?? null });
 }
 
 /** Sends immediately — the composer's path. No `EmailMessage` row is

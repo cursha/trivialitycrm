@@ -906,6 +906,13 @@ model WorkspaceSettings {
   // template placeholder rather than hardcoded per-template.
   mailingAddress String?
 
+  // The branded frame every CRM email goes out in (src/lib/comms/
+  // branded-layout.ts): on unless an administrator turns it off, with the
+  // business phone and website shown in its footer when set.
+  emailBrandingEnabled Boolean @default(true)
+  emailFooterPhone     String?
+  emailFooterWebsite   String?
+
   // Module Nine: one business-wide quiet-hours window (BUSINESS_TIMEZONE-
   // relative, see src/lib/timezone.ts), applied to CRM-outreach sends only
   // (prepareSend/processDueScheduledEmail/sequence steps) — transactional/

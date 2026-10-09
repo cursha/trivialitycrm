@@ -13,6 +13,9 @@ export function WorkspaceSettingsForm({
     noActivityThresholdDays: number;
     newlyAssignedThresholdDays: number;
     mailingAddress: string | null;
+    emailBrandingEnabled: boolean;
+    emailFooterPhone: string | null;
+    emailFooterWebsite: string | null;
     quietHoursStartHour: number | null;
     quietHoursEndHour: number | null;
   };
@@ -65,6 +68,25 @@ export function WorkspaceSettingsForm({
             CAN-SPAM requires a valid physical mailing address in every commercial email — resolved via the{" "}
             <code>{"{{sender.mailingAddress}}"}</code> template placeholder.
           </HelpText>
+        </div>
+        <div className="sm:col-span-2">
+          <label className="flex items-center gap-2 text-sm font-semibold text-text">
+            <input type="checkbox" name="emailBrandingEnabled" defaultChecked={defaultValues.emailBrandingEnabled} />
+            Send email in the Triviality Mayhem branded layout
+          </label>
+          <HelpText className="mt-1">
+            Every email reps send from the CRM goes out with the logo at the top and a footer with the rep&apos;s name and the phone number and website
+            below. Untick to send plain emails.
+          </HelpText>
+        </div>
+        <div>
+          <Label>Email footer phone (optional)</Label>
+          <Input name="emailFooterPhone" defaultValue={defaultValues.emailFooterPhone ?? ""} placeholder="e.g. 905-555-0123" maxLength={40} className="mt-1" />
+        </div>
+        <div>
+          <Label>Email footer website (optional)</Label>
+          <Input name="emailFooterWebsite" defaultValue={defaultValues.emailFooterWebsite ?? ""} placeholder="e.g. trivialitymayhem.com" maxLength={200} className="mt-1" />
+          <HelpText className="mt-1">Left blank, the footer shows just the rep&apos;s name and Triviality Mayhem.</HelpText>
         </div>
         <div>
           <Label>Quiet hours start (optional)</Label>

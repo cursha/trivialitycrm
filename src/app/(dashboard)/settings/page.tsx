@@ -157,6 +157,9 @@ export default async function SettingsPage() {
         noActivityThresholdDays: 14,
         newlyAssignedThresholdDays: 3,
         mailingAddress: null,
+        emailBrandingEnabled: true,
+        emailFooterPhone: null,
+        emailFooterWebsite: null,
         quietHoursStartHour: null,
         quietHoursEndHour: null,
       })

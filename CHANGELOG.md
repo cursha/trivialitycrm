@@ -14,6 +14,18 @@ Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
 ## v17.0 — 2026-10-09
+### New — emails go out in the Triviality Mayhem layout
+- Every email reps send from the CRM now goes out branded: the logo at the
+  top, the message on a white card with a thin Mayhem Red line, and a
+  footer with the rep's name, Triviality Mayhem, and the business phone and
+  website (Curt's call). Reps write exactly as before.
+- Administrators set the footer phone and website in Settings, and can
+  turn the layout off there. Password resets and other system emails are
+  unchanged.
+- A small copy of the logo (27 KB) is used, since the full-size one is
+  7.6 MB.
+- Database change: three new workspace settings for the layout.
+
 ### New — Find email in a company's Quick Sales Actions
 - A company with no email now has a **Find email** button in Quick Sales
   Actions. It reads the bar's own website (home page, then contact page)
