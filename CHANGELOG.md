@@ -13,6 +13,17 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v21.0 — 2026-10-11
+### New — Missing Info report
+- **Reports → Missing Info** lists every active location missing a phone,
+  website, email or EOS score, one row per location, worked out live
+  rather than from the last data-quality scan (Curt's call).
+- Checkboxes choose which missing fields to look for, each with its count,
+  and missing values are highlighted in red. The usual filters apply:
+  search, country, state/province, city, lead type, stage, rep and sort.
+- Each person sees the bars their reports already cover, so a rep sees
+  their own. Data Quality links to it too.
+
 ## v20.1 — 2026-10-11
 ### Improved — country is a Canada / USA dropdown everywhere
 - Every place the CRM asks for a country now offers a dropdown of

@@ -695,6 +695,12 @@ and outcome.
   score.
 - **Lead Sources**: where new bars came from (added by hand, AI research
   or import).
+- **Missing Info**: every location missing a phone, website, email or EOS
+  score, live from the company records. Tick the fields you care about;
+  each checkbox shows how many locations are missing it. Missing values
+  are highlighted in red, and you can narrow the list by country,
+  state/province, city, stage or rep. Click a company to fill in what's
+  missing. You see the same bars your reports already cover.
 - **AI Research**: searches by status and what happened to their results.
   **Finding emails** shows how many emails the free website check and the
   paid web search each found, how many of the web-search finds were

@@ -68,6 +68,13 @@ export default async function DataQualityPage() {
           <StatCard label="Contacts missing phone" value={counts.missingContactPhone} href="/data-quality/issues?entityType=CONTACT&field=phone" />
           <StatCard label="Contacts missing email" value={counts.missingContactEmail} href="/data-quality/issues?entityType=CONTACT&field=email" />
         </div>
+        <p className="mt-3 text-sm text-text-muted">
+          For a live list of every location missing a phone, website, email or EOS score, with filters, see{" "}
+          <Link href="/reports/missing-info" className="font-semibold text-secondary hover:underline">
+            Reports → Missing Info
+          </Link>
+          .
+        </p>
       </div>
 
       <div>
