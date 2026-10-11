@@ -13,6 +13,23 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v18.0 — 2026-10-11
+### New — two-letter user codes
+- Every user can have a two-letter code, such as CS for Curt Skene and JS
+  for Joe Staab (Curt's call). Administrators set it in the new
+  **Initials** column on Settings → Users, or when adding a user. Codes are
+  stored in capitals, and two people can't share one.
+- Database change: a new optional, unique `initials` field on users.
+  Existing users start without one, so set the codes after this ships.
+
+### Improved — tighter Sales List tables
+- The Salesperson column on Sales Lists (the list page, the list builder's
+  preview, and the list of lists) shows the rep's code instead of their full
+  name, with the full name on hover (Curt's call). Reps without a code still
+  show by name.
+- Phone and email now share one column, phone on top and email below. The
+  EOS score now sits under the pipeline stage (Curt's call).
+
 ## v17.0 — 2026-10-09
 ### New — emails go out in the Triviality Mayhem layout
 - Every email reps send from the CRM now goes out branded: the logo at the

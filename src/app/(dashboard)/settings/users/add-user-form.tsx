@@ -21,7 +21,8 @@ export function AddUserForm({
       <h3 className="text-sm font-bold text-accent">Add a user</h3>
       <div className="grid gap-3 sm:grid-cols-2">
         <Input name="name" placeholder="Full name" required />
-        <Input name="email" type="email" placeholder="Email" required />
+        <Input name="initials" placeholder="Initials, e.g. CS (optional)" maxLength={2} autoComplete="off" className="uppercase placeholder:normal-case" />
+        <Input name="email" type="email" placeholder="Email" required className="sm:col-span-2" />
         <Select name="roleId" required defaultValue="">
           <option value="" disabled>
             Choose a role

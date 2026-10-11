@@ -10,6 +10,7 @@ import { Input, Textarea, Label, Select, FieldError } from "@/components/ui/fiel
 import { Alert } from "@/components/ui/alert";
 import { evaluateCompanyEligibility } from "@/lib/sales-lists/eligibility";
 import { createSalesList, updateSalesList, selectAllMatchingIds } from "../actions";
+import { userCode } from "@/lib/ui/user-code";
 import type { SalesListCompanyRow } from "@/lib/sales-lists/queries";
 import type { SalesListPurpose } from "@/generated/prisma/enums";
 
@@ -198,7 +199,7 @@ export function ListBuilder({
                         {company.city}, {company.region}
                       </div>
                     </td>
-                    <td className="px-5 py-4">{company.assignedTo?.name ?? <span className="text-text-muted">Unassigned</span>}</td>
+                    <td className="px-5 py-4">{company.assignedTo ? <span title={company.assignedTo.name}>{userCode(company.assignedTo)}</span> : <span className="text-text-muted">Unassigned</span>}</td>
                     <td className="px-5 py-4">
                       {company.primaryContact ? `${company.primaryContact.firstName} ${company.primaryContact.lastName}` : <span className="text-text-muted">None</span>}
                     </td>
@@ -273,7 +274,7 @@ export function ListBuilder({
                     <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
                       <div>
                         <dt className="text-text-muted">Salesperson</dt>
-                        <dd className="font-medium text-text">{company.assignedTo?.name ?? "Unassigned"}</dd>
+                        <dd className="font-medium text-text">{company.assignedTo ? userCode(company.assignedTo) : "Unassigned"}</dd>
                       </div>
                       <div>
                         <dt className="text-text-muted">Primary contact</dt>

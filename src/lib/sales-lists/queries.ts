@@ -35,7 +35,7 @@ export async function getLastContactDates(companyIds: string[]): Promise<Record<
 export const SALES_LIST_COMPANY_INCLUDE = {
   leadType: true,
   pipelineStage: true,
-  assignedTo: { select: { id: true, name: true } },
+  assignedTo: { select: { id: true, name: true, initials: true } },
   competitor: true,
   primaryContact: true,
 } satisfies Prisma.CompanyInclude;

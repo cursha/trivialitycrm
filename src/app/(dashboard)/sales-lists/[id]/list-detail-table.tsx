@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TRIVIA_STATUS_LABEL } from "@/lib/ui/status-tones";
+import { userCode } from "@/lib/ui/user-code";
 import { evaluateCompanyEligibility } from "@/lib/sales-lists/eligibility";
 import { removeCompanyFromList } from "../actions";
 import type { SalesListCompanyRow } from "@/lib/sales-lists/queries";
@@ -70,11 +71,11 @@ export function ListDetailTable({
               <th className="px-4 py-3">Company</th>
               <th className="px-4 py-3">Salesperson</th>
               <th className="px-4 py-3">Primary Contact</th>
-              <th className="px-4 py-3">Phone</th>
-              <th className="px-4 py-3">Email</th>
+              <th className="px-4 py-3">Phone / Email</th>
               {showLeadType && <th className="px-4 py-3">Lead Type</th>}
-              <th className="px-4 py-3">Stage</th>
-              <th className="px-4 py-3" title="Entertainment Opportunity Score">EOS</th>
+              <th className="px-4 py-3">
+                Stage / <span title="Entertainment Opportunity Score">EOS</span>
+              </th>
               <th className="px-4 py-3">Confidence</th>
               <th className="px-4 py-3">Competitor</th>
               <th className="px-4 py-3">Trivia Status</th>
@@ -98,17 +99,27 @@ export function ListDetailTable({
                       {company.city}, {company.region}
                     </div>
                   </td>
-                  <td className="px-4 py-3">{company.assignedTo?.name ?? <span className="text-text-muted">Unassigned</span>}</td>
+                  <td className="px-4 py-3">
+                    {company.assignedTo ? (
+                      <span title={company.assignedTo.name}>{userCode(company.assignedTo)}</span>
+                    ) : (
+                      <span className="text-text-muted">Unassigned</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     {company.primaryContact ? `${company.primaryContact.firstName} ${company.primaryContact.lastName}` : <span className="text-text-muted">None</span>}
                   </td>
-                  <td className="px-4 py-3">{company.phone ?? <span className="text-text-muted">—</span>}</td>
-                  <td className="px-4 py-3">{company.email ?? <span className="text-text-muted">—</span>}</td>
+                  <td className="px-4 py-3">
+                    <div className="whitespace-nowrap">{company.phone ?? <span className="text-text-muted">—</span>}</div>
+                    <div className="text-xs text-text-muted">{company.email ?? "—"}</div>
+                  </td>
                   {showLeadType && <td className="px-4 py-3">{company.leadType.name}</td>}
                   <td className="px-4 py-3">
                     <Badge tone="secondary">{company.pipelineStage.name}</Badge>
+                    <div className="mt-1 text-xs text-text-muted" title="Entertainment Opportunity Score">
+                      EOS {company.eosScore ?? "—"}
+                    </div>
                   </td>
-                  <td className="px-4 py-3">{company.eosScore ?? "—"}</td>
                   <td className="px-4 py-3">{company.confidenceLevel ?? "—"}</td>
                   <td className="px-4 py-3">{company.competitor?.name ?? "—"}</td>
                   <td className="px-4 py-3">{TRIVIA_STATUS_LABEL[company.triviaStatus]}</td>
@@ -136,7 +147,7 @@ export function ListDetailTable({
             })}
             {companies.length === 0 && (
               <tr>
-                <td colSpan={showLeadType ? 15 : 14} className="px-4 py-10 text-center text-text-muted">
+                <td colSpan={11 + (showLeadType ? 1 : 0) + (type === "FIXED" && canManage ? 1 : 0)} className="px-4 py-10 text-center text-text-muted">
                   No companies to show.
                 </td>
               </tr>
@@ -166,7 +177,7 @@ export function ListDetailTable({
               <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
                 <div>
                   <dt className="text-text-muted">Salesperson</dt>
-                  <dd className="font-medium text-text">{company.assignedTo?.name ?? "Unassigned"}</dd>
+                  <dd className="font-medium text-text">{company.assignedTo ? userCode(company.assignedTo) : "Unassigned"}</dd>
                 </div>
                 <div>
                   <dt className="text-text-muted">Primary contact</dt>

@@ -65,6 +65,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
         users={users.map((u) => ({
           id: u.id,
           name: u.name,
+          initials: u.initials,
           email: u.email,
           disabled: u.disabled,
           mustChangePassword: u.mustChangePassword,

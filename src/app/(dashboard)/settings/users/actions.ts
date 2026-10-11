@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
 import { hashPassword } from "@/lib/auth/password";
 import { invalidateAllSessionsForUser } from "@/lib/auth/session";
-import { CreateUserSchema, ResetPasswordSchema } from "@/lib/validation/user";
+import { CreateUserSchema, InitialsSchema, ResetPasswordSchema } from "@/lib/validation/user";
 import { LookupNameSchema } from "@/lib/validation/lookup";
 import { formString } from "@/lib/form-data";
 import { writeAuditEvent } from "@/lib/audit/log";
@@ -17,6 +17,12 @@ import { getEnv } from "@/lib/env";
 export type ActionResult = { error?: string } | undefined;
 
 const PATH = "/settings/users";
+
+/** Whether another user (not `exceptUserId`) already has these initials. */
+async function initialsTakenBy(initials: string, exceptUserId?: string): Promise<boolean> {
+  const holder = await prisma.user.findUnique({ where: { initials }, select: { id: true } });
+  return holder !== null && holder.id !== exceptUserId;
+}
 
 async function requireUserManager() {
   const user = await requireUser();
@@ -29,6 +35,7 @@ export async function createUser(_prevState: ActionResult, formData: FormData): 
 
   const parsed = CreateUserSchema.safeParse({
     name: formString(formData, "name"),
+    initials: formString(formData, "initials").trim() || undefined,
     email: formString(formData, "email"),
     roleId: formString(formData, "roleId"),
     teamId: formString(formData, "teamId") || undefined,
@@ -42,6 +49,10 @@ export async function createUser(_prevState: ActionResult, formData: FormData): 
   // The administrator chooses this temporary password themselves (Module
   // One has no email delivery to send an invite link) — it is never
   // generated or logged by application code.
+  if (parsed.data.initials && (await initialsTakenBy(parsed.data.initials))) {
+    return { error: `${parsed.data.initials} is already used by another user.` };
+  }
+
   const passwordHash = await hashPassword(parsed.data.initialPassword);
 
   let created;
@@ -49,6 +60,7 @@ export async function createUser(_prevState: ActionResult, formData: FormData): 
     created = await prisma.user.create({
       data: {
         name: parsed.data.name,
+        initials: parsed.data.initials ?? null,
         email: parsed.data.email,
         roleId: parsed.data.roleId,
         teamId: parsed.data.teamId || null,
@@ -57,10 +69,12 @@ export async function createUser(_prevState: ActionResult, formData: FormData): 
       },
     });
   } catch {
-    return { error: "A user with that email already exists." };
+    // Initials were checked above, so a clash here is almost always the email
+    // (or two admins saving the same initials at the same moment).
+    return { error: "A user with that email or those initials already exists." };
   }
 
-  await writeAuditEvent({ actorId: actor.id, module: "users", action: "user.created", entityType: "User", entityId: created.id, afterData: { name: created.name, email: created.email, roleId: created.roleId } });
+  await writeAuditEvent({ actorId: actor.id, module: "users", action: "user.created", entityType: "User", entityId: created.id, afterData: { name: created.name, initials: created.initials, email: created.email, roleId: created.roleId } });
 
   revalidatePath(PATH);
 }
@@ -278,6 +292,44 @@ export async function renameUser(id: string, name: string): Promise<ActionResult
     entityId: id,
     beforeData: { name: existing.name },
     afterData: { name: parsed.data },
+  });
+
+  revalidatePath(PATH);
+}
+
+/**
+ * Sets or clears a user's two-letter code (e.g. "CS"). Blank clears it.
+ * Codes are unique, so the same two letters can't belong to two people.
+ */
+export async function setUserInitials(id: string, initials: string): Promise<ActionResult> {
+  const actor = await requireUserManager();
+
+  let next: string | null = null;
+  if (initials.trim() !== "") {
+    const parsed = InitialsSchema.safeParse(initials);
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter two letters." };
+    next = parsed.data;
+  }
+
+  const existing = await prisma.user.findUnique({ where: { id }, select: { initials: true } });
+  if (!existing) return { error: "That user no longer exists." };
+  if (existing.initials === next) return;
+
+  if (next && (await initialsTakenBy(next, id))) return { error: `${next} is already used by another user.` };
+
+  try {
+    await prisma.user.update({ where: { id }, data: { initials: next } });
+  } catch {
+    return { error: `${next} is already used by another user.` };
+  }
+  await writeAuditEvent({
+    actorId: actor.id,
+    module: "users",
+    action: "user.initials_changed",
+    entityType: "User",
+    entityId: id,
+    beforeData: { initials: existing.initials },
+    afterData: { initials: next },
   });
 
   revalidatePath(PATH);

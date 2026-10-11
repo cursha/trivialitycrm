@@ -230,6 +230,9 @@ enum ImportBatchStatus {
 model User {
   id                             String                  @id @default(cuid())
   name                           String
+  // Two-letter code for the user, e.g. "CS" for Curt Skene. Optional (older
+  // accounts start without one) and unique, so a code always means one person.
+  initials                       String?                 @unique
   email                          String                  @unique
   passwordHash                   String
   mustChangePassword             Boolean                 @default(false)

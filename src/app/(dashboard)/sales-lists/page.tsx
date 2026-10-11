@@ -3,6 +3,7 @@ import { CirclePlus } from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
 import { listSalesLists } from "@/lib/sales-lists/queries";
+import { userCode } from "@/lib/ui/user-code";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -98,7 +99,7 @@ export default async function SalesListsPage({
                     </td>
                     <td className="px-5 py-4">{list.type === "FIXED" ? "Fixed" : "Dynamic"}</td>
                     <td className="px-5 py-4">{VISIBILITY_LABEL[list.visibility]}</td>
-                    <td className="px-5 py-4">{list.owner.name}</td>
+                    <td className="px-5 py-4" title={list.owner.name}>{userCode(list.owner)}</td>
                     <td className="px-5 py-4">{list.type === "FIXED" ? list._count.members : "—"}</td>
                     <td className="px-5 py-4">{new Date(list.updatedAt).toLocaleDateString()}</td>
                   </tr>
@@ -130,7 +131,7 @@ export default async function SalesListsPage({
                   </div>
                   <div>
                     <dt className="text-text-muted">Salesperson</dt>
-                    <dd className="font-medium text-text">{list.owner.name}</dd>
+                    <dd className="font-medium text-text">{userCode(list.owner)}</dd>
                   </div>
                   <div>
                     <dt className="text-text-muted">Companies</dt>

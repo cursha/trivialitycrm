@@ -148,6 +148,11 @@ steps are in `AGENTS.md`.
   The first account the CRM creates is named "Administrator"; rename it to
   the person's real name. Everything assigned to that user shows the new
   name right away.
+- **Give each user a two-letter code** (initials, like CS for Curt Skene or
+  JS for Joe Staab) in the **Initials** column on Settings → Users: type it
+  and press Enter or click away. You can also enter it when you add a user.
+  Each code can belong to only one person, and clearing the box removes it.
+  Sales Lists show reps by their code; anyone without one shows by name.
 - **Hand a user's work to someone else** (they're leaving, or changing
   territory): click **Manage** next to them on Settings → Users. It shows
   how many active companies and open follow-ups they own. Choose a person

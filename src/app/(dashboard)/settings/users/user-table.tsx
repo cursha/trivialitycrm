@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useEffect, useState, useTransition } from "react";
-import { setUserRole, setUserTeam, setUserDisabled, unlockUserAccount, revokeUserSessions, fetchOwnershipSummary, transferUserOwnership, renameUser } from "./actions";
+import { setUserRole, setUserTeam, setUserDisabled, unlockUserAccount, revokeUserSessions, fetchOwnershipSummary, transferUserOwnership, renameUser, setUserInitials } from "./actions";
 import { Pencil } from "lucide-react";
 import { ResetPasswordControl } from "./reset-password-control";
 import { Card } from "@/components/ui/card";
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 export type UserRow = {
   id: string;
   name: string;
+  initials: string | null;
   email: string;
   disabled: boolean;
   mustChangePassword: boolean;
@@ -127,6 +128,7 @@ export function UserTable({
         <thead className="bg-black/5 text-xs uppercase text-text-muted">
           <tr>
             <th className="px-5 py-3">Name</th>
+            <th className="px-5 py-3">Initials</th>
             <th className="px-5 py-3">Email</th>
             <th className="px-5 py-3">Role</th>
             <th className="px-5 py-3">Team</th>
@@ -189,6 +191,30 @@ export function UserTable({
                         Locked out
                       </Badge>
                     )}
+                  </td>
+                  <td className="px-5 py-4">
+                    {/* Saves when the field loses focus or Enter is pressed. Blank clears it. */}
+                    <Input
+                      key={user.initials ?? ""}
+                      defaultValue={user.initials ?? ""}
+                      maxLength={2}
+                      placeholder="—"
+                      autoComplete="off"
+                      disabled={isPending}
+                      aria-label={`Initials for ${user.name}`}
+                      className="w-14 py-1 text-center uppercase"
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") event.currentTarget.blur();
+                      }}
+                      onBlur={(event) => {
+                        const value = event.target.value.trim().toUpperCase();
+                        if (value === (user.initials ?? "")) return;
+                        startTransition(async () => {
+                          const result = await setUserInitials(user.id, value);
+                          setError(user.id, result?.error ?? null);
+                        });
+                      }}
+                    />
                   </td>
                   <td className="px-5 py-4 text-text-muted">{user.email}</td>
                   <td className="px-5 py-4">
@@ -253,14 +279,14 @@ export function UserTable({
                 </tr>
                 {rowErrors[user.id] && (
                   <tr className="border-t-0">
-                    <td colSpan={8} className="bg-danger/5 px-5 py-2">
+                    <td colSpan={9} className="bg-danger/5 px-5 py-2">
                       <FieldError>{rowErrors[user.id]}</FieldError>
                     </td>
                   </tr>
                 )}
                 {expandedId === user.id && (
                   <tr className="border-t-0">
-                    <td colSpan={8} className="space-y-3 bg-black/5 px-5 py-4">
+                    <td colSpan={9} className="space-y-3 bg-black/5 px-5 py-4">
                       <div className="flex flex-wrap gap-2">
                         {lockedOut && (
                           <Button
@@ -299,7 +325,7 @@ export function UserTable({
           })}
           {users.length === 0 && (
             <tr>
-              <td colSpan={8} className="px-5 py-8 text-center text-text-muted">
+              <td colSpan={9} className="px-5 py-8 text-center text-text-muted">
                 No users match these filters.
               </td>
             </tr>
