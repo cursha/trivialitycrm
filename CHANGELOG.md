@@ -13,6 +13,11 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v19.1 — 2026-10-11
+### Improved — EOS score centred under the stage
+- On a Sales List, the EOS number now sits centred under the pipeline
+  stage instead of hugging the left edge (Curt's call).
+
 ## v19.0 — 2026-10-11
 ### New — filter a Sales List by eligibility
 - A list's page has **Show: All · Eligible · Ineligible** above the table,

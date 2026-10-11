@@ -115,9 +115,12 @@ export function ListDetailTable({
                   </td>
                   {showLeadType && <td className="px-4 py-3">{company.leadType.name}</td>}
                   <td className="px-4 py-3">
-                    <Badge tone="secondary">{company.pipelineStage.name}</Badge>
-                    <div className="mt-1 text-xs text-text-muted" title="Entertainment Opportunity Score">
-                      {company.eosScore ?? "—"}
+                    {/* The EOS score, centred under the stage badge. */}
+                    <div className="inline-flex flex-col items-center gap-1">
+                      <Badge tone="secondary">{company.pipelineStage.name}</Badge>
+                      <span className="text-xs text-text-muted" title="Entertainment Opportunity Score">
+                        {company.eosScore ?? "—"}
+                      </span>
                     </div>
                   </td>
                   <td className="px-4 py-3">{company.confidenceLevel ?? "—"}</td>
