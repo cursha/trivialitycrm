@@ -170,6 +170,10 @@ export function ListBuilderFilters({
             <input type="checkbox" checked={checked("neverAnalyzedOnly")} onChange={() => toggleParam("neverAnalyzedOnly")} />
             Never analyzed
           </label>
+          <label className="flex items-center gap-1.5 text-sm" title="Leave out bars that can't be used for this list's purpose, e.g. no phone number on a Calling List">
+            <input type="checkbox" checked={checked("excludeIneligible")} onChange={() => toggleParam("excludeIneligible")} />
+            Exclude ineligible bars
+          </label>
           <Input
             className="w-40"
             type="date"

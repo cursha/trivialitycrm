@@ -55,6 +55,7 @@ const FILTER_LABELS: Record<string, string> = {
   lastAnalyzedBefore: "Last analyzed before",
   hasDataQualityWarnings: "Has data-quality warnings",
   status: "Status",
+  excludeIneligible: "Exclude ineligible bars",
 };
 
 function toSingle(value: string | string[] | undefined): string | undefined {

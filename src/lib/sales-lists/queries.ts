@@ -4,7 +4,7 @@ import type { AuthenticatedUser } from "@/lib/auth/current-user";
 import { companyScope } from "@/lib/companies/scope";
 import { buildCompanyWhere, PAGE_SIZE, SORTABLE_FIELDS_LIST } from "@/app/(dashboard)/companies/queries";
 import { salesListVisibilityWhere } from "./scope";
-import { parseSalesListFilters, toCompanyListParams } from "./filters";
+import { parseSalesListFilters, toCompanyListParams, type SalesListFilters } from "./filters";
 import { evaluateCompanyEligibility } from "./eligibility";
 import type { Prisma } from "@/generated/prisma/client";
 import type { SalesListPurpose } from "@/generated/prisma/enums";
@@ -78,11 +78,27 @@ export async function getSalesListById(user: AuthenticatedUser, id: string) {
  * matching id (not a page of them, and not the display-only relations
  * SALES_LIST_COMPANY_INCLUDE carries) — the List Builder's live preview is
  * a different, paginated function (previewListCompanies). */
-export async function evaluateDynamicFilters(user: AuthenticatedUser, filters: unknown): Promise<{ id: string }[]> {
+export async function evaluateDynamicFilters(user: AuthenticatedUser, filters: unknown, purpose: SalesListPurpose): Promise<{ id: string }[]> {
   const parsed = parseSalesListFilters(filters);
-  const where = buildCompanyWhere(user, toCompanyListParams(parsed));
-  if (!where) return [];
+  const baseWhere = buildCompanyWhere(user, toCompanyListParams(parsed));
+  if (!baseWhere) return [];
+  const where = await withEligibilityFilter(baseWhere, parsed, purpose);
   return prisma.company.findMany({ where, select: { id: true } });
+}
+
+/** Applies a list's "Exclude ineligible bars" filter. Eligibility is decided
+ * in code (evaluateCompanyEligibility), not SQL, so this reads the small
+ * eligibility fields of every match once and narrows `where` to the
+ * eligible ids, so paging, counts and sorting stay correct. */
+async function withEligibilityFilter(
+  where: Prisma.CompanyWhereInput,
+  filters: SalesListFilters,
+  purpose: SalesListPurpose,
+): Promise<Prisma.CompanyWhereInput> {
+  if (!filters.excludeIneligible) return where;
+  const rows = await prisma.company.findMany({ where, select: ELIGIBILITY_SELECT });
+  const ids = rows.filter((row) => evaluateCompanyEligibility(row, purpose).eligible).map((row) => row.id);
+  return { AND: [where, { id: { in: ids } }] };
 }
 
 type ListLike = { id: string; type: "FIXED" | "DYNAMIC"; filters: unknown };
@@ -169,12 +185,13 @@ export async function getListMembershipCount(list: ListLike): Promise<number> {
 export async function previewListCompanies(
   user: AuthenticatedUser,
   filters: unknown,
-  params: { page?: number; sortBy?: string; sortDir?: string },
+  params: { page?: number; sortBy?: string; sortDir?: string; purpose: SalesListPurpose },
 ): Promise<{ companies: SalesListCompanyRow[]; total: number; page: number; pageCount: number } | null> {
   const parsed = parseSalesListFilters(filters);
   const listParams = { ...toCompanyListParams(parsed), sortBy: params.sortBy ?? parsed.sortBy, sortDir: params.sortDir ?? parsed.sortDir };
-  const where = buildCompanyWhere(user, listParams);
-  if (!where) return null;
+  const baseWhere = buildCompanyWhere(user, listParams);
+  if (!baseWhere) return null;
+  const where = await withEligibilityFilter(baseWhere, parsed, params.purpose);
 
   const sortBy = listParams.sortBy && SORTABLE_FIELDS.has(listParams.sortBy) ? listParams.sortBy : "name";
   const sortDir = listParams.sortDir === "desc" ? "desc" : "asc";
@@ -236,10 +253,15 @@ const SELECT_ALL_MATCHING_CAP = 5000;
 /** Every company id currently matching the in-progress filter selection,
  * up to a safety cap — backs the List Builder's "select all matching"
  * button (as opposed to "select this page," which is plain client state). */
-export async function selectAllMatchingCompanyIds(user: AuthenticatedUser, filters: unknown): Promise<{ ids: string[]; truncated: boolean }> {
+export async function selectAllMatchingCompanyIds(
+  user: AuthenticatedUser,
+  filters: unknown,
+  purpose: SalesListPurpose,
+): Promise<{ ids: string[]; truncated: boolean }> {
   const parsed = parseSalesListFilters(filters);
-  const where = buildCompanyWhere(user, toCompanyListParams(parsed));
-  if (!where) return { ids: [], truncated: false };
+  const baseWhere = buildCompanyWhere(user, toCompanyListParams(parsed));
+  if (!baseWhere) return { ids: [], truncated: false };
+  const where = await withEligibilityFilter(baseWhere, parsed, purpose);
 
   const rows = await prisma.company.findMany({ where, select: { id: true }, take: SELECT_ALL_MATCHING_CAP + 1, orderBy: { name: "asc" } });
   const truncated = rows.length > SELECT_ALL_MATCHING_CAP;

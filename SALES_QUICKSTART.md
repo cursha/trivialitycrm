@@ -344,7 +344,9 @@ Email Campaign list additionally needs an active contact with an email
 address who hasn't opted out or bounced, and excludes existing customers.
 These eligibility rules can't be overridden — the preview table shows each
 company as Eligible or Ineligible with a plain-English reason before you
-save.
+save. Tick **Exclude ineligible bars** in the filters to leave them out of
+the preview and of **Select all matching**; on a dynamic list it keeps them
+out every time the list refreshes.
 
 You choose **Fixed** (a frozen snapshot of companies you hand-pick, up to
 5,000) or **Dynamic** (saves the filter itself and re-runs it — click

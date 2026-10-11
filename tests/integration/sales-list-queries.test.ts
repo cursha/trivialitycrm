@@ -27,7 +27,7 @@ describe("previewListCompanies", () => {
     await createCompanyFixture({ name: "In Toronto", leadTypeId: leadType.id, pipelineStageId: stage.id, assignedToId: null, createdById: user.id, city: "Toronto" });
 
     const currentUser = await getCurrentUser();
-    const result = await previewListCompanies(currentUser!, { city: "Milton" }, {});
+    const result = await previewListCompanies(currentUser!, { city: "Milton" }, { purpose: "GENERAL_SALES" });
     expect(result?.companies.map((c) => c.name)).toEqual(["In Milton"]);
   });
 });
@@ -41,9 +41,49 @@ describe("selectAllMatchingCompanyIds", () => {
     );
 
     const currentUser = await getCurrentUser();
-    const { ids, truncated } = await selectAllMatchingCompanyIds(currentUser!, {});
+    const { ids, truncated } = await selectAllMatchingCompanyIds(currentUser!, {}, "GENERAL_SALES");
     expect(ids.sort()).toEqual(created.map((c) => c.id).sort());
     expect(truncated).toBe(false);
+  });
+});
+
+describe("Exclude ineligible bars (List Builder filter)", () => {
+  async function phoneFixtures() {
+    const { user, leadType, stage } = await baseFixtures();
+    await loginAs(user.id);
+    const withPhone = await createCompanyFixture({ name: "Has Phone", leadTypeId: leadType.id, pipelineStageId: stage.id, assignedToId: null, createdById: user.id, city: "Milton" });
+    const noPhone = await createCompanyFixture({ name: "No Phone", leadTypeId: leadType.id, pipelineStageId: stage.id, assignedToId: null, createdById: user.id, city: "Milton" });
+    await testPrisma.company.update({ where: { id: withPhone.id }, data: { phone: "555-0100" } });
+    await testPrisma.company.update({ where: { id: noPhone.id }, data: { phone: null } });
+    return { withPhone, noPhone };
+  }
+
+  it("leaves ineligible bars out of the preview and select-all, for the list's purpose", async () => {
+    const { withPhone } = await phoneFixtures();
+    const currentUser = await getCurrentUser();
+
+    const preview = await previewListCompanies(currentUser!, { excludeIneligible: true }, { purpose: "CALLING" });
+    expect(preview?.companies.map((c) => c.name)).toEqual(["Has Phone"]);
+    expect(preview?.total).toBe(1);
+
+    const { ids } = await selectAllMatchingCompanyIds(currentUser!, { excludeIneligible: true }, "CALLING");
+    expect(ids).toEqual([withPhone.id]);
+
+    // Unticked, or for a purpose where a missing phone doesn't matter, both show.
+    expect((await previewListCompanies(currentUser!, {}, { purpose: "CALLING" }))?.total).toBe(2);
+    expect((await previewListCompanies(currentUser!, { excludeIneligible: true }, { purpose: "GENERAL_SALES" }))?.total).toBe(2);
+  });
+
+  it("keeps ineligible bars out of a dynamic list when it refreshes", async () => {
+    await phoneFixtures();
+    const created = await createSalesList({ name: "Callable Milton", purpose: "CALLING", type: "DYNAMIC", visibility: "PRIVATE", filters: { city: "Milton", excludeIneligible: true } });
+    if (!("success" in created)) throw new Error("failed");
+
+    await refreshDynamicList(created.id);
+    const list = await testPrisma.salesList.findUniqueOrThrow({ where: { id: created.id } });
+    const currentUser = await getCurrentUser();
+    const result = await getListCompanies(currentUser!, list, {});
+    expect(result?.companies.map((c) => c.name)).toEqual(["Has Phone"]);
   });
 });
 

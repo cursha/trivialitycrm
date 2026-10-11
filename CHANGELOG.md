@@ -13,6 +13,16 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v20.0 — 2026-10-11
+### New — "Exclude ineligible bars" when building a Sales List
+- Build a Sales List has a new **Exclude ineligible bars** checkbox among
+  the filters (Curt's call). Ticked, the preview leaves out bars that can't
+  be used for the list's purpose (for example no phone number on a Calling
+  List), and so does **Select all matching**, so a fixed list saves
+  without them.
+- On a dynamic list the setting is saved with its filters, so ineligible
+  bars stay out every time the list is refreshed.
+
 ## v19.1 — 2026-10-11
 ### Improved — EOS score centred under the stage
 - On a Sales List, the EOS number now sits centred under the pipeline

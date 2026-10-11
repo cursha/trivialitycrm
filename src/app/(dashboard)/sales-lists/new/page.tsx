@@ -67,12 +67,13 @@ export default async function NewSalesListPage({
     lastAnalyzedBefore: toSingle(params.lastAnalyzedBefore) || undefined,
     hasDataQualityWarnings: toSingle(params.hasDataQualityWarnings) === "true" || undefined,
     status: toSingle(params.status),
+    excludeIneligible: toSingle(params.excludeIneligible) === "true" || undefined,
     sortBy: toSingle(params.sortBy),
     sortDir: toSingle(params.sortDir),
   };
 
   const [preview, leadTypes, pipelineStages, competitors, users] = await Promise.all([
-    previewListCompanies(user, filters, { page, sortBy: filters.sortBy, sortDir: filters.sortDir }),
+    previewListCompanies(user, filters, { page, sortBy: filters.sortBy, sortDir: filters.sortDir, purpose }),
     prisma.leadType.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
     prisma.pipelineStage.findMany({ where: { active: true }, orderBy: { sortOrder: "asc" } }),
     prisma.competitor.findMany({ where: { active: true }, orderBy: { name: "asc" } }),

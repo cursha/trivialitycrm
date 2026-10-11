@@ -10,7 +10,7 @@ import { SalesListFiltersSchema } from "@/lib/sales-lists/filters";
 import { canManageSalesList, salesListVisibilityWhere } from "@/lib/sales-lists/scope";
 import { evaluateDynamicFilters, selectAllMatchingCompanyIds } from "@/lib/sales-lists/queries";
 import type { Prisma } from "@/generated/prisma/client";
-import type { SalesListPurpose, SalesListType, SalesListVisibility } from "@/generated/prisma/enums";
+import { SalesListPurpose as SalesListPurposeEnum, type SalesListPurpose, type SalesListType, type SalesListVisibility } from "@/generated/prisma/enums";
 
 export type SalesListActionResult = { error: string } | { success: true; id: string };
 
@@ -45,10 +45,12 @@ async function validateSharedUserIds(userIds: string[]): Promise<string[]> {
 /** List Builder's "select all matching" button — re-runs the current
  * in-progress filter selection server-side (never trusts a client-supplied
  * id list) and returns every matching id up to the safety cap. */
-export async function selectAllMatchingIds(filters: unknown): Promise<{ ids: string[]; truncated: boolean }> {
+export async function selectAllMatchingIds(filters: unknown, purpose: SalesListPurpose): Promise<{ ids: string[]; truncated: boolean }> {
   const user = await requireUser();
   requirePermission(user, "create_sales_lists");
-  return selectAllMatchingCompanyIds(user, filters);
+  // The purpose decides what "ineligible" means; never trust it unchecked.
+  const safePurpose = (Object.values(SalesListPurposeEnum) as string[]).includes(purpose) ? purpose : "GENERAL_SALES";
+  return selectAllMatchingCompanyIds(user, filters, safePurpose);
 }
 
 export async function createSalesList(input: {
@@ -373,7 +375,7 @@ export async function refreshDynamicList(
   if (!list) return { error: "List not found." };
   if (list.type !== "DYNAMIC") return { error: "Only a dynamic list can be refreshed." };
 
-  const matches = await evaluateDynamicFilters(user, list.filters);
+  const matches = await evaluateDynamicFilters(user, list.filters, list.purpose);
   const matchedIds = new Set(matches.map((c) => c.id));
 
   const previous = await prisma.salesListDynamicMember.findMany({ where: { listId }, select: { companyId: true } });

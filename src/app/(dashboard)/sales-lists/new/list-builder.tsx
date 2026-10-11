@@ -69,7 +69,7 @@ export function ListBuilder({
 
   function selectAllMatching() {
     startTransition(async () => {
-      const result = await selectAllMatchingIds(filters);
+      const result = await selectAllMatchingIds(filters, purpose);
       setSelected(new Set(result.ids));
       setSelectAllNotice(
         result.truncated

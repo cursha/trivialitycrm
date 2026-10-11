@@ -52,6 +52,10 @@ export const SalesListFiltersSchema = z
     lastAnalyzedBefore: isoDate.optional(),
     hasDataQualityWarnings: z.boolean().optional(),
     status: z.enum(Object.values(CompanyStatus) as [string, ...string[]]).optional(),
+    // Leave out companies that aren't eligible for the list's purpose (see
+    // evaluateCompanyEligibility). Not a database filter: applied in
+    // queries.ts after buildCompanyWhere(), since eligibility is decided in code.
+    excludeIneligible: z.boolean().optional(),
     sortBy: z.enum(SORTABLE_FIELDS_LIST).optional(),
     sortDir: z.enum(["asc", "desc"]).optional(),
   })
@@ -73,8 +77,11 @@ export function parseSalesListFilters(value: unknown): SalesListFilters {
  * snapshot, campaign recipient resolution) must go through this rather than
  * hand-rolling its own CompanyListParams, so all four stay consistent. */
 export function toCompanyListParams(filters: SalesListFilters): CompanyListParams {
+  // excludeIneligible isn't a company-list filter; queries.ts applies it.
+  const companyFilters = { ...filters };
+  delete companyFilters.excludeIneligible;
   return {
-    ...filters,
-    status: (filters.status as CompanyListParams["status"]) ?? "ACTIVE",
+    ...companyFilters,
+    status: (companyFilters.status as CompanyListParams["status"]) ?? "ACTIVE",
   };
 }
