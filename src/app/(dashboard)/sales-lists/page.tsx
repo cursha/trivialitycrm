@@ -80,7 +80,7 @@ export default async function SalesListsPage({
                   <th className="px-5 py-3">Purpose</th>
                   <th className="px-5 py-3">Type</th>
                   <th className="px-5 py-3">Visibility</th>
-                  <th className="px-5 py-3">Salesperson</th>
+                  <th className="px-5 py-3" title="Salesperson">Rep</th>
                   <th className="px-5 py-3">Companies</th>
                   <th className="px-5 py-3">Updated</th>
                 </tr>
@@ -130,7 +130,7 @@ export default async function SalesListsPage({
                     <dd className="font-medium text-text">{VISIBILITY_LABEL[list.visibility]}</dd>
                   </div>
                   <div>
-                    <dt className="text-text-muted">Salesperson</dt>
+                    <dt className="text-text-muted">Rep</dt>
                     <dd className="font-medium text-text">{userCode(list.owner)}</dd>
                   </div>
                   <div>

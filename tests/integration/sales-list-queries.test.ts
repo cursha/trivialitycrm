@@ -84,6 +84,30 @@ describe("getListCompanies", () => {
     result = await getListCompanies(currentUser!, list, {});
     expect(result?.companies.map((c) => c.name)).toEqual(["Matches"]);
   });
+
+  it("shows only eligible or only ineligible companies when asked, with matching totals", async () => {
+    const { user, leadType, stage } = await baseFixtures();
+    await loginAs(user.id);
+    const withPhone = await createCompanyFixture({ name: "Has Phone", leadTypeId: leadType.id, pipelineStageId: stage.id, assignedToId: null, createdById: user.id });
+    const noPhone = await createCompanyFixture({ name: "No Phone", leadTypeId: leadType.id, pipelineStageId: stage.id, assignedToId: null, createdById: user.id });
+    await testPrisma.company.update({ where: { id: withPhone.id }, data: { phone: "555-0100" } });
+    await testPrisma.company.update({ where: { id: noPhone.id }, data: { phone: null } });
+
+    const created = await createSalesList({ name: "Calling Filter", purpose: "CALLING", type: "FIXED", visibility: "PRIVATE", companyIds: [withPhone.id, noPhone.id] });
+    if (!("success" in created)) throw new Error("failed");
+    const list = await testPrisma.salesList.findUniqueOrThrow({ where: { id: created.id } });
+    const currentUser = await getCurrentUser();
+
+    const ineligible = await getListCompanies(currentUser!, list, { eligibility: { show: "ineligible", purpose: "CALLING" } });
+    expect(ineligible?.companies.map((c) => c.name)).toEqual(["No Phone"]);
+    expect(ineligible?.total).toBe(1);
+
+    const eligible = await getListCompanies(currentUser!, list, { eligibility: { show: "eligible", purpose: "CALLING" } });
+    expect(eligible?.companies.map((c) => c.name)).toEqual(["Has Phone"]);
+
+    const all = await getListCompanies(currentUser!, list, {});
+    expect(all?.total).toBe(2);
+  });
 });
 
 describe("getListEligibilitySummary", () => {

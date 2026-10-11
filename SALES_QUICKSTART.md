@@ -354,11 +354,17 @@ people, or shared with the whole team. Only you (or an admin) can edit or
 archive your own list, and it can't be deleted outright once it has calling
 or campaign history — archive it instead.
 
-In a list's table, the **Salesperson** column shows each rep's two-letter
-code (like CS for Curt Skene); hover over it for the full name. A rep who
+In a list's table, the **Rep** column shows each rep's two-letter code
+(like CS for Curt Skene); hover over it for the full name. A rep who
 hasn't been given a code yet shows by name. To save room, the phone sits
-above the email in one column, and the EOS score sits under the pipeline
-stage.
+above the email in one column, the EOS score sits under the pipeline
+stage, and a few headers are shortened: **Comp** is the competitor and
+**Status** is the trivia status (hover a header for its full name).
+
+The **Elig** column shows **Y** if a bar is eligible for the list's
+purpose and **N** if not; hover an N to see why. Use **Show: All ·
+Eligible · Ineligible** above the table to see just one group — handy for
+finding the bars that need a phone number or contact filled in.
 
 ## Calling Sessions
 

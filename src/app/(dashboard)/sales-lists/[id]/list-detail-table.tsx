@@ -68,8 +68,8 @@ export function ListDetailTable({
         <table className="w-full text-left text-sm">
           <thead className="bg-black/5 text-xs uppercase text-text-muted">
             <tr>
-              <th className="px-4 py-3">Company</th>
-              <th className="px-4 py-3">Salesperson</th>
+              <th className="min-w-64 px-4 py-3">Company</th>
+              <th className="px-4 py-3" title="Salesperson">Rep</th>
               <th className="px-4 py-3">Primary Contact</th>
               <th className="px-4 py-3">Phone / Email</th>
               {showLeadType && <th className="px-4 py-3">Lead Type</th>}
@@ -77,11 +77,11 @@ export function ListDetailTable({
                 Stage / <span title="Entertainment Opportunity Score">EOS</span>
               </th>
               <th className="px-4 py-3">Confidence</th>
-              <th className="px-4 py-3">Competitor</th>
-              <th className="px-4 py-3">Trivia Status</th>
+              <th className="px-4 py-3" title="Competitor">Comp</th>
+              <th className="px-4 py-3" title="Trivia Status">Status</th>
               <th className="px-4 py-3">Last Contact</th>
               <th className="px-4 py-3">Next Action</th>
-              <th className="px-4 py-3">Eligibility</th>
+              <th className="px-4 py-3" title="Eligibility">Elig</th>
               {type === "FIXED" && canManage && <th className="px-4 py-3" />}
             </tr>
           </thead>
@@ -117,7 +117,7 @@ export function ListDetailTable({
                   <td className="px-4 py-3">
                     <Badge tone="secondary">{company.pipelineStage.name}</Badge>
                     <div className="mt-1 text-xs text-text-muted" title="Entertainment Opportunity Score">
-                      EOS {company.eosScore ?? "—"}
+                      {company.eosScore ?? "—"}
                     </div>
                   </td>
                   <td className="px-4 py-3">{company.confidenceLevel ?? "—"}</td>
@@ -126,13 +126,11 @@ export function ListDetailTable({
                   <td className="px-4 py-3">{lastContact ? new Date(lastContact).toLocaleDateString() : <span className="text-text-muted">Never</span>}</td>
                   <td className="px-4 py-3">{company.nextFollowUpAt ? new Date(company.nextFollowUpAt).toLocaleDateString() : <span className="text-text-muted">None</span>}</td>
                   <td className="px-4 py-3">
+                    {/* Y or N; an N's reasons show on hover. */}
                     {eligible ? (
-                      <Badge tone="success">Eligible</Badge>
+                      <Badge tone="success" title="Eligible">Y</Badge>
                     ) : (
-                      <div className="space-y-0.5">
-                        <Badge tone="danger">Ineligible</Badge>
-                        <div className="text-xs text-text-muted">{reasons.join("; ")}</div>
-                      </div>
+                      <Badge tone="danger" title={`Ineligible: ${reasons.join("; ")}`}>N</Badge>
                     )}
                   </td>
                   {type === "FIXED" && canManage && (
@@ -176,7 +174,7 @@ export function ListDetailTable({
               {!eligible && <p className="mt-1 text-xs text-text-muted">{reasons.join("; ")}</p>}
               <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
                 <div>
-                  <dt className="text-text-muted">Salesperson</dt>
+                  <dt className="text-text-muted">Rep</dt>
                   <dd className="font-medium text-text">{company.assignedTo ? userCode(company.assignedTo) : "Unassigned"}</dd>
                 </div>
                 <div>

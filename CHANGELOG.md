@@ -13,6 +13,24 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v19.0 — 2026-10-11
+### New — filter a Sales List by eligibility
+- A list's page has **Show: All · Eligible · Ineligible** above the table,
+  each with its count, so you can pull up just the bars that can't be
+  worked yet and fix them (Curt's call). The filter covers the whole list,
+  not only the page on screen, and stays on as you page through.
+
+### Improved — shorter Sales List headers
+- Sales List tables rename **Salesperson** to **Rep**, **Competitor** to
+  **Comp**, and **Trivia Status** to **Status**; hover a header for its
+  full name (Curt's call).
+- The score under each stage no longer repeats "EOS", since the header
+  already says it (Curt's call).
+- **Eligibility** is now **Elig** and shows **Y** or **N**; hover an N to
+  see why that bar is ineligible (Curt's call).
+- The Company column on a list's table uses the space this frees up, so
+  bar names wrap less (Curt's call).
+
 ## v18.0 — 2026-10-11
 ### New — two-letter user codes
 - Every user can have a two-letter code, such as CS for Curt Skene and JS

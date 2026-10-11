@@ -76,8 +76,17 @@ export default async function SalesListDetailPage({
   if (!list) notFound();
 
   const page = Number(toSingle(query.page)) || 1;
+  // ?show=eligible|ineligible narrows the table; anything else shows all.
+  const showParam = toSingle(query.show);
+  const show = showParam === "eligible" || showParam === "ineligible" ? showParam : undefined;
   const [companiesResult, total, eligibility] = await Promise.all([
-    getListCompanies(user, list, { q: toSingle(query.q), sortBy: toSingle(query.sortBy), sortDir: toSingle(query.sortDir), page }),
+    getListCompanies(user, list, {
+      q: toSingle(query.q),
+      sortBy: toSingle(query.sortBy),
+      sortDir: toSingle(query.sortDir),
+      page,
+      eligibility: show ? { show, purpose: list.purpose } : undefined,
+    }),
     getListMembershipCount(list),
     getListEligibilitySummary(user, list, list.purpose),
   ]);
@@ -207,6 +216,33 @@ export default async function SalesListDetailPage({
 
       <ListActionsBar listId={list.id} type={list.type} archived={!!list.archivedAt} canManage={canManage} canDelete={canDelete} />
 
+      <nav aria-label="Filter by eligibility" className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-text-muted">Show:</span>
+        {(
+          [
+            { key: undefined, label: "All", count: eligibility.eligible + eligibility.ineligible },
+            { key: "eligible", label: "Eligible", count: eligibility.eligible },
+            { key: "ineligible", label: "Ineligible", count: eligibility.ineligible },
+          ] as const
+        ).map((option) => {
+          const active = show === option.key;
+          return (
+            <Link
+              key={option.label}
+              href={option.key ? `/sales-lists/${list.id}?show=${option.key}` : `/sales-lists/${list.id}`}
+              aria-current={active ? "page" : undefined}
+              className={
+                active
+                  ? "rounded-full bg-secondary px-3 py-1 font-semibold text-white"
+                  : "rounded-full border border-border-strong px-3 py-1 text-text hover:bg-black/5"
+              }
+            >
+              {option.label} ({option.count.toLocaleString()})
+            </Link>
+          );
+        })}
+      </nav>
+
       <ListDetailTable
         listId={list.id}
         purpose={list.purpose}
@@ -217,7 +253,7 @@ export default async function SalesListDetailPage({
         showLeadType={await hasMultipleLeadTypes()}
       />
 
-      <Pagination page={page} pageCount={pageCount} pageSize={PAGE_SIZE} hrefFor={(p) => `/sales-lists/${list.id}?page=${p}`} />
+      <Pagination page={page} pageCount={pageCount} pageSize={PAGE_SIZE} hrefFor={(p) => `/sales-lists/${list.id}?page=${p}${show ? `&show=${show}` : ""}`} />
     </div>
   );
 }

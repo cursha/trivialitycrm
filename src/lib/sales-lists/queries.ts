@@ -97,7 +97,15 @@ type ListLike = { id: string; type: "FIXED" | "DYNAMIC"; filters: unknown };
 export async function getListCompanies(
   user: AuthenticatedUser,
   list: ListLike,
-  params: { q?: string; sortBy?: string; sortDir?: string; page?: number },
+  params: {
+    q?: string;
+    sortBy?: string;
+    sortDir?: string;
+    page?: number;
+    /** Show only the companies that are (or aren't) usable for the list's
+     * purpose — the same rule as the header's Eligible/Ineligible counts. */
+    eligibility?: { show: "eligible" | "ineligible"; purpose: SalesListPurpose };
+  },
 ): Promise<{ companies: SalesListCompanyRow[]; total: number; page: number; pageCount: number } | null> {
   const scope = companyScope(user);
   if (!scope) return null;
@@ -119,6 +127,15 @@ export async function getListCompanies(
         { phone: { contains: params.q, mode: "insensitive" } },
       ],
     });
+  }
+  if (params.eligibility) {
+    // Eligibility is worked out in code (evaluateCompanyEligibility), not
+    // SQL, so check the whole membership's small eligibility fields first
+    // and page over the matching ids — paging stays correct across the list.
+    const { show, purpose } = params.eligibility;
+    const rows = await prisma.company.findMany({ where: { AND: filters }, select: ELIGIBILITY_SELECT });
+    const ids = rows.filter((row) => evaluateCompanyEligibility(row, purpose).eligible === (show === "eligible")).map((row) => row.id);
+    filters.push({ id: { in: ids } });
   }
   const where: Prisma.CompanyWhereInput = { AND: filters };
 
