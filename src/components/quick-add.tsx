@@ -13,6 +13,7 @@ import { toDateTimeInputValue } from "@/lib/dates";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import { useFocusTrap } from "@/hooks/use-focus-trap";
+import { CountrySelect } from "@/components/country-select";
 
 type Tab = "company" | "contact" | "note" | "activity" | "follow-up";
 
@@ -230,7 +231,7 @@ function QuickAddCompanyForm({ options }: { options: QuickAddOptions | null }) {
       <div className="grid grid-cols-2 gap-3">
         <div className={options.leadTypes.length === 1 ? "col-span-2" : undefined}>
           <Label>Country</Label>
-          <Input name="country" required className="mt-1" />
+          <CountrySelect name="country" emptyLabel="Choose a country" required className="mt-1" />
         </div>
         {/* With a single lead type there's nothing to choose — it's used without asking. */}
         {options.leadTypes.length === 1 ? (

@@ -5,6 +5,7 @@ import { companyScope } from "@/lib/companies/scope";
 import { dayBounds } from "@/lib/dates";
 import type { Prisma } from "@/generated/prisma/client";
 import { TriviaStatus, OpportunityGrade, ConfidenceLevel, PrimaryClassification } from "@/generated/prisma/enums";
+import { countrySpellings } from "@/lib/constants/countries";
 
 export const PAGE_SIZE = 25;
 
@@ -174,7 +175,9 @@ export function buildCompanyWhere(user: AuthenticatedUser, params: CompanyListPa
   }
   if (params.competitorId) filters.push({ competitorId: params.competitorId });
   if (triviaStatus) filters.push({ triviaStatus });
-  if (params.country) filters.push({ country: { equals: params.country, mode: "insensitive" } });
+  if (params.country) {
+    filters.push({ OR: countrySpellings(params.country).map((spelling) => ({ country: { equals: spelling, mode: "insensitive" as const } })) });
+  }
   if (params.region) filters.push({ region: { equals: params.region, mode: "insensitive" } });
   if (params.city) filters.push({ city: { equals: params.city, mode: "insensitive" } });
   if (params.cities && params.cities.length > 0) {

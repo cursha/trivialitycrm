@@ -13,6 +13,18 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v20.1 — 2026-10-11
+### Improved — country is a Canada / USA dropdown everywhere
+- Every place the CRM asks for a country now offers a dropdown of
+  **Canada** or **USA** instead of a text box (Curt's call): adding or
+  editing a company, Quick Add, territories, the organization's default
+  country, lead searches, and the Sales List builder's filter.
+- Countries are saved as "Canada" and "United States", the values lead
+  searches already used. A company saved earlier as "canada", "USA" or "US"
+  opens with the right country already chosen.
+- Country filters now match every common spelling, so picking USA also
+  finds companies saved as "USA" or "US".
+
 ## v20.0 — 2026-10-11
 ### New — "Exclude ineligible bars" when building a Sales List
 - Build a Sales List has a new **Exclude ineligible bars** checkbox among

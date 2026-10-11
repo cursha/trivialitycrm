@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label, Input, Select, FieldError } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { ACTIVE_TONE } from "@/lib/ui/status-tones";
+import { CountrySelect } from "@/components/country-select";
 
 export type TerritoryRow = {
   id: string;
@@ -31,7 +32,7 @@ function TerritoryFields({ defaultValues }: { defaultValues?: Partial<TerritoryR
       </div>
       <div>
         <Label>Country</Label>
-        <Input name="country" defaultValue={defaultValues?.country ?? ""} required className="mt-1" />
+        <CountrySelect name="country" defaultValue={defaultValues?.country} emptyLabel="Choose a country" required className="mt-1" />
       </div>
       <div>
         <Label>State / Province (optional)</Label>

@@ -5,6 +5,7 @@ import { startSearch, type SearchFormState } from "./actions";
 import { Card } from "@/components/ui/card";
 import { Label, Input, Select, FieldError } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
+import { CountrySelect } from "@/components/country-select";
 
 export type SearchFormOptions = {
   prompts: { id: string; name: string }[];
@@ -86,10 +87,7 @@ export function SearchForm({ prompts, leadTypes, competitors, canOverrideBudget 
       <div className="grid grid-cols-2 gap-4">
         <div>
           <Label className="mb-1 block text-xs uppercase">Country</Label>
-          <Select name="country" required>
-            <option value="Canada">Canada</option>
-            <option value="United States">United States</option>
-          </Select>
+          <CountrySelect name="country" required />
         </div>
         <div>
           <Label className="mb-1 block text-xs uppercase">State / Province</Label>

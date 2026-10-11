@@ -4,6 +4,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useTransition } from "react";
 import { Input, Select, Label } from "@/components/ui/field";
 import { Card } from "@/components/ui/card";
+import { CountrySelect } from "@/components/country-select";
 
 type Option = { id: string; name: string };
 
@@ -50,7 +51,7 @@ export function ListBuilderFilters({
       <div>
         <p className="mb-1.5 text-xs font-bold uppercase text-text-muted">Location &amp; assignment</p>
         <div className="flex flex-wrap gap-2">
-          <Input className="w-36" placeholder="Country" defaultValue={searchParams.get("country") ?? ""} onChange={(e) => updateParam("country", e.target.value)} />
+          <CountrySelect className="w-36" aria-label="Country" emptyLabel="Any country" defaultValue={searchParams.get("country")} onChange={(e) => updateParam("country", e.target.value)} />
           <Input className="w-32" placeholder="State/Province" defaultValue={searchParams.get("region") ?? ""} onChange={(e) => updateParam("region", e.target.value)} />
           <Input className="w-36" placeholder="City" defaultValue={searchParams.get("city") ?? ""} onChange={(e) => updateParam("city", e.target.value)} />
           {/* A lead-type filter only matters once there is more than one lead type. */}

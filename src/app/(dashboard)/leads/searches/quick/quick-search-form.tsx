@@ -220,7 +220,7 @@ export function QuickSearchForm({ leadTypes, cityLists }: QuickSearchFormOptions
             <Label className="mb-1 block text-xs uppercase">Country</Label>
             <Select name="country" required value={country} onChange={(event) => setCountry(event.target.value)}>
               <option value="Canada">Canada</option>
-              <option value="United States">United States</option>
+              <option value="United States">USA</option>
             </Select>
           </div>
           <div>

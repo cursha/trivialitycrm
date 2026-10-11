@@ -32,6 +32,25 @@ describe("previewListCompanies", () => {
   });
 });
 
+describe("country filter", () => {
+  it("matches every spelling of the chosen country", async () => {
+    const { user, leadType, stage } = await baseFixtures();
+    await loginAs(user.id);
+    const usa = await createCompanyFixture({ name: "Saved as USA", leadTypeId: leadType.id, pipelineStageId: stage.id, assignedToId: null, createdById: user.id });
+    const us = await createCompanyFixture({ name: "Saved as United States", leadTypeId: leadType.id, pipelineStageId: stage.id, assignedToId: null, createdById: user.id });
+    const ca = await createCompanyFixture({ name: "Saved as canada", leadTypeId: leadType.id, pipelineStageId: stage.id, assignedToId: null, createdById: user.id });
+    await testPrisma.company.update({ where: { id: usa.id }, data: { country: "USA" } });
+    await testPrisma.company.update({ where: { id: us.id }, data: { country: "United States" } });
+    await testPrisma.company.update({ where: { id: ca.id }, data: { country: "canada" } });
+
+    const currentUser = await getCurrentUser();
+    const american = await previewListCompanies(currentUser!, { country: "United States" }, { purpose: "GENERAL_SALES" });
+    expect(american?.companies.map((c) => c.name).sort()).toEqual(["Saved as USA", "Saved as United States"]);
+    const canadian = await previewListCompanies(currentUser!, { country: "Canada" }, { purpose: "GENERAL_SALES" });
+    expect(canadian?.companies.map((c) => c.name)).toEqual(["Saved as canada"]);
+  });
+});
+
 describe("selectAllMatchingCompanyIds", () => {
   it("returns every matching id, not just one page", async () => {
     const { user, leadType, stage } = await baseFixtures();

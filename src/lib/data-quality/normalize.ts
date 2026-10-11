@@ -9,6 +9,7 @@
 // re-implementing them, and adds only what Company/Contact need that
 // SearchResult does not.
 import { normalizePhone, normalizeEmail } from "../duplicates/normalize";
+import { CANADA_SPELLINGS, UNITED_STATES_SPELLINGS } from "../constants/countries";
 
 export function normalizePersonName(name: string): string {
   return name
@@ -105,12 +106,12 @@ const CA_PROVINCES: Record<string, string> = {
 
 function isCanada(country: string): boolean {
   const c = country.trim().toLowerCase();
-  return c === "canada" || c === "ca" || c === "can";
+  return CANADA_SPELLINGS.includes(c);
 }
 
 function isUnitedStates(country: string): boolean {
   const c = country.trim().toLowerCase();
-  return c === "united states" || c === "usa" || c === "us" || c === "u.s." || c === "u.s.a." || c === "united states of america";
+  return UNITED_STATES_SPELLINGS.includes(c);
 }
 
 /** "canada" / "united states" for any common spelling, else lower-cased. */

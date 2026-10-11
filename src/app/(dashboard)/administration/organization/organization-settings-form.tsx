@@ -6,6 +6,7 @@ import { Card, SectionHeading } from "@/components/ui/card";
 import { Label, Input, Select, Textarea, HelpText, FieldError } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { CURRENCY_VALUES, DATE_FORMAT_VALUES } from "@/lib/validation/organization-settings";
+import { CountrySelect } from "@/components/country-select";
 
 export type OrganizationSettingsDefaults = {
   organizationName: string;
@@ -44,7 +45,7 @@ export function OrganizationSettingsForm({
         </div>
         <div>
           <Label>Default country</Label>
-          <Input name="defaultCountry" defaultValue={defaultValues.defaultCountry} required className="mt-1" />
+          <CountrySelect name="defaultCountry" defaultValue={defaultValues.defaultCountry} emptyLabel="Choose a country" required className="mt-1" />
         </div>
         <div>
           <Label>Default state / province (optional)</Label>

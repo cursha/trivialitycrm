@@ -303,7 +303,8 @@ Locator, Pub Lead Finder, and the scan):
 Settings → **Territories** groups bars by area and gives each area a
 salesperson.
 
-- A territory covers a **country**, a **state/province** or a **city**
+- A territory covers a **country** (Canada or USA, chosen from a
+  dropdown), a **state/province** or a **city**
   (leave the smaller ones blank to cover the whole of the larger one). Give
   it a name such as "Greater Toronto Area" if you like.
 - When territories overlap, the most specific wins: a Milton territory

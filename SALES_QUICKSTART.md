@@ -91,6 +91,9 @@ company, a contact on an existing company, a note, a logged activity, or a
 follow-up — without leaving whatever page you're on. If you need more fields
 than the quick form offers, it always has an "Open full form" link.
 
+Wherever the CRM asks for a country, pick **Canada** or **USA** from the
+dropdown.
+
 ## The sales process
 
 Every bar goes through the same steps:

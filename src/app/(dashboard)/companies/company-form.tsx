@@ -7,6 +7,7 @@ import { Label, Input, Select, Textarea, FieldError } from "@/components/ui/fiel
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import { useUnsavedChangesWarning } from "@/hooks/use-unsaved-changes-warning";
+import { CountrySelect } from "@/components/country-select";
 
 type Option = { id: string; name: string };
 type PipelineStageOption = Option & { outcomeType: string | null };
@@ -86,7 +87,7 @@ export function CompanyForm({
         </div>
         <div>
           <Label>Country</Label>
-          <Input name="country" defaultValue={defaultValues?.country} required className="mt-1" />
+          <CountrySelect name="country" defaultValue={defaultValues?.country} emptyLabel="Choose a country" required className="mt-1" />
         </div>
 
         <div>
