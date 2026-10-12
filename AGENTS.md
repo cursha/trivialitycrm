@@ -66,3 +66,26 @@ Same scheme as the Gr8daybingo project (its Constitution §10).
 - **Documentation-only changes** that don't touch the app (AGENTS.md, guides)
   don't need a version bump, but note they still deploy when pushed to
   `main`.
+
+# Every user-visible change updates the user manual
+
+The in-app User Manual (Administration → User Manual) is built from
+`SALES_QUICKSTART.md` and `ADMIN_GUIDE.md` at the repo root. A release is
+not done until the manual matches it.
+
+- **Any change a user can see or do differently goes in the manual in the
+  same commit.** New screens, buttons, filters, reports, fields, wording a
+  user will look for, permissions, and changed behaviour all count.
+- **Salesperson-facing changes go in `SALES_QUICKSTART.md`**; administrator
+  and manager features go in `ADMIN_GUIDE.md`. If both audiences use it,
+  update both.
+- **Edit, don't just append.** Remove or correct anything the change makes
+  wrong, and keep each section describing the app as it is now.
+- **Write for the user, not the developer.** Use plain steps and the
+  on-screen names, and say why the feature matters as well as how to use it.
+- **Skip only when nothing user-visible changed** (internal fixes,
+  refactors, tests, performance). Say so in the `CHANGELOG.md` entry, e.g.
+  "No manual change: internal fix."
+- **A new manual file must also be added** to `MANUALS` in
+  `src/lib/docs/manuals.ts` and let through by the Dockerfile and
+  `.dockerignore`, or it won't appear in the app.
