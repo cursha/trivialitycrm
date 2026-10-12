@@ -13,6 +13,28 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v22.0 — 2026-10-12
+### New — AI Spend report
+- **Reports → AI Spend** shows how the AI money was spent (Curt's call):
+  total estimated spend, number of AI calls, average per call and tokens
+  for the date range, then the spend by feature (finding venues, checking
+  them, scoring, finding emails, opportunity analysis, campaign
+  personalisation, prompt help), by person, by AI model, the ten most
+  expensive lead searches, spend per day (per month for ranges over two
+  months), and every AI call with paging.
+- Filter by date range and salesperson; Export CSV / Excel and Scheduled
+  Reports include it. Only people with "View AI research cost estimates"
+  see the tab, and each sees the spend their reports cover (a rep sees
+  their own).
+- The figures are the CRM's estimates at the provider's published rates,
+  not the Anthropic bill, and don't include hosting.
+
+### Fixed — exports now match the screen
+- Export CSV / Excel on every report ignored the on-screen filters and
+  always exported "this month" with no filters. It now exports exactly what
+  the filters show.
+- Changing a report filter goes back to the first page of a paged table.
+
 ## v21.0 — 2026-10-11
 ### New — Missing Info report
 - **Reports → Missing Info** lists every active location missing a phone,

@@ -203,6 +203,13 @@ steps are in `AGENTS.md`.
   report while finding venues makes that step slow and expensive and
   returns few. Name chains to leave out, and treat hard-to-find facts (seat
   count, ownership) as signals rather than must-haves.
+- **Reports → AI Spend** is the full breakdown of where AI money went: by
+  feature, person, model, lead search and day, plus every call, exportable
+  to CSV / Excel or as a scheduled report. It needs "View AI research cost
+  estimates" (`view_ai_costs`), and follows the viewer's report scope:
+  calls made by the system rather than a person only show with "View all
+  reports". It's an estimate; compare it with the Anthropic Console's
+  Billing page for the real invoice.
 - The Integrations page shows recent AI/email usage and any recent provider
   errors — check here first if something AI/email-related seems off.
 - Anyone with `view_administration` also sees a running today's-spend/

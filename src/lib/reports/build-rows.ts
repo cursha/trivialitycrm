@@ -14,6 +14,7 @@ import { getCompetitorsReport } from "@/app/(dashboard)/reports/competitors/quer
 import { getTerritoriesReport } from "@/app/(dashboard)/reports/territories/queries";
 import { getLeadTypesReport } from "@/app/(dashboard)/reports/lead-types/queries";
 import { getTrendsReport } from "@/app/(dashboard)/reports/trends/queries";
+import { getAiSpendReport } from "@/app/(dashboard)/reports/ai-spend/queries";
 
 export const REPORT_KEYS = [
   "dashboard",
@@ -25,6 +26,7 @@ export const REPORT_KEYS = [
   "territories",
   "lead-types",
   "trends",
+  "ai-spend",
 ] as const;
 export type ReportKey = (typeof REPORT_KEYS)[number];
 
@@ -38,6 +40,7 @@ export const REPORT_LABELS: Record<ReportKey, string> = {
   territories: "Territory Report",
   "lead-types": "Lead Type Report",
   trends: "Trends Report",
+  "ai-spend": "AI Spend Report",
 };
 
 function rateLabel(result: RateResult): string {
@@ -266,6 +269,28 @@ export async function buildReportRows(key: ReportKey, user: AuthenticatedUser, f
           lost: String(r.lost),
           activities: String(r.activities),
         })),
+      };
+    }
+    case "ai-spend": {
+      const report = await getAiSpendReport(user, filters);
+      if (!report) return { forbidden: true };
+      const money = (usd: number) => usd.toFixed(2);
+      return {
+        forbidden: false,
+        columns: [
+          { key: "section", label: "Section" },
+          { key: "label", label: "Label" },
+          { key: "calls", label: "Calls" },
+          { key: "costUsd", label: "Estimated Cost (USD)" },
+        ],
+        rows: [
+          { section: "Total", label: "All AI calls", calls: String(report.callCount), costUsd: money(report.totalUsd) },
+          ...report.byOperation.map((r) => ({ section: "By feature", label: r.label, calls: String(r.calls), costUsd: money(r.costUsd) })),
+          ...report.byUser.map((r) => ({ section: "By person", label: r.label, calls: String(r.calls), costUsd: money(r.costUsd) })),
+          ...report.topSearches.map((r) => ({ section: "Most expensive lead searches", label: r.label, calls: String(r.calls), costUsd: money(r.costUsd) })),
+          ...report.byModel.map((r) => ({ section: "By AI model", label: r.label, calls: String(r.calls), costUsd: money(r.costUsd) })),
+          ...report.timeline.map((r) => ({ section: report.period === "day" ? "Per day" : "Per month", label: r.label, calls: String(r.calls), costUsd: money(r.costUsd) })),
+        ],
       };
     }
   }

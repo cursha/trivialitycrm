@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
 import { parseReportFilters, type ReportFilters } from "@/lib/reports/filters";
 import { buildReportCsv, buildReportXlsx } from "@/lib/reports/export";
+import { rawFiltersFromParams } from "@/app/(dashboard)/reports/filter-options";
 import { buildReportRows, REPORT_KEYS, REPORT_LABELS, type ReportKey } from "@/lib/reports/build-rows";
 
 const DATE_RANGE_LABELS: Record<string, string> = {
@@ -40,9 +41,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ repo
   const { searchParams } = new URL(request.url);
   const format = searchParams.get("format") === "xlsx" ? "xlsx" : "csv";
 
-  const rawFilters: Record<string, string | undefined> = {};
-  for (const [k, v] of searchParams.entries()) rawFilters[k] = v;
-  const filters = parseReportFilters(rawFilters);
+  // Only the filter keys: the link also carries `format` (and a paged
+  // report's `page`), which the strict filter schema would reject, quietly
+  // exporting "this month, no filters" instead of what was on screen.
+  const filters = parseReportFilters(rawFiltersFromParams(Object.fromEntries(searchParams.entries())));
 
   const result = await buildReportRows(key, user, filters);
   if (result.forbidden) {

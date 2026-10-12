@@ -37,6 +37,9 @@ export default async function ReportsLayout({ children }: { children: React.Reac
     { href: "/reports/trends", label: "Trends" },
     { href: "/reports/missing-info", label: "Missing Info" },
   );
+  if (hasPermission(user, "view_ai_costs")) {
+    tabs.push({ href: "/reports/ai-spend", label: "AI Spend" });
+  }
   if (hasPermission(user, "view_campaign_reports")) {
     tabs.push({ href: "/reports/campaigns", label: "Campaigns" });
   }

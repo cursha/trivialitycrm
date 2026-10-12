@@ -95,6 +95,16 @@ Source: `src/app/(dashboard)/reports/ai-research/queries.ts`. Scope applied via 
 - **Result disposition**: `SearchResult` count grouped by `disposition` (New/Reviewed/Transferred/Rejected/Below minimum score/Duplicate). There is no separate "restored" disposition value in the schema — a restored result returns to New/Reviewed and is indistinguishable after the fact from one that started there, so a "restored" funnel stage is not shown (would require guessing).
 - **Estimated AI cost (in range)**: sum of `AiUsageRecord.estimatedCostUsd` for searches in range, gated on the `view_ai_costs` permission — a user without it sees no cost figures at all, not a hidden-but-fetched number. Labeled "ESTIMATE, not a bill" in the UI. Pricing assumptions live in `src/lib/research/providers/pricing.ts` (hardcoded per-token rates, verified against the provider's published pricing page as of 2026-07-18 — see that file's header comment for the re-verification note).
 
+## AI spend reporting
+
+Source: `src/app/(dashboard)/reports/ai-spend/queries.ts`. Every figure is `AiUsageRecord.estimatedCostUsd` for calls whose `createdAt` is in range, so it covers all AI use (lead searches, email finding, opportunity analysis, campaign personalisation, prompt help), not only searches. Gated on `view_ai_costs`. Scope is by the person who made the call (`AiUsageRecord.user` via `reportUserWhere()`); calls with no person (system jobs) only appear under the all-reports scope. The salesperson filter narrows to that person's calls; no other report filter applies.
+
+- **Totals**: sum of cost, call count, average per call, and input + output + cache tokens.
+- **By feature / person / model**: the same sum grouped by `operation`, `userId` and `model`, largest first.
+- **Most expensive lead searches**: the ten `searchId`s with the highest summed cost in range.
+- **Spend per day / month**: bucketed by calendar day in the business timezone (America/Toronto) for ranges up to 62 days, by month otherwise; days with no calls show $0.00.
+- **Every AI call**: the individual rows, newest first, 25 per page.
+
 ## Competitor reporting
 
 Source: `src/app/(dashboard)/reports/competitors/queries.ts`. Gated on the `view_competitor_reports` permission in addition to base report scope — a user with report access but not this permission sees a plain "you do not have this permission" message, not a hidden/greyed-out page.

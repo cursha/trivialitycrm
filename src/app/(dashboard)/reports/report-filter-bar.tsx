@@ -57,6 +57,8 @@ export function ReportFilterBar({
     const params = new URLSearchParams(searchParams.toString());
     if (value) params.set(key, value);
     else params.delete(key);
+    // A filter change goes back to the first page of any paged table.
+    params.delete("page");
     startTransition(() => router.push(`${pathname}?${params.toString()}`));
   }
 

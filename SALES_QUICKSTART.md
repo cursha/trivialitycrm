@@ -707,6 +707,13 @@ and outcome.
   transferred into the CRM, and (with cost access) what the web search
   cost and the cost per email it found. Use it to decide whether the web
   search is worth keeping.
+- **AI Spend** (with cost access): how the AI money was spent in the date
+  range. It shows the total, number of AI calls and average per call, then
+  the spend by feature, by person, by AI model, the most expensive lead
+  searches, spend per day (per month for long ranges) and every AI call.
+  Filter by salesperson to see one person's spend. These are the CRM's
+  estimates, in US dollars; the actual bill is in the Anthropic Console,
+  and hosting isn't included.
 - **Competitors**: bars linked to each competitor.
 - **Territories**: how each territory is covered.
 - **Lead Types**: active bars by lead type (shown when there's more than
