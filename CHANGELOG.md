@@ -13,6 +13,13 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v22.1 — 2026-10-13
+### Fixed — clean lint run
+- The last lint warning is gone (an unused address input in the test-only
+  stand-in for address lookups), so type check, lint and the full test suite
+  all pass with nothing outstanding.
+- No manual change: internal fix.
+
 ## v22.0 — 2026-10-12
 ### New — AI Spend report
 - **Reports → AI Spend** shows how the AI money was spent (Curt's call):

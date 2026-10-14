@@ -23,6 +23,7 @@ export interface AddressGeocoder {
 const MOCK_COORDINATES: LatLng = { lat: 43.6532, lng: -79.3832 };
 
 export class MockAddressGeocoder implements AddressGeocoder {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- kept to match AddressGeocoder; mock ignores the address
   async geocode(_address: string): Promise<LatLng | null> {
     return MOCK_COORDINATES;
   }
