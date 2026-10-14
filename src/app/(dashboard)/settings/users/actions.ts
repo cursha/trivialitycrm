@@ -237,7 +237,7 @@ export async function generatePasswordResetLinkAction(requestId: string): Promis
   const result = await generatePasswordResetLink(requestId, actor.id);
   if (!result.ok) return result;
 
-  const baseUrl = getEnv().APP_URL ?? "http://localhost:3000";
+  const baseUrl = getEnv().APP_URL ?? "http://localhost:3002";
   const link = `${baseUrl}/reset-password?token=${result.token}`;
 
   revalidatePath(PATH);

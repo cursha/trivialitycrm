@@ -13,6 +13,15 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v22.2 — 2026-10-14
+### Changed — local dev runs on port 3002
+- `npm run dev` now serves on http://localhost:3002 instead of 3000, so it
+  can run alongside CNC Community (3000), In2WinBook (3001) and Gr8daybingo
+  (3003) on the same machine (Curt's call). Email links fall back to
+  localhost:3002 when `APP_URL` isn't set. Production is unaffected: it sets
+  `APP_URL` and runs `next start`.
+- No manual change: developer setting only.
+
 ## v22.1 — 2026-10-13
 ### Fixed — clean lint run
 - The last lint warning is gone (an unused address input in the test-only

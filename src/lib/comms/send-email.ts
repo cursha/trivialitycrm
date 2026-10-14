@@ -139,7 +139,7 @@ async function prepareSend(params: {
   }
 
   const to = [contact.email];
-  const unsubscribeLink = `${getEnv().APP_URL ?? "http://localhost:3000"}/unsubscribe?token=${createUnsubscribeToken(contact.id)}`;
+  const unsubscribeLink = `${getEnv().APP_URL ?? "http://localhost:3002"}/unsubscribe?token=${createUnsubscribeToken(contact.id)}`;
   const placeholderData = {
     contact,
     company,

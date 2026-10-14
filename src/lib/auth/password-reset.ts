@@ -118,7 +118,7 @@ export async function generatePasswordResetLink(requestId: string, adminId: stri
   try {
     const integrationSettings = await getIntegrationSettings();
     if (integrationSettings.emailSendingEnabled) {
-      const resetLink = `${getEnv().APP_URL ?? "http://localhost:3000"}/reset-password?token=${rawToken}`;
+      const resetLink = `${getEnv().APP_URL ?? "http://localhost:3002"}/reset-password?token=${rawToken}`;
       await sendSystemEmail({
         purpose: "PASSWORD_RESET",
         toAddress: request.user.email,
