@@ -432,6 +432,10 @@ inbox:
   Titan mailbox connected go out as standard calendar invite emails
   instead. Google, Outlook and Apple calendars all offer "add to calendar"
   for them, and rescheduling or cancelling sends an updated invite.
+  Titan also gives the CRM no way to see incoming mail, so replies and
+  bounces to emails you send through Titan aren't detected: a contact's
+  reply won't stop their sequence or campaign automatically, so stop it
+  yourself when someone answers. Replies show up in your own Titan inbox.
 - Once connected, use the **Send test email** button on that page any time
   you want to confirm the connection is actually working before relying on
   it for a real send.

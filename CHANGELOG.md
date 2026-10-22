@@ -13,6 +13,17 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v22.4 — 2026-10-22
+### Fixed — no more hourly Titan error in the worker logs
+- The worker no longer tries to set up reply/bounce detection for Titan
+  mailboxes. Titan has no API for incoming mail, so every attempt failed and
+  logged an error once an hour. Keeping the Titan mailbox already connected
+  rather than moving it to Microsoft or Google (Curt's call). Sending through
+  Titan is unchanged.
+- Manual: Connecting your email now says that replies and bounces to Titan
+  sends aren't detected, so a Titan user knows to stop sequences by hand
+  when a contact replies.
+
 ## v22.3 — 2026-10-22
 ### Improved — unsubscribe secret can be changed safely
 - New optional setting `UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS`. While changing

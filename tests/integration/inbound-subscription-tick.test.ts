@@ -26,7 +26,7 @@ async function connectedUser() {
   return createTestUser({ roleId: role.id });
 }
 
-async function connection(userId: string, overrides: Partial<{ provider: "MICROSOFT" | "GOOGLE"; status: "CONNECTED" | "EXPIRED" | "REVOKED" | "ERROR"; inboundSubscriptionId: string | null; inboundSubscriptionExpiresAt: Date | null }> = {}) {
+async function connection(userId: string, overrides: Partial<{ provider: "MICROSOFT" | "GOOGLE" | "TITAN"; status: "CONNECTED" | "EXPIRED" | "REVOKED" | "ERROR"; inboundSubscriptionId: string | null; inboundSubscriptionExpiresAt: Date | null }> = {}) {
   return testPrisma.providerConnection.create({
     data: {
       userId,
@@ -120,5 +120,17 @@ describe("runInboundSubscriptionTick", () => {
     const result = await runInboundSubscriptionTick();
     expect(result.ok).toBe(0);
     expect(result.failed).toBe(0);
+  });
+
+  it("skips a Titan connection, which has no inbound API", async () => {
+    const user = await connectedUser();
+    const conn = await connection(user.id, { provider: "TITAN" });
+
+    const result = await runInboundSubscriptionTick();
+    expect(result.ok).toBe(0);
+    expect(result.failed).toBe(0);
+
+    const updated = await testPrisma.providerConnection.findUniqueOrThrow({ where: { id: conn.id } });
+    expect(updated.inboundSubscriptionId).toBeNull();
   });
 });

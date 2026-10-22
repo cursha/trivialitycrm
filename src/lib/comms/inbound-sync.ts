@@ -87,7 +87,13 @@ export async function ensureInboundSubscription(connectionId: string): Promise<v
  * stop every other user's subscription from being created/renewed.
  */
 export async function runInboundSubscriptionTick(): Promise<{ ok: number; failed: number }> {
-  const connections = await prisma.providerConnection.findMany({ where: { status: "CONNECTED" }, select: { id: true } });
+  // Titan is skipped outright: it has no inbound API at all (see
+  // titan.ts's createInboundSubscription), so trying it every hour only
+  // logged an error that could never succeed.
+  const connections = await prisma.providerConnection.findMany({
+    where: { status: "CONNECTED", provider: { not: "TITAN" } },
+    select: { id: true },
+  });
 
   let ok = 0;
   let failed = 0;
