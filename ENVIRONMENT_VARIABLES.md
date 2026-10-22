@@ -90,6 +90,7 @@ provider *would* be used.
 |---|---|---|
 | `TOKEN_ENCRYPTION_KEY` | Required when `NODE_ENV=production` | AES-256-GCM key (32 bytes, base64-encoded) encrypting stored OAuth tokens (`ProviderConnection`) at rest. Optional in dev/test so the app boots without it. |
 | `UNSUBSCRIBE_TOKEN_SECRET` | Required when `NODE_ENV=production` | HMAC secret signing `{{unsubscribeLink}}` tokens so an unauthenticated visitor can't forge or extend one. |
+| `UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS` | Optional | Only while changing `UNSUBSCRIBE_TOKEN_SECRET`: set it to the old value so unsubscribe links in emails already sent keep working. New links use the new secret. To rotate: copy the current value here, put a new random value in `UNSUBSCRIBE_TOKEN_SECRET`, deploy web and worker. Remove it once the old links no longer matter (they expire after 400 days; CAN-SPAM requires 30). |
 
 ## Optional / operational
 

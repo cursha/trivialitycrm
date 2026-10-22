@@ -19,8 +19,14 @@ function loadSecret(): string {
   return UNSUBSCRIBE_TOKEN_SECRET;
 }
 
-function sign(encodedPayload: string): string {
-  return crypto.createHmac("sha256", loadSecret()).update(encodedPayload).digest("base64url");
+function sign(encodedPayload: string, secret: string = loadSecret()): string {
+  return crypto.createHmac("sha256", secret).update(encodedPayload).digest("base64url");
+}
+
+function signatureMatches(signature: string, expectedSignature: string): boolean {
+  const signatureBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expectedSignature);
+  return signatureBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(signatureBuffer, expectedBuffer);
 }
 
 /**
@@ -40,19 +46,20 @@ export function createUnsubscribeToken(contactId: string): string {
 /**
  * Verifies signature and expiry, returning the contact id only if both
  * check out. A constant-time comparison prevents a timing attack from
- * narrowing down a valid signature byte-by-byte.
+ * narrowing down a valid signature byte-by-byte. During a secret rotation a
+ * signature made with UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS is accepted too, so
+ * links in emails sent before the change keep working.
  */
 export function verifyUnsubscribeToken(token: string): { contactId: string } | null {
   const parts = token.split(".");
   if (parts.length !== 2) return null;
   const [encodedPayload, signature] = parts;
 
-  const expectedSignature = sign(encodedPayload);
-  const signatureBuffer = Buffer.from(signature);
-  const expectedBuffer = Buffer.from(expectedSignature);
-  if (signatureBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)) {
-    return null;
-  }
+  const { UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS } = getEnv();
+  const validSignature =
+    signatureMatches(signature, sign(encodedPayload)) ||
+    (UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS !== undefined && signatureMatches(signature, sign(encodedPayload, UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS)));
+  if (!validSignature) return null;
 
   let payload: unknown;
   try {

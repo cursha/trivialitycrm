@@ -61,6 +61,11 @@ const envSchema = z
     // unauthenticated visitor can't forge or extend one). Same
     // optional-in-dev/required-in-production shape as TOKEN_ENCRYPTION_KEY.
     UNSUBSCRIBE_TOKEN_SECRET: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
+    // Rotation: set this to the old UNSUBSCRIBE_TOKEN_SECRET when changing it,
+    // so links in emails already sent keep verifying. New links are always
+    // signed with UNSUBSCRIBE_TOKEN_SECRET. Remove it once the old links no
+    // longer matter (they expire after 400 days; CAN-SPAM needs 30).
+    UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
     MICROSOFT_CLIENT_ID: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
     MICROSOFT_CLIENT_SECRET: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),
     GOOGLE_CLIENT_ID: z.preprocess(blankToUndefined, z.string().min(1, "must not be empty").optional()),

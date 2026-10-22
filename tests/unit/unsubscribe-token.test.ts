@@ -13,6 +13,7 @@ beforeEach(() => {
 
 afterEach(() => {
   delete mutableEnv.UNSUBSCRIBE_TOKEN_SECRET;
+  delete mutableEnv.UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS;
   resetEnvCacheForTests();
   vi.useRealTimers();
 });
@@ -26,6 +27,35 @@ describe("unsubscribe-token", () => {
   it("rejects a token signed with a different secret", () => {
     const token = createUnsubscribeToken("contact-123");
     mutableEnv.UNSUBSCRIBE_TOKEN_SECRET = OTHER_SECRET;
+    resetEnvCacheForTests();
+    expect(verifyUnsubscribeToken(token)).toBeNull();
+  });
+
+  it("accepts a token signed with the previous secret during a rotation", () => {
+    const token = createUnsubscribeToken("contact-123");
+    mutableEnv.UNSUBSCRIBE_TOKEN_SECRET = OTHER_SECRET;
+    mutableEnv.UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS = TEST_SECRET;
+    resetEnvCacheForTests();
+    expect(verifyUnsubscribeToken(token)).toEqual({ contactId: "contact-123" });
+  });
+
+  it("signs new tokens with the current secret, not the previous one", () => {
+    mutableEnv.UNSUBSCRIBE_TOKEN_SECRET = OTHER_SECRET;
+    mutableEnv.UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS = TEST_SECRET;
+    resetEnvCacheForTests();
+    const token = createUnsubscribeToken("contact-123");
+
+    delete mutableEnv.UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS;
+    resetEnvCacheForTests();
+    expect(verifyUnsubscribeToken(token)).toEqual({ contactId: "contact-123" });
+  });
+
+  it("rejects a token signed with neither the current nor the previous secret", () => {
+    mutableEnv.UNSUBSCRIBE_TOKEN_SECRET = "dGhpcmRrZXl0aGlyZGtleXRoaXJka2V5dGhpcmRrZXk=";
+    resetEnvCacheForTests();
+    const token = createUnsubscribeToken("contact-123");
+    mutableEnv.UNSUBSCRIBE_TOKEN_SECRET = OTHER_SECRET;
+    mutableEnv.UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS = TEST_SECRET;
     resetEnvCacheForTests();
     expect(verifyUnsubscribeToken(token)).toBeNull();
   });

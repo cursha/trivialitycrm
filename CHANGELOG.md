@@ -13,6 +13,16 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v22.3 — 2026-10-22
+### Improved — unsubscribe secret can be changed safely
+- New optional setting `UNSUBSCRIBE_TOKEN_SECRET_PREVIOUS`. While changing
+  `UNSUBSCRIBE_TOKEN_SECRET`, put the old value here and unsubscribe links
+  in emails already sent keep working; new links use the new secret.
+  Needed after Railway's October 21 security incident, which may have
+  exposed the current secret (Curt's call). Steps are in
+  ENVIRONMENT_VARIABLES.md.
+- No manual change: internal fix.
+
 ## v22.2 — 2026-10-14
 ### Changed — local dev runs on port 3002
 - `npm run dev` now serves on http://localhost:3002 instead of 3000, so it
