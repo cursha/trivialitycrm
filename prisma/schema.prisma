@@ -1249,6 +1249,7 @@ enum SearchVenueKind {
   TAPROOM
   BREWERY
   LOUNGE
+  SERVICE_CLUB
 }
 
 enum SearchEntertainment {

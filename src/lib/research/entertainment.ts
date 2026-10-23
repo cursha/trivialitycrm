@@ -10,6 +10,7 @@ const VENUE_KIND_LABELS = {
   TAPROOM: "taprooms",
   BREWERY: "breweries",
   LOUNGE: "lounges",
+  SERVICE_CLUB: "service clubs",
 } as const;
 
 /** "pubs", "pubs, bars, taverns" — what a Quick Search asked the directory

@@ -359,6 +359,9 @@ describe("Quick Search trivia / karaoke", () => {
       { textQuery: "Brewery in Milton, ON, Canada", includedType: "brewery" },
       { textQuery: "Lounge in Milton, ON, Canada", includedType: "lounge_bar" },
     ]);
+    expect(placesTextQueries({ ...baseParams, venueKinds: ["SERVICE_CLUB"], entertainment: ["BINGO"] }, "Milton")).toEqual([
+      { textQuery: "Service club with bingo night in Milton, ON, Canada", includedType: "association_or_organization" },
+    ]);
     expect(texts(placesTextQueries({ ...baseParams, venueKinds: ["PUB", "BAR"], entertainment: ["TRIVIA", "KARAOKE"] }, "Milton"))).toEqual([
       "Pub with trivia night in Milton, ON, Canada",
       "Pub with karaoke in Milton, ON, Canada",

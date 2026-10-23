@@ -127,12 +127,15 @@ const VENUE_KIND_TERMS: Record<SearchVenueKind, string> = {
   TAPROOM: "Taproom",
   BREWERY: "Brewery",
   LOUNGE: "Lounge",
+  SERVICE_CLUB: "Service club",
 };
 
 // The Google place type each venue kind is held to (Places API Table A).
 // It has no tavern, pour house or taproom type, so those are held to "bar".
 // Without it Google matches the words alone: "Bar with weekly events in
-// Milton" returned fairgrounds, parks and community centres.
+// Milton" returned fairgrounds, parks and community centres. Service clubs
+// (Legion branches, Lions, Rotary, Elks and so on) have no type of their
+// own, so they're held to "association_or_organization".
 const VENUE_KIND_PLACE_TYPES: Record<SearchVenueKind, string> = {
   PUB: "pub",
   BAR: "bar",
@@ -143,6 +146,7 @@ const VENUE_KIND_PLACE_TYPES: Record<SearchVenueKind, string> = {
   TAPROOM: "bar",
   BREWERY: "brewery",
   LOUNGE: "lounge_bar",
+  SERVICE_CLUB: "association_or_organization",
 };
 
 export type PlacesQuery = { textQuery: string; includedType?: string };

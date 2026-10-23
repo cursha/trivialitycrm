@@ -13,6 +13,17 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v24.0 — 2026-10-23
+### New — Quick Search looks for service clubs
+- Quick Search's **Search for** row now has **Service clubs**: Legion
+  branches, Lions, Rotary, Kinsmen, Elks lodges and the like, which often
+  run trivia and bingo nights as fundraisers. Google has no service-club
+  category, so the search is held to its "association or organization"
+  category; expect the odd charity or club with no hall of its own.
+- Manual: Quick Search section lists the new choice.
+- Database change: migration `20261023180000_quick_search_service_clubs`
+  adds the choice to the venue-kind list. Nothing existing is changed.
+
 ## v23.0 — 2026-10-23
 ### New — Quick Search looks for sports bars, gastropubs, breweries and more
 - Quick Search's **Search for** row now also has **Sports bars**, **Pour
