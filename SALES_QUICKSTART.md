@@ -565,6 +565,9 @@ Worth pursuing:
   head office.
 - **Reviews that mention the event** ("great trivia night"), which shows
   people actually come.
+- **Service clubs and Legions that run fundraisers.** A trivia night is an
+  easy fundraiser for them. Ask for whoever runs events or fundraising,
+  and check whether the Legion has its own hall and bar.
 
 Rank lower:
 

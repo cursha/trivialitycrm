@@ -20,6 +20,8 @@ history.
   says that's for the bar choices, and that clubs are matched by name.
 - **Search the web for emails** now says plainly that a search costs the
   same whether or not it finds an email.
+- "Worth pursuing" now includes service clubs and Legions that run
+  fundraisers, and who to ask for (Curt's call).
 - Manual-only change; the app itself is unchanged.
 
 ## v26.1 — 2026-10-23
