@@ -451,8 +451,12 @@ inbox:
 ## Quick Search (if you have access)
 
 Leads → **Quick Search** lists businesses from the directory, with no AI
-scoring. Choose the area, and under **Search for** tick the kinds of venue
-you want: **Pubs**, **Bars**, **Taverns**, **Sports bars**, **Pour houses**,
+scoring. Choose the area: pick the **Country**, then the province or state
+from the **State / Province** list (it shows provinces for Canada and
+states for the USA, and clears when you change country). Under **Search
+for**, **All Bars** ticks every bar choice and **All Service** ticks every
+club; untick either to clear its group. Or tick the kinds of venue you
+want one by one: **Pubs**, **Bars**, **Taverns**, **Sports bars**, **Pour houses**,
 **Gastropubs**, **Taprooms**, **Breweries**, **Lounges**, **Rotary Clubs**,
 **Lions Clubs**, **Kiwanis Clubs** and/or **Legions** (Pubs is ticked to
 start). Each is its own directory search, and the results are
@@ -485,7 +489,8 @@ Choose the country and province or state once, then paste your cities
 into the **Cities** box: one per line, or separated by commas, up to 50.
 "Milton, ON" on its own line is read as Milton, and repeats are dropped.
 The box shows the cities it read, so check them before you start. Leave
-it blank to search the whole province or state.
+it blank to search the whole province or state. **Clear cities**, next to
+the box's name, empties it in one click (the country and province stay).
 
 With more than one city, **Run each city as its own search** is ticked:
 each city gets its own search and results page, and the next page lists

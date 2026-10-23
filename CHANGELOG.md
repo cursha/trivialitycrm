@@ -13,7 +13,21 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
-## v25.2 — 2026-10-23
+## v26.0 — 2026-10-23
+### New — State / Province dropdown on Quick Search
+- **State / Province** is now a list instead of a box you type a code
+  into: provinces when the country is Canada, states when it's the USA. It
+  clears when you change country, so a province can't be sent with the
+  USA. A saved list whose region isn't in the list (a territory) still
+  shows it.
+### New — "All Bars" and "All Service" on Quick Search
+- Two boxes at the top of **Search for**: **All Bars** ticks every bar
+  choice (Pubs through Lounges) and **All Service** ticks all four clubs
+  (Curt's call). Unticking one clears its group, and each shows ticked
+  when every box in its group is.
+### New — Clear cities button on Quick Search
+- **Clear cities** next to the Cities box empties it in one click, for
+  starting a new list. The country and province stay as they are.
 ### Improved — club boxes say "Clubs"
 - The Quick Search boxes now read **Rotary Clubs**, **Lions Clubs** and
   **Kiwanis Clubs** (Curt's call), and searches list them the same way.
@@ -22,8 +36,10 @@ history.
   chains and franchises are kept unless you tick it (Curt's call).
 - The hint under the box said "Left unticked" chains are left out, which
   had been backwards since v23.0; it now says "Ticked".
-- Manual: Quick Search section uses the new names and the new chains
+- Manual: Quick Search section covers the dropdown, the All Bars and All
+  Service boxes, Clear cities, the new club names and the new chains
   default.
+- No database change.
 
 ## v25.1 — 2026-10-23
 ### Improved — club boxes shaded on Quick Search

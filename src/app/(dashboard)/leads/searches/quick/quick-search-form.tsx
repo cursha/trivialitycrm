@@ -7,8 +7,9 @@ import { Card } from "@/components/ui/card";
 import { Label, Input, Select, Textarea, FieldError } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { parseCityList } from "@/lib/research/city-list";
+import { US_STATES, CA_PROVINCES } from "@/lib/constants/north-american-regions";
 
-const VENUE_KINDS = [
+const VENUE_KINDS: { value: string; label: string; club?: boolean }[] = [
   { value: "PUB", label: "Pubs" },
   { value: "BAR", label: "Bars" },
   { value: "TAVERN", label: "Taverns" },
@@ -24,6 +25,10 @@ const VENUE_KINDS = [
   { value: "KIWANIS_CLUB", label: "Kiwanis Clubs", club: true },
   { value: "LEGION", label: "Legions", club: true },
 ];
+
+// "All Bars" and "All Service" tick or untick every box in their group.
+const BAR_KINDS = VENUE_KINDS.filter((kind) => !kind.club).map((kind) => kind.value);
+const CLUB_KINDS = VENUE_KINDS.filter((kind) => kind.club).map((kind) => kind.value);
 
 // Matches the Quick Search limit (CitiesSchema in validation/search.ts).
 const MAX_CITIES = 50;
@@ -43,6 +48,15 @@ export function QuickSearchForm({ leadTypes, cityLists }: QuickSearchFormOptions
   const [citiesInput, setCitiesInput] = useState("");
   const [perCity, setPerCity] = useState(true);
   const cities = parseCityList(citiesInput);
+  const regionOptions = country === "Canada" ? CA_PROVINCES : US_STATES;
+  // A saved list's region that isn't in the dropdown (a territory, say) still shows.
+  const regionListed = regionOptions.some((option) => option.code === region);
+
+  const [venueKinds, setVenueKinds] = useState<string[]>(["PUB"]);
+  const allTicked = (group: string[]) => group.every((value) => venueKinds.includes(value));
+  function tickVenueKinds(values: string[], ticked: boolean) {
+    setVenueKinds((current) => (ticked ? [...new Set([...current, ...values])] : current.filter((value) => !values.includes(value))));
+  }
 
   // Saved city lists: pick one to fill in the area, or save what's typed.
   const [listId, setListId] = useState("");
@@ -148,10 +162,26 @@ export function QuickSearchForm({ leadTypes, cityLists }: QuickSearchFormOptions
 
         <div>
           <Label className="mb-1 block text-xs uppercase">Search for</Label>
+          <div className="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <label className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm font-semibold text-text">
+              <input type="checkbox" checked={allTicked(BAR_KINDS)} onChange={(event) => tickVenueKinds(BAR_KINDS, event.target.checked)} />
+              All Bars
+            </label>
+            <label className="flex items-center gap-2 rounded-lg border border-border-strong bg-accent/10 px-3 py-2 text-sm font-semibold text-text">
+              <input type="checkbox" checked={allTicked(CLUB_KINDS)} onChange={(event) => tickVenueKinds(CLUB_KINDS, event.target.checked)} />
+              All Service
+            </label>
+          </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {VENUE_KINDS.map(({ value, label, club }) => (
               <label key={value} className={`flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm text-text${club ? " bg-accent/10" : ""}`}>
-                <input type="checkbox" name="venueKinds" value={value} defaultChecked={value === "PUB"} />
+                <input
+                  type="checkbox"
+                  name="venueKinds"
+                  value={value}
+                  checked={venueKinds.includes(value)}
+                  onChange={(event) => tickVenueKinds([value], event.target.checked)}
+                />
                 {label}
               </label>
             ))}
@@ -229,14 +259,32 @@ export function QuickSearchForm({ leadTypes, cityLists }: QuickSearchFormOptions
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label className="mb-1 block text-xs uppercase">Country</Label>
-            <Select name="country" required value={country} onChange={(event) => setCountry(event.target.value)}>
+            <Select
+              name="country"
+              required
+              value={country}
+              onChange={(event) => {
+                setCountry(event.target.value);
+                setRegion("");
+              }}
+            >
               <option value="Canada">Canada</option>
               <option value="United States">USA</option>
             </Select>
           </div>
           <div>
             <Label className="mb-1 block text-xs uppercase">State / Province</Label>
-            <Input name="region" required value={region} onChange={(event) => setRegion(event.target.value)} placeholder="e.g. ON or CO" />
+            <Select name="region" required value={region} onChange={(event) => setRegion(event.target.value)}>
+              <option value="" disabled>
+                {country === "Canada" ? "Choose a province..." : "Choose a state..."}
+              </option>
+              {region && !regionListed && <option value={region}>{region}</option>}
+              {regionOptions.map((option) => (
+                <option key={option.code} value={option.code}>
+                  {option.label} ({option.code})
+                </option>
+              ))}
+            </Select>
           </div>
         </div>
 
@@ -271,7 +319,22 @@ export function QuickSearchForm({ leadTypes, cityLists }: QuickSearchFormOptions
         </div>
 
         <div>
-          <Label className="mb-1 block text-xs uppercase">Cities (optional)</Label>
+          <div className="mb-1 flex items-center justify-between">
+            <Label className="block text-xs uppercase">Cities (optional)</Label>
+            {citiesInput.trim() && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setCitiesInput("");
+                  setListId("");
+                  setTownMessage(null);
+                }}
+              >
+                Clear cities
+              </Button>
+            )}
+          </div>
           <Textarea
             rows={4}
             value={citiesInput}
