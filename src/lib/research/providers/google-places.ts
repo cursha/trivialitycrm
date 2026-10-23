@@ -117,7 +117,7 @@ const ENTERTAINMENT_PHRASES: Record<SearchEntertainment, string> = {
   EVENTS: "with weekly events",
 };
 
-const VENUE_KIND_TERMS: Record<SearchVenueKind, string> = {
+const VENUE_KIND_TERMS: Record<Exclude<SearchVenueKind, "SERVICE_CLUB" | ClubKind>, string> = {
   PUB: "Pub",
   BAR: "Bar",
   TAVERN: "Tavern",
@@ -127,16 +127,13 @@ const VENUE_KIND_TERMS: Record<SearchVenueKind, string> = {
   TAPROOM: "Taproom",
   BREWERY: "Brewery",
   LOUNGE: "Lounge",
-  SERVICE_CLUB: "Service club",
 };
 
 // The Google place type each venue kind is held to (Places API Table A).
 // It has no tavern, pour house or taproom type, so those are held to "bar".
 // Without it Google matches the words alone: "Bar with weekly events in
-// Milton" returned fairgrounds, parks and community centres. Service clubs
-// (Legion branches, Lions, Rotary, Elks and so on) have no type of their
-// own, so they're held to "association_or_organization".
-const VENUE_KIND_PLACE_TYPES: Record<SearchVenueKind, string> = {
+// Milton" returned fairgrounds, parks and community centres.
+const VENUE_KIND_PLACE_TYPES: Record<Exclude<SearchVenueKind, "SERVICE_CLUB" | ClubKind>, string> = {
   PUB: "pub",
   BAR: "bar",
   TAVERN: "bar",
@@ -146,10 +143,36 @@ const VENUE_KIND_PLACE_TYPES: Record<SearchVenueKind, string> = {
   TAPROOM: "bar",
   BREWERY: "brewery",
   LOUNGE: "lounge_bar",
-  SERVICE_CLUB: "association_or_organization",
 };
 
-export type PlacesQuery = { textQuery: string; includedType?: string };
+type QueryTerm = { term: string; includedType?: string; nameIncludes?: RegExp };
+type ClubKind = "ROTARY_CLUB" | "LIONS_CLUB" | "KIWANIS_CLUB" | "LEGION";
+
+// The only community clubs wanted (Curt's call). A result is kept only when
+// its name carries the club's, since a search for a club also turns up the
+// restaurants and halls it meets at. Google has no service-club place
+// type, so the name check stands in for one.
+const CLUB_TERMS: Record<ClubKind, QueryTerm> = {
+  ROTARY_CLUB: { term: "Rotary Club", nameIncludes: /\brotary\b/i },
+  LIONS_CLUB: { term: "Lions Club", nameIncludes: /\blions\b/i },
+  KIWANIS_CLUB: { term: "Kiwanis Club", nameIncludes: /\bkiwanis\b/i },
+  LEGION: { term: "Legion", nameIncludes: /\blegion\b/i },
+};
+
+function isClubKind(kind: SearchVenueKind): kind is ClubKind {
+  return kind in CLUB_TERMS;
+}
+
+function venueKindTerms(kind: SearchVenueKind): QueryTerm[] {
+  // v24.0's single "Service clubs" box, kept so searches saved with it
+  // still run: it stands for all four clubs.
+  if (kind === "SERVICE_CLUB") return Object.values(CLUB_TERMS);
+  if (isClubKind(kind)) return [CLUB_TERMS[kind]];
+  return [{ term: VENUE_KIND_TERMS[kind], includedType: VENUE_KIND_PLACE_TYPES[kind] }];
+}
+
+/** `nameIncludes`: keep a result only when its name matches. */
+export type PlacesQuery = { textQuery: string; includedType?: string; nameIncludes?: RegExp };
 
 /**
  * The Text Search queries for one city: "Pub in Oakville, ON, Canada" —
@@ -163,14 +186,14 @@ export type PlacesQuery = { textQuery: string; includedType?: string };
 export function placesTextQueries(params: Pick<DiscoverParams, "leadTypeName" | "region" | "country" | "entertainment" | "venueKinds">, city: string): PlacesQuery[] {
   const place = `in ${city}, ${params.region}, ${params.country}`;
   // A search by the Lead Type's own name has no place type to hold it to.
-  const terms: { term: string; includedType?: string }[] = params.venueKinds?.length
-    ? params.venueKinds.map((kind) => ({ term: VENUE_KIND_TERMS[kind], includedType: VENUE_KIND_PLACE_TYPES[kind] }))
-    : [{ term: params.leadTypeName }];
+  const terms: QueryTerm[] = params.venueKinds?.length ? params.venueKinds.flatMap(venueKindTerms) : [{ term: params.leadTypeName }];
   const entertainment = params.entertainment ?? [];
-  return terms.flatMap(({ term, includedType }) =>
-    (entertainment.length === 0 ? [`${term} ${place}`] : entertainment.map((kind) => `${term} ${ENTERTAINMENT_PHRASES[kind]} ${place}`)).map((textQuery) =>
-      includedType ? { textQuery, includedType } : { textQuery },
-    ),
+  return terms.flatMap(({ term, includedType, nameIncludes }) =>
+    (entertainment.length === 0 ? [`${term} ${place}`] : entertainment.map((kind) => `${term} ${ENTERTAINMENT_PHRASES[kind]} ${place}`)).map((textQuery) => ({
+      textQuery,
+      ...(includedType && { includedType }),
+      ...(nameIncludes && { nameIncludes }),
+    })),
   );
 }
 
@@ -262,6 +285,7 @@ export class GooglePlacesDiscoveryProvider implements CandidateDiscoveryProvider
             // the requested city when one was given.
             const candidate = candidateFromPlace(place, params, city);
             if (!isInSearchedRegion(candidate, params)) continue;
+            if (query.nameIncludes && !query.nameIncludes.test(candidate.name)) continue;
             if (params.cities.length > 0 && !placeIsInCity(place.addressComponents, city)) continue;
             results.push(candidate);
           }

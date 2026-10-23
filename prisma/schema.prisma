@@ -1249,7 +1249,12 @@ enum SearchVenueKind {
   TAPROOM
   BREWERY
   LOUNGE
+  // v24.0's single "Service clubs" box; new searches tick each club instead.
   SERVICE_CLUB
+  ROTARY_CLUB
+  LIONS_CLUB
+  KIWANIS_CLUB
+  LEGION
 }
 
 enum SearchEntertainment {

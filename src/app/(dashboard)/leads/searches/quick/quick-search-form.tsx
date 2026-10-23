@@ -18,7 +18,10 @@ const VENUE_KINDS = [
   { value: "TAPROOM", label: "Taprooms" },
   { value: "BREWERY", label: "Breweries" },
   { value: "LOUNGE", label: "Lounges" },
-  { value: "SERVICE_CLUB", label: "Service clubs" },
+  { value: "ROTARY_CLUB", label: "Rotary clubs" },
+  { value: "LIONS_CLUB", label: "Lions clubs" },
+  { value: "KIWANIS_CLUB", label: "Kiwanis clubs" },
+  { value: "LEGION", label: "Legions" },
 ];
 
 // Matches the Quick Search limit (CitiesSchema in validation/search.ts).

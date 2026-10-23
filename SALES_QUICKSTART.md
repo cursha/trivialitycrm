@@ -453,19 +453,22 @@ inbox:
 Leads → **Quick Search** lists businesses from the directory, with no AI
 scoring. Choose the area, and under **Search for** tick the kinds of venue
 you want: **Pubs**, **Bars**, **Taverns**, **Sports bars**, **Pour houses**,
-**Gastropubs**, **Taprooms**, **Breweries**, **Lounges** and/or **Service
-clubs** (Pubs is ticked to start). Each is its own directory search, and the results are
+**Gastropubs**, **Taprooms**, **Breweries**, **Lounges**, **Rotary clubs**,
+**Lions clubs**, **Kiwanis clubs** and/or **Legions** (Pubs is ticked to
+start). Each is its own directory search, and the results are
 combined without duplicates, so a sports bar that's also listed as a pub
 only shows once. Only places the directory lists as that kind of venue
 come back (taverns, pour houses and taprooms count as bars, since the
 directory has no category for them), so a search for events won't turn up
 parks or community halls, though a golf club or entertainment centre with
 a bar inside can. A brewery search can include breweries that only make
-beer and have no taproom, so check before you call. **Service clubs** finds
-Legion branches, Lions, Rotary, Kinsmen, Elks lodges and similar clubs,
-which often run trivia or bingo nights as fundraisers. The directory files
-them with other associations and organizations, so expect the odd charity
-or club with no hall of its own.
+beer and have no taproom, so check before you call. The club boxes find
+Rotary, Lions and Kiwanis clubs and Legion branches, which often run
+trivia or bingo nights as fundraisers. A place is kept only when its name
+has the club's in it (Rotary, Lions, Kiwanis or Legion), so other clubs,
+charities and the restaurants a club meets at are left out. A Rotary or
+Kiwanis club with no hall of its own can still come back; it meets
+somewhere, so ask where.
 
 Chains and franchises are left out while **Exclude chains/franchises** is
 ticked, as it is to start; untick it to keep them. A place counts as a chain when it's a known bar or

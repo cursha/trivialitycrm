@@ -264,6 +264,26 @@ describe("GooglePlacesDiscoveryProvider", () => {
     expect(candidates[0].name).toBe("Open Pub");
   });
 
+  it("keeps only places named for the club on a club search", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        places: [
+          { displayName: { text: "Rotary Club of Milton" }, businessStatus: "OPERATIONAL" },
+          { displayName: { text: "Milton Rotary Park Pavilion" }, businessStatus: "OPERATIONAL" },
+          { displayName: { text: "Ned's Grill" }, businessStatus: "OPERATIONAL" },
+          { displayName: { text: "Milton Community Foundation" }, businessStatus: "OPERATIONAL" },
+        ],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const candidates = await new GooglePlacesDiscoveryProvider().discover({ ...baseParams, venueKinds: ["ROTARY_CLUB"] });
+    expect(candidates.map((c) => c.name)).toEqual(["Rotary Club of Milton", "Milton Rotary Park Pavilion"]);
+    const [, init] = fetchMock.mock.calls[0];
+    expect(JSON.parse(init.body)).toEqual({ textQuery: "Rotary Club in Milton, ON, Canada" });
+  });
+
   it("throws a clear error on a non-ok HTTP response rather than silently returning nothing", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 403, text: async () => "API key not authorized" });
     vi.stubGlobal("fetch", fetchMock);
@@ -359,8 +379,18 @@ describe("Quick Search trivia / karaoke", () => {
       { textQuery: "Brewery in Milton, ON, Canada", includedType: "brewery" },
       { textQuery: "Lounge in Milton, ON, Canada", includedType: "lounge_bar" },
     ]);
-    expect(placesTextQueries({ ...baseParams, venueKinds: ["SERVICE_CLUB"], entertainment: ["BINGO"] }, "Milton")).toEqual([
-      { textQuery: "Service club with bingo night in Milton, ON, Canada", includedType: "association_or_organization" },
+    expect(placesTextQueries({ ...baseParams, venueKinds: ["ROTARY_CLUB", "LIONS_CLUB", "KIWANIS_CLUB", "LEGION"], entertainment: ["BINGO"] }, "Milton")).toEqual([
+      { textQuery: "Rotary Club with bingo night in Milton, ON, Canada", nameIncludes: /\brotary\b/i },
+      { textQuery: "Lions Club with bingo night in Milton, ON, Canada", nameIncludes: /\blions\b/i },
+      { textQuery: "Kiwanis Club with bingo night in Milton, ON, Canada", nameIncludes: /\bkiwanis\b/i },
+      { textQuery: "Legion with bingo night in Milton, ON, Canada", nameIncludes: /\blegion\b/i },
+    ]);
+    // v24.0 searches saved with the single Service clubs box run all four.
+    expect(texts(placesTextQueries({ ...baseParams, venueKinds: ["SERVICE_CLUB"] }, "Milton"))).toEqual([
+      "Rotary Club in Milton, ON, Canada",
+      "Lions Club in Milton, ON, Canada",
+      "Kiwanis Club in Milton, ON, Canada",
+      "Legion in Milton, ON, Canada",
     ]);
     expect(texts(placesTextQueries({ ...baseParams, venueKinds: ["PUB", "BAR"], entertainment: ["TRIVIA", "KARAOKE"] }, "Milton"))).toEqual([
       "Pub with trivia night in Milton, ON, Canada",

@@ -13,6 +13,21 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v25.0 — 2026-10-23
+### New — a Quick Search box for each club: Rotary, Lions, Kiwanis, Legion
+- The single **Service clubs** box is replaced by **Rotary clubs**, **Lions
+  clubs**, **Kiwanis clubs** and **Legions**, one box each (Curt's call:
+  these are the only community clubs wanted, each ticked on its own).
+- A club search keeps a place only when its name has the club's in it, so
+  other clubs, charities and the restaurants or halls a club meets at are
+  left out. Google has no service-club category, so the name check stands
+  in for one.
+- Searches already run with v24.0's Service clubs box still work: they
+  search all four clubs.
+- Manual: Quick Search section lists the four boxes.
+- Database change: migration `20261023200000_quick_search_club_kinds` adds
+  the four clubs to the venue-kind list. Nothing existing is changed.
+
 ## v24.0 — 2026-10-23
 ### New — Quick Search looks for service clubs
 - Quick Search's **Search for** row now has **Service clubs**: Legion
