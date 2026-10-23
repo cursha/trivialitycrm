@@ -19,9 +19,9 @@ const VENUE_KINDS = [
   { value: "BREWERY", label: "Breweries" },
   { value: "LOUNGE", label: "Lounges" },
   // Shaded on the form so they stand apart from the bars (Curt's call).
-  { value: "ROTARY_CLUB", label: "Rotary clubs", club: true },
-  { value: "LIONS_CLUB", label: "Lions clubs", club: true },
-  { value: "KIWANIS_CLUB", label: "Kiwanis clubs", club: true },
+  { value: "ROTARY_CLUB", label: "Rotary Clubs", club: true },
+  { value: "LIONS_CLUB", label: "Lions Clubs", club: true },
+  { value: "KIWANIS_CLUB", label: "Kiwanis Clubs", club: true },
   { value: "LEGION", label: "Legions", club: true },
 ];
 
@@ -158,11 +158,11 @@ export function QuickSearchForm({ leadTypes, cityLists }: QuickSearchFormOptions
           </div>
           <p className="mt-1 text-xs text-text-muted">Each one is its own directory search; the results are combined, without duplicates.</p>
           <label className="mt-2 flex items-center gap-2 text-sm text-text">
-            <input type="checkbox" name="excludeChains" defaultChecked />
+            <input type="checkbox" name="excludeChains" />
             Exclude chains/franchises
           </label>
           <p className="mt-1 text-xs text-text-muted">
-            Left unticked, places like Boston Pizza or Applebee&apos;s are left out: known chains, places whose website is a chain&apos;s location page, and names found at three or more
+            Ticked, places like Boston Pizza or Applebee&apos;s are left out: known chains, places whose website is a chain&apos;s location page, and names found at three or more
             locations. The search page lists what was left out.
           </p>
         </div>

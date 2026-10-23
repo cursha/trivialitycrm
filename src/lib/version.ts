@@ -5,7 +5,7 @@
  * AGENTS.md and CHANGELOG.md. This constant is the single source of truth
  * (package.json's "version" is unused).
  */
-export const APP_VERSION = "v25.1";
+export const APP_VERSION = "v25.2";
 
 /** Short commit SHA of the running deploy, when Railway provides it. */
 export function getBuildId(): string | null {

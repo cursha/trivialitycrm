@@ -453,8 +453,8 @@ inbox:
 Leads → **Quick Search** lists businesses from the directory, with no AI
 scoring. Choose the area, and under **Search for** tick the kinds of venue
 you want: **Pubs**, **Bars**, **Taverns**, **Sports bars**, **Pour houses**,
-**Gastropubs**, **Taprooms**, **Breweries**, **Lounges**, **Rotary clubs**,
-**Lions clubs**, **Kiwanis clubs** and/or **Legions** (Pubs is ticked to
+**Gastropubs**, **Taprooms**, **Breweries**, **Lounges**, **Rotary Clubs**,
+**Lions Clubs**, **Kiwanis Clubs** and/or **Legions** (Pubs is ticked to
 start). Each is its own directory search, and the results are
 combined without duplicates, so a sports bar that's also listed as a pub
 only shows once. Only places the directory lists as that kind of venue
@@ -471,8 +471,8 @@ charities and the restaurants a club meets at are left out. A Rotary or
 Kiwanis club with no hall of its own can still come back; it meets
 somewhere, so ask where.
 
-Chains and franchises are left out while **Exclude chains/franchises** is
-ticked, as it is to start; untick it to keep them. A place counts as a chain when it's a known bar or
+Chains and franchises are kept unless you tick **Exclude
+chains/franchises**, which starts unticked; tick it to leave them out. A place counts as a chain when it's a known bar or
 restaurant chain (Boston Pizza, Kelseys, Applebee's and so on), when its
 website is a chain's page for that location, or when its name turns up at
 three or more locations, in the CRM or in the same search. The search

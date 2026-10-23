@@ -13,6 +13,18 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v25.2 — 2026-10-23
+### Improved — club boxes say "Clubs"
+- The Quick Search boxes now read **Rotary Clubs**, **Lions Clubs** and
+  **Kiwanis Clubs** (Curt's call), and searches list them the same way.
+### Improved — chains kept unless you choose to leave them out
+- **Exclude chains/franchises** on Quick Search now starts unticked, so
+  chains and franchises are kept unless you tick it (Curt's call).
+- The hint under the box said "Left unticked" chains are left out, which
+  had been backwards since v23.0; it now says "Ticked".
+- Manual: Quick Search section uses the new names and the new chains
+  default.
+
 ## v25.1 — 2026-10-23
 ### Improved — club boxes shaded on Quick Search
 - The **Rotary clubs**, **Lions clubs**, **Kiwanis clubs** and **Legions**

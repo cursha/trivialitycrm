@@ -11,9 +11,9 @@ const VENUE_KIND_LABELS = {
   BREWERY: "breweries",
   LOUNGE: "lounges",
   SERVICE_CLUB: "service clubs",
-  ROTARY_CLUB: "Rotary clubs",
-  LIONS_CLUB: "Lions clubs",
-  KIWANIS_CLUB: "Kiwanis clubs",
+  ROTARY_CLUB: "Rotary Clubs",
+  LIONS_CLUB: "Lions Clubs",
+  KIWANIS_CLUB: "Kiwanis Clubs",
   LEGION: "Legions",
 } as const;
 
