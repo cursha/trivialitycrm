@@ -456,28 +456,31 @@ from the **State / Province** list (it shows provinces for Canada and
 states for the USA, and clears when you change country). Under **Search
 for**, **All Bars** ticks every bar choice and **All Service** ticks every
 club; untick either to clear its group. Or tick the kinds of venue you
-want one by one: **Pubs**, **Bars**, **Taverns**, **Sports bars**, **Pour houses**,
-**Gastropubs**, **Taprooms**, **Breweries**, **Lounges**, **Rotary Clubs**,
-**Lions Clubs**, **Kiwanis Clubs** and/or **Legions** (Pubs is ticked to
-start). Each is its own directory search, and the results are
-combined without duplicates, so a sports bar that's also listed as a pub
-only shows once. Only places the directory lists as that kind of venue
-come back (taverns, pour houses and taprooms count as bars, since the
-directory has no category for them), so a search for events won't turn up
-parks or community halls, though a golf club or entertainment centre with
-a bar inside can. A brewery search can include breweries that only make
-beer and have no taproom, so check before you call. The club boxes, shaded
-so they stand apart from the bars, find
-Rotary, Lions and Kiwanis clubs and Legion branches, which often run
-trivia or bingo nights as fundraisers. A place is kept only when its name
-has the club's in it (Rotary, Lions, Kiwanis or Legion), so other clubs,
-charities and the restaurants a club meets at are left out. A Rotary or
-Kiwanis club with no hall of its own can still come back; it meets
-somewhere, so ask where.
+want one by one: **Pubs**, **Bars**, **Taverns**, **Sports bars**, **Pour
+houses**, **Gastropubs**, **Taprooms**, **Breweries**, **Lounges**,
+**Rotary Clubs**, **Lions Clubs**, **Kiwanis Clubs** and/or **Legions**
+(Pubs is ticked to start). Each is its own directory search, and the
+results are combined without duplicates, so a sports bar that's also
+listed as a pub only shows once.
+
+For the bar choices, only places the directory lists as that kind of
+venue come back (taverns, pour houses and taprooms count as bars, since
+the directory has no category for them), so a search for events won't
+turn up parks or community halls, though a golf club or entertainment
+centre with a bar inside can. A brewery search can include breweries that
+only make beer and have no taproom, so check before you call.
+
+The club boxes, shaded so they stand apart from the bars, find Rotary,
+Lions and Kiwanis clubs and Legion branches, which often run trivia or
+bingo nights as fundraisers. The directory has no category for service
+clubs, so instead a place is kept only when its name has the club's in it
+(Rotary, Lions, Kiwanis or Legion): other clubs, charities and the
+restaurants a club meets at are left out. A Rotary or Kiwanis club with no
+hall of its own can still come back; it meets somewhere, so ask where.
 
 Chains and franchises are kept unless you tick **Exclude
-chains/franchises**, which starts unticked; tick it to leave them out. A place counts as a chain when it's a known bar or
-restaurant chain (Boston Pizza, Kelseys, Applebee's and so on), when its
+chains/franchises**, which starts unticked; tick it to leave them out. A
+place counts as a chain when it's a known bar or restaurant chain (Boston Pizza, Kelseys, Applebee's and so on), when its
 website is a chain's page for that location, or when its name turns up at
 three or more locations, in the CRM or in the same search. The search
 page lists every chain location it left out, so you can see what was
@@ -672,8 +675,10 @@ researched" until you research them.
   sites. This one costs money: about 8–10¢ per venue, from the AI budget.
   The confirmation shows the total; tick **Yes, spend about $…** and click
   **Search the web**. Up to 10 venues at a time, and each venue is only
-  ever searched once, so you never pay twice for the same one. An email it
-  finds shows "Found by web search" and the site it came from. Run the
+  ever searched once, so you never pay twice for the same one. A search
+  costs the same whether or not it finds an email: you pay for the
+  searching, not the result. One that finds nothing shows "No email found
+  in a web search" and isn't searched again. An email it finds shows "Found by web search" and the site it came from. Run the
   free **Find emails** first, so you only pay for the venues it missed.
 - **Export CSV / Excel** downloads the list.
 - Tick the ones worth pursuing and click **Transfer selected**. On the

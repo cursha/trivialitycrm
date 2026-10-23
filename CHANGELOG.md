@@ -13,6 +13,15 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v26.2 — 2026-10-23
+### Improved — User Manual: Quick Search tidied
+- The Quick Search section said only places the directory lists as that
+  kind of venue come back, which isn't how the club boxes work; it now
+  says that's for the bar choices, and that clubs are matched by name.
+- **Search the web for emails** now says plainly that a search costs the
+  same whether or not it finds an email.
+- Manual-only change; the app itself is unchanged.
+
 ## v26.1 — 2026-10-23
 ### Improved — search results show the phone number
 - Each venue on a search's results page now shows its phone number under
