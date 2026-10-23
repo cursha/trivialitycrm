@@ -13,6 +13,15 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v26.1 — 2026-10-23
+### Improved — search results show the phone number
+- Each venue on a search's results page now shows its phone number under
+  its name, above the email, as a click-to-call link. The number was
+  already being collected from the directory listing (and goes with the
+  venue when it's transferred), but the results table never showed it.
+- Manual: the results section says where the phone shows.
+- No database change.
+
 ## v26.0 — 2026-10-23
 ### New — State / Province dropdown on Quick Search
 - **State / Province** is now a list instead of a box you type a code

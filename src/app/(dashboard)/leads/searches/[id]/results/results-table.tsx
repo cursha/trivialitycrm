@@ -113,12 +113,18 @@ function ResultEvidencePanel({ result, minimumScore }: { result: ResultRow; mini
   );
 }
 
-/** The venue's email (and where a web search found it), or why none was
- * found, with a link to its Facebook or Instagram page to check by hand. */
+/** The venue's phone (from its directory listing) and email (and where a
+ * web search found it), or why none was found, with a link to its Facebook
+ * or Instagram page to check by hand. */
 function ResultEmail({ result }: { result: ResultRow }) {
   const social = result.email ? null : socialSiteName(result.websiteUrl);
   return (
     <>
+      {result.phone && (
+        <a href={`tel:${result.phone.replace(/[^\d+]/g, "")}`} className="mt-0.5 block whitespace-nowrap text-xs text-secondary hover:underline">
+          {result.phone}
+        </a>
+      )}
       {result.email && (
         <a href={`mailto:${result.email}`} className="mt-0.5 block break-all text-xs text-secondary hover:underline">
           {result.email}

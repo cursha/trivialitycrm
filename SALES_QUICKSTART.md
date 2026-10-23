@@ -651,6 +651,9 @@ researched" until you research them.
   are remembered: a later search that finds one marks it rejected again.
   **Restore**
   brings one back.
+- **Phone**: a venue's phone number from its directory listing shows
+  under its name, above any email. Click it (or tap it on a phone) to
+  call.
 - **Find emails**: tick the venues that look like a fit and click **Find
   emails**. Tick **Yes, check these websites** to confirm, then click
   **Find emails** again. The CRM reads each venue's own website (its home
