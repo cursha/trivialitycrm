@@ -18,10 +18,11 @@ const VENUE_KINDS = [
   { value: "TAPROOM", label: "Taprooms" },
   { value: "BREWERY", label: "Breweries" },
   { value: "LOUNGE", label: "Lounges" },
-  { value: "ROTARY_CLUB", label: "Rotary clubs" },
-  { value: "LIONS_CLUB", label: "Lions clubs" },
-  { value: "KIWANIS_CLUB", label: "Kiwanis clubs" },
-  { value: "LEGION", label: "Legions" },
+  // Shaded on the form so they stand apart from the bars (Curt's call).
+  { value: "ROTARY_CLUB", label: "Rotary clubs", club: true },
+  { value: "LIONS_CLUB", label: "Lions clubs", club: true },
+  { value: "KIWANIS_CLUB", label: "Kiwanis clubs", club: true },
+  { value: "LEGION", label: "Legions", club: true },
 ];
 
 // Matches the Quick Search limit (CitiesSchema in validation/search.ts).
@@ -148,8 +149,8 @@ export function QuickSearchForm({ leadTypes, cityLists }: QuickSearchFormOptions
         <div>
           <Label className="mb-1 block text-xs uppercase">Search for</Label>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {VENUE_KINDS.map(({ value, label }) => (
-              <label key={value} className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm text-text">
+            {VENUE_KINDS.map(({ value, label, club }) => (
+              <label key={value} className={`flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm text-text${club ? " bg-accent/10" : ""}`}>
                 <input type="checkbox" name="venueKinds" value={value} defaultChecked={value === "PUB"} />
                 {label}
               </label>

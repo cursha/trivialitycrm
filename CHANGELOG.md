@@ -13,6 +13,13 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v25.1 — 2026-10-23
+### Improved — club boxes shaded on Quick Search
+- The **Rotary clubs**, **Lions clubs**, **Kiwanis clubs** and **Legions**
+  boxes under **Search for** are lightly shaded so they stand apart from
+  the bar choices (Curt's call).
+- Manual: Quick Search section mentions the shading.
+
 ## v25.0 — 2026-10-23
 ### New — a Quick Search box for each club: Rotary, Lions, Kiwanis, Legion
 - The single **Service clubs** box is replaced by **Rotary clubs**, **Lions

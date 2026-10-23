@@ -462,7 +462,8 @@ come back (taverns, pour houses and taprooms count as bars, since the
 directory has no category for them), so a search for events won't turn up
 parks or community halls, though a golf club or entertainment centre with
 a bar inside can. A brewery search can include breweries that only make
-beer and have no taproom, so check before you call. The club boxes find
+beer and have no taproom, so check before you call. The club boxes, shaded
+so they stand apart from the bars, find
 Rotary, Lions and Kiwanis clubs and Legion branches, which often run
 trivia or bingo nights as fundraisers. A place is kept only when its name
 has the club's in it (Rotary, Lions, Kiwanis or Legion), so other clubs,
