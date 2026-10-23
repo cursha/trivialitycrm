@@ -5,8 +5,8 @@ import { normalizeCompanyName } from "../duplicates/normalize";
 import type { ResearchCandidate } from "./providers/types";
 
 /**
- * Quick Search leaves chains and franchises out unless "Include chains and
- * franchises" is ticked (Curt's call: head office usually decides for them,
+ * Quick Search leaves chains and franchises out while "Exclude
+ * chains/franchises" is ticked, as it is to start (Curt's call: head office usually decides for them,
  * so they're rarely worth a rep's call). Google's directory doesn't say
  * whether a place is a chain, so a place counts as one when any of these
  * hold:

@@ -77,7 +77,7 @@ export async function startQuickSearch(_prevState: QuickSearchFormState, formDat
   const perCity = formData.get("perCity") === "on" && parsed.data.cities.length > 1;
   const cityGroups = perCity ? parsed.data.cities.map((city) => [city]) : [parsed.data.cities];
   // Chains and franchises are left out unless the box is ticked.
-  const excludeChains = formData.get("includeChains") !== "on";
+  const excludeChains = formData.get("excludeChains") === "on";
 
   const searchIds: string[] = [];
   for (const leadType of leadTypes) {

@@ -1,0 +1,8 @@
+-- Quick Search: more kinds of venue under "Search for".
+-- AlterEnum
+ALTER TYPE "SearchVenueKind" ADD VALUE IF NOT EXISTS 'SPORTS_BAR';
+ALTER TYPE "SearchVenueKind" ADD VALUE IF NOT EXISTS 'POUR_HOUSE';
+ALTER TYPE "SearchVenueKind" ADD VALUE IF NOT EXISTS 'GASTROPUB';
+ALTER TYPE "SearchVenueKind" ADD VALUE IF NOT EXISTS 'TAPROOM';
+ALTER TYPE "SearchVenueKind" ADD VALUE IF NOT EXISTS 'BREWERY';
+ALTER TYPE "SearchVenueKind" ADD VALUE IF NOT EXISTS 'LOUNGE';

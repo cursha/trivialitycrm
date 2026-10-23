@@ -123,24 +123,24 @@ describe("startQuickSearch with trivia / karaoke", () => {
 
     const fd = quickSearchFormData([pubs.id]);
     fd.append("venueKinds", "NIGHTCLUB");
-    expect((await run(fd))?.error).toBe("Choose pub, bar or tavern.");
+    expect((await run(fd))?.error).toBe("Choose the kinds of venue from the list.");
     expect(await testPrisma.leadSearch.count()).toBe(0);
   });
 
-  it("leaves chains out unless Include chains and franchises is ticked", async () => {
+  it("leaves chains out only while Exclude chains/franchises is ticked", async () => {
     const { user } = await baseFixtures();
     const pubs = await createLeadTypeFixture("Pubs");
     await loginAs(user.id);
 
-    await run(quickSearchFormData([pubs.id]));
-    const unticked = await testPrisma.leadSearch.findFirstOrThrow();
-    expect(unticked.excludeChains).toBe(true);
-    expect(unticked.promptSnapshot).toContain("Chains and franchises left out.");
+    await run(quickSearchFormData([pubs.id], { excludeChains: "on" }));
+    const ticked = await testPrisma.leadSearch.findFirstOrThrow();
+    expect(ticked.excludeChains).toBe(true);
+    expect(ticked.promptSnapshot).toContain("Chains and franchises left out.");
 
-    await run(quickSearchFormData([pubs.id], { includeChains: "on" }));
-    const ticked = await testPrisma.leadSearch.findFirstOrThrow({ where: { id: { not: unticked.id } } });
-    expect(ticked.excludeChains).toBe(false);
-    expect(ticked.promptSnapshot).not.toContain("Chains");
+    await run(quickSearchFormData([pubs.id]));
+    const unticked = await testPrisma.leadSearch.findFirstOrThrow({ where: { id: { not: ticked.id } } });
+    expect(unticked.excludeChains).toBe(false);
+    expect(unticked.promptSnapshot).not.toContain("Chains");
   });
 
   it("lists every venue when nothing is ticked", async () => {

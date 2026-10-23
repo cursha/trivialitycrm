@@ -117,19 +117,39 @@ const ENTERTAINMENT_PHRASES: Record<SearchEntertainment, string> = {
   EVENTS: "with weekly events",
 };
 
-const VENUE_KIND_TERMS: Record<SearchVenueKind, string> = { PUB: "Pub", BAR: "Bar", TAVERN: "Tavern" };
+const VENUE_KIND_TERMS: Record<SearchVenueKind, string> = {
+  PUB: "Pub",
+  BAR: "Bar",
+  TAVERN: "Tavern",
+  SPORTS_BAR: "Sports bar",
+  POUR_HOUSE: "Pour house",
+  GASTROPUB: "Gastropub",
+  TAPROOM: "Taproom",
+  BREWERY: "Brewery",
+  LOUNGE: "Lounge",
+};
 
-// The Google place type each venue kind is held to (Places API Table A —
-// it has "pub" and "bar" but no tavern type, so a tavern search is held to
-// "bar"). Without it Google matches the words alone: "Bar with weekly
-// events in Milton" returned fairgrounds, parks and community centres.
-const VENUE_KIND_PLACE_TYPES: Record<SearchVenueKind, string> = { PUB: "pub", BAR: "bar", TAVERN: "bar" };
+// The Google place type each venue kind is held to (Places API Table A).
+// It has no tavern, pour house or taproom type, so those are held to "bar".
+// Without it Google matches the words alone: "Bar with weekly events in
+// Milton" returned fairgrounds, parks and community centres.
+const VENUE_KIND_PLACE_TYPES: Record<SearchVenueKind, string> = {
+  PUB: "pub",
+  BAR: "bar",
+  TAVERN: "bar",
+  SPORTS_BAR: "sports_bar",
+  POUR_HOUSE: "bar",
+  GASTROPUB: "gastropub",
+  TAPROOM: "bar",
+  BREWERY: "brewery",
+  LOUNGE: "lounge_bar",
+};
 
 export type PlacesQuery = { textQuery: string; includedType?: string };
 
 /**
  * The Text Search queries for one city: "Pub in Oakville, ON, Canada" —
- * one per venue kind ticked on Quick Search (Pub, Bar, Tavern; the Lead
+ * one per venue kind ticked on Quick Search (Pub, Bar, Sports bar...; the Lead
  * Type's name when none), times one per entertainment ticked ("Pub with
  * trivia night in …", "Bar with karaoke in …"). "And/or" by running each
  * and letting run-search's dedupeWithinRun merge the overlap. Google

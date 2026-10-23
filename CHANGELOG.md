@@ -13,6 +13,22 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v23.0 — 2026-10-23
+### New — Quick Search looks for sports bars, gastropubs, breweries and more
+- Quick Search's **Search for** row now also has **Sports bars**, **Pour
+  houses**, **Gastropubs**, **Taprooms**, **Breweries** and **Lounges**,
+  alongside Pubs, Bars and Taverns. Each ticked one is its own directory
+  search, held to the matching Google category (sports bar, gastropub,
+  brewery, lounge). Google has no pour house or taproom category, so those
+  are held to "bar", the same as taverns.
+### Improved — "Exclude chains/franchises" box
+- The **Include chains and franchises** box is now **Exclude
+  chains/franchises**, ticked to start (Curt's call). Same result as
+  before: chains are left out unless you untick it.
+- Manual: Quick Search section lists the new choices and the renamed box.
+- Database change: migration `20261023120000_quick_search_more_venue_kinds`
+  adds the six choices to the venue-kind list. Nothing existing is changed.
+
 ## v22.4 — 2026-10-22
 ### Fixed — no more hourly Titan error in the worker logs
 - The worker no longer tries to set up reply/bounce detection for Titan

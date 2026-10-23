@@ -49,7 +49,7 @@ export default async function SearchStatusPage({ params }: { params: Promise<{ i
       />
       {search.chainsLeftOut.length > 0 && (
         <p className="text-sm text-text-muted">
-          {`Left out ${search.chainsLeftOut.length} chain ${search.chainsLeftOut.length === 1 ? "location" : "locations"}: ${chainList}. Tick "Include chains and franchises" on Quick Search to keep them.`}
+          {`Left out ${search.chainsLeftOut.length} chain ${search.chainsLeftOut.length === 1 ? "location" : "locations"}: ${chainList}. Untick "Exclude chains/franchises" on Quick Search to keep them.`}
         </p>
       )}
       <SearchStatus

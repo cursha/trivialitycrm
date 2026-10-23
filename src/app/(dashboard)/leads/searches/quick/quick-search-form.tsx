@@ -12,6 +12,12 @@ const VENUE_KINDS = [
   { value: "PUB", label: "Pubs" },
   { value: "BAR", label: "Bars" },
   { value: "TAVERN", label: "Taverns" },
+  { value: "SPORTS_BAR", label: "Sports bars" },
+  { value: "POUR_HOUSE", label: "Pour houses" },
+  { value: "GASTROPUB", label: "Gastropubs" },
+  { value: "TAPROOM", label: "Taprooms" },
+  { value: "BREWERY", label: "Breweries" },
+  { value: "LOUNGE", label: "Lounges" },
 ];
 
 // Matches the Quick Search limit (CitiesSchema in validation/search.ts).
@@ -147,8 +153,8 @@ export function QuickSearchForm({ leadTypes, cityLists }: QuickSearchFormOptions
           </div>
           <p className="mt-1 text-xs text-text-muted">Each one is its own directory search; the results are combined, without duplicates.</p>
           <label className="mt-2 flex items-center gap-2 text-sm text-text">
-            <input type="checkbox" name="includeChains" />
-            Include chains and franchises
+            <input type="checkbox" name="excludeChains" defaultChecked />
+            Exclude chains/franchises
           </label>
           <p className="mt-1 text-xs text-text-muted">
             Left unticked, places like Boston Pizza or Applebee&apos;s are left out: known chains, places whose website is a chain&apos;s location page, and names found at three or more

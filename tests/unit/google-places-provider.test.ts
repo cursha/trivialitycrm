@@ -351,6 +351,14 @@ describe("Quick Search trivia / karaoke", () => {
       { textQuery: "Bar in Milton, ON, Canada", includedType: "bar" },
       { textQuery: "Tavern in Milton, ON, Canada", includedType: "bar" },
     ]);
+    expect(placesTextQueries({ ...baseParams, venueKinds: ["SPORTS_BAR", "POUR_HOUSE", "GASTROPUB", "TAPROOM", "BREWERY", "LOUNGE"] }, "Milton")).toEqual([
+      { textQuery: "Sports bar in Milton, ON, Canada", includedType: "sports_bar" },
+      { textQuery: "Pour house in Milton, ON, Canada", includedType: "bar" },
+      { textQuery: "Gastropub in Milton, ON, Canada", includedType: "gastropub" },
+      { textQuery: "Taproom in Milton, ON, Canada", includedType: "bar" },
+      { textQuery: "Brewery in Milton, ON, Canada", includedType: "brewery" },
+      { textQuery: "Lounge in Milton, ON, Canada", includedType: "lounge_bar" },
+    ]);
     expect(texts(placesTextQueries({ ...baseParams, venueKinds: ["PUB", "BAR"], entertainment: ["TRIVIA", "KARAOKE"] }, "Milton"))).toEqual([
       "Pub with trivia night in Milton, ON, Canada",
       "Pub with karaoke in Milton, ON, Canada",

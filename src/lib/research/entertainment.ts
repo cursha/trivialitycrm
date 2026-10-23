@@ -1,6 +1,16 @@
 const LABELS = { TRIVIA: "trivia", KARAOKE: "karaoke", BINGO: "bingo", EVENTS: "events" } as const;
 
-const VENUE_KIND_LABELS = { PUB: "pubs", BAR: "bars", TAVERN: "taverns" } as const;
+const VENUE_KIND_LABELS = {
+  PUB: "pubs",
+  BAR: "bars",
+  TAVERN: "taverns",
+  SPORTS_BAR: "sports bars",
+  POUR_HOUSE: "pour houses",
+  GASTROPUB: "gastropubs",
+  TAPROOM: "taprooms",
+  BREWERY: "breweries",
+  LOUNGE: "lounges",
+} as const;
 
 /** "pubs", "pubs, bars, taverns" — what a Quick Search asked the directory
  * for. Empty string when it used the Lead Type's own name. */

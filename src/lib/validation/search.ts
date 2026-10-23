@@ -37,7 +37,7 @@ export type SearchSetupValues = z.infer<typeof SearchSetupSchema>;
 // the Company a result later transfers into) is always tied to exactly one
 // Lead Type.
 export const SearchEntertainmentValues = ["TRIVIA", "KARAOKE", "BINGO", "EVENTS"] as const;
-export const SearchVenueKindValues = ["PUB", "BAR", "TAVERN"] as const;
+export const SearchVenueKindValues = ["PUB", "BAR", "TAVERN", "SPORTS_BAR", "POUR_HOUSE", "GASTROPUB", "TAPROOM", "BREWERY", "LOUNGE"] as const;
 
 export const QuickSearchSetupSchema = z.object({
   leadTypeIds: z.array(z.string().min(1)).min(1, { error: "Choose at least one Lead Type." }),
@@ -51,7 +51,7 @@ export const QuickSearchSetupSchema = z.object({
     .transform((values) => [...new Set(values)]),
   // What to search the directory for; empty = the Lead Type's own name.
   venueKinds: z
-    .array(z.enum(SearchVenueKindValues, { error: "Choose pub, bar or tavern." }))
+    .array(z.enum(SearchVenueKindValues, { error: "Choose the kinds of venue from the list." }))
     .default([])
     .transform((values) => [...new Set(values)]),
 });

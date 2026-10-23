@@ -451,20 +451,25 @@ inbox:
 ## Quick Search (if you have access)
 
 Leads → **Quick Search** lists businesses from the directory, with no AI
-scoring. Choose the area, and under **Search for** tick **Pubs**, **Bars**
-and/or **Taverns** (Pubs is ticked to start). Each is its own directory
-search, and the results are combined without duplicates. Only places the
-directory lists as a pub or bar come back, so a search for events won't
-turn up parks or community halls, though a golf club or entertainment
-centre with a bar inside can.
+scoring. Choose the area, and under **Search for** tick the kinds of venue
+you want: **Pubs**, **Bars**, **Taverns**, **Sports bars**, **Pour houses**,
+**Gastropubs**, **Taprooms**, **Breweries** and/or **Lounges** (Pubs is
+ticked to start). Each is its own directory search, and the results are
+combined without duplicates, so a sports bar that's also listed as a pub
+only shows once. Only places the directory lists as that kind of venue
+come back (taverns, pour houses and taprooms count as bars, since the
+directory has no category for them), so a search for events won't turn up
+parks or community halls, though a golf club or entertainment centre with
+a bar inside can. A brewery search can include breweries that only make
+beer and have no taproom, so check before you call.
 
-Chains and franchises are left out unless you tick **Include chains and
-franchises**. A place counts as a chain when it's a known bar or
+Chains and franchises are left out while **Exclude chains/franchises** is
+ticked, as it is to start; untick it to keep them. A place counts as a chain when it's a known bar or
 restaurant chain (Boston Pizza, Kelseys, Applebee's and so on), when its
 website is a chain's page for that location, or when its name turns up at
 three or more locations, in the CRM or in the same search. The search
 page lists every chain location it left out, so you can see what was
-dropped and run it again with the box ticked if you want them.
+dropped and run it again with the box unticked if you want them.
 
 ### Searching a list of cities
 

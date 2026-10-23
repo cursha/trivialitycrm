@@ -224,7 +224,7 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       const inArea =
         search.mode === "PUB_RADIUS" || search.mode === "COMPETITOR" ? withoutOrigin : withoutOrigin.filter((candidate) => isInSearchedRegion(candidate, search));
 
-      // Quick Search with "Include chains and franchises" unticked: drop
+      // Quick Search with "Exclude chains/franchises" ticked: drop
       // them before the cap, so the cap counts only places that are kept.
       let filtered = inArea;
       if (search.excludeChains) {

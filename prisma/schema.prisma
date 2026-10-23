@@ -1243,6 +1243,12 @@ enum SearchVenueKind {
   PUB
   BAR
   TAVERN
+  SPORTS_BAR
+  POUR_HOUSE
+  GASTROPUB
+  TAPROOM
+  BREWERY
+  LOUNGE
 }
 
 enum SearchEntertainment {
