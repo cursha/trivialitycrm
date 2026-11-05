@@ -5,13 +5,16 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
 import { TransferPayloadSchema, type TransferPayload } from "@/lib/validation/transfer";
+import { describeInvalidRows, type TransferFieldErrors } from "@/lib/validation/transfer-errors";
+
+export type { TransferFieldErrors };
 import { findPotentialDuplicates, computeNormalizedFields } from "@/lib/duplicates/match";
 import type { DuplicateMatch } from "@/lib/duplicates/match";
 import { logInitialPipelineStage } from "@/lib/companies/activity-log";
 import { resolveReplaceOrMergeFields, type ResolvedCompanyFields } from "@/lib/companies/field-resolution";
 
 export type TransferResult =
-  | { error: string }
+  | { error: string; fieldErrors?: TransferFieldErrors }
   | { duplicates: Record<string, DuplicateMatch[]> }
   | { transferredCount: number; ignoredCount: number };
 
@@ -43,7 +46,7 @@ export async function transferSearchResults(rawPayload: TransferPayload): Promis
 
   const parsed = TransferPayloadSchema.safeParse(rawPayload);
   if (!parsed.success) {
-    return { error: parsed.error.issues[0]?.message ?? "Please correct the highlighted fields." };
+    return describeInvalidRows(parsed.error.issues, rawPayload);
   }
   const payload = parsed.data;
 

@@ -13,6 +13,17 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v27.1 — 2026-11-05
+### Fixed — transfer says which lead has the bad field
+- When a lead on the transfer page had an invalid postal code (or any
+  other field the CRM can't accept), the transfer was refused with just
+  "Enter a valid Canadian postal code", and nothing said which of the
+  leads it meant. The message now names the bar (or lists them all when
+  several are wrong), and each bad field is marked in red with its reason
+  on that bar's card. Curt hit this transferring leads.
+- Manual: the transfer steps say what happens when a field is invalid.
+- No database change.
+
 ## v27.0 — 2026-11-05
 ### New — Find address on the company screen
 - **Find address** in Quick Sales Actions, shown when a company has no

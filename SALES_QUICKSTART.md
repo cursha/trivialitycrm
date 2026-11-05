@@ -694,8 +694,12 @@ researched" until you research them.
 - **Export CSV / Excel** downloads the list.
 - Tick the ones worth pursuing and click **Transfer selected**. On the
   next page you can edit each one, add a first contact, choose who it's
-  assigned to and its starting step. A result that matches a bar already
-  in the CRM is flagged, and you choose:
+  assigned to and its starting step. If a lead has something the CRM
+  can't accept, such as a postal code that isn't valid or belongs to a
+  different province, nothing is transferred: the message names the bar,
+  and the field is marked in red on its card so you can fix or clear it
+  and click **Transfer** again. A result that matches a bar already in the
+  CRM is flagged, and you choose:
   - **Merge** (usually the right choice): update the existing bar. The
     result's details win wherever it has them; the bar keeps its own
     wherever the result is blank.

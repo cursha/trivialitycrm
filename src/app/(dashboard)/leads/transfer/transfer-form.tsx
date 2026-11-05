@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { transferSearchResults, type TransferResult } from "./actions";
+import { transferSearchResults, type TransferResult, type TransferFieldErrors } from "./actions";
 import type { DuplicateMatch } from "@/lib/duplicates/match";
 import { Card } from "@/components/ui/card";
 import { Label, Input, Select } from "@/components/ui/field";
@@ -79,6 +79,7 @@ export function TransferForm({
   const [duplicates, setDuplicates] = useState<Record<string, DuplicateMatch[]>>({});
   const [resolutions, setResolutions] = useState<Record<string, DuplicateResolution>>({});
   const [error, setError] = useState<string | undefined>();
+  const [fieldErrors, setFieldErrors] = useState<TransferFieldErrors>({});
   const [successCounts, setSuccessCounts] = useState<{ transferredCount: number; ignoredCount: number } | undefined>();
   const [isPending, startTransition] = useTransition();
 
@@ -92,6 +93,7 @@ export function TransferForm({
 
   function handleSubmit() {
     setError(undefined);
+    setFieldErrors({});
     startTransition(async () => {
       const result: TransferResult = await transferSearchResults({
         assignedToId,
@@ -106,6 +108,7 @@ export function TransferForm({
 
       if ("error" in result) {
         setError(result.error);
+        setFieldErrors(result.fieldErrors ?? {});
       } else if ("duplicates" in result) {
         setDuplicates(result.duplicates);
       } else {
@@ -166,8 +169,10 @@ export function TransferForm({
                 <Input
                   value={row[field] as string}
                   onChange={(e) => updateField(row.resultId, field, e.target.value)}
-                  className="py-1.5"
+                  aria-invalid={fieldErrors[row.resultId]?.[field] ? true : undefined}
+                  className={`py-1.5 ${fieldErrors[row.resultId]?.[field] ? "border-danger" : ""}`}
                 />
+                {fieldErrors[row.resultId]?.[field] && <p className="mt-1 text-xs font-semibold text-danger">{fieldErrors[row.resultId][field]}</p>}
               </div>
             ))}
           </div>
@@ -180,8 +185,10 @@ export function TransferForm({
                 <Input
                   value={row[field] as string}
                   onChange={(e) => updateField(row.resultId, field, e.target.value)}
-                  className="py-1.5"
+                  aria-invalid={fieldErrors[row.resultId]?.[field] ? true : undefined}
+                  className={`py-1.5 ${fieldErrors[row.resultId]?.[field] ? "border-danger" : ""}`}
                 />
+                {fieldErrors[row.resultId]?.[field] && <p className="mt-1 text-xs font-semibold text-danger">{fieldErrors[row.resultId][field]}</p>}
               </div>
             ))}
           </div>
