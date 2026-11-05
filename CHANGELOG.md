@@ -13,6 +13,18 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v28.0 — 2026-11-05
+### New — printable route sheet
+- **Print route sheet** on the Route Plan page opens a printable list of
+  every company on the route you're looking at: name, address, phone,
+  pipeline step, main contact (with best time to reach), last logged
+  touch, next follow-up due, and a space for notes. **Print** prints it
+  without the menu or header. Curt asked for a route report he can print.
+- Each address on the sheet has a **Map** link to Google Maps (on screen
+  only). It's a plain Google Maps link: no API key and no cost.
+- Manual: the Route plans section explains the route sheet.
+- No database change.
+
 ## v27.1 — 2026-11-05
 ### Fixed — transfer says which lead has the bad field
 - When a lead on the transfer page had an invalid postal code (or any

@@ -13,3 +13,11 @@ export function routeLabel(route: { name: string; plannedDate: string | null }):
   const day = formatRouteDate(route.plannedDate);
   return day ? `${route.name} (${day})` : route.name;
 }
+
+/** A Google Maps link for a place (Maps URLs: no API key, opens the Maps app
+ * on a phone). Name plus address finds the business itself rather than just
+ * the street address; null when there's no address to go on. */
+export function googleMapsHref(name: string, formattedAddress: string): string | null {
+  if (!formattedAddress.trim()) return null;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name}, ${formattedAddress}`)}`;
+}

@@ -137,6 +137,9 @@ export function RoutePlanView({ detail, canManage, canExport }: { detail: RouteD
             Clear Route Plan
           </Button>
         )}
+        <Link href="/route-plan/print" className={buttonClasses("secondary")}>
+          Print route sheet
+        </Link>
         {canExport && (
           <Button type="button" variant="primary" disabled={isPending || invalidRows.length > 0} onClick={openExportConfirmation}>
             Export CSV

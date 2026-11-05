@@ -217,6 +217,15 @@ alone; nobody else sees or changes them.
   notification or open **Files → Downloads**; on iPhone, tap the download
   arrow in Safari's address bar or open **Files → Downloads**. Share or
   open it into EZRoutePlanner from there.
+- **Print route sheet** gives you a paper copy of the route you're
+  looking at, to take on the road. Each bar gets its own box, in the same
+  order as the route, with its address, phone, pipeline step, main contact
+  (and their best time to reach), your last call, visit or note, any
+  follow-up due, and lines for writing notes at the door. Click **Print**
+  on that page; the menu and header are left off the paper. On screen,
+  each address has a **Map** link that opens it in Google Maps (the Maps
+  app on a phone). To print a different route, switch to it on the Route
+  Plan page first.
 - **Add several bars at once** from the Companies list or a Pipeline list:
   tick them, click **Add Selected to Route**, then pick the route (your
   current one is chosen for you) or **+ New route…**, and click **Add**.

@@ -17,6 +17,7 @@ import {
   listRoutes,
   getCompanyRouteOptions,
   getAllRoutedCompanyIds,
+  getRouteSheet,
 } from "../../src/lib/route-plan/service";
 
 beforeEach(async () => {
@@ -563,5 +564,33 @@ describe("multiple routes per user", () => {
     expect(await deleteRoute(f.user, joesRoute.id)).toEqual({ ok: false, error: "That route no longer exists." });
     expect(await listRoutes(f.user.id)).toEqual([]);
     expect((await listRoutes(joe.id)).map((r) => r.name)).toEqual(["Joe's Oakville"]);
+  });
+});
+
+describe("getRouteSheet", () => {
+  it("lists every stop with its stage, main contact and last logged touch", async () => {
+    const f = await baseFixtures();
+    const bravo = await makeCompany(f, { name: "Bravo Pub" });
+    const alpha = await makeCompany(f, { name: "Alpha Pub" });
+    await testPrisma.company.update({ where: { id: alpha.id }, data: { phone: "905-555-0100" } });
+    await testPrisma.contact.create({ data: { companyId: alpha.id, firstName: "Sam", lastName: "Owner", title: "Owner", isDecisionMaker: true } });
+    await testPrisma.activity.create({ data: { companyId: alpha.id, userId: f.user.id, type: "VISIT", occurredAt: new Date("2026-10-01T15:00:00Z") } });
+    // System entries aren't a rep's touch, so a later one doesn't count.
+    await testPrisma.activity.create({ data: { companyId: alpha.id, userId: f.user.id, type: "PIPELINE_CHANGE", occurredAt: new Date("2026-10-02T15:00:00Z") } });
+    await addCompanyToRoute(f.user, bravo.id);
+    await addCompanyToRoute(f.user, alpha.id);
+
+    const sheet = await getRouteSheet(f.user);
+
+    expect(sheet.companies.map((c) => c.name)).toEqual(["Alpha Pub", "Bravo Pub"]);
+    const [first, second] = sheet.companies;
+    expect(first).toMatchObject({ phone: "905-555-0100", stageName: f.stage.name, contact: { name: "Sam Owner", title: "Owner" } });
+    expect(first.lastTouch).toEqual({ type: "VISIT", occurredAt: new Date("2026-10-01T15:00:00Z") });
+    expect(second).toMatchObject({ contact: null, lastTouch: null });
+  });
+
+  it("is empty with no route", async () => {
+    const f = await baseFixtures();
+    expect((await getRouteSheet(f.user)).companies).toEqual([]);
   });
 });

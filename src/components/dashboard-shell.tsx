@@ -75,7 +75,7 @@ export function DashboardShell({
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-30 flex w-72 flex-col border-r border-border-strong bg-surface transition-transform lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-30 flex w-72 flex-col print:hidden border-r border-border-strong bg-surface transition-transform lg:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -113,8 +113,8 @@ export function DashboardShell({
         </p>
       </aside>
 
-      <section className="lg:pl-72">
-        <header className="sticky top-0 z-20 flex h-20 items-center justify-between border-b border-border bg-surface-raised/95 px-5 backdrop-blur lg:px-8">
+      <section className="lg:pl-72 print:pl-0">
+        <header className="sticky top-0 z-20 flex h-20 print:hidden items-center justify-between border-b border-border bg-surface-raised/95 px-5 backdrop-blur lg:px-8">
           <div className="flex items-center gap-3">
             <button
               className="rounded-lg border border-border-strong p-2 text-text hover:bg-black/5 lg:hidden"
@@ -168,7 +168,7 @@ export function DashboardShell({
           </div>
         </header>
 
-        <div className="p-5 lg:p-8">{children}</div>
+        <div className="p-5 lg:p-8 print:p-0">{children}</div>
       </section>
     </div>
   );

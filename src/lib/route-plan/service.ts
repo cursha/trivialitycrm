@@ -644,3 +644,63 @@ export async function exportRoutePlanCsv(user: AuthenticatedUser, options: { che
 
   return { ok: true, csv, filename: detail.exportFilename, count: detail.companies.length };
 }
+
+/** Touches a rep logs themselves — not system entries like transfers or stage changes. */
+const SHEET_TOUCH_TYPES = ["PHONE", "EMAIL", "MEETING", "VISIT", "MATERIAL_SENT", "DEMO", "TRIAL", "NOTE"] as const;
+
+export type RouteSheetRow = {
+  id: string;
+  name: string;
+  formattedAddress: string;
+  phone: string | null;
+  stageName: string;
+  contact: { name: string; title: string | null; phone: string | null; bestTimeToReach: string | null } | null;
+  lastTouch: { type: (typeof SHEET_TOUCH_TYPES)[number]; occurredAt: Date } | null;
+  nextFollowUpAt: Date | null;
+};
+
+/**
+ * The printable route sheet: every company on the current route (same scope
+ * filter and order as getRouteDetail) with what a rep wants on paper at the
+ * door — phone, stage, main contact, last touch and next follow-up.
+ */
+export async function getRouteSheet(user: AuthenticatedUser): Promise<{ route: RouteSummary; companies: RouteSheetRow[] }> {
+  const detail = await getRouteDetail(user);
+  const ids = detail.companies.map((company) => company.id);
+  if (ids.length === 0) return { route: detail.route, companies: [] };
+
+  const companies = await prisma.company.findMany({
+    where: { id: { in: ids } },
+    select: {
+      id: true,
+      phone: true,
+      nextFollowUpAt: true,
+      pipelineStage: { select: { name: true } },
+      primaryContact: { select: { firstName: true, lastName: true, title: true, phone: true, bestTimeToReach: true } },
+      contacts: { select: { firstName: true, lastName: true, title: true, phone: true, bestTimeToReach: true }, orderBy: [{ isDecisionMaker: "desc" }, { createdAt: "asc" }], take: 1 },
+      activities: { where: { type: { in: [...SHEET_TOUCH_TYPES] } }, select: { type: true, occurredAt: true }, orderBy: { occurredAt: "desc" }, take: 1 },
+    },
+  });
+  const byId = new Map(companies.map((company) => [company.id, company]));
+
+  return {
+    route: detail.route,
+    companies: detail.companies.map((row) => {
+      const company = byId.get(row.id);
+      const contact = company?.primaryContact ?? company?.contacts[0] ?? null;
+      const touch = company?.activities[0];
+      return {
+        id: row.id,
+        name: row.name,
+        formattedAddress: row.formattedAddress,
+        phone: company?.phone ?? null,
+        stageName: company?.pipelineStage.name ?? "",
+        contact: contact
+          ? { name: `${contact.firstName} ${contact.lastName}`.trim(), title: contact.title, phone: contact.phone, bestTimeToReach: contact.bestTimeToReach }
+          : null,
+        lastTouch: touch ? { type: touch.type as NonNullable<RouteSheetRow["lastTouch"]>["type"], occurredAt: touch.occurredAt } : null,
+        nextFollowUpAt: company?.nextFollowUpAt ?? null,
+      };
+    }),
+  };
+}
