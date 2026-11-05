@@ -274,6 +274,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         canSendEmail={canSendCompanyEmail}
         companyEmail={validCompanyEmail}
         hasEmail={!!company.email}
+        hasAddress={!!company.address1?.trim()}
       />
 
       {canRoutePlan && <AddToRouteToggle companyId={company.id} routes={routeOptions} canManage={canRoutePlan} />}

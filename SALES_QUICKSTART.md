@@ -262,6 +262,14 @@ On any company's page:
   can run research, it offers **Search the web**: an AI web search for the
   bar's email, about 10¢, charged to the AI budget. Neither ever replaces
   an email already on file.
+
+  When the company has no street address, **Find address** looks the bar
+  up on Google by its name and city and saves its street address (and its
+  postal code, if that's blank too). It only accepts a result with the
+  same name in the same city and province/state, so it won't fill in a
+  different bar down the road, but check the address it shows you. It
+  needs the city filled in, and it never replaces an address already on
+  file. It isn't an AI search, so it doesn't use the AI budget.
 - **Next best action**: a short, plain-language list of what this company
   specifically needs next (e.g. "no contact on file," "a follow-up is
   overdue," "no activity in a while") — never an opaque score, and it never

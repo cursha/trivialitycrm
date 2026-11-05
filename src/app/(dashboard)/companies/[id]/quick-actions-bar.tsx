@@ -2,9 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Phone, Mail, Users, FileText, Presentation, FlaskConical, StickyNote, CalendarClock, Sparkles, Globe, Send, MapPin, Search, AtSign } from "lucide-react";
+import { Phone, Mail, Users, FileText, Presentation, FlaskConical, StickyNote, CalendarClock, Sparkles, Globe, Send, MapPin, Search, AtSign, MapPinned } from "lucide-react";
 import { changeCompanyStage } from "../actions";
 import { findCompanyEmail, searchWebForCompanyEmail, type FindCompanyEmailResult } from "./find-email-actions";
+import { findCompanyAddress } from "./find-address-actions";
 import { useQuickActions } from "./quick-action-context";
 import { SendCompanyEmailModal } from "./send-company-email-modal";
 import { Card } from "@/components/ui/card";
@@ -34,6 +35,7 @@ export function QuickActionsBar({
   canSendEmail,
   companyEmail,
   hasEmail,
+  hasAddress,
 }: {
   companyId: string;
   currentStageId: string;
@@ -54,6 +56,8 @@ export function QuickActionsBar({
   companyEmail: string | null;
   /** Any email on file, valid or not — "Find email" is only offered without one. */
   hasEmail: boolean;
+  /** A street address on file — "Find address" is only offered without one. */
+  hasAddress: boolean;
 }) {
   const router = useRouter();
   const { requestActivity, requestFollowUp, requestAnalyze } = useQuickActions();
@@ -81,6 +85,25 @@ export function QuickActionsBar({
       } else {
         setEmailMessage({ tone: "error", text: `${outcome.note}.` });
         setOfferWebSearch(outcome.canSearchWeb);
+      }
+    });
+  }
+
+  // "Find address": a Google Places lookup by the bar's name and city.
+  const [addressPending, startAddressTransition] = useTransition();
+  const [addressMessage, setAddressMessage] = useState<{ tone: "info" | "error"; text: string } | null>(null);
+
+  function runAddressLookup() {
+    setAddressMessage(null);
+    startAddressTransition(async () => {
+      const outcome = await findCompanyAddress(companyId);
+      if ("error" in outcome) {
+        setAddressMessage({ tone: "error", text: outcome.error });
+      } else if (outcome.address !== null) {
+        setAddressMessage({ tone: "info", text: `Found ${outcome.address} and saved it to this company. Check it's the right place.` });
+        router.refresh();
+      } else {
+        setAddressMessage({ tone: "error", text: `${outcome.note}.` });
       }
     });
   }
@@ -158,6 +181,18 @@ export function QuickActionsBar({
             {emailPending ? "Finding email..." : "Find email"}
           </button>
         )}
+        {canEdit && !hasAddress && (
+          <button
+            type="button"
+            disabled={addressPending}
+            onClick={runAddressLookup}
+            title="Look up the bar's street address on Google"
+            className="flex items-center gap-1.5 rounded-lg border border-border-strong px-3 py-2 text-xs font-semibold text-text hover:bg-black/5 disabled:opacity-60"
+          >
+            <MapPinned size={14} />
+            {addressPending ? "Finding address..." : "Find address"}
+          </button>
+        )}
         {canEdit &&
           ACTIVITY_LINKS.map((link) => (
             <button
@@ -207,6 +242,9 @@ export function QuickActionsBar({
             </>
           )}
         </div>
+      )}
+      {addressMessage && (
+        <p className={`mt-2 text-xs ${addressMessage.tone === "error" ? "font-semibold text-danger" : "text-text-muted"}`}>{addressMessage.text}</p>
       )}
       {!canEdit && <p className="mt-3 text-sm text-text-muted">You don&apos;t have permission to log activity for this company.</p>}
       {canEdit && (

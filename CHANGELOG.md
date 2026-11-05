@@ -13,6 +13,19 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v27.0 — 2026-11-05
+### New — Find address on the company screen
+- **Find address** in Quick Sales Actions, shown when a company has no
+  street address. It looks the bar up on Google Places by name and city
+  and saves the street address, plus the postal code if that's blank too.
+  It only accepts a result with a matching name in the same city and
+  province/state, and it never overwrites an address already on file.
+  The lookup is logged in the audit trail (Curt's call).
+- Uses the Google Places key the lead searches already use, asking only
+  for name and address (the cheaper Places tier). It isn't an AI call.
+- Manual: the company page section explains Find address.
+- No database change.
+
 ## v26.2 — 2026-10-23
 ### Improved — User Manual: Quick Search tidied
 - The Quick Search section said only places the directory lists as that
