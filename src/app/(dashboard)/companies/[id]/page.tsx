@@ -37,6 +37,7 @@ import { Badge } from "@/components/ui/badge";
 import { TRIVIA_STATUS_LABEL, WEEKDAY_LABEL } from "@/lib/ui/status-tones";
 import { formatRouteAddress } from "@/lib/route-plan/validation";
 import { websiteHref, findWebsiteHref } from "@/lib/companies/website";
+import { MapLink } from "@/components/ui/map-link";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -296,7 +297,17 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
           <Card>
             <h2 className="font-bold text-accent">Company details</h2>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <Field label="Street address" value={company.address1} />
+              <Field
+                label="Street address"
+                value={
+                  company.address1 ? (
+                    <>
+                      {company.address1}
+                      <MapLink name={company.name} address={[company.address1, company.city, company.region, company.postalCode, company.country]} className="ml-2 text-xs" />
+                    </>
+                  ) : null
+                }
+              />
               <Field label="City" value={company.city} />
               <Field label="State / Province" value={company.region} />
               <Field label="ZIP / Postal code" value={company.postalCode} />

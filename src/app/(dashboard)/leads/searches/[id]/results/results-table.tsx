@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Pagination } from "@/components/ui/pagination";
 import { TRIVIA_STATUS_TONE, DISPOSITION_TONE, DISPOSITION_LABEL, humanizeEnum, type BadgeTone } from "@/lib/ui/status-tones";
 import { isMockResearchResult, computeResultConfidence, recommendResultNextAction } from "@/lib/research/result-explanation";
+import { MapLink } from "@/components/ui/map-link";
 
 export type ResultRow = {
   id: string;
@@ -468,7 +469,10 @@ export function ResultsTable({
                     {result.competitorName && <p className="mt-0.5 text-xs text-amber-700">Uses {result.competitorName}</p>}
                     <ResultEmail result={result} />
                   </td>
-                  <td className="px-4 py-3 text-text-muted">{result.address1 ?? "—"}</td>
+                  <td className="px-4 py-3 text-text-muted">
+                    {result.address1 ?? "—"}
+                    <MapLink name={result.name} address={[result.address1, result.city, result.region, result.postalCode]} className="ml-1.5 text-xs" />
+                  </td>
                   <td className="px-4 py-3 text-text-muted">{result.city}</td>
                   <td className="px-4 py-3 text-text-muted">{result.region}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-text-muted">{result.postalCode ?? "—"}</td>
@@ -564,6 +568,7 @@ export function ResultsTable({
                     {result.address1 && <>{result.address1}, </>}
                     {result.city}, {result.region}
                     {result.postalCode && <> {result.postalCode}</>}
+                    <MapLink name={result.name} address={[result.address1, result.city, result.region, result.postalCode]} className="ml-2" />
                   </p>
 
                   <div className="mt-2 flex flex-wrap items-center gap-2">

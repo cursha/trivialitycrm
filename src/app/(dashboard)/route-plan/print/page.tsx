@@ -2,12 +2,13 @@ import Link from "next/link";
 import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
 import { getRouteSheet } from "@/lib/route-plan/service";
-import { formatRouteDate, googleMapsHref } from "@/lib/route-plan/format";
+import { formatRouteDate, describeRoutePlan } from "@/lib/route-plan/format";
 import { ACTIVITY_TYPE_LABELS } from "@/lib/activities/labels";
 import { formatDueDate } from "@/lib/dates";
 import { BUSINESS_TIMEZONE } from "@/lib/timezone";
 import { buttonClasses } from "@/components/ui/button";
 import { PrintButton } from "./print-button";
+import { MapLink } from "@/components/ui/map-link";
 
 export const metadata = { title: "Route Sheet — Triviality CRM" };
 
@@ -24,7 +25,8 @@ function formatTouchDate(value: Date): string {
 export default async function RouteSheetPage() {
   const user = await requireUser();
   requirePermission(user, "view_route_plan");
-  const { route, companies } = await getRouteSheet(user);
+  const { route, plan, companies } = await getRouteSheet(user);
+  const planSummary = describeRoutePlan(plan, route.country);
   const day = formatRouteDate(route.plannedDate);
   const printedOn = new Intl.DateTimeFormat("en-CA", { timeZone: BUSINESS_TIMEZONE, dateStyle: "medium" }).format(new Date());
 
@@ -47,6 +49,10 @@ export default async function RouteSheetPage() {
           {user.name} · {companies.length} stop{companies.length === 1 ? "" : "s"}
           {route.leadTypeName ? ` · ${route.leadTypeName}` : ""} · Printed {printedOn}
         </p>
+        {planSummary && <p className="mt-1 text-sm font-semibold text-text">{planSummary}</p>}
+        {plan.unplannedCount > 0 && (
+          <p className="mt-1 text-sm text-text-muted print:text-black">The last {plan.unplannedCount} stop{plan.unplannedCount === 1 ? " was" : "s were"} added after the route was planned.</p>
+        )}
       </header>
 
       {companies.length === 0 ? (
@@ -66,16 +72,7 @@ export default async function RouteSheetPage() {
                   <dt className="inline font-semibold">Address: </dt>
                   <dd className="inline">
                     {company.formattedAddress || "No address on file"}
-                    {googleMapsHref(company.name, company.formattedAddress) && (
-                      <a
-                        href={googleMapsHref(company.name, company.formattedAddress)!}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        className="ml-2 font-semibold text-secondary hover:underline print:hidden"
-                      >
-                        Map
-                      </a>
-                    )}
+                    <MapLink name={company.name} address={[company.formattedAddress]} className="ml-2" />
                   </dd>
                 </div>
                 <div>

@@ -18,6 +18,7 @@ import {
   getCompanyRouteOptions,
   getAllRoutedCompanyIds,
   getRouteSheet,
+  planRouteOrder,
 } from "../../src/lib/route-plan/service";
 
 beforeEach(async () => {
@@ -592,5 +593,61 @@ describe("getRouteSheet", () => {
   it("is empty with no route", async () => {
     const f = await baseFixtures();
     expect((await getRouteSheet(f.user)).companies).toEqual([]);
+  });
+});
+
+describe("planRouteOrder", () => {
+  async function routeOfThree() {
+    const f = await baseFixtures();
+    const names = ["Alpha Pub", "Bravo Pub", "Charlie Pub"];
+    const companies = [];
+    for (const name of names) {
+      const company = await makeCompany(f, { name });
+      await testPrisma.company.update({ where: { id: company.id }, data: { address1: `${names.indexOf(name) + 1} Main St`, postalCode: "L9T 2X5" } });
+      await addCompanyToRoute(f.user, company.id);
+      companies.push(company);
+    }
+    return { f, companies };
+  }
+
+  it("saves Google's driving order (mock: reversed) and the trip totals", async () => {
+    const { f } = await routeOfThree();
+
+    expect(await planRouteOrder(f.user, "  1 Home St, Milton, ON ")).toEqual({ ok: true, stopCount: 3 });
+
+    const detail = await getRouteDetail(f.user);
+    expect(detail.companies.map((c) => [c.position, c.name])).toEqual([
+      [1, "Charlie Pub"],
+      [2, "Bravo Pub"],
+      [3, "Alpha Pub"],
+    ]);
+    expect(detail.plan).toMatchObject({ startAddress: "1 Home St, Milton, ON", distanceMeters: 12_345, durationSeconds: 3_600, unplannedCount: 0 });
+    expect(detail.plan.optimizedAt).toBeInstanceOf(Date);
+  });
+
+  it("lists a bar added afterwards at the end, flagged as unplanned", async () => {
+    const { f } = await routeOfThree();
+    await planRouteOrder(f.user, "1 Home St");
+    const late = await makeCompany(f, { name: "Aardvark Arms" });
+    await addCompanyToRoute(f.user, late.id);
+
+    const detail = await getRouteDetail(f.user);
+    expect(detail.companies.at(-1)).toMatchObject({ name: "Aardvark Arms", position: null });
+    expect(detail.plan.unplannedCount).toBe(1);
+  });
+
+  it("refuses when a stop has no street address, naming it", async () => {
+    const { f, companies } = await routeOfThree();
+    await testPrisma.company.update({ where: { id: companies[1].id }, data: { address1: null } });
+
+    const result = await planRouteOrder(f.user, "1 Home St");
+    expect(result).toEqual({ ok: false, error: expect.stringContaining("Bravo Pub") });
+    expect((await getRouteDetail(f.user)).plan.optimizedAt).toBeNull();
+  });
+
+  it("needs a start address and some stops", async () => {
+    const f = await baseFixtures();
+    expect(await planRouteOrder(f.user, "   ")).toMatchObject({ ok: false });
+    expect(await planRouteOrder(f.user, "1 Home St")).toEqual({ ok: false, error: "Add some bars to this route first." });
   });
 });

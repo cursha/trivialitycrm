@@ -5,12 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TriangleAlert, X } from "lucide-react";
 import { removeFromRoute, clearRouteAction } from "./actions";
+import { RouteOrderPanel } from "./route-order-panel";
 import { checkRoutePlanExport, ROUTE_PLAN_EXPORT_URL } from "@/lib/route-plan/download-client";
 import type { RouteDetail } from "@/lib/route-plan/service";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/alert";
 import { Button, buttonClasses } from "@/components/ui/button";
+import { MapLink } from "@/components/ui/map-link";
 
 type ExportStep = "idle" | "confirming" | "post-download";
 
@@ -85,10 +87,13 @@ export function RoutePlanView({ detail, canManage, canExport }: { detail: RouteD
         </Alert>
       )}
 
+      {canManage && <RouteOrderPanel plan={detail.plan} country={detail.route.country} stopCount={detail.companies.length} />}
+
       <Card className="overflow-hidden p-0">
         <table className="w-full text-left text-sm">
           <thead className="bg-black/5 text-xs uppercase text-text-muted">
             <tr>
+              {detail.plan.optimizedAt && <th className="w-12 px-3 py-3 text-right">Stop</th>}
               <th className="px-5 py-3">Company Name</th>
               <th className="px-5 py-3">Address</th>
               {canManage && <th className="px-5 py-3 text-right">Actions</th>}
@@ -97,6 +102,9 @@ export function RoutePlanView({ detail, canManage, canExport }: { detail: RouteD
           <tbody>
             {detail.companies.map((company) => (
               <tr key={company.id} className="border-t border-border align-top">
+                {detail.plan.optimizedAt && (
+                  <td className="px-3 py-4 text-right font-bold text-text-muted">{company.position !== null ? company.position : "—"}</td>
+                )}
                 <td className="px-5 py-4">
                   <Link href={`/companies/${company.id}`} className="font-bold text-secondary hover:underline">
                     {company.name}
@@ -105,6 +113,7 @@ export function RoutePlanView({ detail, canManage, canExport }: { detail: RouteD
                 </td>
                 <td className="px-5 py-4">
                   {company.formattedAddress || <span className="text-text-muted">No address on file</span>}
+                  <MapLink name={company.name} address={[company.formattedAddress]} className="ml-2 text-xs" />
                   {company.missingAddressFields.length > 0 && (
                     <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-amber-700">
                       <TriangleAlert size={12} className="shrink-0" aria-hidden="true" />

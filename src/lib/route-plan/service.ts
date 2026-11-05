@@ -5,6 +5,8 @@ import { companyScope } from "@/lib/companies/scope";
 import type { AuthenticatedUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
 import { writeAuditEvent } from "@/lib/audit/log";
+import { checkRateLimit } from "@/lib/rate-limit/postgres-bucket";
+import { getRouteOptimizer, RouteOptimizerError, MAX_OPTIMIZED_STOPS, type OptimizedRoute } from "@/lib/research/providers/route-optimizer";
 import { buildCsv } from "@/lib/export/serialize";
 import { zonedCalendarDate } from "@/lib/timezone";
 import { Prisma } from "@/generated/prisma/client";
@@ -24,6 +26,7 @@ export type RouteSummary = {
 
 const EMPTY_SUMMARY: RouteSummary = { id: null, name: null, plannedDate: null, count: 0, leadTypeId: null, leadTypeName: null, country: null };
 export const DEFAULT_ROUTE_NAME = "My route";
+const EMPTY_PLAN: RoutePlanInfo = { startAddress: null, optimizedAt: null, distanceMeters: null, durationSeconds: null, unplannedCount: 0 };
 
 type Db = AppTransactionClient | typeof prisma;
 
@@ -517,11 +520,25 @@ export type RouteCompanyRow = {
    * lead type or country, flag it as invalid") — a company's own lead type
    * or country can change after it was added. */
   stillValid: boolean;
+  /** Stop number in the planned driving order; null if not planned yet. */
+  position: number | null;
+};
+
+export type RoutePlanInfo = {
+  /** The start/finish address last used, kept to pre-fill the form. */
+  startAddress: string | null;
+  /** Set once the route has been put in driving order. */
+  optimizedAt: Date | null;
+  distanceMeters: number | null;
+  durationSeconds: number | null;
+  /** Bars added since the order was worked out; they list at the end until it's planned again. */
+  unplannedCount: number;
 };
 
 export type RouteDetail = {
   route: RouteSummary;
   companies: RouteCompanyRow[];
+  plan: RoutePlanInfo;
   /** Precomputed here (not just inside exportRoutePlanCsv) so the Route
    * Plan page's export-confirmation dialog can show the exact filename
    * before generation, per spec 9 — null when the lead type has no
@@ -535,10 +552,10 @@ export type RouteDetail = {
  * company was added. */
 export async function getRouteDetail(user: AuthenticatedUser): Promise<RouteDetail> {
   const scope = companyScope(user);
-  if (!scope) return { route: EMPTY_SUMMARY, companies: [], exportFilename: null };
+  if (!scope) return { route: EMPTY_SUMMARY, companies: [], plan: EMPTY_PLAN, exportFilename: null };
 
   const routeId = await activeRouteId(prisma, user.id);
-  if (!routeId) return { route: EMPTY_SUMMARY, companies: [], exportFilename: null };
+  if (!routeId) return { route: EMPTY_SUMMARY, companies: [], plan: EMPTY_PLAN, exportFilename: null };
   const route = await prisma.routePlan.findUnique({
     where: { id: routeId },
     include: {
@@ -551,7 +568,7 @@ export async function getRouteDetail(user: AuthenticatedUser): Promise<RouteDeta
       companies: { where: { company: scope }, include: { company: { include: { leadType: true } } } },
     },
   });
-  if (!route) return { route: EMPTY_SUMMARY, companies: [], exportFilename: null };
+  if (!route) return { route: EMPTY_SUMMARY, companies: [], plan: EMPTY_PLAN, exportFilename: null };
 
   const rows: RouteCompanyRow[] = route.companies.map((entry) => ({
     id: entry.company.id,
@@ -559,7 +576,9 @@ export async function getRouteDetail(user: AuthenticatedUser): Promise<RouteDeta
     formattedAddress: formatRouteAddress(entry.company),
     missingAddressFields: missingRouteAddressFields(entry.company),
     stillValid: entry.company.leadTypeId === route.leadTypeId && normalizeCountry(entry.company.country) === normalizeCountry(route.country ?? ""),
+    position: entry.position,
   }));
+  const planned = route.optimizedAt !== null && rows.some((row) => row.position !== null);
 
   return {
     route: {
@@ -572,6 +591,13 @@ export async function getRouteDetail(user: AuthenticatedUser): Promise<RouteDeta
       country: route.country,
     },
     companies: sortRouteCompanies(rows),
+    plan: {
+      startAddress: route.startAddress,
+      optimizedAt: planned ? route.optimizedAt : null,
+      distanceMeters: planned ? route.totalDistanceMeters : null,
+      durationSeconds: planned ? route.totalDurationSeconds : null,
+      unplannedCount: planned ? rows.filter((row) => row.position === null).length : 0,
+    },
     // Dated by the route's planned day when it has one (e.g. Friday's
     // Hamilton route), else today; the route name goes in too, so several
     // exported routes don't overwrite each other in Downloads.
@@ -664,10 +690,10 @@ export type RouteSheetRow = {
  * filter and order as getRouteDetail) with what a rep wants on paper at the
  * door — phone, stage, main contact, last touch and next follow-up.
  */
-export async function getRouteSheet(user: AuthenticatedUser): Promise<{ route: RouteSummary; companies: RouteSheetRow[] }> {
+export async function getRouteSheet(user: AuthenticatedUser): Promise<{ route: RouteSummary; plan: RoutePlanInfo; companies: RouteSheetRow[] }> {
   const detail = await getRouteDetail(user);
   const ids = detail.companies.map((company) => company.id);
-  if (ids.length === 0) return { route: detail.route, companies: [] };
+  if (ids.length === 0) return { route: detail.route, plan: detail.plan, companies: [] };
 
   const companies = await prisma.company.findMany({
     where: { id: { in: ids } },
@@ -685,6 +711,7 @@ export async function getRouteSheet(user: AuthenticatedUser): Promise<{ route: R
 
   return {
     route: detail.route,
+    plan: detail.plan,
     companies: detail.companies.map((row) => {
       const company = byId.get(row.id);
       const contact = company?.primaryContact ?? company?.contacts[0] ?? null;
@@ -703,4 +730,63 @@ export async function getRouteSheet(user: AuthenticatedUser): Promise<{ route: R
       };
     }),
   };
+}
+
+export type PlanRouteResult = { ok: true; stopCount: number } | { ok: false; error: string };
+
+/**
+ * "Put stops in driving order": asks Google for the shortest round trip
+ * from the rep's start address through every bar on the current route and
+ * back, then saves each bar's stop number. Every stop needs a street
+ * address, or Google would be guessing where it is.
+ */
+export async function planRouteOrder(user: AuthenticatedUser, rawStartAddress: string): Promise<PlanRouteResult> {
+  requirePermission(user, "manage_route_plan");
+  const startAddress = rawStartAddress.trim();
+  if (!startAddress) return { ok: false, error: "Enter where you'll start and finish, e.g. your home or office address." };
+  if (startAddress.length > 300) return { ok: false, error: "Keep the start address under 300 characters." };
+
+  const detail = await getRouteDetail(user);
+  const routeId = detail.route.id;
+  const stops = detail.companies;
+  if (!routeId || stops.length === 0) return { ok: false, error: "Add some bars to this route first." };
+  if (stops.length > MAX_OPTIMIZED_STOPS) {
+    return { ok: false, error: `Google can put up to ${MAX_OPTIMIZED_STOPS} stops in order at once, and this route has ${stops.length}. Split it into two routes.` };
+  }
+  const noStreet = stops.filter((stop) => stop.missingAddressFields.includes("street address"));
+  if (noStreet.length > 0) {
+    return { ok: false, error: `Add a street address first (Find address on the company page can look it up): ${noStreet.map((stop) => stop.name).join(", ")}.` };
+  }
+
+  const rateLimit = await checkRateLimit(`route-optimize:${user.id}`, { windowMs: 60_000, limit: 5 });
+  if (!rateLimit.allowed) return { ok: false, error: "Too many route plans. Wait a minute and try again." };
+
+  const country = detail.route.country ?? "";
+  const addresses = stops.map((stop) => [stop.formattedAddress, country].filter(Boolean).join(", "));
+  let result: OptimizedRoute;
+  try {
+    result = await getRouteOptimizer().optimize(startAddress, addresses);
+  } catch (error) {
+    if (error instanceof RouteOptimizerError) return { ok: false, error: error.message };
+    return { ok: false, error: "Route planning didn't work this time. Try again later." };
+  }
+
+  await prisma.$transaction([
+    ...result.order.map((stopIndex, visit) =>
+      prisma.routePlanCompany.updateMany({ where: { routePlanId: routeId, companyId: stops[stopIndex].id }, data: { position: visit + 1 } }),
+    ),
+    prisma.routePlan.update({
+      where: { id: routeId },
+      data: { startAddress, optimizedAt: new Date(), totalDistanceMeters: result.distanceMeters, totalDurationSeconds: result.durationSeconds },
+    }),
+  ]);
+  await writeAuditEvent({
+    actorId: user.id,
+    module: "route-plan",
+    action: "route_plan.optimized",
+    entityType: "RoutePlan",
+    entityId: routeId,
+    metadata: { stopCount: stops.length, distanceMeters: result.distanceMeters, durationSeconds: result.durationSeconds },
+  });
+  return { ok: true, stopCount: stops.length };
 }

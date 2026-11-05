@@ -12,6 +12,7 @@ import { CONFIDENCE_LABEL, CONFIDENCE_TONE, TRIVIA_STATUS_LABEL } from "@/lib/ui
 import { describeDefaultAction, type CallOutcomeLike } from "@/lib/calling/outcome-preview";
 import { recordCallOutcome, skipEntryTemporarily, skipEntryPermanently, pauseCallingSession, endCallingSession, goToNextEntryOrSummary } from "../../actions";
 import { formatDueDate } from "@/lib/dates";
+import { MapLink } from "@/components/ui/map-link";
 
 type Contact = { id: string; firstName: string; lastName: string; title: string | null; phone: string | null; email: string | null };
 type Activity = { id: string; type: string; occurredAt: Date; notes: string | null; outcome: string | null };
@@ -141,6 +142,7 @@ export function CallScreen({
             <p className="text-sm text-text-muted">
               {company.address1 ? `${company.address1}, ` : ""}
               {company.city}, {company.region}
+              <MapLink name={company.name} address={[company.address1, company.city, company.region]} className="ml-2" />
             </p>
             {company.websiteUrl && (
               <a href={company.websiteUrl} target="_blank" rel="noreferrer" className="text-sm text-secondary hover:underline">

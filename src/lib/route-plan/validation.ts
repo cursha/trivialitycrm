@@ -104,8 +104,16 @@ export function isRouteAddressComplete(company: RouteAddressInput): boolean {
  * same relative order across renders/exports rather than however the
  * underlying query happened to return them.
  */
-export function sortRouteCompanies<T extends { id: string; name: string }>(companies: T[]): T[] {
-  return [...companies].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }) || a.id.localeCompare(b.id));
+export function sortRouteCompanies<T extends { id: string; name: string; position?: number | null }>(companies: T[]): T[] {
+  return [...companies].sort((a, b) => {
+    // Planned stops first, in driving order; anything added since, by name.
+    const aPos = a.position ?? null;
+    const bPos = b.position ?? null;
+    if (aPos !== null && bPos !== null && aPos !== bPos) return aPos - bPos;
+    if (aPos !== null && bPos === null) return -1;
+    if (aPos === null && bPos !== null) return 1;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: "base" }) || a.id.localeCompare(b.id);
+  });
 }
 
 /** Filename-safe: lowercase letters, digits, and hyphens only, no leading/

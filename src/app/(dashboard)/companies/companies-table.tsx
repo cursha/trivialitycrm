@@ -8,6 +8,7 @@ import { GRADE_TONE, GRADE_LABEL, TRIVIA_STATUS_LABEL } from "@/lib/ui/status-to
 import { BulkToolbar } from "@/app/(dashboard)/pipeline/bulk-toolbar";
 import type { StageOption } from "@/app/(dashboard)/pipeline/company-card";
 import type { RouteListItem } from "@/lib/route-plan/service";
+import { MapLink } from "@/components/ui/map-link";
 
 type Option = { id: string; name: string };
 
@@ -133,8 +134,11 @@ export function CompaniesTable({
                       </Link>
                       <RouteBadge names={routeNamesByCompany[company.id]} />
                     </div>
-                    <div className="max-w-xs truncate text-xs text-text-muted" title={formatAddressLine(company)}>
-                      {formatAddressLine(company)}
+                    <div className="flex max-w-xs items-center gap-2 text-xs text-text-muted">
+                      <span className="truncate" title={formatAddressLine(company)}>
+                        {formatAddressLine(company)}
+                      </span>
+                      <MapLink name={company.name} address={[formatAddressLine(company)]} />
                     </div>
                   </td>
                   {showLeadType && <td className="px-5 py-4">{company.leadType.name}</td>}
@@ -205,7 +209,10 @@ export function CompaniesTable({
                       {company.pipelineStage.name}
                     </Badge>
                   </div>
-                  <p className="text-xs text-text-muted">{formatAddressLine(company)}</p>
+                  <p className="text-xs text-text-muted">
+                    {formatAddressLine(company)}
+                    <MapLink name={company.name} address={[formatAddressLine(company)]} className="ml-2" />
+                  </p>
                   <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
                     {showLeadType && (
                       <div>

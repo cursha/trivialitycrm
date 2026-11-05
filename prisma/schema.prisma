@@ -858,22 +858,29 @@ model SavedView {
 // isolation via userId is the entire privacy boundary — confirmed with the
 // account holder before building this.
 model RoutePlan {
-  id          String             @id @default(cuid())
-  userId      String
-  user        User               @relation("UserRoutePlans", fields: [userId], references: [id], onDelete: Cascade)
-  name        String             @default("My route")
+  id                   String             @id @default(cuid())
+  userId               String
+  user                 User               @relation("UserRoutePlans", fields: [userId], references: [id], onDelete: Cascade)
+  name                 String             @default("My route")
   // Optional day the route is for; also dates the exported CSV's filename.
-  plannedDate DateTime?          @db.Date
-  activeFor   User?              @relation("ActiveRoutePlan")
+  plannedDate          DateTime?          @db.Date
+  activeFor            User?              @relation("ActiveRoutePlan")
   // Both null while the route is empty — the first company added
   // establishes both, per spec. Never inferred from display text: compared
   // by ID (leadTypeId) and a normalized country string, never by name.
-  leadTypeId  String?
-  leadType    LeadType?          @relation(fields: [leadTypeId], references: [id])
-  country     String?
-  companies   RoutePlanCompany[]
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  leadTypeId           String?
+  leadType             LeadType?          @relation(fields: [leadTypeId], references: [id])
+  country              String?
+  // "Put stops in driving order" (Google Routes API): where the rep starts
+  // and finishes, when the order was last worked out, and that trip's
+  // driving totals. All null until the route is first planned.
+  startAddress         String?
+  optimizedAt          DateTime?
+  totalDistanceMeters  Int?
+  totalDurationSeconds Int?
+  companies            RoutePlanCompany[]
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 
   @@index([userId])
 }
@@ -887,6 +894,10 @@ model RoutePlanCompany {
   addedAt     DateTime  @default(now())
   addedById   String
   addedBy     User      @relation(fields: [addedById], references: [id])
+  // Stop number in the planned driving order (1 = first). Null until the
+  // route is planned, and for a bar added after — those list after the
+  // planned stops, by name.
+  position    Int?
 
   // Prevents a duplicate add at the database level, not just in application
   // logic — a second "Add to Route" on the same company is a no-op, not a

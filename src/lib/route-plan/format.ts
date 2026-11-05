@@ -14,10 +14,31 @@ export function routeLabel(route: { name: string; plannedDate: string | null }):
   return day ? `${route.name} (${day})` : route.name;
 }
 
-/** A Google Maps link for a place (Maps URLs: no API key, opens the Maps app
- * on a phone). Name plus address finds the business itself rather than just
- * the street address; null when there's no address to go on. */
-export function googleMapsHref(name: string, formattedAddress: string): string | null {
-  if (!formattedAddress.trim()) return null;
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name}, ${formattedAddress}`)}`;
+
+/** "142 km", or miles for a US route. */
+export function formatRouteDistance(meters: number, country: string | null): string {
+  const us = /^(us|usa|united states)/i.test(country?.trim() ?? "");
+  const value = us ? meters / 1609.344 : meters / 1000;
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${us ? "mi" : "km"}`;
+}
+
+/** "3 h 10 min", "45 min". */
+export function formatDriveTime(seconds: number): string {
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours === 0) return `${minutes} min`;
+  return rest === 0 ? `${hours} h` : `${hours} h ${rest} min`;
+}
+
+/** One line for a planned route, or null when it hasn't been planned. */
+export function describeRoutePlan(
+  plan: { startAddress: string | null; optimizedAt: Date | null; distanceMeters: number | null; durationSeconds: number | null },
+  country: string | null,
+): string | null {
+  if (!plan.optimizedAt || !plan.startAddress) return null;
+  const parts = [`In driving order from ${plan.startAddress} and back`];
+  if (plan.distanceMeters) parts.push(formatRouteDistance(plan.distanceMeters, country));
+  if (plan.durationSeconds) parts.push(`about ${formatDriveTime(plan.durationSeconds)} of driving`);
+  return `${parts.join(" · ")}.`;
 }

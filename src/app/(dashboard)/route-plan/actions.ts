@@ -11,6 +11,8 @@ import {
   updateRoute,
   selectRoute,
   deleteRoute,
+  planRouteOrder,
+  type PlanRouteResult,
   type AddToRouteResult,
   type BulkAddResult,
   type RouteMutationResult,
@@ -89,4 +91,12 @@ export async function clearRouteAction(): Promise<void> {
   await clearRoute(user);
   revalidatePath(ROUTE_PLAN_PATH);
   revalidatePath("/companies");
+}
+
+/** Puts the current route's stops in driving order from a start address. */
+export async function planRouteAction(startAddress: string): Promise<PlanRouteResult> {
+  const user = await requireUser();
+  const result = await planRouteOrder(user, startAddress);
+  if (result.ok) revalidatePath(ROUTE_PLAN_PATH);
+  return result;
 }

@@ -222,6 +222,26 @@ steps are in `AGENTS.md`.
   their own copy of the prompt they used, so deleting one never changes
   search history.
 
+## Google lookups (Find address, route planning)
+
+Quick Search, Pub Lead Finder, **Find address** and **Put stops in driving
+order** use the CRM's Google key (`GOOGLE_PLACES_API_KEY`, with
+`PLACES_PROVIDER=google`). None of them is AI or counts against the AI
+budget.
+
+- **Find address** uses the Places API, already enabled for the lead
+  searches.
+- **Put stops in driving order** uses Google's **Routes API**, which has
+  to be enabled once on the same key: in Google Cloud Console, open the
+  project that holds the key, go to **APIs & Services → Library**, search
+  for **Routes API** and click **Enable**. If the key has API
+  restrictions, add Routes API to its allowed list. Until then,
+  salespeople see "Route planning isn't switched on yet."
+- Cost: Google gives 5,000 route plans a month free (across all projects
+  on the billing account), then about 1¢ each. Each click of **Put stops
+  in driving order** or **Plan again** is one plan, limited to 5 a minute
+  per person.
+
 ## Email connections (per-user)
 
 Settings → Email Connections (`connect_mailbox`) is where each user connects

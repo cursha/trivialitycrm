@@ -211,6 +211,16 @@ alone; nobody else sees or changes them.
 - **Route Plan** (in the menu) shows one route at a time. Click a route to
   switch to it, use **New route** to start another, and rename, change the
   day of, or delete the route you're looking at.
+- **Put stops in driving order**: in the **Driving order** box, type where
+  you'll start and finish (your home or office address) and click **Put
+  stops in driving order**. Google works out the shortest drive from there
+  through every bar on the route and back, and the list, the route sheet
+  and the export all follow that order, numbered by stop. It shows the
+  total distance and driving time too. Every bar needs a street address
+  first (**Find address** on the company page can look one up), and one
+  route can have up to 25 stops. A bar you add afterwards goes at the end
+  of the list until you click **Plan again**. The start address is
+  remembered for next time.
 - **Export** the route you're looking at to EZRoutePlanner to put the stops
   in order. The file is named after the route and its day. On a phone it
   goes to your downloads: on Android, tap the "Download complete"
@@ -222,10 +232,18 @@ alone; nobody else sees or changes them.
   order as the route, with its address, phone, pipeline step, main contact
   (and their best time to reach), your last call, visit or note, any
   follow-up due, and lines for writing notes at the door. Click **Print**
-  on that page; the menu and header are left off the paper. On screen,
-  each address has a **Map** link that opens it in Google Maps (the Maps
-  app on a phone). To print a different route, switch to it on the Route
-  Plan page first.
+  on that page; the menu and header are left off the paper. To print a
+  different route, switch to it on the Route Plan page first.
+
+## Map links
+
+Wherever the CRM shows a bar's address, a small **📍 Map** link next to
+it opens that bar in Google Maps, in a new tab (or the Maps app on a
+phone), ready for directions. You'll find it on the company page (beside
+the street address), the Companies list, your Route Plan and route sheet,
+the call screen, search results, and the Pub Lead Finder and Competition
+Locator reviews. It searches for the bar's name and address together, so
+Maps lands on the business itself. Map links don't appear on printouts.
 - **Add several bars at once** from the Companies list or a Pipeline list:
   tick them, click **Add Selected to Route**, then pick the route (your
   current one is chosen for you) or **+ New route…**, and click **Add**.

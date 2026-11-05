@@ -13,6 +13,33 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v29.0 — 2026-11-05
+### New — put a route's stops in driving order
+- The Route Plan page has a **Driving order** box: enter where you start
+  and finish, click **Put stops in driving order**, and Google's Routes
+  API works out the shortest round trip through every bar on the route.
+  The list, the route sheet and the EZRoutePlanner export follow that
+  order, numbered by stop, with the total distance and driving time. A bar
+  added later goes at the end until the route is planned again. Up to 25
+  stops; every stop needs a street address. Curt chose in-app planning
+  over opening the stops in Google Maps.
+- Needs the **Routes API** enabled on the CRM's Google key (see the
+  Administrator Guide). About 1¢ per plan after Google's 5,000 free a
+  month.
+- Database: a migration adds the start address, when the route was
+  planned and its driving totals to each route, and a stop number to each
+  bar on a route. All new columns are optional; existing routes are
+  unchanged until they're planned.
+### Improved — Google Maps links on every address
+- A **Map** link (with a pin icon) now sits next to each bar's address on
+  the company page, the Companies list, the Route Plan page, the call
+  screen, search results, and the Pub Lead Finder and Competition Locator
+  reviews, as well as the route sheet. It opens Google Maps on the bar's
+  name and address. Curt asked for map links on every location.
+- Plain Google Maps links: no API key, no cost. Hidden on printouts.
+- Manual: Route plans explains driving order; new "Map links" section; the
+  Administrator Guide has a new "Google lookups" section.
+
 ## v28.0 — 2026-11-05
 ### New — printable route sheet
 - **Print route sheet** on the Route Plan page opens a printable list of

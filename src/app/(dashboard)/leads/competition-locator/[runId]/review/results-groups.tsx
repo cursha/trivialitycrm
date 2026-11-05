@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Label, Select } from "@/components/ui/field";
+import { MapLink } from "@/components/ui/map-link";
 
 type ContactDataEntry = { firstName?: string; lastName?: string; phone?: string; email?: string; title?: string; note?: string };
 
@@ -294,6 +295,7 @@ function ResultRowCard({
           </div>
           <p className="text-sm text-text-muted">
             {[row.address1, row.city, row.region, row.postalCode, row.country].filter(Boolean).join(", ")}
+            <MapLink name={row.name} address={[row.address1, row.city, row.region, row.postalCode, row.country]} className="ml-2" />
           </p>
           <p className="text-sm text-text-muted">
             {[row.phone, row.email, row.websiteUrl].filter(Boolean).join(" · ")}
