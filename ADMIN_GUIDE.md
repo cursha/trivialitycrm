@@ -194,6 +194,14 @@ steps are in `AGENTS.md`.
   tell salespeople to stop using it, or remove `run_research` from their
   role (which also stops Research this business). The free website check
   needs only `review_research_results`.
+- **Read a Web Page** (Leads, needs `run_research`) uses one AI call
+  per page to pick the businesses out of its text: a few cents for one
+  bar's page, up to about 30¢ for a long list page. It counts against the
+  daily and monthly caps and the per-user daily search limit like any
+  search, and shows in Reports → AI Spend as "Reading a web page for
+  leads". The CRM fetches the page itself, public web addresses only
+  (never internal or private network addresses), and nothing reaches the
+  CRM until someone transfers it.
 - **Minimum score:** a strict prompt scores honestly, so a good lead can
   land in the 70s. If good-looking venues are marked below the minimum
   score, lower it (70 suits a prompt that says 70–84 is a good fit).

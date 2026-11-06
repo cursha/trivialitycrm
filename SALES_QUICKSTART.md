@@ -49,8 +49,8 @@ with work left opens on its own, and a step turns green when there's
 nothing left in it.
 
 1. **Add new bars**: every way to add them (Quick Add, the full form, Pub
-   Lead Finder, Quick Search, AI research, Competition Locator, spreadsheet
-   import, and reviewing search results).
+   Lead Finder, Quick Search, Read a Web Page, AI research, Competition
+   Locator, spreadsheet import, and reviewing search results).
 2. **Fill in the info**: your Target bars missing the manager's contact
    info or trivia history.
 3. **Plan your route and drop off flyers**: Local Target bars not on any
@@ -617,6 +617,37 @@ The quickest check: their Facebook or Instagram first (more current than a
 website), then the newest Google reviews (search them for "trivia" or
 "karaoke"), then the Google photos for TVs and seating.
 
+## Read a Web Page (if you have access)
+
+Found a bar on TripAdvisor, a "best pubs in town" article, a league's list
+of venues or a local directory? Leads → **Read a Web Page** pulls the
+businesses off that page for you, so you don't have to copy them in by
+hand.
+
+1. Paste the page's link from your browser's address bar.
+2. Choose the Lead Type, and the country and province. The province is
+   only used when the page doesn't say where a business is.
+3. Click **Read this page**. It takes a few seconds to a minute.
+4. The results page lists every business found, with whatever the page
+   showed: name, street address, city, postal code, phone, email and
+   website. Check each one, then transfer the ones you want into the CRM
+   the same way as any other search (see **Reviewing search results**).
+   Nothing goes into the CRM until you transfer it.
+
+Good to know:
+
+- It reads only what the page shows. Anything missing (often the email or
+  website) is left blank, never guessed. **Find address**, **Find emails**
+  or **Research this business** can fill gaps afterwards.
+- It works on one bar's page (one result) or a list page (one result per
+  business, up to 150).
+- Some pages can't be read: ones you have to sign in to see, sites that
+  block the CRM, and pages built entirely by JavaScript in the browser.
+  The search page says so when that happens.
+- It uses a small amount of AI: a few cents for one bar's page, up to
+  about 30¢ for a very long list.
+- Use pages that are public, and respect the site's rules on copying.
+
 ## Pub Lead Finder (if you have access)
 
 Leads → **Pub Lead Finder** finds bars near a pub you already have, for
@@ -676,8 +707,8 @@ Competitors page), and the states or provinces to search.
 ## Reviewing search results
 
 A search's **results** page lists what it found, highest score first.
-Directory results (Quick Search, Directory listing) all show "Not yet
-researched" until you research them.
+Directory results (Quick Search, Directory listing) and businesses read
+off a web page all show "Not yet researched" until you research them.
 
 - **Meets minimum score** shows only results at or above the search's
   minimum score; **All results** shows everything, including those below

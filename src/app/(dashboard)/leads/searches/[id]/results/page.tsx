@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission, hasPermission } from "@/lib/auth/permissions";
 import { ResultsTable } from "./results-table";
 import { PageHeader } from "@/components/ui/page-header";
+import { webPageLabel } from "@/lib/research/page-text";
 
 export const metadata = { title: "Search Results — Triviality CRM" };
 
@@ -71,8 +72,12 @@ export default async function SearchResultsPage({
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader
-        title={`${search.region}, ${search.country} — Results`}
-        description={`Ranked highest to lowest quality score. Minimum score for this search: ${search.minimumScore}.`}
+        title={search.mode === "WEB_PAGE" ? `Web page: ${webPageLabel(search.sourceUrl)} — Results` : `${search.region}, ${search.country} — Results`}
+        description={
+          search.mode === "WEB_PAGE"
+            ? `The businesses read from ${search.sourceUrl ?? "the page"}. Check each one, then transfer the ones you want.`
+            : `Ranked highest to lowest quality score. Minimum score for this search: ${search.minimumScore}.`
+        }
       />
 
       <ResultsTable

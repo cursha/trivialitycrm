@@ -50,6 +50,10 @@ enum LeadSearchMode {
   // AI finds venues against the search's prompt; existing trivia is kept
   // (a buying signal), not excluded. Curt's call, v9.0.
   AI_PROMPT
+  // "Read a web page" (v30.0): the businesses listed on one public page the
+  // user pasted (LeadSearch.sourceUrl), pulled out by AI. Reviewed and
+  // transferred like Quick Search results; no verify/score pass.
+  WEB_PAGE
 }
 
 enum DistanceUnit {
@@ -1364,6 +1368,9 @@ model LeadSearch {
   // The names of the chain locations left out, one per location, so the
   // search page can say what was dropped.
   chainsLeftOut String[] @default([])
+
+  // WEB_PAGE only: the public page the leads were read from.
+  sourceUrl String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

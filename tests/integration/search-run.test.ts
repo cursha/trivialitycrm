@@ -3,6 +3,7 @@ import { resetDatabase, testPrisma } from "../helpers/db";
 import { createRoleWithPermissions, createTestUser, createLeadTypeFixture, createCompetitorFixture, createLeadSearchFixture, createSearchResultFixture } from "../helpers/fixtures";
 import { runSearchJob } from "../../src/lib/research/run-search";
 import { MockCandidateDiscoveryProvider, MockPlacesProvider } from "../../src/lib/research/providers/mock";
+import { WebPageDiscoveryProvider, WebPageError } from "../../src/lib/research/providers/web-page";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -207,6 +208,41 @@ describe("runSearchJob", () => {
     expect(results.map((r) => r.name)).toEqual(["Has Trivia Already", "Live Music Pub"]);
     const candidates = await testPrisma.searchCandidate.findMany({ where: { searchId: search.id } });
     expect(candidates.every((c) => c.status === "COMPLETED" && c.verifiedData !== null)).toBe(true);
+  });
+
+  it("WEB_PAGE lists what was read off the page as NEW, unscored, wherever each business is", async () => {
+    const { user, leadType } = await baseFixtures();
+    const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, region: "ON", mode: "WEB_PAGE", minimumScore: 0, sourceUrl: "https://www.tripadvisor.ca/x.html" });
+    const discover = vi.spyOn(WebPageDiscoveryProvider.prototype, "discover").mockImplementation(async (params) => {
+      expect(params.sourceUrl).toBe("https://www.tripadvisor.ca/x.html");
+      return [
+        { name: "Wimpy's Diner", address1: "400 Scott St", city: "St. Catharines", region: "ON", postalCode: "L2M 3W4", country: "Canada", phone: "+1 905-397-0800", email: null, websiteUrl: null, contactData: null, triviaStatus: "UNCERTAIN", competitorName: null, day: null, evidence: [], sources: [{ url: "https://www.tripadvisor.ca/x.html", title: null }] },
+        { name: "Over The Border", address1: null, city: "Gatineau", region: "QC", postalCode: null, country: "Canada", phone: null, email: null, websiteUrl: null, contactData: null, triviaStatus: "UNCERTAIN", competitorName: null, day: null, evidence: [], sources: [] },
+      ];
+    });
+
+    await runSearchJob(search.id);
+
+    expect(discover).toHaveBeenCalledOnce();
+    expect((await testPrisma.leadSearch.findUniqueOrThrow({ where: { id: search.id } })).status).toBe("SUCCEEDED");
+    const results = await testPrisma.searchResult.findMany({ where: { searchId: search.id }, orderBy: { name: "asc" } });
+    expect(results.map((r) => [r.name, r.disposition, r.score])).toEqual([
+      ["Over The Border", "NEW", 0],
+      ["Wimpy's Diner", "NEW", 0],
+    ]);
+    expect(results[1]).toMatchObject({ postalCode: "L2M 3W4", phone: "+1 905-397-0800" });
+  });
+
+  it("WEB_PAGE shows the page reader's own message when the page can't be read", async () => {
+    const { user, leadType } = await baseFixtures();
+    const search = await createLeadSearchFixture({ createdById: user.id, leadTypeId: leadType.id, mode: "WEB_PAGE", sourceUrl: "https://blocked.example.com/" });
+    vi.spyOn(WebPageDiscoveryProvider.prototype, "discover").mockRejectedValueOnce(new WebPageError("Couldn't open that page. The site may be down."));
+
+    await runSearchJob(search.id);
+
+    const updated = await testPrisma.leadSearch.findUniqueOrThrow({ where: { id: search.id } });
+    expect(updated.status).toBe("FAILED");
+    expect(updated.errorMessage).toBe("Couldn't open that page. The site may be down.");
   });
 
   it("checkpoints a large discovery in one bulk insert, not a per-candidate transaction", async () => {

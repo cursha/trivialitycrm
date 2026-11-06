@@ -11,6 +11,8 @@ import {
 } from "./anthropic";
 import { GooglePlacesDiscoveryProvider } from "./google-places";
 import { GooglePlacesNearbyDiscoveryProvider } from "./google-places-nearby";
+import { WebPageDiscoveryProvider, MockPageExtractor } from "./web-page";
+import { AnthropicPageExtractor } from "./anthropic";
 
 /**
  * Selects the research provider implementation from AI_PROVIDER (and, for
@@ -55,7 +57,11 @@ export function getProviders(mode: LeadSearchMode): ResearchProviders {
   }
 
   let discovery;
-  if (mode === "GENERAL" && placesProvider === "google") {
+  // "Read a web page": the CRM fetches the page itself; only reading the
+  // businesses off it depends on AI_PROVIDER.
+  if (mode === "WEB_PAGE") {
+    discovery = new WebPageDiscoveryProvider(aiProvider === "anthropic" ? new AnthropicPageExtractor() : new MockPageExtractor());
+  } else if (mode === "GENERAL" && placesProvider === "google") {
     discovery = new GooglePlacesDiscoveryProvider();
   } else if (mode === "GENERAL" && placesProvider === "mock") {
     discovery = new MockPlacesProvider();

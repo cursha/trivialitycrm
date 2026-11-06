@@ -58,6 +58,15 @@ export const QuickSearchSetupSchema = z.object({
 
 export type QuickSearchSetupValues = z.infer<typeof QuickSearchSetupSchema>;
 
+// "Read a web page" (Leads): one public page to read the businesses off.
+// The address itself is checked again by parseWebsiteUrl() when it's read.
+export const WebPageSearchSchema = z.object({
+  url: z.string().trim().min(1, { error: "Paste the web address of the page." }).max(2000, { error: "That web address is too long." }),
+  leadTypeId: z.string().min(1, { error: "Choose a Lead Type." }),
+  country: z.enum(CountryValues, { error: "Choose Canada or United States." }),
+  region: RegionCodeSchema,
+});
+
 // A population box: blank for no limit, otherwise a whole number of people
 // ("10,000" and "10000" both read as 10000).
 const PopulationBoundSchema = z

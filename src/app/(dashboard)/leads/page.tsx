@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Sparkles, ListChecks, Upload, FileText, Zap, Trophy } from "lucide-react";
+import { Sparkles, ListChecks, Upload, FileText, Zap, Trophy, Globe } from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
 import { PageHeader } from "@/components/ui/page-header";
@@ -22,6 +22,13 @@ export default async function LeadsHubPage() {
       label: "Quick Search",
       description: "Check off venue types and an area, get a plain directory listing — no prompt, no AI scoring.",
       icon: Zap,
+      show: hasPermission(user, "run_research"),
+    },
+    {
+      href: "/leads/web-page",
+      label: "Read a Web Page",
+      description: "Paste a link to a public page and pull out the businesses on it to review and transfer.",
+      icon: Globe,
       show: hasPermission(user, "run_research"),
     },
     {

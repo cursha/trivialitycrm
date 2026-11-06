@@ -13,6 +13,30 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v30.0 — 2026-11-05
+### New — Read a Web Page (Leads)
+- Leads → **Read a Web Page**: paste a link to a public page (a
+  TripAdvisor listing, a "best pubs" article, a directory) and the CRM
+  pulls out the businesses on it — name, street address, city, postal
+  code, phone, email and website — onto the usual results page to review
+  and transfer. Nothing reaches the CRM until it's transferred. Curt asked
+  for it: give it a URL under Leads, pull out the info, transfer if he
+  chooses.
+- How it works: the CRM fetches the page itself through the same
+  hardened fetcher Find emails uses (public addresses only, redirects
+  rechecked, size and time capped), turns it into plain text, and one AI
+  call lists the businesses on it, copying only what the page shows. Up to
+  150 per page. About 2–3¢ for one bar's page (measured on a TripAdvisor
+  listing: 540 KB of page became about 18,000 characters of text), up to
+  about 30¢ for a long list. Counts against the AI budget and daily search
+  limit; shows in AI Spend as "Reading a web page for leads".
+- Pages that need a sign-in, block the CRM, or are built entirely by
+  JavaScript can't be read; the search page says so in plain words.
+- Database: a migration adds a "web page" search type and the page's
+  address to each search. Existing searches are unchanged.
+- Manual: new "Read a Web Page" section; the Administrator Guide covers
+  its cost.
+
 ## v29.0 — 2026-11-05
 ### New — put a route's stops in driving order
 - The Route Plan page has a **Driving order** box: enter where you start

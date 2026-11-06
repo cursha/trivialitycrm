@@ -17,6 +17,7 @@ import { classifyProviderError } from "../integrations/provider-errors";
 import { findOrCreateCompetitor } from "../competitors/find-or-create";
 import { radiusToMeters } from "../geo/distance";
 import type { DiscoverParams, ResearchCandidate, DiscoveryProgressUpdate } from "./providers/types";
+import { WebPageError } from "./providers/web-page";
 
 // Competition Locator's verification-standard rejection reasons (seeded in
 // prisma/seed.ts). Looked up once by name, not hardcoded ids, matching the
@@ -50,6 +51,8 @@ async function callProviderSafely<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
   } catch (error) {
+    // Already written for the user ("Couldn't open that page..."), so shown as-is.
+    if (error instanceof WebPageError) throw error;
     throw new Error(classifyProviderError(error).safeMessage);
   }
 }
@@ -78,6 +81,11 @@ function isOriginCompany(candidate: ResearchCandidate, originCompany: { normaliz
 // rate limit per provider name, and small enough that a mid-batch budget
 // breach (see below) only ever overshoots by a bounded, small amount.
 const CANDIDATE_CONCURRENCY = 3;
+
+// Modes whose candidates get no automatic AI verify/score pass: listed as
+// found, NEW, placeholder score 0, until someone uses "Research this
+// business". WEB_PAGE's one AI call is reading the page, in discovery.
+const UNSCORED_MODES = new Set<string>(["GENERAL", "COMPETITOR", "PUB_RADIUS", "WEB_PAGE"]);
 
 function chunk<T>(items: T[], size: number): T[][] {
   const chunks: T[][] = [];
@@ -158,6 +166,7 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       // (startPubRadiusSearch), never recomputed here. radiusValue/radiusUnit
       // are only ever both set together with originLat/originLng (see the
       // schema comment on LeadSearch), so this is safe as a single condition.
+      sourceUrl: search.sourceUrl ?? undefined,
       originLatLng: search.mode === "PUB_RADIUS" && search.originLat !== null && search.originLng !== null ? { lat: search.originLat, lng: search.originLng } : undefined,
       radiusMeters: search.mode === "PUB_RADIUS" && search.radiusValue !== null && search.radiusUnit !== null ? radiusToMeters(search.radiusValue, search.radiusUnit) : undefined,
       searchId: search.id,
@@ -222,7 +231,9 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       // (which keeps them visible as auto-rejected, below). Google Places
       // results are also checked by city in the provider itself.
       const inArea =
-        search.mode === "PUB_RADIUS" || search.mode === "COMPETITOR" ? withoutOrigin : withoutOrigin.filter((candidate) => isInSearchedRegion(candidate, search));
+        // WEB_PAGE too: a list page can cover several provinces, and the
+        // page is what the user chose to read.
+        search.mode === "PUB_RADIUS" || search.mode === "COMPETITOR" || search.mode === "WEB_PAGE" ? withoutOrigin : withoutOrigin.filter((candidate) => isInSearchedRegion(candidate, search));
 
       // Quick Search with "Exclude chains/franchises" ticked: drop
       // them before the cap, so the cap counts only places that are kept.
@@ -291,7 +302,7 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       // once its own verify/score calls moved to the opt-in "Research this
       // business" pass (below) — pass-1 COMPETITOR candidates place no paid
       // call here either now.
-      if (search.mode !== "GENERAL" && search.mode !== "COMPETITOR" && search.mode !== "PUB_RADIUS") {
+      if (!UNSCORED_MODES.has(search.mode)) {
         const midRunCheck = await checkMidRunAiBudget(search.id, { overrideSpendLimit: search.budgetOverride });
         if (!midRunCheck.allowed) {
           await writeAuditEvent({
@@ -312,7 +323,7 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       let score: number;
       let explanation: string;
 
-      if (search.mode === "GENERAL" || search.mode === "COMPETITOR" || search.mode === "PUB_RADIUS") {
+      if (UNSCORED_MODES.has(search.mode)) {
         // Directory-sourced (GENERAL, PUB_RADIUS) candidates never got an automatic AI
         // verify/score pass — that's the entire point of the discovery/
         // research split (see providers/google-places.ts and results/
@@ -406,7 +417,7 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       let disposition: "REJECTED" | "NEW" | "BELOW_SCORE" =
         priorRejections.length > 0
           ? "REJECTED"
-          : search.mode === "GENERAL" || search.mode === "COMPETITOR" || search.mode === "PUB_RADIUS"
+          : UNSCORED_MODES.has(search.mode)
             ? "NEW"
             : score < search.minimumScore
               ? "BELOW_SCORE"
@@ -487,7 +498,7 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       // in practice (competitorId is null unless a candidate's own
       // competitorName happens to resolve one, same as GENERAL mode) — no
       // separate branch needed for that part.
-      if ((search.mode === "COMPETITOR" || search.mode === "PUB_RADIUS") && disposition !== "REJECTED") {
+      if ((search.mode === "COMPETITOR" || search.mode === "PUB_RADIUS" || search.mode === "WEB_PAGE") && disposition !== "REJECTED") {
         duplicateMatches = await findScoredDuplicateMatches(prisma, {
           name: verified.name,
           address1: verified.address1,

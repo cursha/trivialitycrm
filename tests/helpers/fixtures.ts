@@ -205,7 +205,8 @@ export async function createLeadSearchFixture(opts: {
   region?: string;
   cities?: string[];
   minimumScore?: number;
-  mode?: "TRIVIA_GAP" | "TRIVIA_CONFIRMED" | "COMPETITOR" | "GENERAL" | "PUB_RADIUS" | "AI_PROMPT";
+  mode?: "TRIVIA_GAP" | "TRIVIA_CONFIRMED" | "COMPETITOR" | "GENERAL" | "PUB_RADIUS" | "AI_PROMPT" | "WEB_PAGE";
+  sourceUrl?: string | null;
   runCorrelationId?: string | null;
   // PUB_RADIUS only — see the schema comment on LeadSearch. Left undefined
   // for every other mode's fixture calls.
@@ -233,6 +234,7 @@ export async function createLeadSearchFixture(opts: {
       radiusUnit: opts.radiusUnit ?? null,
       originLat: opts.originLat ?? null,
       originLng: opts.originLng ?? null,
+      sourceUrl: opts.sourceUrl ?? null,
     },
   });
 }

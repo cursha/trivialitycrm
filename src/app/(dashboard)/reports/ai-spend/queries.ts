@@ -6,6 +6,7 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { reportScope, reportUserWhere } from "@/lib/reports/scope";
 import { resolveValidatedDateRange, type ReportFilters } from "@/lib/reports/filters";
 import { zonedCalendarDate } from "@/lib/timezone";
+import { webPageLabel } from "@/lib/research/page-text";
 import type { Prisma } from "@/generated/prisma/client";
 
 /**
@@ -21,6 +22,7 @@ export const AI_OPERATION_LABEL: Record<string, string> = {
   verify: "Lead search: checking venues",
   score: "Lead search: scoring venues",
   findEmail: "Finding emails (web search)",
+  readWebPage: "Reading a web page for leads",
   analyzeOpportunity: "Opportunity analysis",
   personalizeCampaign: "Campaign personalisation",
   promptAssist: "Prompt help",
@@ -100,7 +102,7 @@ export async function getAiSpendReport(user: AuthenticatedUser, filters: ReportF
     prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } }),
     prisma.leadSearch.findMany({
       where: { id: { in: searchIds } },
-      select: { id: true, mode: true, region: true, country: true, createdAt: true, originCompany: { select: { name: true } } },
+      select: { id: true, mode: true, region: true, country: true, sourceUrl: true, createdAt: true, originCompany: { select: { name: true } } },
     }),
   ]);
   const userName = new Map(users.map((u) => [u.id, u.name]));
@@ -148,7 +150,9 @@ export async function getAiSpendReport(user: AuthenticatedUser, filters: ReportF
         ? "Deleted search"
         : search.mode === "PUB_RADIUS"
           ? `Near ${search.originCompany?.name ?? "unknown pub"}`
-          : `${search.region}, ${search.country}`;
+          : search.mode === "WEB_PAGE"
+            ? `Web page: ${webPageLabel(search.sourceUrl)}`
+            : `${search.region}, ${search.country}`;
       return { label, costUsd: cost(g._sum), calls: g._count, href: search ? `/leads/searches/${search.id}` : undefined, createdAt: search?.createdAt ?? null };
     }),
     calls: calls.map((c) => ({

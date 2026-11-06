@@ -5,6 +5,7 @@ import { requirePermission, hasPermission } from "@/lib/auth/permissions";
 import { SearchStatus } from "./search-status";
 import { PageHeader } from "@/components/ui/page-header";
 import { describeEntertainment, describeVenueKinds } from "@/lib/research/entertainment";
+import { webPageLabel } from "@/lib/research/page-text";
 
 export const metadata = { title: "Search Status — Triviality CRM" };
 
@@ -28,13 +29,19 @@ export default async function SearchStatusPage({ params }: { params: Promise<{ i
       venueKinds: true,
       excludeChains: true,
       chainsLeftOut: true,
+      sourceUrl: true,
       originCompany: { select: { name: true } },
     },
   });
   if (!search) notFound();
 
   const isPubRadius = search.mode === "PUB_RADIUS";
-  const title = isPubRadius ? `Search: near ${search.originCompany?.name ?? "Unknown pub"}` : `Search: ${search.region}, ${search.country}`;
+  const isWebPage = search.mode === "WEB_PAGE";
+  const title = isPubRadius
+    ? `Search: near ${search.originCompany?.name ?? "Unknown pub"}`
+    : isWebPage
+      ? `Web page: ${webPageLabel(search.sourceUrl)}`
+      : `Search: ${search.region}, ${search.country}`;
 
   // Each chain once, with how many of its locations were left out.
   const chainCounts = new Map<string, number>();
@@ -45,7 +52,7 @@ export default async function SearchStatusPage({ params }: { params: Promise<{ i
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader
         title={title}
-        description={`Mode: ${search.mode}${search.venueKinds.length > 0 ? ` · Searched for ${describeVenueKinds(search.venueKinds)}` : ""}${search.entertainment.length > 0 ? ` · Only venues offering ${describeEntertainment(search.entertainment)}` : ""}${search.excludeChains ? " · Chains and franchises left out" : ""}`}
+        description={isWebPage ? `Businesses read from ${search.sourceUrl ?? "the page"}` : `Mode: ${search.mode}${search.venueKinds.length > 0 ? ` · Searched for ${describeVenueKinds(search.venueKinds)}` : ""}${search.entertainment.length > 0 ? ` · Only venues offering ${describeEntertainment(search.entertainment)}` : ""}${search.excludeChains ? " · Chains and franchises left out" : ""}`}
       />
       {search.chainsLeftOut.length > 0 && (
         <p className="text-sm text-text-muted">
