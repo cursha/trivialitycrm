@@ -162,6 +162,7 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       competitorName: search.competitor?.name,
       entertainment: search.entertainment,
       venueKinds: search.venueKinds,
+      companyName: search.companyName ?? undefined,
       // PUB_RADIUS only — geocoded once at search-creation time
       // (startPubRadiusSearch), never recomputed here. radiusValue/radiusUnit
       // are only ever both set together with originLat/originLng (see the

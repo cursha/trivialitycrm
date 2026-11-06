@@ -53,6 +53,10 @@ export function QuickSearchForm({ leadTypes, cityLists }: QuickSearchFormOptions
   const regionListed = regionOptions.some((option) => option.code === region);
 
   const [venueKinds, setVenueKinds] = useState<string[]>(["PUB"]);
+  // Searching by name replaces the venue boxes below, so they're switched
+  // off (and not sent) while a name is typed.
+  const [companyName, setCompanyName] = useState("");
+  const byName = companyName.trim().length > 0;
   const allTicked = (group: string[]) => group.every((value) => venueKinds.includes(value));
   function tickVenueKinds(values: string[], ticked: boolean) {
     setVenueKinds((current) => (ticked ? [...new Set([...current, ...values])] : current.filter((value) => !values.includes(value))));
@@ -161,67 +165,85 @@ export function QuickSearchForm({ leadTypes, cityLists }: QuickSearchFormOptions
         )}
 
         <div>
-          <Label className="mb-1 block text-xs uppercase">Search for</Label>
-          <div className="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <label className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm font-semibold text-text">
-              <input type="checkbox" checked={allTicked(BAR_KINDS)} onChange={(event) => tickVenueKinds(BAR_KINDS, event.target.checked)} />
-              All Bars
-            </label>
-            <label className="flex items-center gap-2 rounded-lg border border-border-strong bg-accent/10 px-3 py-2 text-sm font-semibold text-text">
-              <input type="checkbox" checked={allTicked(CLUB_KINDS)} onChange={(event) => tickVenueKinds(CLUB_KINDS, event.target.checked)} />
-              All Service
-            </label>
-          </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {VENUE_KINDS.map(({ value, label, club }) => (
-              <label key={value} className={`flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm text-text${club ? " bg-accent/10" : ""}`}>
-                <input
-                  type="checkbox"
-                  name="venueKinds"
-                  value={value}
-                  checked={venueKinds.includes(value)}
-                  onChange={(event) => tickVenueKinds([value], event.target.checked)}
-                />
-                {label}
-              </label>
-            ))}
-          </div>
-          <p className="mt-1 text-xs text-text-muted">Each one is its own directory search; the results are combined, without duplicates.</p>
-          <label className="mt-2 flex items-center gap-2 text-sm text-text">
-            <input type="checkbox" name="excludeChains" />
-            Exclude chains/franchises
-          </label>
+          <Label className="mb-1 block text-xs uppercase">Company name (optional)</Label>
+          <Input
+            name="companyName"
+            value={companyName}
+            onChange={(event) => setCompanyName(event.target.value)}
+            maxLength={100}
+            placeholder="e.g. Kelseys or Joe's Pub"
+            className="max-w-md"
+          />
           <p className="mt-1 text-xs text-text-muted">
-            Ticked, places like Boston Pizza or Applebee&apos;s are left out: known chains, places whose website is a chain&apos;s location page, and names found at three or more
-            locations. The search page lists what was left out.
+            Finds a business by its name in the area below, instead of by kind of venue. Only places with every word of the name come back, chains included. Leave blank to search
+            by the boxes below.
           </p>
         </div>
 
-        <div>
-          <Label className="mb-1 block text-xs uppercase">Only venues that offer (optional)</Label>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <label className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm text-text">
-              <input type="checkbox" name="entertainment" value="TRIVIA" />
-              Trivia
+        <fieldset disabled={byName} className={`space-y-4${byName ? " opacity-50" : ""}`}>
+          <div>
+            <Label className="mb-1 block text-xs uppercase">Search for</Label>
+            <div className="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <label className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm font-semibold text-text">
+                <input type="checkbox" checked={allTicked(BAR_KINDS)} onChange={(event) => tickVenueKinds(BAR_KINDS, event.target.checked)} />
+                All Bars
+              </label>
+              <label className="flex items-center gap-2 rounded-lg border border-border-strong bg-accent/10 px-3 py-2 text-sm font-semibold text-text">
+                <input type="checkbox" checked={allTicked(CLUB_KINDS)} onChange={(event) => tickVenueKinds(CLUB_KINDS, event.target.checked)} />
+                All Service
+              </label>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {VENUE_KINDS.map(({ value, label, club }) => (
+                <label key={value} className={`flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm text-text${club ? " bg-accent/10" : ""}`}>
+                  <input
+                    type="checkbox"
+                    name="venueKinds"
+                    value={value}
+                    checked={venueKinds.includes(value)}
+                    onChange={(event) => tickVenueKinds([value], event.target.checked)}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-text-muted">Each one is its own directory search; the results are combined, without duplicates.</p>
+            <label className="mt-2 flex items-center gap-2 text-sm text-text">
+              <input type="checkbox" name="excludeChains" />
+              Exclude chains/franchises
             </label>
-            <label className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm text-text">
-              <input type="checkbox" name="entertainment" value="KARAOKE" />
-              Karaoke
-            </label>
-            <label className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm text-text">
-              <input type="checkbox" name="entertainment" value="BINGO" />
-              Bingo
-            </label>
-            <label className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm text-text">
-              <input type="checkbox" name="entertainment" value="EVENTS" />
-              Any events
-            </label>
+            <p className="mt-1 text-xs text-text-muted">
+              Ticked, places like Boston Pizza or Applebee&apos;s are left out: known chains, places whose website is a chain&apos;s location page, and names found at three or more
+              locations. The search page lists what was left out.
+            </p>
           </div>
-          <p className="mt-1 text-xs text-text-muted">
-            Tick any to find venues with any of them. Any events catches open mic, game nights and other weekly event nights. Leave all blank to list every venue. This is the directory&apos;s best guess from
-            listings and reviews, not a confirmed fact.
-          </p>
-        </div>
+
+          <div>
+            <Label className="mb-1 block text-xs uppercase">Only venues that offer (optional)</Label>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <label className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm text-text">
+                <input type="checkbox" name="entertainment" value="TRIVIA" />
+                Trivia
+              </label>
+              <label className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm text-text">
+                <input type="checkbox" name="entertainment" value="KARAOKE" />
+                Karaoke
+              </label>
+              <label className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm text-text">
+                <input type="checkbox" name="entertainment" value="BINGO" />
+                Bingo
+              </label>
+              <label className="flex items-center gap-2 rounded-lg border border-border-strong px-3 py-2 text-sm text-text">
+                <input type="checkbox" name="entertainment" value="EVENTS" />
+                Any events
+              </label>
+            </div>
+            <p className="mt-1 text-xs text-text-muted">
+              Tick any to find venues with any of them. Any events catches open mic, game nights and other weekly event nights. Leave all blank to list every venue. This is the directory&apos;s best guess from
+              listings and reviews, not a confirmed fact.
+            </p>
+          </div>
+        </fieldset>
 
         {cityLists.length > 0 && (
           <div>

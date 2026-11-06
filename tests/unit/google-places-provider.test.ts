@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { GooglePlacesDiscoveryProvider, placesTextQueries } from "../../src/lib/research/providers/google-places";
+import { GooglePlacesDiscoveryProvider, placesTextQueries, companyNameMatcher, withoutApostrophes } from "../../src/lib/research/providers/google-places";
 import { resetEnvCacheForTests } from "../../src/lib/env";
 import type { DiscoverParams } from "../../src/lib/research/providers/types";
 
@@ -431,5 +431,43 @@ describe("Quick Search trivia / karaoke", () => {
     const queries = fetchMock.mock.calls.map(([, init]) => (JSON.parse((init as { body: string }).body) as { textQuery: string }).textQuery);
     expect(queries).toEqual(["Pub with trivia night in Milton, ON, Canada", "Pub with karaoke in Milton, ON, Canada"]);
     expect(candidates.map((c) => c.name)).toEqual(["Quiz Pub", "Both Pub", "Both Pub"]);
+  });
+});
+
+describe("Quick Search by company name", () => {
+  it("runs one query for the name, with no place type, ignoring venue kinds and entertainment", () => {
+    const queries = placesTextQueries({ ...baseParams, venueKinds: ["PUB", "BAR"], entertainment: ["TRIVIA"], companyName: "Kelseys" }, "Milton");
+    expect(queries).toHaveLength(1);
+    expect(queries[0].textQuery).toBe("Kelseys in Milton, ON, Canada");
+    expect(queries[0].includedType).toBeUndefined();
+  });
+
+  it("matches every word of the name, in any order, ignoring case and apostrophes", () => {
+    const keeps = (typed: string, name: string) => companyNameMatcher(typed).test(withoutApostrophes(name));
+    expect(keeps("kelseys", "Kelsey's Original Roadhouse")).toBe(true);
+    expect(keeps("Joe's Pub", "Joe’s Pub & Grill")).toBe(true);
+    expect(keeps("pub joes", "Joe's Pub")).toBe(true);
+    expect(keeps("Joe's Pub", "Joe's Diner")).toBe(false);
+    expect(keeps("Kelseys", "The Keg")).toBe(false);
+    // Each word starts a word in the name, not in the middle of one.
+    expect(keeps("bar", "Barley Mow")).toBe(true);
+    expect(keeps("arley", "Barley Mow")).toBe(false);
+  });
+
+  it("keeps only places named like the search", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        places: [
+          { displayName: { text: "Kelsey’s Original Roadhouse" }, businessStatus: "OPERATIONAL" },
+          { displayName: { text: "Boston Pizza" }, businessStatus: "OPERATIONAL" },
+        ],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const candidates = await new GooglePlacesDiscoveryProvider(0).discover({ ...baseParams, companyName: "Kelseys" });
+    expect(candidates.map((c) => c.name)).toEqual(["Kelsey’s Original Roadhouse"]);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ textQuery: "Kelseys in Milton, ON, Canada" });
   });
 });

@@ -1359,6 +1359,12 @@ model LeadSearch {
   // deduped like entertainment. Empty = the Lead Type's own name, as before.
   venueKinds SearchVenueKind[] @default([])
 
+  // Quick Search: look a business up by name ("Kelseys", "Joe's Pub")
+  // instead of by kind of venue. Set, it replaces venueKinds and
+  // entertainment, and a result is kept only when its name has every word
+  // typed. Null for every other search.
+  companyName String?
+
   // Quick Search: leave chains and franchises out of the results (the
   // default; "Include chains and franchises" unticked). See
   // src/lib/research/chains.ts for how a chain is recognized. False for

@@ -41,6 +41,7 @@ export default async function QuickSearchBatchPage({ searchParams }: { searchPar
             <span className="font-semibold text-text">
               {citiesLabel(search.cities) ?? search.leadType.name}
               {manyLeadTypes && citiesLabel(search.cities) && <span className="font-normal text-text-muted"> · {search.leadType.name}</span>}
+              {search.companyName && <span className="font-normal text-text-muted"> (named &quot;{search.companyName}&quot;)</span>}
               {search.venueKinds.length > 0 && <span className="font-normal text-text-muted"> ({describeVenueKinds(search.venueKinds)})</span>}
               {search.entertainment.length > 0 && <span className="font-normal text-text-muted"> offering {describeEntertainment(search.entertainment)}</span>}
               {search.excludeChains && <span className="font-normal text-text-muted"> · no chains</span>}

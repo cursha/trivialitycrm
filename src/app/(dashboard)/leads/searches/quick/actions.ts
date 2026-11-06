@@ -52,6 +52,7 @@ export async function startQuickSearch(_prevState: QuickSearchFormState, formDat
       .filter(Boolean),
     entertainment: formData.getAll("entertainment").map((value) => String(value)),
     venueKinds: formData.getAll("venueKinds").map((value) => String(value)),
+    companyName: formString(formData, "companyName"),
   });
 
   if (!parsed.success) {
@@ -67,9 +68,14 @@ export async function startQuickSearch(_prevState: QuickSearchFormState, formDat
     return { error: "One or more selected Lead Types no longer exist." };
   }
 
-  const { entertainment, venueKinds } = parsed.data;
+  // A company name replaces the venue kinds and entertainment, and its
+  // chains are kept: searching "Kelseys" with chains left out would find
+  // nothing.
+  const { companyName } = parsed.data;
+  const entertainment = companyName ? [] : parsed.data.entertainment;
+  const venueKinds = companyName ? [] : parsed.data.venueKinds;
   const offering = entertainment.length === 0 ? "" : ` offering ${describeEntertainment(entertainment)}`;
-  const searchingFor = venueKinds.length === 0 ? "" : ` (searching for ${describeVenueKinds(venueKinds)})`;
+  const searchingFor = companyName ? ` (searching for the name "${companyName}")` : venueKinds.length === 0 ? "" : ` (searching for ${describeVenueKinds(venueKinds)})`;
 
   // "Run each city as its own search": a pasted list of cities becomes one
   // search per city, each with its own results page, instead of one search
@@ -77,7 +83,7 @@ export async function startQuickSearch(_prevState: QuickSearchFormState, formDat
   const perCity = formData.get("perCity") === "on" && parsed.data.cities.length > 1;
   const cityGroups = perCity ? parsed.data.cities.map((city) => [city]) : [parsed.data.cities];
   // Chains and franchises are left out unless the box is ticked.
-  const excludeChains = formData.get("excludeChains") === "on";
+  const excludeChains = !companyName && formData.get("excludeChains") === "on";
 
   const searchIds: string[] = [];
   for (const leadType of leadTypes) {
@@ -95,6 +101,7 @@ export async function startQuickSearch(_prevState: QuickSearchFormState, formDat
           mode: "GENERAL",
           entertainment,
           venueKinds,
+          companyName: companyName ?? null,
           excludeChains,
           promptSnapshot: `Quick search — list every "${leadType.name}"${searchingFor}${offering} match in ${where}, ${parsed.data.country}. ${excludeChains ? " Chains and franchises left out." : ""} No AI qualification prompt used.`,
         },

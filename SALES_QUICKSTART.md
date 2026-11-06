@@ -521,6 +521,23 @@ three or more locations, in the CRM or in the same search. The search
 page lists every chain location it left out, so you can see what was
 dropped and run it again with the box unticked if you want them.
 
+### Looking a business up by name
+
+To find one particular business, or every location of one, type its name
+in **Company name** at the top of the form (for example "Kelseys" or
+"Joe's Pub"), choose the area as usual, and click **List locations**. The
+**Search for**, **Exclude chains/franchises** and "Only venues that offer"
+choices grey out while a name is typed, because the name takes their
+place; clear the name to use them again.
+
+Only places whose name has every word you typed come back, in any order
+and with or without apostrophes, so "Kelseys" finds "Kelsey's Original
+Roadhouse" but not the bar next door. Chains are always kept on a name
+search, since the name is often a chain's. Type the name as the business
+shows it; a nickname or abbreviation may not match. It works with a list
+of cities too, so you can find every Kelseys across the towns in a saved
+list.
+
 ### Searching a list of cities
 
 Choose the country and province or state once, then paste your cities

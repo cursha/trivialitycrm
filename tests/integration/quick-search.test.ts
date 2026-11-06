@@ -154,6 +154,33 @@ describe("startQuickSearch with trivia / karaoke", () => {
     expect(search.venueKinds).toEqual([]);
   });
 
+  it("searches by company name instead of venue kinds, keeping chains", async () => {
+    const { user } = await baseFixtures();
+    const pubs = await createLeadTypeFixture("Pubs");
+    await loginAs(user.id);
+
+    const fd = quickSearchFormData([pubs.id], { companyName: "  Kelseys  ", excludeChains: "on" });
+    fd.append("venueKinds", "BAR");
+    fd.append("entertainment", "TRIVIA");
+    await run(fd);
+
+    const search = await testPrisma.leadSearch.findFirstOrThrow();
+    expect(search.companyName).toBe("Kelseys");
+    expect(search.venueKinds).toEqual([]);
+    expect(search.entertainment).toEqual([]);
+    expect(search.excludeChains).toBe(false);
+    expect(search.promptSnapshot).toContain('(searching for the name "Kelseys")');
+  });
+
+  it("leaves the company name empty when the box is blank", async () => {
+    const { user } = await baseFixtures();
+    const pubs = await createLeadTypeFixture("Pubs");
+    await loginAs(user.id);
+
+    await run(quickSearchFormData([pubs.id], { companyName: "   " }));
+    expect((await testPrisma.leadSearch.findFirstOrThrow()).companyName).toBeNull();
+  });
+
   it("refuses anything other than trivia, karaoke, bingo or events", async () => {
     const { user } = await baseFixtures();
     const pubs = await createLeadTypeFixture("Pubs");

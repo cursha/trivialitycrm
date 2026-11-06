@@ -171,6 +171,27 @@ function venueKindTerms(kind: SearchVenueKind): QueryTerm[] {
   return [{ term: VENUE_KIND_TERMS[kind], includedType: VENUE_KIND_PLACE_TYPES[kind] }];
 }
 
+/**
+ * Matches a place whose name has every word of the typed company name, in
+ * any order, each as the start of a word: "kelseys" matches "Kelsey's
+ * Original Roadhouse", "joes pub" matches "Joe’s Pub & Grill". Apostrophes
+ * are ignored on both sides (see withoutApostrophes). Google returns lookalikes
+ * for a name search, so without this "Kelseys" also brought back the bars
+ * next door.
+ */
+export function companyNameMatcher(companyName: string): RegExp {
+  const words = withoutApostrophes(companyName)
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((word) => word.length > 1);
+  return new RegExp(words.map((word) => `(?=.*(?:^|[^\\p{L}\\p{N}])${word})`).join(""), "iu");
+}
+
+/** "Kelsey’s" → "Kelseys": a name check doesn't hang on the apostrophe. */
+export function withoutApostrophes(text: string): string {
+  return text.replace(/['‘’`]/g, "");
+}
+
 /** `nameIncludes`: keep a result only when its name matches. */
 export type PlacesQuery = { textQuery: string; includedType?: string; nameIncludes?: RegExp };
 
@@ -183,8 +204,12 @@ export type PlacesQuery = { textQuery: string; includedType?: string; nameInclud
  * matches these from listings and reviews, so it's a best guess, not
  * confirmation.
  */
-export function placesTextQueries(params: Pick<DiscoverParams, "leadTypeName" | "region" | "country" | "entertainment" | "venueKinds">, city: string): PlacesQuery[] {
+export function placesTextQueries(params: Pick<DiscoverParams, "leadTypeName" | "region" | "country" | "entertainment" | "venueKinds" | "companyName">, city: string): PlacesQuery[] {
   const place = `in ${city}, ${params.region}, ${params.country}`;
+  // A search by company name is that one query: no venue kind, place type
+  // or entertainment, and only places named like it are kept.
+  const companyName = params.companyName?.trim();
+  if (companyName) return [{ textQuery: `${companyName} ${place}`, nameIncludes: companyNameMatcher(companyName) }];
   // A search by the Lead Type's own name has no place type to hold it to.
   const terms: QueryTerm[] = params.venueKinds?.length ? params.venueKinds.flatMap(venueKindTerms) : [{ term: params.leadTypeName }];
   const entertainment = params.entertainment ?? [];
@@ -285,7 +310,7 @@ export class GooglePlacesDiscoveryProvider implements CandidateDiscoveryProvider
             // the requested city when one was given.
             const candidate = candidateFromPlace(place, params, city);
             if (!isInSearchedRegion(candidate, params)) continue;
-            if (query.nameIncludes && !query.nameIncludes.test(candidate.name)) continue;
+            if (query.nameIncludes && !query.nameIncludes.test(withoutApostrophes(candidate.name))) continue;
             if (params.cities.length > 0 && !placeIsInCity(place.addressComponents, city)) continue;
             results.push(candidate);
           }

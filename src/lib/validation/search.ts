@@ -54,6 +54,14 @@ export const QuickSearchSetupSchema = z.object({
     .array(z.enum(SearchVenueKindValues, { error: "Choose the kinds of venue from the list." }))
     .default([])
     .transform((values) => [...new Set(values)]),
+  // Look one business up by name instead; blank = search by venue kind.
+  companyName: z
+    .string()
+    .trim()
+    .max(100, { error: "Keep the company name to 100 characters or fewer." })
+    .optional()
+    .transform((value) => (value ? value : undefined))
+    .refine((value) => value === undefined || /[\p{L}\p{N}]{2}/u.test(value), { error: "Type more of the company name." }),
 });
 
 export type QuickSearchSetupValues = z.infer<typeof QuickSearchSetupSchema>;

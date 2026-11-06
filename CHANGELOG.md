@@ -13,6 +13,22 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v31.0 — 2026-11-06
+### New — Quick Search by company name
+- Quick Search has a new **Company name** box at the top. Type a
+  business's name ("Kelseys", "Joe's Pub") and the area, and it lists the
+  places by that name, instead of searching by kind of venue. Curt asked
+  for a search by company name on Quick Search.
+- Only places whose name has every word typed are kept (any order, case
+  and apostrophes ignored), since the directory also returns lookalikes
+  nearby. Chains are kept on a name search, and the venue kind, chains and
+  "Only venues that offer" choices are switched off while a name is typed.
+- The search page and the Quick Search summary show the name searched for.
+- Database: a migration adds the company name to each search. Existing
+  searches are unchanged.
+- Manual: Quick Search section has a new "Looking a business up by name"
+  part.
+
 ## v30.1 — 2026-11-06
 ### Fixed — Read a Web Page couldn't open TripAdvisor
 - TripAdvisor (like Yelp and other big sites) refuses pages to servers

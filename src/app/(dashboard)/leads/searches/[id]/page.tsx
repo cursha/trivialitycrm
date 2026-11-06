@@ -27,6 +27,7 @@ export default async function SearchStatusPage({ params }: { params: Promise<{ i
       mode: true,
       entertainment: true,
       venueKinds: true,
+      companyName: true,
       excludeChains: true,
       chainsLeftOut: true,
       sourceUrl: true,
@@ -52,7 +53,7 @@ export default async function SearchStatusPage({ params }: { params: Promise<{ i
     <div className="mx-auto max-w-2xl space-y-6">
       <PageHeader
         title={title}
-        description={isWebPage ? `Businesses read from ${search.sourceUrl ?? "the page"}` : `Mode: ${search.mode}${search.venueKinds.length > 0 ? ` · Searched for ${describeVenueKinds(search.venueKinds)}` : ""}${search.entertainment.length > 0 ? ` · Only venues offering ${describeEntertainment(search.entertainment)}` : ""}${search.excludeChains ? " · Chains and franchises left out" : ""}`}
+        description={isWebPage ? `Businesses read from ${search.sourceUrl ?? "the page"}` : `Mode: ${search.mode}${search.companyName ? ` · Searched for the name "${search.companyName}"` : ""}${search.venueKinds.length > 0 ? ` · Searched for ${describeVenueKinds(search.venueKinds)}` : ""}${search.entertainment.length > 0 ? ` · Only venues offering ${describeEntertainment(search.entertainment)}` : ""}${search.excludeChains ? " · Chains and franchises left out" : ""}`}
       />
       {search.chainsLeftOut.length > 0 && (
         <p className="text-sm text-text-muted">

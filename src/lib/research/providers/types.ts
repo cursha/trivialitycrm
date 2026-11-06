@@ -80,6 +80,9 @@ export type DiscoverParams = {
   // GENERAL (Quick Search) only: search the directory for these kinds of
   // venue. Empty or absent = the Lead Type's name. See placesTextQueries().
   venueKinds?: SearchVenueKind[];
+  // GENERAL (Quick Search) only: look this business up by name instead of
+  // venueKinds/entertainment. See placesTextQueries().
+  companyName?: string;
   // PUB_RADIUS mode only — the origin Company's geocoded coordinates and the
   // user's chosen radius (already converted to meters via
   // src/lib/geo/distance.ts). Populated only by run-search.ts when
