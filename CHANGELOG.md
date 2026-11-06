@@ -13,6 +13,22 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v30.1 — 2026-11-06
+### Fixed — Read a Web Page couldn't open TripAdvisor
+- TripAdvisor (like Yelp and other big sites) refuses pages to servers
+  such as the CRM's, so Curt's first try said "Couldn't open that page".
+  The same request from his own computer worked, so it's the site blocking
+  the server, not a CRM fault.
+- New **Page text** box on Read a Web Page: copy the page in the browser
+  (Ctrl+A, Ctrl+C) and paste it, and the CRM reads that instead of
+  fetching the page. Costs the same as before.
+- When a page won't open, the search now says what the site answered
+  (for example "refused... it answered 403", or "wasn't found") and how to
+  paste the page instead.
+- Database: a migration adds the pasted text to each search. Existing
+  searches are unchanged.
+- Manual: Read a Web Page section explains pasting the page.
+
 ## v30.0 — 2026-11-05
 ### New — Read a Web Page (Leads)
 - Leads → **Read a Web Page**: paste a link to a public page (a

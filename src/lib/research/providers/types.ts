@@ -87,8 +87,10 @@ export type DiscoverParams = {
   // GooglePlacesNearbyDiscoveryProvider/MockPubRadiusPlacesProvider require
   // these; every other provider ignores them.
   originLatLng?: { lat: number; lng: number };
-  // WEB_PAGE mode only: the public page to read the businesses from.
+  // WEB_PAGE mode only: the public page to read the businesses from, and
+  // its text when the user pasted it (then the page isn't fetched).
   sourceUrl?: string;
+  sourceText?: string;
   radiusMeters?: number;
   // Optional attribution for AiUsageRecord (worker-side cost tracking). Not
   // used by mock providers; the Anthropic provider writes one row per call

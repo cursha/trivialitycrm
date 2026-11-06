@@ -6,8 +6,12 @@
 // time and size capped), turned into plain text (page-text.ts), and handed
 // to a PageExtractor: the AI one in production, a mock in tests and local
 // development.
-import { fetchPage as defaultFetchPage, parseWebsiteUrl, usableEmail, type PageFetcher } from "../website-email";
-import { htmlToListingText, pageTitle } from "../page-text";
+//
+// Big sites (TripAdvisor, Yelp...) refuse requests from servers like the
+// CRM's, so the user can instead paste the page's text, copied from their
+// own browser (LeadSearch.sourceText, v30.1); then nothing is fetched.
+import { fetchPageOrThrow, PageFetchError, parseWebsiteUrl, usableEmail, type PageFetcher } from "../website-email";
+import { htmlToListingText, pageTitle, MAX_PAGE_TEXT_CHARS } from "../page-text";
 import { normalizeRegion } from "../../data-quality/normalize";
 import { canonicalCountry } from "../../constants/countries";
 import type { CandidateDiscoveryProvider, DiscoverParams, DiscoveryProgressUpdate, ResearchCandidate } from "./types";
@@ -52,6 +56,31 @@ export class WebPageError extends Error {
 // Under this much text a page is almost certainly built in the browser by
 // JavaScript (or is a sign-in / bot-check page), so there's nothing to read.
 const MIN_PAGE_TEXT_CHARS = 200;
+
+const PASTE_HINT =
+  "Open the page in your browser, press Ctrl+A then Ctrl+C (Cmd on a Mac), and paste it into the Page text box on Read a Web Page.";
+
+/** What to tell the user when the CRM couldn't open the page itself. */
+export function fetchFailureMessage(error: unknown, host: string): string {
+  const status = error instanceof PageFetchError ? error.status : null;
+  if (status === 404 || status === 410) return `That page wasn't found (${host} answered ${status}). Check the link opens in your browser.`;
+  if (status !== null && (status === 401 || status === 403 || status === 429 || status === 451 || status >= 500 || status < 300)) {
+    return `${host} refused to let the CRM open that page (it answered ${status}). Big sites like TripAdvisor and Yelp block servers. ${PASTE_HINT}`;
+  }
+  const detail = error instanceof Error && error.message ? ` (${error.message.replace(/\.$/, "")})` : "";
+  return `Couldn't open that page${detail}. The site may be down, need a sign-in, or block the CRM. ${PASTE_HINT}`;
+}
+
+/** Pasted page text tidied: spaces collapsed, blank runs dropped, capped. */
+function pastedText(raw: string): { text: string; truncated: boolean } {
+  const text = raw
+    .replace(/\r\n?/g, "\n")
+    .replace(/[ \t\f\v\u00a0]+/g, " ")
+    .replace(/ *\n[ \n]*/g, "\n")
+    .trim();
+  const truncated = text.length > MAX_PAGE_TEXT_CHARS;
+  return { text: truncated ? text.slice(0, MAX_PAGE_TEXT_CHARS) : text, truncated };
+}
 
 function clean(value: string | null | undefined): string | null {
   const trimmed = value?.replace(/\s+/g, " ").trim();
@@ -113,35 +142,50 @@ export function listingsToCandidates(listings: PageListing[], params: Pick<Disco
 export class WebPageDiscoveryProvider implements CandidateDiscoveryProvider {
   constructor(
     private readonly extractor: PageExtractor,
-    private readonly fetcher: PageFetcher = defaultFetchPage,
+    private readonly fetcher: PageFetcher = fetchPageOrThrow,
   ) {}
 
   async discover(params: DiscoverParams, onProgress?: (update: DiscoveryProgressUpdate) => Promise<void>): Promise<ResearchCandidate[]> {
     const start = params.sourceUrl ? parseWebsiteUrl(params.sourceUrl) : null;
     if (!start) throw new WebPageError("That isn't a web address the CRM can open. Paste a full public link starting with https://.");
 
-    await onProgress?.({ kind: "message", message: `Opening ${start.hostname}...` });
-    let page;
-    try {
-      page = await this.fetcher(start);
-    } catch {
-      page = null;
-    }
-    if (!page) {
-      throw new WebPageError(`Couldn't open that page. The site may be down, need a sign-in, or block the CRM. Check the link opens in your browser without signing in.`);
+    let pageUrl: URL;
+    let title: string | null;
+    let text: string;
+    let truncated: boolean;
+    if (params.sourceText?.trim()) {
+      // Pasted from the user's browser: nothing to fetch.
+      pageUrl = start;
+      title = null;
+      ({ text, truncated } = pastedText(params.sourceText));
+      if (text.length < MIN_PAGE_TEXT_CHARS) {
+        throw new WebPageError("The pasted page text is too short to hold any businesses. Press Ctrl+A on the page first, so it copies the whole page, then Ctrl+C.");
+      }
+    } else {
+      await onProgress?.({ kind: "message", message: `Opening ${start.hostname}...` });
+      let page;
+      try {
+        page = await this.fetcher(start);
+      } catch (error) {
+        throw new WebPageError(fetchFailureMessage(error, start.hostname));
+      }
+      if (!page) throw new WebPageError(fetchFailureMessage(null, start.hostname));
+      pageUrl = page.url;
+      title = pageTitle(page.html);
+      ({ text, truncated } = htmlToListingText(page.html, page.url));
+      if (text.length < MIN_PAGE_TEXT_CHARS) {
+        throw new WebPageError(
+          `That page has almost no text the CRM can read. It's probably built by JavaScript in the browser, or it's a sign-in or robot-check page. ${PASTE_HINT}`,
+        );
+      }
     }
 
-    const { text, truncated } = htmlToListingText(page.html, page.url);
-    if (text.length < MIN_PAGE_TEXT_CHARS) {
-      throw new WebPageError("That page has almost no text the CRM can read. It's probably built by JavaScript in the browser, or it's a sign-in or robot-check page.");
-    }
-
-    await onProgress?.({ kind: "message", message: `Reading the businesses listed on ${page.url.hostname}${truncated ? " (a long page, so only the first part)" : ""}...` });
+    await onProgress?.({ kind: "message", message: `Reading the businesses listed on ${pageUrl.hostname}${truncated ? " (a long page, so only the first part)" : ""}...` });
     const listings = await this.extractor.extract(
-      { pageUrl: page.url.toString(), pageTitle: pageTitle(page.html), pageText: text, leadTypeName: params.leadTypeName, country: params.country, region: params.region },
+      { pageUrl: pageUrl.toString(), pageTitle: title, pageText: text, leadTypeName: params.leadTypeName, country: params.country, region: params.region },
       { searchId: params.searchId, userId: params.userId },
     );
-    return listingsToCandidates(listings, params, page.url);
+    return listingsToCandidates(listings, params, pageUrl);
   }
 }
 

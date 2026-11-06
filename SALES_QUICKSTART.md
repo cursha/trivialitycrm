@@ -641,9 +641,15 @@ Good to know:
   or **Research this business** can fill gaps afterwards.
 - It works on one bar's page (one result) or a list page (one result per
   business, up to 150).
-- Some pages can't be read: ones you have to sign in to see, sites that
-  block the CRM, and pages built entirely by JavaScript in the browser.
-  The search page says so when that happens.
+- **If the CRM can't open the page** (TripAdvisor and Yelp, for example,
+  block it), paste the page in yourself: open the page in your browser,
+  press **Ctrl+A** then **Ctrl+C** (Cmd on a Mac), go back to **Read a Web
+  Page**, paste the link as usual and paste the page into the **Page text**
+  box, then click **Read this page**. The search page tells you when to do
+  this. Pasted text doesn't include the links behind words, so a
+  business's website is usually left blank that way.
+- Pages you have to sign in to see can still be read this way, once
+  you've signed in yourself in your browser.
 - It uses a small amount of AI: a few cents for one bar's page, up to
   about 30¢ for a very long list.
 - Use pages that are public, and respect the site's rules on copying.

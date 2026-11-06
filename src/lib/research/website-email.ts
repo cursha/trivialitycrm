@@ -115,6 +115,19 @@ export function parseWebsiteUrl(raw: string): URL | null {
 
 type Page = { url: URL; html: string };
 
+/** The site answered but fetchPageOrThrow got no page from it: its HTTP
+ * status, or null (not HTML, redirect refused, too many redirects).
+ * Connection failures (timed out, private address) throw their own error. */
+export class PageFetchError extends Error {
+  constructor(
+    message: string,
+    readonly status: number | null,
+  ) {
+    super(message);
+    this.name = "PageFetchError";
+  }
+}
+
 // Node connects to an IP-address host directly, without calling the lookup
 // above, so those are checked here instead.
 function isBlockedIpHost(url: URL): boolean {
@@ -162,21 +175,34 @@ function requestOnce(url: URL): Promise<{ status: number; location: string | nul
 
 export type PageFetcher = (url: URL) => Promise<Page | null>;
 
-/** Fetches one HTML page, following up to three redirects, each one rechecked. */
-export const fetchPage: PageFetcher = async (start) => {
+/** Fetches one HTML page, following up to three redirects, each one
+ * rechecked; throws PageFetchError saying why when the site gives no page. */
+export async function fetchPageOrThrow(start: URL): Promise<Page> {
   let url = start;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const response = await requestOnce(url);
     if (response.status >= 300 && response.status < 400 && response.location) {
       const next = parseWebsiteUrl(new URL(response.location, url).toString());
-      if (!next) return null;
+      if (!next) throw new PageFetchError("Redirected to an address the CRM won't open", response.status);
       url = next;
       continue;
     }
     if (response.status >= 200 && response.status < 300 && response.body) return { url, html: response.body };
-    return null;
+    if (response.status >= 200 && response.status < 300) throw new PageFetchError(`Not a web page (${response.contentType || "no content type"})`, null);
+    throw new PageFetchError(`The site answered ${response.status}`, response.status);
   }
-  return null;
+  throw new PageFetchError("Too many redirects", null);
+}
+
+/** fetchPageOrThrow, or null when the site gives no page (connection
+ * failures still throw). */
+export const fetchPage: PageFetcher = async (start) => {
+  try {
+    return await fetchPageOrThrow(start);
+  } catch (error) {
+    if (error instanceof PageFetchError) return null;
+    throw error;
+  }
 };
 
 function decodeEntities(text: string): string {

@@ -1371,6 +1371,9 @@ model LeadSearch {
 
   // WEB_PAGE only: the public page the leads were read from.
   sourceUrl String?
+  // WEB_PAGE only: the page's text as the user pasted it from their own
+  // browser (sites that refuse the CRM's server); read instead of fetching.
+  sourceText String? @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

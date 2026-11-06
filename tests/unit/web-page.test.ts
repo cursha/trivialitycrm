@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { htmlToListingText, pageTitle, webPageLabel, MAX_PAGE_TEXT_CHARS } from "../../src/lib/research/page-text";
 import { WebPageDiscoveryProvider, MockPageExtractor, WebPageError, listingsToCandidates, MAX_PAGE_LISTINGS, type PageExtractor, type PageListing } from "../../src/lib/research/providers/web-page";
 import type { DiscoverParams } from "../../src/lib/research/providers/types";
+import { PageFetchError } from "../../src/lib/research/website-email";
 
 const base = new URL("https://www.pubguide.example.com/niagara/best-pubs");
 
@@ -146,5 +147,28 @@ describe("WebPageDiscoveryProvider", () => {
     expect(candidates).toEqual([
       expect.objectContaining({ name: "Keenan's Irish Pub", address1: "12 King St", city: "St. Catharines", region: "ON", postalCode: "L2R 3H1", phone: "905-555-1234", websiteUrl: "https://keenans.example.ca/" }),
     ]);
+  });
+
+  it("says when a site refuses the CRM, and how to paste the page instead", async () => {
+    const refused = vi.fn().mockRejectedValue(new PageFetchError("The site answered 403", 403));
+    await expect(new WebPageDiscoveryProvider(new MockPageExtractor(), refused).discover(params)).rejects.toThrow(/pubguide\.example\.com refused .*answered 403.*Page text box/);
+    const missing = vi.fn().mockRejectedValue(new PageFetchError("The site answered 404", 404));
+    await expect(new WebPageDiscoveryProvider(new MockPageExtractor(), missing).discover(params)).rejects.toThrow(/wasn't found .*404/);
+    await expect(new WebPageDiscoveryProvider(new MockPageExtractor(), vi.fn().mockRejectedValue(new Error("Timed out"))).discover(params)).rejects.toThrow(/Couldn't open that page \(Timed out\)/);
+  });
+
+  it("reads pasted page text instead of fetching", async () => {
+    const fetcher = vi.fn();
+    const extract = vi.fn<PageExtractor["extract"]>().mockResolvedValue([
+      { name: "Wimpy's Diner", address1: "4 Hartzel Rd", city: "St. Catharines", region: "Ontario", postalCode: null, country: "Canada", phone: "+1 905-555-0100", email: null, websiteUrl: null },
+    ]);
+    const pasted = "Wimpy's Diner\r\n\r\n\r\n   4 Hartzel Rd,   St. Catharines  \r\n" + "Breakfast and burgers. ".repeat(20);
+    const candidates = await new WebPageDiscoveryProvider({ extract }, fetcher).discover({ ...params, sourceText: pasted });
+    expect(fetcher).not.toHaveBeenCalled();
+    const input = extract.mock.calls[0][0];
+    expect(input.pageText.startsWith("Wimpy's Diner\n4 Hartzel Rd, St. Catharines\nBreakfast")).toBe(true);
+    expect(input.pageUrl).toBe(base.toString());
+    expect(candidates).toEqual([expect.objectContaining({ name: "Wimpy's Diner", region: "ON", sources: [{ url: base.toString(), title: null }] })]);
+    await expect(new WebPageDiscoveryProvider({ extract }, fetcher).discover({ ...params, sourceText: "Too short" })).rejects.toThrow(/too short/);
   });
 });

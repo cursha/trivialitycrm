@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import { startWebPageSearch, type WebPageFormState } from "./actions";
 import { Card } from "@/components/ui/card";
-import { Label, Input, Select } from "@/components/ui/field";
+import { Label, Input, Select, Textarea } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { US_STATES, CA_PROVINCES } from "@/lib/constants/north-american-regions";
 
@@ -24,6 +24,17 @@ export function WebPageForm({ leadTypes }: { leadTypes: { id: string; name: stri
           <p className="mt-1 text-xs text-text-muted">
             Paste the link from your browser&apos;s address bar. It can be one bar&apos;s page or a list of many (a directory, a &quot;best pubs in town&quot; article, a
             league&apos;s venue list).
+          </p>
+        </div>
+
+        <div>
+          <Label htmlFor="pageText" className="mb-1 block text-xs uppercase">
+            Page text (optional)
+          </Label>
+          <Textarea id="pageText" name="pageText" rows={4} placeholder="Leave blank, unless the CRM couldn't open the page." />
+          <p className="mt-1 text-xs text-text-muted">
+            Some big sites, TripAdvisor and Yelp among them, won&apos;t let the CRM open their pages. For those, open the page in your browser, press Ctrl+A then Ctrl+C
+            (Cmd on a Mac), and paste it here. Keep the link above too.
           </p>
         </div>
 

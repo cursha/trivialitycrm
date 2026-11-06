@@ -26,6 +26,7 @@ export async function startWebPageSearch(_prevState: WebPageFormState, formData:
 
   const parsed = WebPageSearchSchema.safeParse({
     url: formString(formData, "url"),
+    pageText: formString(formData, "pageText"),
     leadTypeId: formString(formData, "leadTypeId"),
     country: formString(formData, "country"),
     region: formString(formData, "region"),
@@ -60,6 +61,7 @@ export async function startWebPageSearch(_prevState: WebPageFormState, formData:
       minimumScore: 0,
       mode: "WEB_PAGE",
       sourceUrl: url.toString(),
+      sourceText: parsed.data.pageText?.trim() ? parsed.data.pageText : null,
       promptSnapshot: `Read a web page — list the businesses shown on ${url.toString()} as "${leadType.name}" leads.`,
     },
   });
@@ -72,7 +74,7 @@ export async function startWebPageSearch(_prevState: WebPageFormState, formData:
     action: "web_page_search.started",
     entityType: "LeadSearch",
     entityId: search.id,
-    metadata: { host: url.hostname, leadType: leadType.name },
+    metadata: { host: url.hostname, leadType: leadType.name, pasted: Boolean(parsed.data.pageText?.trim()) },
   });
 
   redirect(`/leads/searches/${search.id}`);

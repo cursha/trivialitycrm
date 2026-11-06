@@ -167,6 +167,7 @@ export async function runSearchJob(searchId: string, options: RunSearchJobOption
       // are only ever both set together with originLat/originLng (see the
       // schema comment on LeadSearch), so this is safe as a single condition.
       sourceUrl: search.sourceUrl ?? undefined,
+      sourceText: search.sourceText ?? undefined,
       originLatLng: search.mode === "PUB_RADIUS" && search.originLat !== null && search.originLng !== null ? { lat: search.originLat, lng: search.originLng } : undefined,
       radiusMeters: search.mode === "PUB_RADIUS" && search.radiusValue !== null && search.radiusUnit !== null ? radiusToMeters(search.radiusValue, search.radiusUnit) : undefined,
       searchId: search.id,

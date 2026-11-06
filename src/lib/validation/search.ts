@@ -62,6 +62,9 @@ export type QuickSearchSetupValues = z.infer<typeof QuickSearchSetupSchema>;
 // The address itself is checked again by parseWebsiteUrl() when it's read.
 export const WebPageSearchSchema = z.object({
   url: z.string().trim().min(1, { error: "Paste the web address of the page." }).max(2000, { error: "That web address is too long." }),
+  // Optional: the page's text copied from the user's browser. Longer than
+  // the AI reads (MAX_PAGE_TEXT_CHARS) is cut, not refused, up to this.
+  pageText: z.string().max(500_000, { error: "That's more text than one page holds. Copy just the one page." }).optional(),
   leadTypeId: z.string().min(1, { error: "Choose a Lead Type." }),
   country: z.enum(CountryValues, { error: "Choose Canada or United States." }),
   region: RegionCodeSchema,
