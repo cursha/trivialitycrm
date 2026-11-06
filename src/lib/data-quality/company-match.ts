@@ -57,15 +57,18 @@ export function scoreCompanyMatch(a: CompanyMatchInput, b: CompanyMatchInput, mi
   const locationA = { city: a.normalizedCity ?? a.city, region: a.normalizedRegion ?? a.region, address1: a.address1 };
   const locationB = { city: b.normalizedCity ?? b.city, region: b.normalizedRegion ?? b.region, address1: b.address1 };
   const located = locationCorroborates(locationA, locationB);
+  // Different street addresses: a different place, even when the phone or
+  // email is shared (a chain's central line). See duplicates/location.ts.
+  const differentAddress = streetAddressesConflict(locationA, locationB);
 
-  if (a.normalizedEmail && b.normalizedEmail && a.normalizedEmail === b.normalizedEmail) {
+  if (!differentAddress && a.normalizedEmail && b.normalizedEmail && a.normalizedEmail === b.normalizedEmail) {
     score += 35;
     reasons.push("Email addresses match exactly.");
     matchedFields.push("email");
     hasStrongSignal = true;
   }
 
-  if (a.normalizedPhone && b.normalizedPhone && a.normalizedPhone === b.normalizedPhone) {
+  if (!differentAddress && a.normalizedPhone && b.normalizedPhone && a.normalizedPhone === b.normalizedPhone) {
     score += 30;
     reasons.push("Phone numbers match.");
     matchedFields.push("phone");

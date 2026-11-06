@@ -1,7 +1,7 @@
 import type { AppPrismaClient } from "../prisma";
 import type { CompanyStatus } from "../../generated/prisma/enums";
 import { normalizeCompanyName, normalizePhone, normalizeEmail, extractWebsiteDomain, normalizeAddressLine } from "./normalize";
-import { locationCorroborates } from "./location";
+import { locationCorroborates, streetAddressesConflict } from "./location";
 
 export type DuplicateCandidateInput = {
   name: string;
@@ -92,10 +92,13 @@ export async function findPotentialDuplicates(
       const matchedOn: DuplicateMatchReason[] = [];
 
       const located = locationCorroborates(input, candidate);
+      // Different street addresses: a different place, even when the phone
+      // or email is shared (a chain's central line). See location.ts.
+      const differentAddress = streetAddressesConflict(input, candidate);
       if (located && candidate.normalizedName === normalizedName) matchedOn.push("name");
       if (located && websiteDomain && candidate.websiteDomain === websiteDomain) matchedOn.push("websiteDomain");
-      if (normalizedPhone && candidate.normalizedPhone === normalizedPhone) matchedOn.push("phone");
-      if (normalizedEmail && candidate.normalizedEmail === normalizedEmail) matchedOn.push("email");
+      if (!differentAddress && normalizedPhone && candidate.normalizedPhone === normalizedPhone) matchedOn.push("phone");
+      if (!differentAddress && normalizedEmail && candidate.normalizedEmail === normalizedEmail) matchedOn.push("email");
       if (
         normalizedAddress &&
         candidate.address1 &&

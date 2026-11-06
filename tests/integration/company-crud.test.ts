@@ -130,6 +130,22 @@ describe("company create", () => {
     expect(await testPrisma.company.count()).toBe(3);
   });
 
+  it("doesn't flag a shared phone or email when the street addresses differ (a chain's locations)", async () => {
+    const { admin, leadType, stageNew } = await baseFixtures();
+    await loginAs(admin.id);
+    const base = { name: "Wimpy's Diner", city: "Markham", leadTypeId: leadType.id, pipelineStageId: stageNew.id, assignedToId: admin.id, phone: "905-555-0199", email: "info@wimpys.test" };
+
+    await expect(createCompany(undefined, companyFormData({ ...base, address1: "8601 Warden Ave" }))).rejects.toThrow(); // redirect = created
+    // Same phone and email, different street: another location, created.
+    await expect(createCompany(undefined, companyFormData({ ...base, address1: "5000 Hwy 7" }))).rejects.toThrow();
+    expect(await testPrisma.company.count()).toBe(2);
+
+    // Same phone, no street address given: still flagged.
+    const result = await createCompany(undefined, companyFormData({ ...base, name: "Some Other Name" }));
+    expect(result?.duplicates?.length).toBe(2);
+    expect(result?.duplicates?.[0].matchedOn).toEqual(expect.arrayContaining(["phone", "email"]));
+  });
+
   it("flags a matching phone number even when the name and city differ", async () => {
     const { admin, leadType, stageNew } = await baseFixtures();
     await loginAs(admin.id);

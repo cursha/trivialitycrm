@@ -11,10 +11,15 @@ import { normalizeAddressLine } from "./normalize";
  * share both across every location. So a name or website match only counts
  * when the two companies are in the same city AND province/state, and
  * their street addresses don't conflict (two different street addresses in
- * the same city are two locations). Phone, email and an exact street
- * address + postal code match are location-specific already and count on
- * their own (Curt's call: duplicates must be checked on address, phone,
- * city and province, not name alone).
+ * the same city are two locations). An exact street address + postal
+ * code match counts on its own (Curt's call: duplicates must be checked on
+ * address, phone, city and province, not name alone).
+ *
+ * Phone and email count on their own too, unless both companies have a
+ * street address and the addresses differ: a chain's locations can share a
+ * central phone line or head-office email, and Curt's call (2026-11-06,
+ * 25 Wimpy's locations flagged against the one entered by hand) is that a
+ * different street address means a different place.
  */
 export type LocationFields = {
   city?: string | null;

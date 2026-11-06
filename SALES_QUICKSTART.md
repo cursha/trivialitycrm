@@ -780,7 +780,10 @@ off a web page all show "Not yet researched" until you research them.
   different province, nothing is transferred: the message names the bar,
   and the field is marked in red on its card so you can fix or clear it
   and click **Transfer** again. A result that matches a bar already in the
-  CRM is flagged, and you choose:
+  CRM is flagged. A different street address always means a different
+  place, even when the phone number or email is the same (chains often
+  share a central line), so a chain's other locations transfer without
+  being flagged. When it is flagged, you choose:
   - **Merge** (usually the right choice): update the existing bar. The
     result's details win wherever it has them; the bar keeps its own
     wherever the result is blank.

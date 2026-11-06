@@ -13,6 +13,23 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v31.3 — 2026-11-06
+### Fixed — a chain's other locations flagged as duplicates
+- Curt transferred 25 Wimpy's locations from a company-name search, and
+  they kept stopping as possible duplicates of the one Wimpy's he had
+  entered by hand, even though the street addresses were different.
+- The cause: a matching phone number or email counted as a duplicate on
+  its own, wherever the business was, and chains often share a central
+  phone line or head-office email.
+- Now, when both have a street address and the addresses differ, a
+  shared phone or email no longer makes them duplicates (Curt's call: a
+  different address is a different place). A shared phone with no street
+  address to compare is still flagged, as before.
+- Applies everywhere duplicates are checked: transferring leads, adding
+  or editing a company, importing, and the Data Quality scan.
+- Manual: the transfer section of the Sales Quick Start says a different
+  street address is always a different place.
+
 ## v31.2 — 2026-11-06
 ### Fixed — transferring 25 or more leads ran out of time
 - With v31.1's fix in, Curt's transfer of 25 leads got further but

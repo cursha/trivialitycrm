@@ -293,6 +293,14 @@ describe("scoreCompanyMatch: name and website need the location to agree", () =>
     expect(result.matchedFields).toEqual(expect.arrayContaining(["name", "websiteUrl", "city"]));
   });
 
+  it("doesn't count a shared phone or email when the street addresses differ", () => {
+    const a = company({ id: "1", ...chain, address1: "8601 Warden Ave", email: "info@chain.test", normalizedEmail: "info@chain.test" });
+    const b = company({ id: "2", ...chain, address1: "5000 Hwy 7", email: "info@chain.test", normalizedEmail: "info@chain.test" });
+    const result = scoreCompanyMatch(a, b);
+    expect(result.matchedFields).not.toContain("phone");
+    expect(result.matchedFields).not.toContain("email");
+  });
+
   it("still matches on phone alone, wherever the company is", () => {
     const a = company({ id: "1", ...chain, normalizedCity: "oakville", city: "Oakville", address1: null });
     const b = company({ id: "2", ...chain, normalizedCity: "mississauga", city: "Mississauga", address1: null });
