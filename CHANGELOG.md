@@ -13,6 +13,18 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v31.1 — 2026-11-06
+### Fixed — transferring leads crashed
+- Curt found that transferring Quick Search results (first noticed on a
+  company-name search) crashed. The cause was in v27.1, not the name
+  search: the transfer code shared a type in a way the live build can't
+  handle, so the transfer page's code failed as it loaded. It most likely
+  broke every transfer since v27.1. Tests didn't catch it because only
+  the live build trips on it.
+- The same pattern was removed from the opportunity-analysis code too,
+  although nothing on screen used that path.
+- No manual change: internal fix.
+
 ## v31.0 — 2026-11-06
 ### New — Quick Search by company name
 - Quick Search has a new **Company name** box at the top. Type a

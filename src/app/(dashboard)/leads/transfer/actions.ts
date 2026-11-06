@@ -6,8 +6,6 @@ import { requireUser } from "@/lib/auth/current-user";
 import { requirePermission } from "@/lib/auth/permissions";
 import { TransferPayloadSchema, type TransferPayload } from "@/lib/validation/transfer";
 import { describeInvalidRows, type TransferFieldErrors } from "@/lib/validation/transfer-errors";
-
-export type { TransferFieldErrors };
 import { findPotentialDuplicates, computeNormalizedFields } from "@/lib/duplicates/match";
 import type { DuplicateMatch } from "@/lib/duplicates/match";
 import { logInitialPipelineStage } from "@/lib/companies/activity-log";

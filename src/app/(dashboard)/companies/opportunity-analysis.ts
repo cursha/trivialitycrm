@@ -2,8 +2,6 @@
 
 import { runOpportunityAnalysis, type AnalyzeOpportunityResult } from "@/lib/companies/analyze-opportunity";
 
-export type { AnalyzeOpportunityResult };
-
 /**
  * Thin Server Action wrapper, kept for programmatic/test callers that just
  * want the final result with no progress reporting. The real UI path

@@ -2,7 +2,10 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { transferSearchResults, type TransferResult, type TransferFieldErrors } from "./actions";
+import { transferSearchResults, type TransferResult } from "./actions";
+// Not re-exported from actions.ts: a "use server" file's every export is
+// built as a server action, and a type one crashed the module on load.
+import type { TransferFieldErrors } from "@/lib/validation/transfer-errors";
 import type { DuplicateMatch } from "@/lib/duplicates/match";
 import { Card } from "@/components/ui/card";
 import { Label, Input, Select } from "@/components/ui/field";
