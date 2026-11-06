@@ -102,10 +102,13 @@ export async function transferSearchResults(rawPayload: TransferPayload): Promis
   let transferredCount = 0;
   let ignoredCount = 0;
 
-  // Each row is several writes, so a big batch outlasts Prisma's default
-  // 5-second transaction limit (a large transfer hit it in production).
-  // Allow time in proportion to the batch, still all-or-nothing.
-  const timeout = Math.max(10_000, payload.rows.length * 500);
+  // Each row is four or five writes, so a big batch outlasts Prisma's
+  // default 5-second transaction limit (a large transfer hit it in
+  // production). Allow time in proportion to the batch, still
+  // all-or-nothing. Production measured ~500ms a row (each write a network
+  // round trip to the database), so 500ms a row failed a 25-lead transfer
+  // at 12.8s of 12.5s; 2.5s a row leaves five times that.
+  const timeout = Math.max(15_000, payload.rows.length * 2_500);
 
   await prisma.$transaction(async (tx) => {
     for (const row of payload.rows) {

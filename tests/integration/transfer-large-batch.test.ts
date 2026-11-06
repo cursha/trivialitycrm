@@ -14,14 +14,16 @@ import type { TransferRow } from "../../src/lib/validation/transfer";
 
 // Production's database is a network hop away, so each write takes far
 // longer than against the local test database. Slow one write per row down
-// to stand in for that: 60 rows x 100ms is past Prisma's default 5-second
-// transaction limit, which is what a large transfer hit in production.
+// to stand in for that. Production measured ~500ms a row in all (a 25-lead
+// transfer took 12.8s and failed the old 500ms-a-row limit), so this adds
+// 500ms a row: 30 rows is 15s+, past both Prisma's default 5-second limit
+// and the old allowance.
 vi.mock("../../src/lib/companies/activity-log", async (importOriginal) => {
   const original = await importOriginal<typeof import("../../src/lib/companies/activity-log")>();
   return {
     ...original,
     logInitialPipelineStage: async (...args: Parameters<typeof original.logInitialPipelineStage>) => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 500));
       return original.logInitialPipelineStage(...args);
     },
   };
@@ -37,7 +39,7 @@ beforeEach(async () => {
 });
 
 describe("transferSearchResults with a large batch", () => {
-  it("transfers 60 venues in one go even when the writes are slow", async () => {
+  it("transfers 30 venues in one go even when the writes are as slow as production's", async () => {
     const role = await createRoleWithPermissions("Administrator", ["transfer_leads"]);
     const user = await createTestUser({ name: "Administrator", roleId: role.id });
     const leadType = await createLeadTypeFixture("Pub");
@@ -46,7 +48,7 @@ describe("transferSearchResults with a large batch", () => {
     await loginAs(user.id);
 
     const rows: TransferRow[] = [];
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 30; i++) {
       const name = `Test Pub ${i}`;
       const city = `Town ${i}`;
       const result = await createSearchResultFixture({ searchId: search.id, name });
@@ -72,8 +74,8 @@ describe("transferSearchResults with a large batch", () => {
 
     const outcome = await transferSearchResults({ assignedToId: user.id, pipelineStageId: stage.id, rows });
 
-    expect(outcome).toEqual({ transferredCount: 60, ignoredCount: 0 });
-    expect(await testPrisma.company.count()).toBe(60);
-    expect(await testPrisma.searchResult.count({ where: { disposition: "TRANSFERRED" } })).toBe(60);
+    expect(outcome).toEqual({ transferredCount: 30, ignoredCount: 0 });
+    expect(await testPrisma.company.count()).toBe(30);
+    expect(await testPrisma.searchResult.count({ where: { disposition: "TRANSFERRED" } })).toBe(30);
   });
 });

@@ -13,6 +13,20 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v31.2 — 2026-11-06
+### Fixed — transferring 25 or more leads ran out of time
+- With v31.1's fix in, Curt's transfer of 25 leads got further but
+  failed again: the CRM gave the transfer 0.5 seconds per lead, and on
+  the live database each lead takes about that long (its four or five
+  saves each travel to the database and back), so it ran 12.8 seconds of
+  its 12.5 allowed and nothing was saved.
+- A transfer now gets 2.5 seconds per lead (at least 15 seconds), five
+  times what the live database needs. It's still all or nothing: either
+  every ticked lead transfers or none do.
+- The large-transfer test now runs as slowly as the live database, so it
+  fails the old limit the way the live site did.
+- No manual change: internal fix.
+
 ## v31.1 — 2026-11-06
 ### Fixed — transferring leads crashed
 - Curt found that transferring Quick Search results (first noticed on a
