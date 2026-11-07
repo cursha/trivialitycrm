@@ -7,10 +7,10 @@ import { requirePermission } from "@/lib/auth/permissions";
 import { writeAuditEvent } from "@/lib/audit/log";
 import { companyScope } from "@/lib/companies/scope";
 import { contactDisplayName, contactUsable, MANAGER } from "@/lib/mailing-labels/contact";
-import { batchAccess, geometryOf, getLabelSettings, getOrCreateDraft, layoutFor, resolveDraft, sheetChoice, storedLines, summarize, type SheetSummary } from "@/lib/mailing-labels/service";
+import { batchAccess, filterWhere, geometryOf, getLabelSettings, getOrCreateDraft, layoutFor, resolveDraft, sheetChoice, storedLines, summarize, type SheetSummary } from "@/lib/mailing-labels/service";
 import { LAYOUT_VERSION, fontMetrics } from "@/lib/mailing-labels/render";
 import { capacity, validStartPosition, type SheetGeometry } from "@/lib/mailing-labels/geometry";
-import { AlignmentProfileSchema, LabelFiltersSchema, parseStoredOverrides } from "@/lib/validation/mailing-labels";
+import { AlignmentProfileSchema, EMPTY_FILTERS, LabelFiltersSchema, parseStoredOverrides } from "@/lib/validation/mailing-labels";
 import { createHash } from "node:crypto";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -72,6 +72,30 @@ export async function saveLabelFilters(input: { revision: number; filters: unkno
   });
   if (result.ok && dropped > 0) result.message = `${dropped} ${dropped === 1 ? "removal or contact choice" : "removals and contact choices"} for companies that no longer match were cleared.`;
   return result;
+}
+
+/**
+ * "Print labels for N selected" on the Companies list: replace the user's
+ * in-progress job with one for exactly those companies (the list asked
+ * first). Only companies the user may see count; the sheet choice is kept.
+ */
+export async function startLabelsForCompanies(companyIds: string[]): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
+  const user = await requireLabelUser();
+  const ids = [...new Set(companyIds.filter((id) => typeof id === "string" && id.length > 0 && id.length <= 40))];
+  if (ids.length === 0) return { ok: false, error: "Tick at least one company." };
+  if (ids.length > 5000) return { ok: false, error: "Tick at most 5,000 companies at a time." };
+  const filters = { ...EMPTY_FILTERS, companyIds: ids };
+  const where = filterWhere(user, filters);
+  if (!where) return { ok: false, error: "You don't have access to companies." };
+  const count = await prisma.company.count({ where });
+  if (count === 0) return { ok: false, error: "None of those companies can get labels (they may be archived or not yours)." };
+  const draft = await getOrCreateDraft(user);
+  await prisma.mailingLabelDraft.update({
+    where: { id: draft.id },
+    data: { filters, allConfirmed: false, removedCompanyIds: [], contactOverrides: {}, reviewedDigest: null, revision: { increment: 1 } },
+  });
+  revalidatePath(PATH);
+  return { ok: true, count };
 }
 
 export async function setLabelRemoved(input: { revision: number; companyId: string; removed: boolean }): Promise<DraftResult> {

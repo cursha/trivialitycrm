@@ -147,6 +147,7 @@ export default async function CompaniesPage({
         routes={routes}
         canBulk={canBulk}
         canRoutePlan={canRoutePlan}
+        canPrintLabels={canPrintLabels}
         sweetSpotIds={companies.filter((company) => assessLikelihood(company, chainNames).sweetSpot).map((company) => company.id)}
         routeNamesByCompany={routeNamesByCompany}
       />

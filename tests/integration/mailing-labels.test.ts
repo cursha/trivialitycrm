@@ -13,6 +13,7 @@ import {
   createReprint,
   confirmBatchMailed,
   confirmBatchPrinted,
+  startLabelsForCompanies,
 } from "../../src/app/(dashboard)/mailing-labels/actions";
 import { saveLabelSheet } from "../../src/app/(dashboard)/settings/label-sheets/actions";
 import { GET as batchPdf } from "../../src/app/api/mailing-labels/batches/[id]/pdf/route";
@@ -161,6 +162,23 @@ describe("resolving recipients", () => {
     ]);
     expect(r.included.map((c) => c.companyName)).toEqual(["Twin A", "Twin B"]);
     expect(r.included[0].warnings.join()).toMatch(/Same address as Twin B/);
+  });
+});
+
+describe("printing labels for companies ticked on the Companies list", () => {
+  it("starts a job for exactly the ticked companies the user may see", async () => {
+    const ctx = await setup();
+    const mine = await company(ctx, "Mine", {}, { assignedToId: ctx.rep.id });
+    const alsoMine = await company(ctx, "Also mine", {}, { assignedToId: ctx.rep.id });
+    await company(ctx, "Not ticked", {}, { assignedToId: ctx.rep.id });
+    const notMine = await company(ctx, "Not mine");
+    await loginAs(ctx.rep.id);
+    const result = await startLabelsForCompanies([mine.id, alsoMine.id, notMine.id]);
+    expect(result).toEqual({ ok: true, count: 2 });
+    const user = await fetchAuthenticatedUser(ctx.rep.id);
+    const resolved = await resolveDraft(user, await draftFor(ctx.rep.id));
+    expect(resolved.included.map((c) => c.companyName)).toEqual(["Also mine", "Mine"]);
+    expect(await startLabelsForCompanies([notMine.id])).toMatchObject({ ok: false });
   });
 });
 

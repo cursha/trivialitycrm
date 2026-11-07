@@ -88,6 +88,7 @@ function companiesPrefill(params: FromCompanies & { from?: string }, options: Fi
     salespersonIds: params.assignedToId && options.salespeople.some((s) => s.id === params.assignedToId) ? [params.assignedToId] : [],
     tags: [],
     tagMode: "any",
+    companyIds: [],
   };
 }
 

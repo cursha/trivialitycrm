@@ -18,13 +18,15 @@ export const LabelFiltersSchema = z.object({
   salespersonIds: z.array(z.string().min(1).max(40)).max(200).default([]),
   tags: z.array(z.enum(Object.values(SecondaryTag) as [SecondaryTag, ...SecondaryTag[]])).max(10).default([]),
   tagMode: z.enum(["any", "all"]).default("any"),
+  /** Companies ticked on the Companies list ("Print labels for N selected"). */
+  companyIds: z.array(z.string().min(1).max(40)).max(5000).default([]),
 });
 export type LabelFilters = z.infer<typeof LabelFiltersSchema>;
 
-export const EMPTY_FILTERS: LabelFilters = { cities: [], regions: [], stageIds: [], salespersonIds: [], tags: [], tagMode: "any" };
+export const EMPTY_FILTERS: LabelFilters = { cities: [], regions: [], stageIds: [], salespersonIds: [], tags: [], tagMode: "any", companyIds: [] };
 
 export function filtersAreEmpty(f: LabelFilters): boolean {
-  return f.cities.length === 0 && f.regions.length === 0 && f.stageIds.length === 0 && f.salespersonIds.length === 0 && f.tags.length === 0;
+  return f.cities.length === 0 && f.regions.length === 0 && f.stageIds.length === 0 && f.salespersonIds.length === 0 && f.tags.length === 0 && f.companyIds.length === 0;
 }
 
 /** A stored draft's filters, falling back to none if they no longer parse. */

@@ -41,6 +41,7 @@ export function filterWhere(user: AuthenticatedUser, filters: LabelFilters): Pri
   if (filters.stageIds.length > 0) and.push({ pipelineStageId: { in: filters.stageIds } });
   if (filters.salespersonIds.length > 0) and.push({ assignedToId: { in: filters.salespersonIds } });
   if (filters.tags.length > 0) and.push(filters.tagMode === "all" ? { secondaryTags: { hasEvery: filters.tags } } : { secondaryTags: { hasSome: filters.tags } });
+  if (filters.companyIds.length > 0) and.push({ id: { in: filters.companyIds } });
   return { AND: and };
 }
 

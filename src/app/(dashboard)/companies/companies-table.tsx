@@ -1,7 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Mail } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { startLabelsForCompanies } from "@/app/(dashboard)/mailing-labels/actions";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { GRADE_TONE, GRADE_LABEL, TRIVIA_STATUS_LABEL } from "@/lib/ui/status-tones";
@@ -42,6 +46,7 @@ export function CompaniesTable({
   routes,
   canBulk,
   canRoutePlan,
+  canPrintLabels = false,
   routeNamesByCompany,
   sweetSpotIds,
   showLeadType,
@@ -55,6 +60,8 @@ export function CompaniesTable({
   routes: RouteListItem[];
   canBulk: boolean;
   canRoutePlan: boolean;
+  /** Can make mailing labels: ticks are shown for "Print labels for N selected". */
+  canPrintLabels?: boolean;
   /** Company id → names of the signed-in user's routes it's in (any route,
    * not just the current one) — a persisted-state badge, deliberately
    * separate from `selected` below (a bulk-action page-selection checkbox
@@ -64,7 +71,22 @@ export function CompaniesTable({
   sweetSpotIds: string[];
 }) {
   const sweetSpot = new Set(sweetSpotIds);
+  const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [labelError, setLabelError] = useState<string | null>(null);
+  const [labelPending, startLabelTransition] = useTransition();
+  // Ticks show for bulk editors and for anyone who can print labels.
+  const selectable = canBulk || canPrintLabels;
+
+  function printLabelsForSelected() {
+    if (!window.confirm(`Start a label job for the ${selected.size} ticked ${selected.size === 1 ? "company" : "companies"}? This replaces any label job you have in progress.`)) return;
+    setLabelError(null);
+    startLabelTransition(async () => {
+      const result = await startLabelsForCompanies(Array.from(selected));
+      if (result.ok) router.push("/mailing-labels");
+      else setLabelError(result.error);
+    });
+  }
   const allSelected = companies.length > 0 && companies.every((c) => selected.has(c.id));
 
   function toggleAll() {
@@ -81,6 +103,20 @@ export function CompaniesTable({
 
   return (
     <div className="space-y-3">
+      {canPrintLabels && selected.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Button type="button" variant="secondary" disabled={labelPending} onClick={printLabelsForSelected}>
+            <Mail size={16} className="mr-1.5 inline" />
+            {labelPending ? "Starting..." : `Print labels for ${selected.size} selected`}
+          </Button>
+          {!canBulk && (
+            <Button type="button" variant="ghost" onClick={() => setSelected(new Set())}>
+              Clear ticks
+            </Button>
+          )}
+          {labelError && <span className="text-sm font-semibold text-danger">{labelError}</span>}
+        </div>
+      )}
       {canBulk && (
         <BulkToolbar
           selectedIds={Array.from(selected)}
@@ -100,7 +136,7 @@ export function CompaniesTable({
           <table className="w-full text-left text-sm">
             <thead className="bg-black/5 text-xs uppercase text-text-muted">
               <tr>
-                {canBulk && (
+                {selectable && (
                   <th className="px-5 py-3">
                     <input type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Select all" />
                   </th>
@@ -117,7 +153,7 @@ export function CompaniesTable({
             <tbody>
               {companies.map((company) => (
                 <tr key={company.id} className="border-t border-border hover:bg-black/5">
-                  {canBulk && (
+                  {selectable && (
                     <td className="px-5 py-4">
                       <input
                         type="checkbox"
@@ -175,7 +211,7 @@ export function CompaniesTable({
               ))}
               {companies.length === 0 && (
                 <tr>
-                  <td colSpan={6 + (canBulk ? 1 : 0) + (showLeadType ? 1 : 0)} className="px-5 py-10 text-center text-text-muted">
+                  <td colSpan={6 + (selectable ? 1 : 0) + (showLeadType ? 1 : 0)} className="px-5 py-10 text-center text-text-muted">
                     No companies match these filters.
                   </td>
                 </tr>
@@ -188,7 +224,7 @@ export function CompaniesTable({
           {companies.map((company) => (
             <li key={company.id} className="p-4">
               <div className="flex items-start gap-3">
-                {canBulk && (
+                {selectable && (
                   <input
                     type="checkbox"
                     checked={selected.has(company.id)}

@@ -143,6 +143,7 @@ export function FilterPanel({
   const [people, setPeople] = useState(new Set(filters.salespersonIds));
   const [tags, setTags] = useState(new Set<string>(filters.tags));
   const [tagMode, setTagMode] = useState(filters.tagMode);
+  const [companyIds, setCompanyIds] = useState(filters.companyIds);
 
   const toggle = (set: Set<string>, update: (s: Set<string>) => void) => (key: string) => {
     const next = new Set(set);
@@ -158,14 +159,16 @@ export function FilterPanel({
     salespersonIds: [...people],
     tags: [...tags] as LabelFilters["tags"],
     tagMode,
+    companyIds,
   };
-  const empty = built.cities.length + built.regions.length + built.stageIds.length + built.salespersonIds.length + built.tags.length === 0;
+  const empty = built.cities.length + built.regions.length + built.stageIds.length + built.salespersonIds.length + built.tags.length + built.companyIds.length === 0;
   const active = [
     built.cities.length && `City: ${built.cities.map((c) => `${c.city}, ${c.region}`).join(" or ")}`,
     built.regions.length && `Province/State: ${built.regions.map((r) => r.region).join(" or ")}`,
     built.stageIds.length && `Stage: ${options.stages.filter((s) => stages.has(s.id)).map((s) => s.name).join(" or ")}`,
     built.salespersonIds.length && `Salesperson: ${options.salespeople.filter((s) => people.has(s.id)).map((s) => s.name).join(" or ")}`,
     built.tags.length && `Tag: ${options.tags.filter((t) => tags.has(t.value)).map((t) => t.label).join(tagMode === "all" ? " and " : " or ")}`,
+    built.companyIds.length && `Ticked on the Companies list: ${built.companyIds.length} ${built.companyIds.length === 1 ? "company" : "companies"}`,
   ].filter(Boolean) as string[];
 
   function apply(confirmAll: boolean) {
@@ -183,6 +186,7 @@ export function FilterPanel({
     setPeople(new Set());
     setTags(new Set());
     setTagMode("any");
+    setCompanyIds([]);
   }
 
   return (
@@ -193,6 +197,16 @@ export function FilterPanel({
           Reset filters
         </Button>
       </div>
+      {companyIds.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-primary/10 px-3 py-2 text-sm text-text">
+          <span>
+            <span className="font-semibold">{companyIds.length}</span> {companyIds.length === 1 ? "company" : "companies"} ticked on the Companies list. Other filters below narrow these further.
+          </span>
+          <Button type="button" variant="ghost" onClick={() => setCompanyIds([])}>
+            Clear the ticked companies
+          </Button>
+        </div>
+      )}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <CheckList title="City" items={options.cities} keyOf={cityKey} labelOf={(c) => `${c.city}, ${c.region}`} selected={cities} onToggle={toggle(cities, setCities)} searchable />
         <CheckList title="Province / State" items={options.regions} keyOf={regionKey} labelOf={(r) => `${r.region} (${r.country === "United States" ? "USA" : r.country})`} selected={regions} onToggle={toggle(regions, setRegions)} searchable />

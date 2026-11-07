@@ -13,6 +13,20 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v32.2 — 2026-11-06
+### Improved — print labels for the companies you tick
+- Curt wanted to tick companies on the Companies list and print labels for
+  just those. Ticking companies now shows **Print labels for N selected**;
+  it starts a label job for exactly the ticked companies (after asking,
+  since it replaces any job in progress) and opens Mailing Labels to
+  review, choose the sheet and print.
+- The tick boxes now show for anyone who can make mailing labels, not only
+  people who can bulk-edit. Salespeople see the label button but none of
+  the bulk-edit actions.
+- On Mailing Labels the ticked companies show at the top of the filters,
+  with **Clear the ticked companies**. Other filters narrow them further.
+- Manual: the Mailing labels section of the Sales Quick Start explains it.
+
 ## v32.1 — 2026-11-06
 ### Improved — Print labels from the Companies list
 - Curt asked for print labels on the company menu. The Companies list now

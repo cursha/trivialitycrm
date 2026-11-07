@@ -268,7 +268,14 @@ The bar's name prints in bold capitals (only on the label; the name in the
 CRM isn't changed). Mail going to the other country (a US bar when the CRM
 is set to Canada, say) gets a **USA** or **CANADA** line at the bottom.
 
-You can also start from the Companies list: set its filters, then click
+To print labels for particular bars, tick them on the **Companies** list
+and click **Print labels for N selected** above the list. That starts a
+label job for exactly those bars (replacing any job you had in progress)
+and opens Mailing Labels to review, choose the sheet and print. The ticked
+bars show at the top of the filters; **Clear the ticked companies** goes
+back to choosing by filter.
+
+You can also start from the Companies list's filters: set them, then click
 **Print labels** at the top. Mailing Labels opens with the matching city,
 province/state, sales stage and salesperson already ticked; click **Apply
 filters** to use them. (Other Companies filters, such as search or lead
