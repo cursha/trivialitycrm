@@ -184,6 +184,7 @@ const DATA_QUALITY_CATEGORY = "Data Quality";
 const ADMINISTRATION_CATEGORY = "Administration";
 const ROUTE_PLANNING_CATEGORY = "Route Planning";
 const SALES_LISTS_CATEGORY = "Sales Lists & Campaigns";
+const MAILING_LABELS_CATEGORY = "Mailing Labels";
 
 const permissions: { key: string; label: string; category: string; description: string }[] = [
   { key: "view_all_leads", label: "View all leads", category: LEADS_CATEGORY, description: "View every company and contact in the CRM, regardless of assignment or team." },
@@ -276,6 +277,11 @@ const permissions: { key: string; label: string; category: string; description: 
   { key: "create_campaigns", label: "Create email campaigns", category: SALES_LISTS_CATEGORY, description: "Build a single-email or multi-step email campaign from a sales list." },
   { key: "send_campaigns", label: "Approve and send email campaigns", category: SALES_LISTS_CATEGORY, description: "Approve a campaign's preview and send it now or on a schedule." },
   { key: "view_campaign_reports", label: "View campaign reports", category: SALES_LISTS_CATEGORY, description: "View campaign and calling-session reporting and dashboards." },
+  // Mailing labels: printing address labels for companies you can see.
+  // Sheet measurements and the workspace's label settings are a separate,
+  // Administrator-only permission.
+  { key: "use_mailing_labels", label: "Make mailing labels", category: MAILING_LABELS_CATEGORY, description: "Build, preview and download address labels for companies you can see, and reprint your own label batches." },
+  { key: "manage_label_sheets", label: "Manage label sheets", category: MAILING_LABELS_CATEGORY, description: "Add and edit label sheet measurements, and set the mailing-label batch limit and retention." },
   { key: "manage_campaign_instructions", label: "Manage reusable campaign instructions", category: SALES_LISTS_CATEGORY, description: "Create and edit reusable, house-wide AI personalization instructions campaign creators can apply." },
 ];
 
@@ -314,6 +320,7 @@ const roleGrants: Record<(typeof roles)[number], string[]> = {
     "create_campaigns",
     "send_campaigns",
     "view_campaign_reports",
+    "use_mailing_labels",
   ],
   Salesperson: [
     "view_assigned_leads",
@@ -333,6 +340,7 @@ const roleGrants: Record<(typeof roles)[number], string[]> = {
     "create_sales_lists",
     "manage_own_sales_lists",
     "use_calling_lists",
+    "use_mailing_labels",
   ],
 };
 

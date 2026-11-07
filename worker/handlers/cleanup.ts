@@ -71,3 +71,26 @@ export async function sweepExpiredRateLimitBuckets(): Promise<number> {
   }
   return result.count;
 }
+
+/**
+ * Mailing-label retention: once a batch is older than the configured
+ * retention (MailingLabelSettings.retentionDays, 365 by default), its
+ * recipients' names and addresses are cleared. The batch keeps its counts,
+ * sheet, dates and printed/mailed confirmations (non-personal history) but
+ * can no longer be reprinted. Drafts are live working state, not history,
+ * and are left alone.
+ */
+export async function sweepExpiredLabelBatches(): Promise<number> {
+  const settings = await prisma.mailingLabelSettings.findUnique({ where: { id: 1 } });
+  const days = settings?.retentionDays ?? 365;
+  const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const expired = await prisma.mailingLabelBatch.findMany({ where: { createdAt: { lt: cutoff }, recipientsPurgedAt: null }, select: { id: true }, take: 500 });
+  if (expired.length === 0) return 0;
+  const ids = expired.map((b) => b.id);
+  await prisma.$transaction([
+    prisma.mailingLabelRecipient.updateMany({ where: { batchId: { in: ids } }, data: { companyName: "", lines: [], contactId: null } }),
+    prisma.mailingLabelBatch.updateMany({ where: { id: { in: ids } }, data: { recipientsPurgedAt: new Date(), exclusions: [] } }),
+  ]);
+  logger.info(`cleanup: cleared names and addresses on ${ids.length} mailing-label batch(es) past retention.`);
+  return ids.length;
+}

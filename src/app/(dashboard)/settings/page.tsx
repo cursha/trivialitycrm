@@ -1,23 +1,5 @@
 import Link from "next/link";
-import {
-  ListTree,
-  GitBranch,
-  Users,
-  ShieldCheck,
-  XCircle,
-  FileSpreadsheet,
-  MapPin,
-  Mail,
-  FileText,
-  ShieldAlert,
-  Workflow,
-  Inbox,
-  ListChecks,
-  Tag,
-  CalendarClock,
-  PhoneCall,
-  Megaphone,
-} from "lucide-react";
+import { CalendarClock, FileSpreadsheet, FileText, GitBranch, Inbox, ListChecks, ListTree, Mail, MapPin, Megaphone, PhoneCall, ShieldAlert, ShieldCheck, Tag, Tags, Users, Workflow, XCircle } from "lucide-react";
 import { requireUser } from "@/lib/auth/current-user";
 import { hasPermission } from "@/lib/auth/permissions";
 import { PageHeader } from "@/components/ui/page-header";
@@ -127,6 +109,13 @@ export default async function SettingsPage() {
       description: "Table-driven rules for missing fields, invalid formats, duplicates, and stale records.",
       icon: ListChecks,
       visible: hasPermission(user, "manage_data_quality_rules"),
+    },
+    {
+      href: "/settings/label-sheets",
+      label: "Label Sheets",
+      description: "Measurements of the label sheets mailing labels print on, plus the label batch limit and retention.",
+      icon: Tags,
+      visible: hasPermission(user, "manage_label_sheets"),
     },
     {
       href: "/settings/territories",

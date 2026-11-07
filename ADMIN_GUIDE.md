@@ -333,6 +333,54 @@ Locator, Pub Lead Finder, and the scan):
   a demo provider, so its suggestions aren't real data. Nothing it suggests
   is ever applied unless someone clicks **Accept**.
 
+## Label sheets and mailing labels
+
+Mailing Labels (see the Sales Quick Start) prints address labels on sheets
+of sticky labels. Before anyone can use it, an administrator adds the label
+sheet the team prints on: Settings → **Label Sheets** → **Add a label
+sheet**.
+
+- **No sheet is built in.** Label makers publish the label size and labels
+  per sheet, but not always the margins and spacing, and a guess wastes
+  labels. Measure your actual sheet with a ruler (or use the maker's
+  published template measurements) and note the source in **Where the
+  measurements came from**.
+- Enter the measurements in **Inches** or **Millimetres** (switch any time;
+  they're stored in millimetres). **US Letter** and **A4** fill in the page
+  size, or type a custom one. You need: page width and height; label width
+  and height; rows and columns; **Top margin** (page top to the first row)
+  and **Left margin** (page left to the first column); **Gap across** and
+  **Gap down** (the space *between* labels, not the distance from one
+  label's edge to the next; 0 if they touch); and **Inner padding** (blank
+  space kept inside each label). The form refuses measurements that don't
+  fit on the page.
+- **Preferred text size** (10 pt suggested) and **Smallest text size**
+  (8 pt suggested): long addresses wrap, then shrink down to the smallest
+  size; a label that still won't fit blocks the job rather than being cut.
+- **Calibration page (PDF)** on each sheet prints outlines, numbers and
+  50 mm rulers. Print it on plain paper at 100% and hold it over a real
+  sheet before anyone uses it.
+- **Edit** saves changed measurements as a new version; batches already
+  printed keep the version they used, so their reprints stay exact.
+  **Duplicate** copies a sheet to adjust; **Make inactive** hides it from
+  new jobs.
+- **Mailing label settings** on the same page: **Most labels in one job**
+  (1,000 by default; bigger jobs are refused with a note to narrow the
+  filters, never cut short) and **Keep names and addresses on past batches
+  for** (365 days by default). After that, a batch keeps its counts, sheet
+  and dates but its names and addresses are cleared and it can't be
+  reprinted. The worker clears them automatically.
+- The country line is left off for mail within the workspace's default
+  country (Settings → Workspace) and added for the other country. Only
+  Canada and US addresses can be printed for now.
+- **Permissions:** **Make mailing labels** (Administrators, Managers and
+  Salespeople by default) lets someone build and print labels for the
+  companies they can already see, and reprint their own batches.
+  **Manage label sheets** (Administrators) covers this page.
+- Labels use the company's address (the CRM keeps one address per
+  company). Companies marked do not contact are never included; an email
+  unsubscribe on its own doesn't stop a postal label.
+
 ## Territories
 
 Settings → **Territories** groups bars by area and gives each area a

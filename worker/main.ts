@@ -17,7 +17,7 @@ import {
 } from "../src/lib/jobs/boss-client";
 import { handleRunSearchJob } from "./handlers/run-search";
 import { handleSendSystemEmailJob } from "./handlers/send-system-email";
-import { sweepExpiredSessions, sweepExpiredImportBatches, sweepExpiredRateLimitBuckets } from "./handlers/cleanup";
+import { sweepExpiredSessions, sweepExpiredImportBatches, sweepExpiredRateLimitBuckets, sweepExpiredLabelBatches } from "./handlers/cleanup";
 import { runReportsTick } from "./handlers/reports-tick";
 import { handleGenerateReportJob } from "./handlers/generate-report";
 import { runSendScheduledEmailTick } from "./handlers/send-scheduled-email-tick";
@@ -181,6 +181,8 @@ async function main(): Promise<void> {
   });
   await boss.work(QUEUE_CLEANUP_IMPORT_BATCHES, async () => {
     await sweepExpiredImportBatches();
+    // Same recurring cleanup slot: mailing-label batches past retention.
+    await sweepExpiredLabelBatches();
   });
   await boss.work(QUEUE_CLEANUP_RATE_LIMIT_BUCKETS, async () => {
     await sweepExpiredRateLimitBuckets();

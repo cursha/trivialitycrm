@@ -252,6 +252,95 @@ Maps lands on the business itself. Map links don't appear on printouts.
   route's name (e.g. **In route: Oakville**), whichever route it's on; on
   more than one it says **In 2 routes**, and hovering shows which.
 
+## Mailing labels
+
+**Mailing Labels** in the menu prints address labels for the bars you
+choose, on sheets of sticky labels from your own printer. Each bar gets one
+label, addressed like this:
+
+> **THE SAMPLE PUB**
+> Attn: Jane Smith
+> 123 Main Street
+> Milton, ON
+> L9T 1A1
+
+The bar's name prints in bold capitals (only on the label; the name in the
+CRM isn't changed). Mail going to the other country (a US bar when the CRM
+is set to Canada, say) gets a **USA** or **CANADA** line at the bottom.
+
+1. **Choose companies.** Tick any of **City**, **Province / State**,
+   **Sales stage**, **Salesperson** and **Tag**, then click **Apply
+   filters**. A bar has to match every filter you use; within one filter,
+   any ticked choice counts (Milton *or* Oakville). For tags you choose
+   **Any chosen tag** or **All chosen tags**. With no filters at all, the
+   button reads **Use all matching companies** and shows how many, so you
+   never print the whole CRM by accident. It always covers every matching
+   bar you can see, not just one page. Bars marked do not contact, archived
+   or merged are never included.
+2. **Review.** The counts show how many matched, how many have a complete
+   address, how many need correcting, and how many labels will print. The
+   **Printing** list shows each label as it will read:
+   - It's addressed to the bar's **primary contact**. With no primary
+     contact, a contact with no name, or one marked do not contact, it
+     says **Attn: Manager**. To pick a different contact or Manager for
+     this job only, use the drop-down under the bar's name; the bar's own
+     primary contact isn't changed.
+   - **Remove** leaves a bar out of this job (**Put back** undoes it).
+   - **Needs correcting** lists bars that can't print yet, with exactly
+     what's missing (street, city, province/state, postal code or
+     country). Click **Correct the address**, fix it, and come back: the
+     page always reads the latest data.
+   - Bars at the same address are flagged so you can check them, but each
+     still gets its own label.
+3. **Label sheet and starting position.** Choose the label sheet you're
+   printing on. If your first sheet is partly used, click the first unused
+   label in the numbered diagram: the labels before it stay blank, and
+   every later sheet starts at 1. (Only works when the used labels are all
+   at the start; for a sheet with gaps here and there, use a fresh sheet.)
+   The line below shows how many labels, sheets and spare labels on the
+   last sheet you'll need.
+4. **Preview and generate.** Click **Preview labels** to see the actual PDF
+   that will print, every page and blank label included. If a label is
+   too long even at the smallest text size, it says which bar and which
+   line; shorten it or choose a sheet with bigger labels (nothing is ever
+   cut off). Click **Generate PDF** to save the job, then **Download PDF**.
+
+**Printing it:** choose the paper size that matches the sheet, print at
+**Actual size / 100%** with Fit to page and Shrink turned off, print
+one-sided, and check which way up your printer takes sheets. The first
+time, print on plain paper and hold it over a label sheet against the light
+to check the text lands inside each label.
+
+**Lining it up (printer setting).** Every printer feeds slightly
+differently. Click **Print a calibration page (plain paper)**: it shows
+every label's outline and number, the sample address placed exactly where
+real labels print, and two 50 mm lines through the middle. Hold it over a
+label sheet:
+- If the 50 mm lines don't measure 50 mm, your printer is scaling; set it
+  to Actual size / 100%.
+- If everything is off by the same amount, click **New** beside **Printer
+  setting**, enter how far to move the text (positive **Across** moves it
+  right, positive **Down** moves it down, in millimetres), save, and print
+  the calibration page again. **Reset to 0** clears it.
+- If labels drift further off the further down or across the sheet you go,
+  a nudge won't fix it: the sheet's measurements need correcting, so tell
+  your administrator.
+
+**Your past batches.** **Past label batches** lists the jobs you've
+generated. Open one to **Download PDF** again (exactly as first made),
+**Reprint some or all at a new position** (tick any labels that jammed and
+choose where to start), or start a **New draft from current CRM data**
+with the same filters. The CRM can't see your printer, so it never marks
+a batch printed or mailed by itself; click **Confirm printed** and
+**Confirm mailed** (with an optional note, such as "November flyer") when
+they're done. Neither changes any bar's sales stage. A batch can't be
+reprinted once a bar on it has been archived, marked do not contact or
+moved out of your list; make a new draft instead.
+
+Your in-progress job is saved as you go, so it's still there after you
+leave or sign out. If you have it open in two tabs and change it in one,
+the other asks you to reload rather than overwrite it.
+
 ## Logging a bar visit
 
 On a company's page, tap **Log visit** (the first button under Quick sales

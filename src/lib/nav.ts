@@ -2,6 +2,7 @@
 // both the server layout (for permission filtering) and the client shell
 // (for rendering) without crossing a function-serialization boundary.
 export type NavIconKey =
+  | "mail"
   | "myDay"
   | "dashboard"
   | "building"
@@ -37,6 +38,7 @@ export const NAV_ITEMS: NavItem[] = [
     requiresAnyPermission: ["run_research", "review_research_results", "manage_prompts", "import_leads"],
   },
   { label: "Sales Lists", href: "/sales-lists", icon: "salesLists", requiresAnyPermission: ["view_sales_lists"] },
+  { label: "Mailing Labels", href: "/mailing-labels", icon: "mail", requiresAnyPermission: ["use_mailing_labels"] },
   { label: "Follow-Ups", href: "/follow-ups", icon: "calendar", requiresAnyPermission: LEAD_VIEW_PERMISSIONS },
   { label: "Competitors", href: "/competitors", icon: "trophy" },
   { label: "Manager Workspace", href: "/manager", icon: "team", requiresAnyPermission: ["view_manager_workspace"] },
@@ -62,6 +64,6 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Settings",
     href: "/settings",
     icon: "settings",
-    requiresAnyPermission: ["manage_users", "manage_settings", "manage_competitors"],
+    requiresAnyPermission: ["manage_users", "manage_settings", "manage_competitors", "manage_label_sheets"],
   },
 ];

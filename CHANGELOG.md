@@ -13,6 +13,42 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v32.0 — 2026-11-06
+### New — Mailing Labels
+- **Mailing Labels** in the menu prints address labels, one per company,
+  on sheets of sticky labels from a PDF. Curt's requirements: filter by
+  city, province/state, sales stage, salesperson and tag; addressed to the
+  primary contact, or "Attn: Manager" when there's no usable name; another
+  contact can be chosen per job; company name in bold capitals;
+  alphabetical; choose the first unused label on a partly used sheet;
+  incomplete addresses left out with what needs fixing.
+- Covers every matching company you can see, across all pages; with no
+  filters it asks you to confirm using every company first. Do-not-contact,
+  archived and merged companies are never included.
+- The preview is the actual PDF. A label too long even at the smallest
+  text size blocks the job and names the company and line; nothing is cut
+  off. Distinct companies at one address each get a label, flagged.
+- Generating freezes an exact snapshot. If a company changed after the
+  preview, it asks for a fresh preview; a double click makes one batch.
+  Past batches can be downloaded again exactly, partly reprinted at a new
+  starting position, or used to start a new draft. Printed and mailed are
+  only recorded when someone confirms them, and never change a stage.
+- Calibration page and per-user printer settings (millimetre nudges, never
+  scaling) for lining text up on a given printer.
+- Administrators set up label sheets (measurements in inches or mm, each
+  edit a new version) and the batch limit (1,000) and retention (365 days,
+  after which a batch's names and addresses are cleared) in Settings →
+  Label Sheets. No Avery or other presets are built in: Avery's site
+  publishes label size and count but not margins or spacing, and a guessed
+  preset wastes labels.
+- New permissions: Make mailing labels (all three roles) and Manage label
+  sheets (Administrators).
+- Database: a migration adds seven new tables for label sheets, printer
+  settings, drafts, batches, their labels and settings. Nothing existing
+  changes.
+- Manual: new Mailing labels section in the Sales Quick Start and Label
+  sheets section in the Admin Guide.
+
 ## v31.3 — 2026-11-06
 ### Fixed — a chain's other locations flagged as duplicates
 - Curt transferred 25 Wimpy's locations from a company-name search, and

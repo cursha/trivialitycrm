@@ -1376,7 +1376,7 @@ model LeadSearch {
   chainsLeftOut String[] @default([])
 
   // WEB_PAGE only: the public page the leads were read from.
-  sourceUrl String?
+  sourceUrl  String?
   // WEB_PAGE only: the page's text as the user pasted it from their own
   // browser (sites that refuse the CRM's server); read instead of fetching.
   sourceText String? @db.Text
@@ -3428,4 +3428,170 @@ model CampaignRecipientStepRun {
   errorMessage   String?
 
   @@unique([recipientId, stepId])
+}
+
+// ---------------------------------------------------------------------------
+// Mailing labels (v32.0). Address labels on sheets of adhesive labels,
+// printed from a PDF. See src/lib/mailing-labels/.
+//
+// User, company and contact references here are plain ids, not relations:
+// a generated batch is a historical snapshot that must outlive later edits
+// or deletion of the records it came from (and users are disabled, never
+// deleted).
+// ---------------------------------------------------------------------------
+
+/// A named label sheet (e.g. "30-up address labels"). Its measurements live
+/// in immutable versions; editing creates a new version, so a generated
+/// batch always points at exactly the geometry it was printed with.
+model LabelSheetTemplate {
+  id          String                      @id @default(cuid())
+  name        String                      @unique
+  /// Optional brand/product number, for people only — never layout logic.
+  productCode String?
+  active      Boolean                     @default(true)
+  createdById String
+  createdAt   DateTime                    @default(now())
+  updatedAt   DateTime                    @updatedAt
+  versions    LabelSheetTemplateVersion[]
+}
+
+/// One immutable set of measurements, all in millimetres (converted to PDF
+/// points only when drawing). Row-major fill order.
+model LabelSheetTemplateVersion {
+  id              String              @id @default(cuid())
+  templateId      String
+  template        LabelSheetTemplate  @relation(fields: [templateId], references: [id], onDelete: Restrict)
+  version         Int
+  pageWidthMm     Float
+  pageHeightMm    Float
+  rows            Int
+  columns         Int
+  labelWidthMm    Float
+  labelHeightMm   Float
+  /// The first (top-left) label's distance from the page's top and left.
+  topMm           Float
+  leftMm          Float
+  /// Space between labels (not pitch).
+  gapXMm          Float
+  gapYMm          Float
+  /// Text inset on all four sides of a label.
+  paddingMm       Float
+  preferredFontPt Float
+  minFontPt       Float
+  /// Line height as a multiple of the font size.
+  lineHeight      Float
+  /// Where the measurements came from (ruler, manufacturer page + date).
+  measurementNote String?
+  createdById     String
+  createdAt       DateTime            @default(now())
+  batches         MailingLabelBatch[]
+
+  @@unique([templateId, version])
+}
+
+/// A user's printer correction for one sheet: X/Y offset in mm (positive X
+/// moves right, positive Y moves down). Offsets only, never scaling.
+model LabelAlignmentProfile {
+  id         String   @id @default(cuid())
+  userId     String
+  templateId String
+  name       String
+  offsetXMm  Float    @default(0)
+  offsetYMm  Float    @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, templateId, name])
+  @@index([userId])
+}
+
+/// A user's one private, in-progress label job: filters, removals, contact
+/// choices and sheet settings. `revision` guards against two tabs saving
+/// over each other; `reviewedDigest` is the recipient set the user last
+/// previewed, which generation must still match.
+model MailingLabelDraft {
+  id                 String   @id @default(cuid())
+  ownerId            String   @unique
+  filters            Json
+  /// The user deliberately chose "Use all matching companies" (no filters).
+  allConfirmed       Boolean  @default(false)
+  removedCompanyIds  String[] @default([])
+  /// { [companyId]: contactId | "MANAGER" } — this draft only.
+  contactOverrides   Json     @default("{}")
+  templateId         String?
+  alignmentProfileId String?
+  startPosition      Int      @default(1)
+  reviewedDigest     String?
+  revision           Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+/// An immutable generated label job. The PDF is re-drawn from this snapshot
+/// (same recipients, geometry, offsets and layout version) rather than
+/// stored. `layoutSha256` fingerprints every drawn line, size and position,
+/// so a re-drawing can be checked against the original (the PDF bytes
+/// themselves differ run to run: the embedded font subset gets a new name).
+model MailingLabelBatch {
+  id                   String                    @id @default(cuid())
+  ownerId              String
+  /// Draft id + revision (or the parent batch for a reprint), so a double
+  /// click or retry can never create two batches.
+  idempotencyKey       String                    @unique
+  parentBatchId        String?
+  parent               MailingLabelBatch?        @relation("MailingLabelReprint", fields: [parentBatchId], references: [id], onDelete: SetNull)
+  reprints             MailingLabelBatch[]       @relation("MailingLabelReprint")
+  filters              Json
+  removedCompanyIds    String[]                  @default([])
+  /// [{ companyId, companyName, reasons[] }] — who was left out and why.
+  exclusions           Json
+  templateVersionId    String
+  templateVersion      LabelSheetTemplateVersion @relation(fields: [templateVersionId], references: [id], onDelete: Restrict)
+  templateName         String
+  alignmentProfileName String?
+  offsetXMm            Float                     @default(0)
+  offsetYMm            Float                     @default(0)
+  startPosition        Int
+  layoutVersion        String
+  recipientCount       Int
+  pageCount            Int
+  layoutSha256         String
+  printedAt            DateTime?
+  printedById          String?
+  mailedAt             DateTime?
+  mailedById           String?
+  mailedNote           String?
+  /// Set when retention cleared the recipients' names and addresses.
+  recipientsPurgedAt   DateTime?
+  createdAt            DateTime                  @default(now())
+  recipients           MailingLabelRecipient[]
+
+  @@index([ownerId, createdAt])
+  @@index([createdAt])
+}
+
+/// One label in a batch, in print order: the exact lines drawn.
+model MailingLabelRecipient {
+  id          String            @id @default(cuid())
+  batchId     String
+  batch       MailingLabelBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  sequence    Int
+  companyId   String
+  contactId   String?
+  companyName String
+  /// [{ text, bold }] — exactly as printed.
+  lines       Json
+
+  @@unique([batchId, sequence])
+  @@index([companyId])
+}
+
+/// Workspace-wide mailing-label settings (a single row, id 1).
+model MailingLabelSettings {
+  id                Int      @id @default(1)
+  maxLabelsPerBatch Int      @default(1000)
+  /// Days a batch keeps its recipients' names and addresses.
+  retentionDays     Int      @default(365)
+  updatedById       String?
+  updatedAt         DateTime @updatedAt
 }
