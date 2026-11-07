@@ -11,7 +11,7 @@ import { buttonClasses } from "@/components/ui/button";
 import { getLabelSettings, getOrCreateDraft, geometryOf, resolveDraft, summarize, type Candidate } from "@/lib/mailing-labels/service";
 import { capacity, validateGeometry } from "@/lib/mailing-labels/geometry";
 import { parseStoredOverrides, type LabelFilters } from "@/lib/validation/mailing-labels";
-import { DraftProvider, FilterPanel, ContactChoice, RemoveToggle, SheetPanel, PreviewPanel, type FilterOptions } from "./label-workflow";
+import { DraftProvider, FilterPanel, SelectionSummary, ContactChoice, RemoveToggle, SheetPanel, PreviewPanel, type FilterOptions } from "./label-workflow";
 
 export const metadata = { title: "Mailing Labels — Triviality CRM" };
 
@@ -158,16 +158,22 @@ export default async function MailingLabelsPage({
           </Card>
         )}
 
-        <FilterPanel
-          key={prefill ? "from-companies" : "saved"}
-          options={options}
-          filters={prefill ?? resolution.filters}
-          fromCompanies={!!prefill}
-          allConfirmed={draft.allConfirmed}
-          hasChoices={draft.removedCompanyIds.length > 0 || Object.keys(overrides).length > 0}
-          needsConfirmAll={resolution.needsConfirmAll}
-          matched={resolution.matched}
-        />
+        {/* Companies ticked in the Companies checkbox menu are already the
+            choice: no filters to set, straight on to review and print. */}
+        {!prefill && resolution.filters.companyIds.length > 0 ? (
+          <SelectionSummary ticked={resolution.filters.companyIds.length} available={resolution.matched} />
+        ) : (
+          <FilterPanel
+            key={prefill ? "from-companies" : "saved"}
+            options={options}
+            filters={prefill ?? resolution.filters}
+            fromCompanies={!!prefill}
+            allConfirmed={draft.allConfirmed}
+            hasChoices={draft.removedCompanyIds.length > 0 || Object.keys(overrides).length > 0}
+            needsConfirmAll={resolution.needsConfirmAll}
+            matched={resolution.matched}
+          />
+        )}
 
         {resolution.tooMany && <Card className="text-sm font-semibold text-danger">{resolution.matched.toLocaleString()} companies match. That&apos;s too many to review; narrow the filters.</Card>}
 

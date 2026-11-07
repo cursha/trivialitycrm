@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
 import { Input, Label, Select } from "@/components/ui/field";
 import type { LabelFilters } from "@/lib/validation/mailing-labels";
+
+const EMPTY_LABEL_FILTERS: LabelFilters = { cities: [], regions: [], stageIds: [], salespersonIds: [], tags: [], tagMode: "any", companyIds: [] };
 import type { SheetSummary } from "@/lib/mailing-labels/service";
 import {
   deleteAlignmentProfile,
@@ -243,6 +245,39 @@ export function FilterPanel({
         )}
         {needsConfirmAll && <span className="text-xs text-text-muted">With no filters, every company you can see ({matched}) would get a label. Confirm to continue, or choose filters.</span>}
       </div>
+    </Card>
+  );
+}
+
+/**
+ * In place of the filters when the job came from the Companies checkbox
+ * menu: the ticked companies are the job, so there's nothing to filter.
+ */
+export function SelectionSummary({ ticked, available }: { ticked: number; available: number }) {
+  const { run, pending } = useDraft();
+  return (
+    <Card className="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h2 className="text-lg font-bold text-text">
+          Labels for the {ticked} {ticked === 1 ? "company" : "companies"} you ticked
+        </h2>
+        <p className="text-sm text-text-muted">
+          From the Companies list.
+          {available < ticked && ` ${ticked - available} of them can't get labels (archived, merged or no longer yours), so ${available} ${available === 1 ? "is" : "are"} listed below.`}
+        </p>
+      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        disabled={pending}
+        onClick={() => {
+          if (window.confirm("Choose companies by filters instead? This clears the ticked companies from this label job.")) {
+            void run((revision) => saveLabelFilters({ revision, filters: EMPTY_LABEL_FILTERS, allConfirmed: false }));
+          }
+        }}
+      >
+        Choose by filters instead
+      </Button>
     </Card>
   );
 }

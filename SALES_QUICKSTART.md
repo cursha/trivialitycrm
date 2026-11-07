@@ -272,9 +272,9 @@ To print labels for particular bars, tick them on the **Companies** list
 and choose **Print labels** in the selection menu (with Change stage, Add
 Selected to Route and the rest), then **Print N labels**. That starts a
 label job for exactly those bars (replacing any job you had in progress)
-and opens Mailing Labels to review, choose the sheet and print. The ticked
-bars show at the top of the filters; **Clear the ticked companies** goes
-back to choosing by filter.
+and opens Mailing Labels with no filters to set: it says how many bars you
+ticked and goes straight to reviewing them, choosing the sheet and
+printing. **Choose by filters instead** switches back to filters.
 
 You can also start from the Companies list's filters: set them, then click
 **Print labels** at the top. Mailing Labels opens with the matching city,

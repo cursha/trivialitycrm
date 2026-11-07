@@ -13,6 +13,15 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v32.4 — 2026-11-06
+### Improved — no filters when printing ticked companies
+- Curt's call: printing labels from the Companies checkbox menu is for the
+  companies ticked, so Mailing Labels shouldn't ask for filters. It now
+  shows "Labels for the N companies you ticked" in place of the filters
+  and goes straight to review, sheet and print. **Choose by filters
+  instead** goes back to filters.
+- Manual: the Mailing labels section of the Sales Quick Start updated.
+
 ## v32.3 — 2026-11-06
 ### Improved — Print labels moved into the selection menu
 - v32.2's "Print labels for N selected" sat on its own above the selection
