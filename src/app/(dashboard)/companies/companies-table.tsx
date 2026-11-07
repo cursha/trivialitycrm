@@ -1,11 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { Mail } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { startLabelsForCompanies } from "@/app/(dashboard)/mailing-labels/actions";
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { GRADE_TONE, GRADE_LABEL, TRIVIA_STATUS_LABEL } from "@/lib/ui/status-tones";
@@ -71,22 +67,9 @@ export function CompaniesTable({
   sweetSpotIds: string[];
 }) {
   const sweetSpot = new Set(sweetSpotIds);
-  const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [labelError, setLabelError] = useState<string | null>(null);
-  const [labelPending, startLabelTransition] = useTransition();
   // Ticks show for bulk editors and for anyone who can print labels.
   const selectable = canBulk || canPrintLabels;
-
-  function printLabelsForSelected() {
-    if (!window.confirm(`Start a label job for the ${selected.size} ticked ${selected.size === 1 ? "company" : "companies"}? This replaces any label job you have in progress.`)) return;
-    setLabelError(null);
-    startLabelTransition(async () => {
-      const result = await startLabelsForCompanies(Array.from(selected));
-      if (result.ok) router.push("/mailing-labels");
-      else setLabelError(result.error);
-    });
-  }
   const allSelected = companies.length > 0 && companies.every((c) => selected.has(c.id));
 
   function toggleAll() {
@@ -103,21 +86,7 @@ export function CompaniesTable({
 
   return (
     <div className="space-y-3">
-      {canPrintLabels && selected.size > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <Button type="button" variant="secondary" disabled={labelPending} onClick={printLabelsForSelected}>
-            <Mail size={16} className="mr-1.5 inline" />
-            {labelPending ? "Starting..." : `Print labels for ${selected.size} selected`}
-          </Button>
-          {!canBulk && (
-            <Button type="button" variant="ghost" onClick={() => setSelected(new Set())}>
-              Clear ticks
-            </Button>
-          )}
-          {labelError && <span className="text-sm font-semibold text-danger">{labelError}</span>}
-        </div>
-      )}
-      {canBulk && (
+      {selectable && (
         <BulkToolbar
           selectedIds={Array.from(selected)}
           selectedCompanies={companies.filter((c) => selected.has(c.id)).map((c) => ({ id: c.id, name: c.name }))}
@@ -127,6 +96,7 @@ export function CompaniesTable({
           routes={routes}
           canBulk={canBulk}
           canRoutePlan={canRoutePlan}
+          canPrintLabels={canPrintLabels}
           onClear={() => setSelected(new Set())}
         />
       )}

@@ -23,9 +23,10 @@ import { Button, buttonClasses } from "@/components/ui/button";
 import { Label, Select, Input, Textarea } from "@/components/ui/field";
 import type { StageOption } from "./company-card";
 import { OpportunityAnalysisPanel } from "@/app/(dashboard)/companies/opportunity-analysis-panel";
+import { startLabelsForCompanies } from "@/app/(dashboard)/mailing-labels/actions";
 
 type Option = { id: string; name: string };
-type BulkActionKind = "stage" | "assign" | "territory" | "followup" | "note" | "archive" | "restore" | "analyze" | "route";
+type BulkActionKind = "stage" | "assign" | "territory" | "followup" | "note" | "archive" | "restore" | "analyze" | "route" | "labels";
 
 const NEW_ROUTE = "__new__";
 
@@ -38,6 +39,7 @@ export function BulkToolbar({
   routes,
   canBulk,
   canRoutePlan,
+  canPrintLabels = false,
   onClear,
 }: {
   selectedIds: string[];
@@ -49,6 +51,9 @@ export function BulkToolbar({
   routes: RouteListItem[];
   canBulk: boolean;
   canRoutePlan: boolean;
+  /** Offer "Print labels" for the ticked companies (Mailing Labels). Someone
+   * who can print labels but not bulk-edit sees only that action. */
+  canPrintLabels?: boolean;
   onClear: () => void;
 }) {
   const router = useRouter();
@@ -63,8 +68,18 @@ export function BulkToolbar({
   const [newRouteDate, setNewRouteDate] = useState("");
   const [routeError, setRouteError] = useState<string | null>(null);
   const [exportedCurrentRoute, setExportedCurrentRoute] = useState(false);
+  const [labelError, setLabelError] = useState<string | null>(null);
 
-  if (!canBulk || selectedIds.length === 0) return null;
+  if ((!canBulk && !canPrintLabels) || selectedIds.length === 0) return null;
+
+  function startLabels() {
+    setLabelError(null);
+    startTransition(async () => {
+      const outcome = await startLabelsForCompanies(selectedIds);
+      if (outcome.ok) router.push("/mailing-labels");
+      else setLabelError(outcome.error);
+    });
+  }
 
   const currentRoute = routes.find((route) => route.isActive) ?? null;
   // Export/clear work on the current route, so they're only offered when
@@ -140,41 +155,62 @@ export function BulkToolbar({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-semibold text-text">{selectedIds.length} selected</p>
         <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="ghost" onClick={() => setActive("stage")}>
-            Change stage
-          </Button>
-          <Button type="button" variant="ghost" onClick={() => setActive("assign")}>
-            Assign
-          </Button>
-          <Button type="button" variant="ghost" onClick={() => setActive("territory")}>
-            Set territory
-          </Button>
-          <Button type="button" variant="ghost" onClick={() => setActive("followup")}>
-            Create follow-up
-          </Button>
-          <Button type="button" variant="ghost" onClick={() => setActive("note")}>
-            Add note
-          </Button>
-          <Button type="button" variant="ghost" onClick={() => setActive("analyze")}>
-            Analyze for opportunities
-          </Button>
-          {canRoutePlan && (
-            <Button type="button" variant="ghost" onClick={openRoutePicker}>
-              Add Selected to Route
+          {canBulk && (
+            <>
+              <Button type="button" variant="ghost" onClick={() => setActive("stage")}>
+                Change stage
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setActive("assign")}>
+                Assign
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setActive("territory")}>
+                Set territory
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setActive("followup")}>
+                Create follow-up
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setActive("note")}>
+                Add note
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setActive("analyze")}>
+                Analyze for opportunities
+              </Button>
+              {canRoutePlan && (
+                <Button type="button" variant="ghost" onClick={openRoutePicker}>
+                  Add Selected to Route
+                </Button>
+              )}
+              <a
+                href={exportUrl}
+                className="inline-flex items-center justify-center rounded-lg border border-border-strong px-4 py-2.5 text-sm font-bold text-text hover:bg-black/5"
+              >
+                Export selected
+              </a>
+              <Button type="button" variant="ghost" onClick={() => setActive("archive")}>
+                Archive
+              </Button>
+              <Button type="button" variant="ghost" onClick={() => setActive("restore")}>
+                Restore
+              </Button>
+            </>
+          )}
+          {canPrintLabels && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setLabelError(null);
+                setActive("labels");
+              }}
+            >
+              Print labels
             </Button>
           )}
-          <a
-            href={exportUrl}
-            className="inline-flex items-center justify-center rounded-lg border border-border-strong px-4 py-2.5 text-sm font-bold text-text hover:bg-black/5"
-          >
-            Export selected
-          </a>
-          <Button type="button" variant="ghost" onClick={() => setActive("archive")}>
-            Archive
-          </Button>
-          <Button type="button" variant="ghost" onClick={() => setActive("restore")}>
-            Restore
-          </Button>
+          {!canBulk && (
+            <Button type="button" variant="ghost" onClick={onClear}>
+              Clear
+            </Button>
+          )}
         </div>
       </div>
 
@@ -338,6 +374,24 @@ export function BulkToolbar({
           <Button type="button" disabled={isPending} variant="primary" onClick={() => startTransition(async () => handleOutcome(await bulkRestore(selectedIds)))}>
             Confirm restore
           </Button>
+        </div>
+      )}
+
+      {active === "labels" && (
+        <div className="space-y-2 border-t border-border pt-3">
+          <p className="text-sm text-text">
+            Print mailing labels for the {selectedIds.length} ticked {selectedIds.length === 1 ? "company" : "companies"}. This starts a new label job (replacing any you have in
+            progress) and opens Mailing Labels, where you check the addresses, choose the label sheet and print.
+          </p>
+          {labelError && <Alert tone="danger">{labelError}</Alert>}
+          <div className="flex gap-2">
+            <Button type="button" disabled={isPending} onClick={startLabels}>
+              {isPending ? "Starting..." : `Print ${selectedIds.length} ${selectedIds.length === 1 ? "label" : "labels"}`}
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => setActive(null)}>
+              Cancel
+            </Button>
+          </div>
         </div>
       )}
 

@@ -13,6 +13,17 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v32.3 — 2026-11-06
+### Improved — Print labels moved into the selection menu
+- v32.2's "Print labels for N selected" sat on its own above the selection
+  menu. Curt's call: it belongs in the menu with the other things you can
+  do with ticked companies. **Print labels** is now one of the selection
+  menu's actions (beside Add Selected to Route, Export selected and the
+  rest) and opens a small panel to confirm, like the other actions.
+- People who can print labels but not bulk-edit see the same menu with just
+  Print labels and Clear.
+- Manual: the Mailing labels section of the Sales Quick Start updated.
+
 ## v32.2 — 2026-11-06
 ### Improved — print labels for the companies you tick
 - Curt wanted to tick companies on the Companies list and print labels for

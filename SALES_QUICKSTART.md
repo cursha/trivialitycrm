@@ -269,7 +269,8 @@ CRM isn't changed). Mail going to the other country (a US bar when the CRM
 is set to Canada, say) gets a **USA** or **CANADA** line at the bottom.
 
 To print labels for particular bars, tick them on the **Companies** list
-and click **Print labels for N selected** above the list. That starts a
+and choose **Print labels** in the selection menu (with Change stage, Add
+Selected to Route and the rest), then **Print N labels**. That starts a
 label job for exactly those bars (replacing any job you had in progress)
 and opens Mailing Labels to review, choose the sheet and print. The ticked
 bars show at the top of the filters; **Clear the ticked companies** goes
