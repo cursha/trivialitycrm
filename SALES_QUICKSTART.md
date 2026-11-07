@@ -268,6 +268,12 @@ The bar's name prints in bold capitals (only on the label; the name in the
 CRM isn't changed). Mail going to the other country (a US bar when the CRM
 is set to Canada, say) gets a **USA** or **CANADA** line at the bottom.
 
+You can also start from the Companies list: set its filters, then click
+**Print labels** at the top. Mailing Labels opens with the matching city,
+province/state, sales stage and salesperson already ticked; click **Apply
+filters** to use them. (Other Companies filters, such as search or lead
+type, don't carry over.)
+
 1. **Choose companies.** Tick any of **City**, **Province / State**,
    **Sales stage**, **Salesperson** and **Tag**, then click **Apply
    filters**. A bar has to match every filter you use; within one filter,

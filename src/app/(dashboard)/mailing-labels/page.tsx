@@ -10,7 +10,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { buttonClasses } from "@/components/ui/button";
 import { getLabelSettings, getOrCreateDraft, geometryOf, resolveDraft, summarize, type Candidate } from "@/lib/mailing-labels/service";
 import { capacity, validateGeometry } from "@/lib/mailing-labels/geometry";
-import { parseStoredOverrides } from "@/lib/validation/mailing-labels";
+import { parseStoredOverrides, type LabelFilters } from "@/lib/validation/mailing-labels";
 import { DraftProvider, FilterPanel, ContactChoice, RemoveToggle, SheetPanel, PreviewPanel, type FilterOptions } from "./label-workflow";
 
 export const metadata = { title: "Mailing Labels — Triviality CRM" };
@@ -69,7 +69,33 @@ function AddressBlock({ candidate }: { candidate: Candidate }) {
   );
 }
 
-export default async function MailingLabelsPage({ searchParams }: { searchParams: Promise<{ view?: string; q?: string; page?: string }> }) {
+type FromCompanies = { city?: string; region?: string; country?: string; pipelineStageId?: string; assignedToId?: string };
+
+/**
+ * The filters a Companies-list "Print labels" click brought over, matched
+ * to this page's choices (a city is ticked in every province/state it's in
+ * unless the province was given too). Null when the page wasn't opened
+ * that way. Nothing is saved until the user clicks Apply.
+ */
+function companiesPrefill(params: FromCompanies & { from?: string }, options: FilterOptions): LabelFilters | null {
+  if (params.from !== "companies") return null;
+  const same = (a: string, b: string | undefined) => !!b && a.trim().toLowerCase() === b.trim().toLowerCase();
+  const country = params.country ? canonicalCountry(params.country) : undefined;
+  return {
+    cities: params.city ? options.cities.filter((c) => same(c.city, params.city) && (!params.region || same(c.region, params.region))) : [],
+    regions: !params.city && params.region ? options.regions.filter((r) => same(r.region, params.region) && (!country || same(r.country, country))) : [],
+    stageIds: params.pipelineStageId && options.stages.some((s) => s.id === params.pipelineStageId) ? [params.pipelineStageId] : [],
+    salespersonIds: params.assignedToId && options.salespeople.some((s) => s.id === params.assignedToId) ? [params.assignedToId] : [],
+    tags: [],
+    tagMode: "any",
+  };
+}
+
+export default async function MailingLabelsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string; q?: string; page?: string; from?: string } & FromCompanies>;
+}) {
   const user = await requireUser();
   requirePermission(user, "use_mailing_labels");
   const params = await searchParams;
@@ -109,6 +135,7 @@ export default async function MailingLabelsPage({ searchParams }: { searchParams
   const chosenSheet = templates.find((t) => t.id === draft.templateId)?.versions[0];
   const summary = chosenSheet ? summarize(resolution.included.length, draft.startPosition, geometryOf(chosenSheet)) : null;
   const overrides = parseStoredOverrides(draft.contactOverrides);
+  const prefill = companiesPrefill(params, options);
 
   return (
     <DraftProvider revision={draft.revision}>
@@ -123,9 +150,18 @@ export default async function MailingLabelsPage({ searchParams }: { searchParams
           }
         />
 
+        {prefill && (
+          <Card className="text-sm text-text">
+            Filters brought over from Companies are ticked below. Click <span className="font-semibold">Apply filters</span> to use them. Only city, province/state, sales stage and
+            salesperson carry over; other Companies filters (search, lead type and so on) don&apos;t apply to labels.
+          </Card>
+        )}
+
         <FilterPanel
+          key={prefill ? "from-companies" : "saved"}
           options={options}
-          filters={resolution.filters}
+          filters={prefill ?? resolution.filters}
+          fromCompanies={!!prefill}
           allConfirmed={draft.allConfirmed}
           hasChoices={draft.removedCompanyIds.length > 0 || Object.keys(overrides).length > 0}
           needsConfirmAll={resolution.needsConfirmAll}

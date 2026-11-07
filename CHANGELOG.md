@@ -13,6 +13,18 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v32.1 — 2026-11-06
+### Improved — Print labels from the Companies list
+- Curt asked for print labels on the company menu. The Companies list now
+  has a **Print labels** button beside Export CSV and Add company, for
+  anyone who can make mailing labels.
+- It opens Mailing Labels with the Companies filters it shares already
+  ticked: city, province/state, sales stage and salesperson. Nothing is
+  saved until Apply filters is clicked. Other Companies filters (search,
+  lead type and the like) don't apply to labels, and the page says so.
+- Manual: the Mailing labels section of the Sales Quick Start mentions the
+  button.
+
 ## v32.0 — 2026-11-06
 ### New — Mailing Labels
 - **Mailing Labels** in the menu prints address labels, one per company,

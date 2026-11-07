@@ -117,7 +117,25 @@ function CheckList<T>({ title, items, keyOf, labelOf, selected, onToggle, search
   );
 }
 
-export function FilterPanel({ options, filters, allConfirmed, hasChoices, needsConfirmAll, matched }: { options: FilterOptions; filters: LabelFilters; allConfirmed: boolean; hasChoices: boolean; needsConfirmAll: boolean; matched: number }) {
+export function FilterPanel({
+  options,
+  filters,
+  fromCompanies = false,
+  allConfirmed,
+  hasChoices,
+  needsConfirmAll,
+  matched,
+}: {
+  options: FilterOptions;
+  filters: LabelFilters;
+  /** Opened from the Companies list's Print labels: filters are pre-ticked, not yet saved. */
+  fromCompanies?: boolean;
+  allConfirmed: boolean;
+  hasChoices: boolean;
+  needsConfirmAll: boolean;
+  matched: number;
+}) {
+  const router = useRouter();
   const { run, pending } = useDraft();
   const [cities, setCities] = useState(new Set(filters.cities.map(cityKey)));
   const [regions, setRegions] = useState(new Set(filters.regions.map(regionKey)));
@@ -152,7 +170,10 @@ export function FilterPanel({ options, filters, allConfirmed, hasChoices, needsC
 
   function apply(confirmAll: boolean) {
     if (hasChoices && !window.confirm("Changing the filters clears your removals and contact choices for companies that no longer match. Continue?")) return;
-    void run((revision) => saveLabelFilters({ revision, filters: built, allConfirmed: confirmAll }));
+    void run((revision) => saveLabelFilters({ revision, filters: built, allConfirmed: confirmAll })).then((result) => {
+      // Saved: drop the Companies hand-off from the address so it isn't re-applied.
+      if (result.ok && fromCompanies) router.replace("/mailing-labels");
+    });
   }
 
   function reset() {

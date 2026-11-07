@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CirclePlus } from "lucide-react";
+import { CirclePlus, Mail } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { assessLikelihood, getChainNames, sweetSpotWhere } from "@/lib/companies/sweet-spot";
 import { requireUser } from "@/lib/auth/current-user";
@@ -71,6 +71,16 @@ export default async function CompaniesPage({
   const canExport = hasPermission(user, "export_leads");
   const canBulk = hasPermission(user, "bulk_update_leads");
 
+  // "Print labels" opens Mailing Labels with the filters it shares with
+  // this list (city, province/state, stage, salesperson) already ticked.
+  const canPrintLabels = hasPermission(user, "use_mailing_labels");
+  const labelQuery = new URLSearchParams(
+    ["city", "region", "country", "pipelineStageId", "assignedToId"]
+      .map((key) => [key, toSingle(params[key])] as const)
+      .filter((entry): entry is [string, string] => !!entry[1]),
+  );
+  labelQuery.set("from", "companies");
+
   const exportQuery = new URLSearchParams(
     ["leadTypeId", "pipelineStageId", "competitorId"]
       .map((key) => [key, toSingle(params[key])] as const)
@@ -96,6 +106,15 @@ export default async function CompaniesPage({
         description={`${total} matching companies.`}
         actions={
           <>
+            {canPrintLabels && (
+              <Link
+                href={`/mailing-labels?${labelQuery.toString()}`}
+                className="inline-flex items-center gap-2 rounded-lg border border-border-strong px-4 py-2.5 text-sm font-semibold text-text hover:bg-black/5"
+              >
+                <Mail size={16} />
+                Print labels
+              </Link>
+            )}
             {canExport && (
               <a
                 href={`/api/export/companies?format=csv${exportQuery ? `&${exportQuery}` : ""}`}
