@@ -8,6 +8,7 @@ import { Alert } from "@/components/ui/alert";
 import { Input, Label, Textarea } from "@/components/ui/field";
 import { MM_PER_INCH, validateGeometry, type SheetGeometry } from "@/lib/mailing-labels/geometry";
 import { duplicateLabelSheet, saveLabelSheet, saveMailingLabelSettings, setLabelSheetActive } from "./actions";
+import { findAveryPreset, gapsFromMargins, PRESET_PAGE, PRESET_SOURCE_DATE, type AveryPreset } from "@/lib/mailing-labels/presets";
 
 type Sheet = { id: string; name: string; productCode: string | null; active: boolean; version: number; measurementNote: string | null; geometry: SheetGeometry };
 type Unit = "mm" | "in";
@@ -66,6 +67,58 @@ function SheetForm({ sheet, onDone }: { sheet: Sheet | null; onDone: () => void 
   const [note, setNote] = useState(sheet?.measurementNote ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // New sheets start by asking for the Avery number (see presets.ts).
+  const [averyNumber, setAveryNumber] = useState("");
+  const [preset, setPreset] = useState<AveryPreset | null>(null);
+  const [lookupMessage, setLookupMessage] = useState<{ found: boolean; text: string } | null>(null);
+  const [gapsEdited, setGapsEdited] = useState(false);
+
+  function lookUp() {
+    const found = findAveryPreset(averyNumber);
+    setPreset(found);
+    setGapsEdited(false);
+    if (!found) {
+      setLookupMessage({ found: false, text: `The CRM doesn't know Avery ${averyNumber.trim() || "that number"}. Enter the sheet's measurements below.` });
+      return;
+    }
+    const inch = (value: number) => toDisplay(value * MM_PER_INCH, unit);
+    setLengths((current) => ({
+      ...current,
+      pageWidthMm: toDisplay(PRESET_PAGE.widthMm, unit),
+      pageHeightMm: toDisplay(PRESET_PAGE.heightMm, unit),
+      labelWidthMm: inch(found.labelWidthIn),
+      labelHeightMm: inch(found.labelHeightIn),
+      topMm: "",
+      leftMm: "",
+      gapXMm: "",
+      gapYMm: "",
+    }));
+    setRows(String(found.rows));
+    setColumns(String(found.columns));
+    if (!name.trim()) setName(`Avery ${found.number}: ${found.description}`);
+    setProductCode(`Avery ${found.number}`);
+    setNote(`Avery ${found.number}: label size and count from avery.com (${PRESET_SOURCE_DATE}). Top and left margins measured with a ruler; gaps worked out assuming equal margins on both sides.`);
+    setLookupMessage({
+      found: true,
+      text: `Found Avery ${found.number}: ${found.description} (${found.columns} across, ${found.rows} down, Letter paper). Avery doesn't publish the margins, so measure two things on one of your sheets: the top margin and the left margin. The gaps fill in from those.`,
+    });
+  }
+
+  /** With a known Avery sheet, the gaps follow from the two margins. */
+  function setLength(key: string, value: string) {
+    setLengths((current) => {
+      const next = { ...current, [key]: value };
+      if (preset && !gapsEdited && (key === "topMm" || key === "leftMm") && next.topMm.trim() && next.leftMm.trim()) {
+        const gaps = gapsFromMargins(preset, toMm(next.topMm, unit), toMm(next.leftMm, unit));
+        if (gaps) {
+          next.gapXMm = toDisplay(gaps.gapXMm, unit);
+          next.gapYMm = toDisplay(gaps.gapYMm, unit);
+        }
+      }
+      return next;
+    });
+    if (key === "gapXMm" || key === "gapYMm") setGapsEdited(true);
+  }
 
   function switchUnit(next: Unit) {
     if (next === unit) return;
@@ -109,6 +162,34 @@ function SheetForm({ sheet, onDone }: { sheet: Sheet | null; onDone: () => void 
         </div>
       </div>
       {sheet && <p className="text-xs text-text-muted">Saving changed measurements makes version {sheet.version + 1}. Batches already printed keep the version they used.</p>}
+      {!sheet && (
+        <div className="space-y-2 rounded-lg bg-black/5 p-3">
+          <Label className="block text-xs uppercase">Avery number (from the box)</Label>
+          <div className="flex flex-wrap gap-2">
+            <Input
+              value={averyNumber}
+              onChange={(e) => setAveryNumber(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  lookUp();
+                }
+              }}
+              inputMode="numeric"
+              placeholder="e.g. 5160 or 18163"
+              className="max-w-[12rem]"
+            />
+            <Button type="button" variant="secondary" disabled={!averyNumber.trim()} onClick={lookUp}>
+              Look up
+            </Button>
+          </div>
+          {lookupMessage ? (
+            <p className={`text-sm ${lookupMessage.found ? "text-text" : "font-semibold text-amber-700"}`}>{lookupMessage.text}</p>
+          ) : (
+            <p className="text-xs text-text-muted">Don&apos;t know it, or not Avery? Skip this and enter the measurements below.</p>
+          )}
+        </div>
+      )}
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <Label className="mb-1 block text-xs uppercase">Name</Label>
@@ -135,7 +216,12 @@ function SheetForm({ sheet, onDone }: { sheet: Sheet | null; onDone: () => void 
             <Label className="mb-1 block text-xs">
               {f.label} ({unit})
             </Label>
-            <Input inputMode="decimal" value={lengths[f.key] ?? ""} onChange={(e) => setLengths((c) => ({ ...c, [f.key]: e.target.value }))} />
+            <Input
+              inputMode="decimal"
+              value={lengths[f.key] ?? ""}
+              onChange={(e) => setLength(f.key, e.target.value)}
+              className={preset && (f.key === "topMm" || f.key === "leftMm") && !(lengths[f.key] ?? "").trim() ? "border-primary ring-1 ring-primary" : undefined}
+            />
             {f.help && <p className="mt-0.5 text-[11px] text-text-muted">{f.help}</p>}
           </div>
         ))}

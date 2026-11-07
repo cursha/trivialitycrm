@@ -13,6 +13,20 @@ number (`v2.1`).
 Versioning started on 2026-10-04. Earlier entries were backfilled from git
 history.
 
+## v32.5 — 2026-11-06
+### Improved — Avery number lookup when adding a label sheet
+- Curt's call: adding a label sheet should ask for the Avery number, fill
+  it in if known, and only ask for measurements if not.
+- **Add a label sheet** now starts with **Avery number** and **Look up**.
+  For 5160, 8160, 18160, 5260, 5161, 5162, 5163, 8163, 18163, 5164 and
+  5167 it fills in the label size, labels per sheet and layout (Letter),
+  then asks for just the top and left margins and works out the gaps.
+  Unknown numbers say so and ask for all the measurements.
+- Label size and count come from Avery's product pages (checked 6 Nov
+  2026). Avery doesn't publish margins or spacing, which is why those two
+  are still measured; the calibration page checks the result.
+- Manual: Label sheets section of the Admin Guide updated.
+
 ## v32.4 — 2026-11-06
 ### Improved — no filters when printing ticked companies
 - Curt's call: printing labels from the Companies checkbox menu is for the

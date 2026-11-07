@@ -340,11 +340,15 @@ of sticky labels. Before anyone can use it, an administrator adds the label
 sheet the team prints on: Settings → **Label Sheets** → **Add a label
 sheet**.
 
-- **No sheet is built in.** Label makers publish the label size and labels
-  per sheet, but not always the margins and spacing, and a guess wastes
-  labels. Measure your actual sheet with a ruler (or use the maker's
-  published template measurements) and note the source in **Where the
-  measurements came from**.
+- **Start with the Avery number** from the box and click **Look up**. For
+  the common Avery sheets (5160, 8160, 18160, 5260, 5161, 5162, 5163, 8163,
+  18163, 5164, 5167) it fills in the label size, labels per sheet and
+  layout on Letter paper. Avery doesn't publish margins, so it then asks
+  for just two ruler measurements, the **top margin** and **left margin**,
+  and works out the gaps from them (assuming equal margins on both sides;
+  you can still change them). For any other number, or another brand,
+  enter all the measurements yourself. Note the source in **Where the
+  measurements came from** (filled in for you after a lookup).
 - Enter the measurements in **Inches** or **Millimetres** (switch any time;
   they're stored in millimetres). **US Letter** and **A4** fill in the page
   size, or type a custom one. You need: page width and height; label width

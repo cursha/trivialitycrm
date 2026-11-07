@@ -4,6 +4,7 @@ import { capacity, inchToMm, labelOrigin, mmToPt, offsetKeepsLabelsOnPage, pageC
 import { checkAddress, formatPostalCode, labelLines } from "../../src/lib/mailing-labels/address";
 import { chooseAttention, compareCompanies, MANAGER, type ContactOption } from "../../src/lib/mailing-labels/contact";
 import { drawCalibrationPdf, drawLabelsPdf, fitLabel, fontMetrics, layoutLabels, type FontMetrics } from "../../src/lib/mailing-labels/render";
+import { AVERY_PRESETS, findAveryPreset, gapsFromMargins, PRESET_PAGE } from "../../src/lib/mailing-labels/presets";
 
 // A test geometry: 30 labels (3 x 10) on US Letter. Not a product preset.
 const SHEET: SheetGeometry = {
@@ -261,5 +262,30 @@ describe("PDF output", () => {
     const pdf = await PDFDocument.load(await drawCalibrationPdf(SHEET, 0, 0, { title: "cal", createdAt: new Date() }));
     expect(pdf.getPageCount()).toBe(1);
     expect(capacity(SHEET)).toBe(30);
+  });
+});
+
+describe("Avery lookup", () => {
+  it("finds a number however it's typed, and not an unknown one", () => {
+    expect(findAveryPreset("18163")?.description).toMatch(/2" x 4", 10 per sheet/);
+    expect(findAveryPreset(" Avery 5160 ")?.number).toBe("5160");
+    expect(findAveryPreset("81863")).toBeNull();
+  });
+
+  it("every preset's labels fit on a Letter page", () => {
+    for (const p of AVERY_PRESETS) {
+      expect(p.columns * inchToMm(p.labelWidthIn)).toBeLessThanOrEqual(PRESET_PAGE.widthMm);
+      expect(p.rows * inchToMm(p.labelHeightIn)).toBeLessThanOrEqual(PRESET_PAGE.heightMm);
+    }
+  });
+
+  it("works out gaps from the two margins, and the result is a valid sheet", () => {
+    const p = findAveryPreset("18163")!;
+    const gaps = gapsFromMargins(p, inchToMm(0.5), inchToMm(0.15625));
+    expect(gaps).not.toBeNull();
+    const g = { ...SHEET, rows: p.rows, columns: p.columns, labelWidthMm: inchToMm(p.labelWidthIn), labelHeightMm: inchToMm(p.labelHeightIn), topMm: inchToMm(0.5), leftMm: inchToMm(0.15625), ...gaps! };
+    expect(validateGeometry(g)).toEqual([]);
+    expect(gaps!.gapYMm).toBeCloseTo(0, 3);
+    expect(gapsFromMargins(p, 30, 30)).toBeNull();
   });
 });
